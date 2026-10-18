@@ -14,7 +14,7 @@ The plan lives in this repository's issues (see *Project tracking*). Its order:
 4. The Journal kind, the first proof of the base (#5).
 5. Roadmap: Campaign (#6), Non-fiction (#7), Android (#8, D16 #12).
 
-Decisions D13–D16 are **Proposed** until the owner accepts them. Don't build on a proposed decision as if it were settled: point it out when work depends on one.
+D13–D15 are accepted (2026-10-18). D16 (Android) is **Proposed** until a spike confirms it: don't build on a proposed decision as if it were settled, and point it out when work depends on one.
 
 ## gh-writer is the reference
 

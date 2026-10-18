@@ -7,11 +7,8 @@ import type { GitAuth } from "./git.ts";
  * response, a log line, a file, or a repository's git config.
  */
 
-/**
- * The OAuth App's client ID (heffrey78/gh-writer#100): public, and shipped in the app. WRITER_GITHUB_CLIENT_ID overrides it.
- * It's still gh-writer's app, so GitHub's sign-in page names gh-writer until Writer registers its own.
- */
-export const GITHUB_CLIENT_ID: string | undefined = "Ov23lidsTX79zar9Gxxv";
+/** Writer's OAuth App's client ID (heffrey78/gh-writer#100): public, and shipped in the app. WRITER_GITHUB_CLIENT_ID overrides it. */
+export const GITHUB_CLIENT_ID: string | undefined = "Ov23liLe7BZKPD6ddnaj";
 
 /**
  * Classic OAuth scopes: private repositories (contents, issues, creating them); the novel's GitHub

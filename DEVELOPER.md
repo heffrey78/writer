@@ -140,7 +140,7 @@ Writer reads and writes gh-writer's novels, issues and boards, so a few names st
 - `urn:gh-writer:<id>`: an EPUB's identifier. A reader would take a recompiled book with a new one for a different book.
 - The JSON Schemas' `$id` URLs, and links to gh-writer's issues (`heffrey78/gh-writer#N`).
 
-Everything else is Writer's own: its packages (`@writer/*`), the `writer` command, `WRITER_*` variables, and the desktop app's identifier (`io.github.heffrey78.writer`), folders and keychain entry. So Writer and gh-writer can be installed side by side without sharing a library or a sign-in. The GitHub OAuth App is still gh-writer's (`GITHUB_CLIENT_ID` in `packages/server/src/github.ts`), so GitHub's sign-in page names gh-writer until Writer has its own.
+Everything else is Writer's own: its packages (`@writer/*`), the `writer` command, `WRITER_*` variables, and the desktop app's identifier (`io.github.heffrey78.writer`), folders and keychain entry. So Writer and gh-writer can be installed side by side without sharing a library or a sign-in. Writer has its own GitHub OAuth App too (`GITHUB_CLIENT_ID` in `packages/server/src/github.ts`, with Device Flow enabled and tokens that don't expire, since the app keeps one token and never refreshes it), so a sign-in made in gh-writer isn't Writer's.
 
 ## Project tracking
 
