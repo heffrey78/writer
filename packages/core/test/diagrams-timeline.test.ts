@@ -1,10 +1,10 @@
 import { fileURLToPath } from "node:url";
-import { loadNovel } from "../src/index.ts";
+import { loadBook } from "../src/index.ts";
 import { nodeSource } from "../src/node.ts";
 import { describe, expect, it } from "vitest";
 import { itemTitle, jump, lanesOf, timeline, when } from "../src/diagrams.ts";
 
-const novel = await loadNovel(nodeSource(fileURLToPath(new URL("../../../examples/sample-novel/", import.meta.url))));
+const novel = await loadBook(nodeSource(fileURLToPath(new URL("../../../examples/sample-novel/", import.meta.url))));
 const H = 3_600_000;
 
 describe("the timeline", () => {
@@ -12,7 +12,7 @@ describe("the timeline", () => {
     const t = timeline(novel, "pov");
     expect([...t.flashbacks]).toEqual(["sc_f100d0"]);
     expect(t.storyRank.get("sc_f100d0")).toBe(1);
-    expect(novel.scenes.findIndex((s) => s.id === "sc_f100d0")).toBe(5);
+    expect(novel.pieces.findIndex((s) => s.id === "sc_f100d0")).toBe(5);
   });
 
   it("puts items in lanes by point of view (events off page), plotline or location", () => {

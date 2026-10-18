@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { bookImages, compileBook, countWords, flatBlocks, loadNovel, memorySource, numberWords, type CompiledBook, type FileSource } from "../src/index.ts";
+import { bookImages, compileBook, countWords, flatBlocks, loadBook, memorySource, numberWords, type CompiledBook, type FileSource } from "../src/index.ts";
 
 const ROOT = fileURLToPath(new URL("../../../examples/sample-novel/", import.meta.url));
 const sample: Record<string, string> = Object.fromEntries(
@@ -14,7 +14,7 @@ const STATION = "manuscript/01-return/01-arrival/01-the-station.md";
 
 async function open(overrides: Record<string, string> = {}) {
   const source: FileSource = memorySource({ ...sample, ...overrides });
-  const novel = await loadNovel(source);
+  const novel = await loadBook(source);
   return { novel, source };
 }
 const text = (book: CompiledBook) => JSON.stringify(book);
@@ -79,12 +79,12 @@ describe("compiling the manuscript", () => {
       [4, "Chapter Four: Varn Holds", undefined],
     ]);
     for (const [i, chapter] of novel.chapters.entries()) {
-      const scenes = chapter.sceneIds.filter((id) => novel.allScenes.find((s) => s.id === id)?.body.trim());
+      const scenes = chapter.sceneIds.filter((id) => novel.allPieces.find((s) => s.id === id)?.body.trim());
       expect(book.chapters[i]!.blocks.filter((b) => b.kind === "break").length, chapter.id).toBeGreaterThanOrEqual(scenes.length - 1);
       expect(book.chapters[i]!.blocks[0]?.kind).toBe("paragraph");
       expect(book.chapters[i]!.blocks.at(-1)?.kind).toBe("paragraph");
     }
-    expect(book.words).toBe(novel.scenes.reduce((n, s) => n + countWords(s.body), 0));
+    expect(book.words).toBe(novel.pieces.reduce((n, s) => n + countWords(s.body), 0));
     expect(book.titlePage.wordCount).toBe(`about ${(Math.round(book.words / 100) * 100).toLocaleString("en-US")} words`);
   });
 

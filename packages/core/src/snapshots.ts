@@ -1,5 +1,5 @@
 import { DEFAULT_GAP, gaps, graphAt, gridKey, itemTitle, jump, type GraphFilter, type LaneMode, lanesOf, presence, sceneColumns, sortRows, swimlanes, timeline, totals, when, type GraphEdge, type GraphNode, type Presence } from "./diagrams.ts";
-import type { Novel, Scene } from "./model.ts";
+import type { Book, Piece } from "./model.ts";
 import { seriesHex, type SeriesSlot } from "./palette.ts";
 
 /*
@@ -37,14 +37,14 @@ const ordinal = (n: number) => `${n}${["th", "st", "nd", "rd"][n % 100 >= 11 && 
 
 // ——— The relationship graph ———
 
-const firstScene = (novel: Novel) => novel.scenes[0];
-const lastScene = (novel: Novel) => novel.scenes.at(-1);
+const firstScene = (novel: Book) => novel.pieces[0];
+const lastScene = (novel: Book) => novel.pieces.at(-1);
 
 /** Mermaid ids are the entity IDs (letters, digits, underscores); labels are quoted, with quotes escaped. */
 const label = (s: string) => `"${s.replace(/"/g, "#quot;")}"`;
 
 /** The relationship graph at a scene as a Mermaid flowchart, styled by relationship type. */
-export function relationshipMermaid(novel: Novel, sceneId: string | undefined, filter: GraphFilter = {}): string {
+export function relationshipMermaid(novel: Book, sceneId: string | undefined, filter: GraphFilter = {}): string {
   const { nodes, edges } = graphAt(novel, sceneId, filter);
   const lines = ["flowchart LR"];
   for (const n of nodes) lines.push(`  ${n.id}[${label(n.label)}]`);
@@ -63,7 +63,7 @@ const NODE_W = 150;
 const NODE_H = 44;
 
 /** The relationship graph at a scene, drawn as in the app: nodes where they're placed, parallel relationships fanned out. */
-export function relationshipSvg(novel: Novel, sceneId: string | undefined, title: string, filter: GraphFilter = {}): string {
+export function relationshipSvg(novel: Book, sceneId: string | undefined, title: string, filter: GraphFilter = {}): string {
   const { nodes, edges } = graphAt(novel, sceneId, filter);
   if (!nodes.length) return svg(360, 60, title, `<text x="20" y="36" ${FONT} font-size="13" fill="${C.muted}">No characters yet.</text>\n`);
   const pad = 48;
@@ -135,7 +135,7 @@ interface Dot {
 interface Grid {
   title: string;
   rows: { id: string; name: string; aside?: string }[];
-  scenes: Scene[];
+  scenes: Piece[];
   dot: (row: string, scene: string) => Dot | undefined;
   shaded: Set<string>;
 }
@@ -145,7 +145,7 @@ const ROW = 32;
 const HEADER = 170;
 
 /** Rows of entries against one column per scene, under chapter and part headers, with dots and shaded absences. */
-function gridSvg(novel: Novel, g: Grid): string {
+function gridSvg(novel: Book, g: Grid): string {
   const { chapters, parts } = sceneColumns(novel, g.scenes);
   const top = 40;
   const partH = parts.length ? 20 : 0;
@@ -192,7 +192,7 @@ function gridSvg(novel: Novel, g: Grid): string {
 }
 
 /** Absences (or quiet plotlines) as shaded cells. */
-function shadedOf(list: { lane: string; from: string; to: string }[], scenes: Scene[]): Set<string> {
+function shadedOf(list: { lane: string; from: string; to: string }[], scenes: Piece[]): Set<string> {
   const ids = scenes.map((s) => s.id);
   const out = new Set<string>();
   for (const g of list) for (const id of ids.slice(ids.indexOf(g.from), ids.indexOf(g.to) + 1)) out.add(gridKey(g.lane, id));
@@ -200,7 +200,7 @@ function shadedOf(list: { lane: string; from: string; to: string }[], scenes: Sc
 }
 
 /** The plotline swimlanes: a large dot for a major beat, a small one for a minor; shaded, a plotline gone quiet past the novel's threshold. */
-export function plotlinesSvg(novel: Novel): string {
+export function plotlinesSvg(novel: Book): string {
   const s = swimlanes(novel);
   const threshold = novel.config?.plotline_gap ?? DEFAULT_GAP;
   return gridSvg(novel, {
@@ -219,7 +219,7 @@ const dotOf = (p: Presence): Dot =>
   !p.listed ? { r: 5, style: "dashed" } : p.strength !== undefined ? { r: 3 + p.strength * 1.6, style: "filled" } : { r: 6, style: "filled", ...(p.pov ? { ring: true } : {}) };
 
 /** Presence of a type's entries across the scenes, by first appearance: filled where listed, ringed for the point of view, dashed where only mentioned. */
-export function presenceSvg(novel: Novel, type: string, title: string): string {
+export function presenceSvg(novel: Book, type: string, title: string): string {
   const m = presence(novel, type);
   const count = totals(m);
   const rows = sortRows(m, "first");
@@ -241,7 +241,7 @@ export function presenceSvg(novel: Novel, type: string, title: string): string {
 const tl = (s: string) => s.replace(/:/g, "∶").replace(/#/g, "No.");
 
 /** The timeline in Mermaid: each moment in story time with what happens then, the book's position and flashbacks noted. */
-export function timelineMermaid(novel: Novel): string {
+export function timelineMermaid(novel: Book): string {
   const t = timeline(novel, "pov");
   const lines = ["timeline", "  title Story time"];
   let period = "";
@@ -250,7 +250,7 @@ export function timelineMermaid(novel: Novel): string {
   for (const item of t.items) {
     const what =
       item.kind === "scene"
-        ? `${item.scene.title} (${ordinal(novel.scenes.indexOf(item.scene) + 1)} in the book${t.flashbacks.has(item.scene.id) ? ", a flashback" : ""})`
+        ? `${item.scene.title} (${ordinal(novel.pieces.indexOf(item.scene) + 1)} in the book${t.flashbacks.has(item.scene.id) ? ", a flashback" : ""})`
         : `${item.event.title} (off page)`;
     const at = when(item);
     if (at === period) events.push(what);
@@ -269,7 +269,7 @@ const SLOT = 136;
 const LANE_H = 54;
 
 /** The timeline as drawn in the app: story time in lanes by point of view, joined to reading order below. */
-export function timelineSvg(novel: Novel, mode: LaneMode = "pov"): string {
+export function timelineSvg(novel: Book, mode: LaneMode = "pov"): string {
   const t = timeline(novel, mode);
   const title = "The book in story time, and in reading order";
   if (!t.items.length) return svg(420, 60, title, `<text x="20" y="36" ${FONT} font-size="13" fill="${C.muted}">No scene or event has a time yet.</text>\n`);
@@ -280,7 +280,7 @@ export function timelineSvg(novel: Novel, mode: LaneMode = "pov"): string {
   const linksY = lanesY + t.lanes.length * LANE_H;
   const linksH = 70;
   const readY = linksY + linksH;
-  const reading = novel.scenes.filter((s) => t.storyRank.has(s.id));
+  const reading = novel.pieces.filter((s) => t.storyRank.has(s.id));
   const w = head + t.items.length * SLOT + 20;
   const readSlot = (t.items.length * SLOT) / Math.max(1, reading.length);
   const h = readY + 34 + 16;
@@ -308,7 +308,7 @@ export function timelineSvg(novel: Novel, mode: LaneMode = "pov"): string {
       const event = item.kind === "event";
       b += `<rect x="${x}" y="${y + 7}" width="${SLOT - 12}" height="40" rx="6" fill="${event ? C.paper : C.paper}" stroke="${flashback ? C.warn : event ? C.muted : C.rule}" stroke-width="${flashback ? 2 : 1}"${event ? ` stroke-dasharray="4 3"` : ""}/>\n`;
       b += `<text x="${x + 8}" y="${y + 24}" ${FONT} font-size="11.5" font-weight="600"${event ? ` font-style="italic"` : ""} fill="${C.ink}">${esc(cut(itemTitle(item), 19))}</text>\n`;
-      const sub = item.kind === "scene" ? (flashback ? `${ordinal(novel.scenes.indexOf(item.scene) + 1)} · flashback` : `${ordinal(novel.scenes.indexOf(item.scene) + 1)} in the book`) : "off page";
+      const sub = item.kind === "scene" ? (flashback ? `${ordinal(novel.pieces.indexOf(item.scene) + 1)} · flashback` : `${ordinal(novel.pieces.indexOf(item.scene) + 1)} in the book`) : "off page";
       b += `<text x="${x + 8}" y="${y + 39}" ${FONT} font-size="10" fill="${flashback ? C.warn : C.muted}">${esc(sub)}</text>\n`;
     });
   });
@@ -329,7 +329,7 @@ export function timelineSvg(novel: Novel, mode: LaneMode = "pov"): string {
 export const SNAPSHOT_MARKER = GENERATED;
 
 /** Every snapshot file, by path from the novel's root: the SVGs for the diagrams that have something to show, and diagrams/README.md, which embeds them. */
-export function snapshots(novel: Novel): Map<string, string> {
+export function snapshots(novel: Book): Map<string, string> {
   const title = novel.config?.title ?? "the novel";
   const first = firstScene(novel);
   const last = lastScene(novel);
@@ -337,9 +337,9 @@ export function snapshots(novel: Novel): Map<string, string> {
   const has = (type: string) => novel.entities.some((e) => e.type === type);
   const hasTimes = timeline(novel, "pov").items.length > 0;
   if (has("character")) files.set("diagrams/relationships.svg", relationshipSvg(novel, last?.id, last ? `Relationships at the end of the book (“${last.title}”)` : "Relationships"));
-  if (has("plotline") && novel.scenes.length) files.set("diagrams/plotlines.svg", plotlinesSvg(novel));
-  if (has("character") && novel.scenes.length) files.set("diagrams/presence-characters.svg", presenceSvg(novel, "character", "Characters by scene"));
-  if (has("theme") && novel.scenes.length) files.set("diagrams/presence-themes.svg", presenceSvg(novel, "theme", "Themes by scene"));
+  if (has("plotline") && novel.pieces.length) files.set("diagrams/plotlines.svg", plotlinesSvg(novel));
+  if (has("character") && novel.pieces.length) files.set("diagrams/presence-characters.svg", presenceSvg(novel, "character", "Characters by scene"));
+  if (has("theme") && novel.pieces.length) files.set("diagrams/presence-themes.svg", presenceSvg(novel, "theme", "Themes by scene"));
   if (hasTimes) files.set("diagrams/timeline.svg", timelineSvg(novel));
   const fence = (s: string) => "```mermaid\n" + s + "```\n";
   const md = [

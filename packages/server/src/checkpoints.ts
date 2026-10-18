@@ -1,4 +1,4 @@
-import { countWords, loadNovel, parseMarkdown, type Novel } from "@writer/core";
+import { countWords, loadBook, parseMarkdown, type Book } from "@writer/core";
 import { nodeSource } from "@writer/core/node";
 import type { Committer } from "./committer.ts";
 import { atomicWrite, writablePath } from "./files.ts";
@@ -182,7 +182,7 @@ export class Checkpoints {
         throw new CheckpointError("BLOCKED", `Your latest work couldn't be committed, so no checkpoint was made. ${blocked?.message ?? ""}`.trim());
       }
     }
-    const words = commit === undefined ? await this.#words() : wordsIn(await loadNovel(await commitSource(this.root, commit)));
+    const words = commit === undefined ? await this.#words() : wordsIn(await loadBook(await commitSource(this.root, commit)));
     const g = git(this.root);
     // A second after the newest checkpoint at the latest, so names sort in the order they were made even
     // within one second (a restore right after a checkpoint) or after the clock steps back.
@@ -200,7 +200,7 @@ export class Checkpoints {
 
   /** Manuscript words in the work tree, which matches HEAD once saved work is committed. */
   async #words(): Promise<number> {
-    return wordsIn(await loadNovel(nodeSource(this.root)));
+    return wordsIn(await loadBook(nodeSource(this.root)));
   }
 
   async #sceneAt(tag: string, sceneId: string): Promise<{ path: string; title: string; content: string }> {
@@ -216,14 +216,14 @@ export class Checkpoints {
   }
 
   async #currentScenePath(sceneId: string): Promise<string | undefined> {
-    const novel = await loadNovel(nodeSource(this.root));
-    return novel.allScenes.find((s) => s.id === sceneId)?.file;
+    const novel = await loadBook(nodeSource(this.root));
+    return novel.allPieces.find((s) => s.id === sceneId)?.file;
   }
 }
 
 /** The manuscript's words. */
-export function wordsIn(novel: Novel): number {
-  return novel.allScenes.reduce((sum, scene) => sum + countWords(scene.body), 0);
+export function wordsIn(novel: Book): number {
+  return novel.allPieces.reduce((sum, scene) => sum + countWords(scene.body), 0);
 }
 
 /** UTC date and time, for tag names that sort: 2026-10-05-183012. */

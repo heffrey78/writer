@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { countWords, loadNovel, writingDays } from "@writer/core";
+import { countWords, loadBook, writingDays } from "@writer/core";
 import { nodeSource } from "@writer/core/node";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { uncommittedChange, writingHistory } from "../src/index.ts";
@@ -24,7 +24,7 @@ const commitAt = (dir: string, message: string, date: string) => {
 };
 const read = (dir: string, path: string) => readFileSync(join(dir, path), "utf8");
 const edit = (dir: string, path: string, from: string, to: string) => writeFileSync(join(dir, path), read(dir, path).replace(from, to));
-const wordsNow = async (dir: string) => (await loadNovel(nodeSource(dir))).allScenes.reduce((n, s) => n + countWords(s.body), 0);
+const wordsNow = async (dir: string) => (await loadBook(nodeSource(dir))).allPieces.reduce((n, s) => n + countWords(s.body), 0);
 
 describe("writingHistory", { timeout: 30_000 }, () => {
   it("counts each day's words added and removed from the commits, on the writer's own date", async () => {
@@ -39,7 +39,7 @@ describe("writingHistory", { timeout: 30_000 }, () => {
     commitAt(dir, "reword", "2026-11-02T23:30:00-07:00");
     gitIn(dir, "mv", STATION, "manuscript/01-return/01-arrival/01-arrival.md");
     commitAt(dir, "rename", "2026-11-02T23:40:00-07:00");
-    const ledgerWords = countWords((await loadNovel(nodeSource(dir))).allScenes.find((s) => s.file === LEDGER)!.body);
+    const ledgerWords = countWords((await loadBook(nodeSource(dir))).allPieces.find((s) => s.file === LEDGER)!.body);
     gitIn(dir, "rm", "-q", LEDGER);
     edit(dir, "manuscript/01-return/02-old-debts/_chapter.yaml", ", sc_1edger", "");
     commitAt(dir, "cut", "2026-11-03T09:00:00+01:00");

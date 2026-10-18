@@ -1,4 +1,4 @@
-import type { Novel } from "@writer/core";
+import type { Book } from "@writer/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
@@ -17,7 +17,7 @@ import { PAGE } from "../ui/page.ts";
 import { cn } from "../ui/cn.ts";
 
 /** One issue: its description and comments, and everything that can be changed about it. */
-export function IssuePage({ novelId, novel, workspace, number }: { novelId: string; novel: Novel; workspace: Workspace; number: number }) {
+export function IssuePage({ novelId, novel, workspace, number }: { novelId: string; novel: Book; workspace: Workspace; number: number }) {
   const issue = useIssue(novelId, number);
   const meta = useIssueMeta(novelId);
   const changes = useIssueChanges(novelId);

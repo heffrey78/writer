@@ -1,5 +1,5 @@
 import { relationshipStyle, type SeriesSlot } from "./palette.ts";
-import { countWords, mentions, relationshipsAt, storyTimeline, type Chapter, type Entity, type Novel, type Part, type Relationship, type Scene, type StoryInstant, type TimelineItem } from "./index.ts";
+import { countWords, mentions, relationshipsAt, storyTimeline, type Chapter, type Entity, type Book, type Part, type Relationship, type Piece, type StoryInstant, type TimelineItem } from "./index.ts";
 
 /*
  * The data behind every diagram: the relationship graph, the plotline swimlanes, the presence matrix
@@ -8,15 +8,15 @@ import { countWords, mentions, relationshipsAt, storyTimeline, type Chapter, typ
  */
 
 /** A chapter's title, or "Chapter N" for one without. */
-export const chapterTitle = (novel: Novel, chapter: Chapter) => chapter.title ?? `Chapter ${novel.chapters.indexOf(chapter) + 1}`;
+export const chapterTitle = (novel: Book, chapter: Chapter) => chapter.title ?? `Chapter ${novel.chapters.indexOf(chapter) + 1}`;
 
 /** A relationship as a sentence from `id`'s side: "Rivals with Ben Varn, from “The Betrayal” (After the bridge betrayal.)". */
-export function describeRelationship(novel: Novel, id: string, r: Relationship): string {
+export function describeRelationship(novel: Book, id: string, r: Relationship): string {
   const type = novel.relationshipTypes.find((t) => t.key === r.type);
   const forward = r.from === id;
   const label = (forward || type?.symmetric ? type?.label : (type?.inverse_label ?? type?.label)) ?? r.type;
   const other = novel.entities.find((e) => e.id === (forward ? r.to : r.from))?.name ?? (forward ? r.to : r.from);
-  const scene = (sceneId?: string) => novel.allScenes.find((s) => s.id === sceneId)?.title;
+  const scene = (sceneId?: string) => novel.allPieces.find((s) => s.id === sceneId)?.title;
   const when = [r.since && `from “${scene(r.since) ?? r.since}”`, r.until && `until “${scene(r.until) ?? r.until}”`].filter(Boolean).join(", ");
   return `${label} ${other}${when ? `, ${when}` : ""}${r.note ? ` (${r.note})` : ""}`;
 }
@@ -52,7 +52,7 @@ export interface GraphEdge {
 export const gridKey = (row: string, scene: string) => `${row}|${scene}`;
 
 /** Scenes grouped for column headers: by chapter, and by part when the book has them. */
-export function sceneColumns(novel: Novel, scenes: Scene[]) {
+export function sceneColumns(novel: Book, scenes: Piece[]) {
   const chapters: { chapter: Chapter; title: string; span: number }[] = [];
   const parts: { part: Part; span: number }[] = [];
   for (const scene of scenes) {
@@ -96,17 +96,17 @@ export interface GraphFilter {
 }
 
 /** Everything a scene refers to: point of view, people, places, plotlines, themes and mentions. */
-export function presentIn(scene: Scene): Set<string> {
+export function presentIn(scene: Piece): Set<string> {
   return new Set([...(scene.pov ? [scene.pov] : []), ...scene.characters, ...scene.locations, ...scene.entities, ...scene.plotlines.map((p) => p.id), ...scene.themes.map((t) => t.id), ...mentions(scene.body).map((m) => m.id)]);
 }
 
 /** The entities the scene filters (plotline, range) allow, or undefined when neither is set. */
-function presentInFiltered(novel: Novel, f: GraphFilter): Set<string> | undefined {
+function presentInFiltered(novel: Book, f: GraphFilter): Set<string> | undefined {
   if (!f.plotline && !f.from && !f.to) return undefined;
-  const pos = (id: string | undefined, fallback: number) => (id ? Math.max(0, novel.scenes.findIndex((s) => s.id === id)) : fallback);
-  const [lo, hi] = [pos(f.from, 0), pos(f.to, novel.scenes.length - 1)].sort((a, b) => a - b);
+  const pos = (id: string | undefined, fallback: number) => (id ? Math.max(0, novel.pieces.findIndex((s) => s.id === id)) : fallback);
+  const [lo, hi] = [pos(f.from, 0), pos(f.to, novel.pieces.length - 1)].sort((a, b) => a - b);
   const out = new Set<string>();
-  novel.scenes.forEach((scene, i) => {
+  novel.pieces.forEach((scene, i) => {
     if (i < lo! || i > hi!) return;
     if (f.plotline && !scene.plotlines.some((p) => p.id === f.plotline)) return;
     for (const id of presentIn(scene)) out.add(id);
@@ -119,7 +119,7 @@ function presentInFiltered(novel: Novel, f: GraphFilter): Set<string> | undefine
  * filters say) as nodes, at their saved positions or laid out around them, and the relationships
  * of the filter's types holding at `sceneId` between two shown entities as edges, styled by type.
  */
-export function graphAt(novel: Novel, sceneId: string | undefined, filter: GraphFilter = {}): GraphView {
+export function graphAt(novel: Book, sceneId: string | undefined, filter: GraphFilter = {}): GraphView {
   const types = filter.types ?? ["character"];
   const present = presentInFiltered(novel, filter);
   const entities = novel.entities.filter((e) => types.includes(e.type) && (!present || present.has(e.id))).sort((a, b) => a.name.localeCompare(b.name));
@@ -140,7 +140,7 @@ export function graphAt(novel: Novel, sceneId: string | undefined, filter: Graph
   return { nodes, edges, list };
 }
 
-function edgeOf(novel: Novel, r: Relationship): GraphEdge {
+function edgeOf(novel: Book, r: Relationship): GraphEdge {
   const type = novel.relationshipTypes.find((t) => t.key === r.type);
   const { slot, line } = relationshipStyle(novel, r.type);
   return {
@@ -187,7 +187,7 @@ export interface Swimlanes {
   /** Plotlines, by name: an order that edits never shuffle. */
   lanes: Entity[];
   /** Scenes in reading order. */
-  scenes: Scene[];
+  scenes: Piece[];
   /** Column groups over the scenes: chapters, and (when the book has them) parts. */
   chapters: { chapter: Chapter; title: string; span: number }[];
   parts: { part: Part; span: number }[];
@@ -200,7 +200,7 @@ export interface Swimlanes {
 export const cellKey = gridKey;
 
 /** The book as plotline lanes against scene columns, from the scenes' plotlines. */
-export function swimlanes(novel: Novel, scenes: Scene[] = novel.scenes): Swimlanes {
+export function swimlanes(novel: Book, scenes: Piece[] = novel.pieces): Swimlanes {
   const marks = new Map<string, Mark>();
   for (const scene of scenes) for (const p of scene.plotlines) marks.set(cellKey(p.id, scene.id), { weight: p.weight, ...(p.beat ? { beat: p.beat } : {}) });
   const lanes = novel.entities.filter((e) => e.type === "plotline").sort((a, b) => a.name.localeCompare(b.name));
@@ -229,7 +229,7 @@ export interface Gap {
  * Where each plotline goes quiet for longer than the threshold: the stretches between two of its
  * beats, and after its last beat to the end of the book. (Before its first beat it hasn't started.)
  */
-export function gaps(s: { lanes: { id: string }[]; scenes: Scene[]; marks: Map<string, unknown>; words: number[] }, threshold: GapThreshold): Gap[] {
+export function gaps(s: { lanes: { id: string }[]; scenes: Piece[]; marks: Map<string, unknown>; words: number[] }, threshold: GapThreshold): Gap[] {
   const { words } = s;
   const out: Gap[] = [];
   for (const lane of s.lanes) {
@@ -248,7 +248,7 @@ export function gaps(s: { lanes: { id: string }[]; scenes: Scene[]; marks: Map<s
 }
 
 /** The scenes a zoom shows: a part's, a chapter's, or (no zoom, or one that's gone) all. */
-export function zoomed(novel: Novel, scenes: Scene[], zoom: string | undefined): Scene[] {
+export function zoomed(novel: Book, scenes: Piece[], zoom: string | undefined): Piece[] {
   if (!zoom) return scenes;
   const part = novel.parts.find((p) => p.id === zoom);
   if (part) return scenes.filter((s) => part.chapterIds.includes(s.chapterId ?? ""));
@@ -287,7 +287,7 @@ export interface PresenceMatrix {
   type: string;
   /** Entries of the type, by name; the view sorts them. */
   rows: Entity[];
-  scenes: Scene[];
+  scenes: Piece[];
   /** By gridKey(entry, scene); absent: not there at all. */
   marks: Map<string, Presence>;
   /** Each scene's words, counted once. */
@@ -300,7 +300,7 @@ export interface PresenceMatrix {
  * Where each entry of a type is in the book: listed in a scene's metadata (characters: point of
  * view or characters; locations, themes and plotlines: their lists), and named in its prose.
  */
-export function presence(novel: Novel, type: string, scenes: Scene[] = novel.scenes): PresenceMatrix {
+export function presence(novel: Book, type: string, scenes: Piece[] = novel.pieces): PresenceMatrix {
   const rows = novel.entities.filter((e) => e.type === type).sort((a, b) => a.name.localeCompare(b.name));
   const ids = new Set(rows.map((r) => r.id));
   const marks = new Map<string, Presence>();
@@ -406,13 +406,13 @@ export interface Timeline {
 }
 
 /** The book's timeline, with lanes for `mode`: in order of first appearance, "none" and "off page" last. */
-export function timeline(novel: Novel, mode: LaneMode): Timeline {
+export function timeline(novel: Book, mode: LaneMode): Timeline {
   const t = storyTimeline(novel);
   const storyRank = new Map(t.items.map((i, k) => [itemId(i), k]));
   // A flashback: some scene read before it happens after it.
   const flashbacks = new Set<string>();
   let latest = -1;
-  for (const scene of novel.scenes) {
+  for (const scene of novel.pieces) {
     const rank = storyRank.get(scene.id);
     if (rank === undefined) continue;
     if (rank < latest) flashbacks.add(scene.id);

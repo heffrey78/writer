@@ -1,4 +1,4 @@
-import type { Novel, Scene } from "@writer/core";
+import type { Book, Piece } from "@writer/core";
 import { GripHorizontal } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent, type KeyboardEvent } from "react";
 import { Link } from "react-router";
@@ -27,23 +27,23 @@ export interface GridMark {
 
 export interface SceneGridProps {
   novelId: string;
-  novel: Novel;
+  novel: Book;
   workspace: Workspace;
   /** The grid's accessible name. */
   label: string;
   /** The rows' column heading ("Plotline", "Character"). */
   rowHeading: string;
   rows: { id: string; name: string; /** Shown after the name, e.g. a count. */ aside?: string }[];
-  scenes: Scene[];
+  scenes: Piece[];
   marks: Map<string, GridMark>;
   /** Cells to shade: a long absence. */
   shaded: Set<string>;
   /** What a screen reader says for a cell. */
-  cellLabel: (row: string, scene: Scene) => string;
+  cellLabel: (row: string, scene: Piece) => string;
   /** Cells that open something (a popover): announced as such. */
   hasPopup?: (row: string, scene: string) => boolean;
   /** A cell chosen by click, Enter or Space. */
-  onChoose: (row: string, scene: Scene, el: HTMLElement) => void;
+  onChoose: (row: string, scene: Piece, el: HTMLElement) => void;
   size: GridSize;
 }
 
@@ -69,7 +69,7 @@ export function SceneGrid({ novelId, novel, workspace, label, rowHeading, rows, 
     const id = refocus.current;
     if (id && (document.activeElement === document.body || !document.activeElement?.isConnected)) document.querySelector<HTMLElement>(`[data-col-handle="${id}"]`)?.focus();
   }, [novel]);
-  const onHandleKey = (e: KeyboardEvent, scene: Scene) => {
+  const onHandleKey = (e: KeyboardEvent, scene: Piece) => {
     if (!e.altKey || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
     e.preventDefault();
     refocus.current = scene.id;
@@ -77,7 +77,7 @@ export function SceneGrid({ novelId, novel, workspace, label, rowHeading, rows, 
       requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-col-handle="${scene.id}"]`)?.focus()),
     );
   };
-  const onDragOver = (e: DragEvent, scene: Scene) => {
+  const onDragOver = (e: DragEvent, scene: Piece) => {
     if (!dragging.current || dragging.current === scene.id) return;
     e.preventDefault();
     const rect = e.currentTarget.getBoundingClientRect();
@@ -96,10 +96,10 @@ export function SceneGrid({ novelId, novel, workspace, label, rowHeading, rows, 
   // Stable for the memoised header: the handlers read the latest state through a ref.
   const handlers = useRef({ onHandleKey, onDragOver, onDrop });
   handlers.current = { onHandleKey, onDragOver, onDrop };
-  const stableHandleKey = useCallback((e: KeyboardEvent, scene: Scene) => handlers.current.onHandleKey(e, scene), []);
-  const stableDragOver = useCallback((e: DragEvent, scene: Scene) => handlers.current.onDragOver(e, scene), []);
+  const stableHandleKey = useCallback((e: KeyboardEvent, scene: Piece) => handlers.current.onHandleKey(e, scene), []);
+  const stableDragOver = useCallback((e: DragEvent, scene: Piece) => handlers.current.onDragOver(e, scene), []);
   const stableDrop = useCallback((e: DragEvent) => handlers.current.onDrop(e), []);
-  const stableDragStart = useCallback((e: DragEvent, scene: Scene) => {
+  const stableDragStart = useCallback((e: DragEvent, scene: Piece) => {
     dragging.current = scene.id;
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("text/plain", scene.title);
@@ -293,15 +293,15 @@ const GridHead = memo(function GridHead({
   onDropScene,
 }: {
   novelId: string;
-  scenes: Scene[];
+  scenes: Piece[];
   chapters: ReturnType<typeof sceneColumns>["chapters"];
   parts: ReturnType<typeof sceneColumns>["parts"];
   rowHeading: string;
   drop: { id: string; after: boolean } | undefined;
-  onHandleKey: (e: KeyboardEvent, scene: Scene) => void;
-  onDragStartScene: (e: DragEvent, scene: Scene) => void;
+  onHandleKey: (e: KeyboardEvent, scene: Piece) => void;
+  onDragStartScene: (e: DragEvent, scene: Piece) => void;
   onDragEndScene: () => void;
-  onDragOverScene: (e: DragEvent, scene: Scene) => void;
+  onDragOverScene: (e: DragEvent, scene: Piece) => void;
   onDropScene: (e: DragEvent) => void;
 }) {
   return (

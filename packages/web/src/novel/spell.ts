@@ -1,5 +1,5 @@
 import type { Api } from "@writer/client";
-import type { Novel } from "@writer/core";
+import type { Book } from "@writer/core";
 import { addToDictionary, knownWords, parseDictionary } from "@writer/core/dictionary";
 import { createWorkerSpellService, type SpellService } from "@writer/editor";
 import { useEffect, useRef, useState } from "react";
@@ -12,7 +12,7 @@ const DICTIONARY = "dictionary.txt";
  * Spell checking for a novel: the English dictionary (fetched on first use, checked in a worker), the
  * story bible's names, and the novel's dictionary.txt, where "Add to dictionary" saves.
  */
-export function useSpell(api: Api, novelId: string, novel: Novel | undefined): { service: SpellService; onAddWord: (word: string) => void } | undefined {
+export function useSpell(api: Api, novelId: string, novel: Book | undefined): { service: SpellService; onAddWord: (word: string) => void } | undefined {
   const [service, setService] = useState<SpellService>();
   const dictionary = useRef<{ text: string; hash: string | null }>({ text: "", hash: null });
 

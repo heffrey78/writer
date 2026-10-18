@@ -1,4 +1,4 @@
-import { SCHEMA_VERSION, type Novel } from "@writer/core";
+import { SCHEMA_VERSION, type Book } from "@writer/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api, keys } from "../api.ts";
@@ -9,14 +9,14 @@ import { Confirm } from "../ui/confirm.tsx";
 export const FORMAT_MOVE = "Writer now keeps each off-page event in a file of its own. The novel moves to the new format in one commit: every event, and its GitHub tools. Copies of Writer from before this one won't open it afterwards.";
 
 /** Whether a novel is in an older format than this app writes: an event change moves it first. */
-export const needsFormatMove = (novel: Novel) => (novel.config?.schema_version ?? 1) < SCHEMA_VERSION;
+export const needsFormatMove = (novel: Book) => (novel.config?.schema_version ?? 1) < SCHEMA_VERSION;
 
 /**
  * Moving a novel in format v1 to v2 before an event is changed (D11). `ensure(then)` runs `then` at once
  * in a novel already moved; otherwise it asks, once, and runs it after the move. Cancelling changes nothing.
  * Show `dialog` somewhere on the page.
  */
-export function useFormatMove(novelId: string, novel: Novel) {
+export function useFormatMove(novelId: string, novel: Book) {
   const queryClient = useQueryClient();
   const show = useNotice((n) => n.show);
   const [waiting, setWaiting] = useState<(() => void) | null>(null);

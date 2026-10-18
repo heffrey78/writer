@@ -1,4 +1,4 @@
-import type { Novel, Scene, StoryEvent } from "./model.ts";
+import type { Book, Piece, StoryEvent } from "./model.ts";
 import type { StoryTime } from "./types.ts";
 
 const MINUTE = 60_000;
@@ -69,25 +69,25 @@ export function apartInTime(timeline: StoryTimeline): TimelineItem[] {
   return days.length && days.length < timeline.items.length ? days : [];
 }
 
-export type TimelineItem = { kind: "scene"; scene: Scene; at: StoryInstant } | { kind: "event"; event: StoryEvent; at: StoryInstant };
+export type TimelineItem = { kind: "scene"; scene: Piece; at: StoryInstant } | { kind: "event"; event: StoryEvent; at: StoryInstant };
 
 export interface StoryTimeline {
   /** Scenes and events with a time, in story-time order: dated first, then relative days; reading order breaks ties. */
   items: TimelineItem[];
   /** Scenes in reading order that have no time. */
-  undatedScenes: Scene[];
+  undatedScenes: Piece[];
   undatedEvents: StoryEvent[];
 }
 
 const itemId = (i: TimelineItem) => (i.kind === "scene" ? i.scene.id : i.event.id);
 
 /** The book's scenes and off-page events in story-time order. */
-export function storyTimeline(novel: Novel): StoryTimeline {
+export function storyTimeline(novel: Book): StoryTimeline {
   const start = novel.config?.calendar?.start;
   const items: TimelineItem[] = [];
-  const undatedScenes: Scene[] = [];
+  const undatedScenes: Piece[] = [];
   const undatedEvents: StoryEvent[] = [];
-  for (const scene of novel.scenes) {
+  for (const scene of novel.pieces) {
     const at = storyInstant(scene.when, scene.duration, start);
     if (at) items.push({ kind: "scene", scene, at });
     else undatedScenes.push(scene);
@@ -145,14 +145,14 @@ export function overlaps(timeline: StoryTimeline): Overlap[] {
  * The scenes either side of a scene or event in story time: the last one before it and the first after
  * it, on its own scale (dates, or relative days without a calendar). None for something undated.
  */
-export function sceneNeighbours(timeline: StoryTimeline, id: string): { before?: Scene; after?: Scene } {
+export function sceneNeighbours(timeline: StoryTimeline, id: string): { before?: Piece; after?: Piece } {
   const at = timeline.items.findIndex((i) => itemId(i) === id);
   if (at < 0) return {};
   const item = timeline.items[at]!;
   const scene = (i: TimelineItem | undefined) => (i?.kind === "scene" && i.at.dated === item.at.dated ? i.scene : undefined);
-  let before: Scene | undefined;
+  let before: Piece | undefined;
   for (let i = at - 1; i >= 0 && !before; i--) before = scene(timeline.items[i]);
-  let after: Scene | undefined;
+  let after: Piece | undefined;
   for (let i = at + 1; i < timeline.items.length && !after; i++) after = scene(timeline.items[i]);
   return { ...(before ? { before } : {}), ...(after ? { after } : {}) };
 }

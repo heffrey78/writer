@@ -1,4 +1,4 @@
-import { loadNovel, type Novel } from "@writer/core";
+import { loadBook, type Book } from "@writer/core";
 import { compareNovels, compareProse } from "@writer/core/compare";
 import type { Hono } from "hono";
 import type { Env } from "./bible-routes.ts";
@@ -16,7 +16,7 @@ import type { NovelWorkspace } from "./workspace.ts";
 
 class SideError extends Error {}
 
-async function side(ws: NovelWorkspace, ref: string | undefined): Promise<Novel> {
+async function side(ws: NovelWorkspace, ref: string | undefined): Promise<Book> {
   if (!ref) throw new SideError("Say what to compare: from and to, each now, version:<id> or checkpoint:<id>.");
   if (ref === "now") return (await ws.loadModel()).novel;
   const colon = ref.indexOf(":");
@@ -26,7 +26,7 @@ async function side(ws: NovelWorkspace, ref: string | undefined): Promise<Novel>
   else if (kind === "checkpoint") commit = await ws.checkpoints.get(id).then((c) => c.commit, (e: unknown) => (e instanceof CheckpointError ? undefined : Promise.reject(e)));
   else throw new SideError(`“${ref}” isn't something to compare: use now, version:<id> or checkpoint:<id>.`);
   if (!commit) throw Object.assign(new SideError(`There's no ${kind} “${id}”.`), { notFound: true });
-  return loadNovel(await commitSource(ws.root, commit));
+  return loadBook(await commitSource(ws.root, commit));
 }
 
 export function compareRoutes(routes: Hono<Env>): void {
@@ -44,7 +44,7 @@ export function compareRoutes(routes: Hono<Env>): void {
     try {
       const [before, after] = [await side(c.var.ws, c.req.query("from")), await side(c.var.ws, c.req.query("to"))];
       const id = c.req.param("sceneId");
-      const [a, b] = [before.allScenes.find((s) => s.id === id), after.allScenes.find((s) => s.id === id)];
+      const [a, b] = [before.allPieces.find((s) => s.id === id), after.allPieces.find((s) => s.id === id)];
       if (!a && !b) return c.json({ code: "NOT_FOUND", error: `Neither side has the scene “${id}”.` }, 404);
       return c.json({ paragraphs: compareProse(a?.body, b?.body) });
     } catch (e) {

@@ -1,4 +1,4 @@
-import { countWords, proseText, storyTimeline, type Novel, type Scene, type StoryEvent } from "@writer/core";
+import { countWords, proseText, storyTimeline, type Book, type Piece, type StoryEvent } from "@writer/core";
 import { when } from "@writer/core/diagrams";
 import { useMemo } from "react";
 import { Link, useSearchParams } from "react-router";
@@ -16,10 +16,10 @@ import type { Workspace } from "./workspace.ts";
  * undated events. Nothing moves here: it's reading order that's rearranged.
  */
 
-type Item = { kind: "scene"; scene: Scene; when?: string } | { kind: "event"; event: StoryEvent; when?: string };
+type Item = { kind: "scene"; scene: Piece; when?: string } | { kind: "event"; event: StoryEvent; when?: string };
 
 /** Every scene and event, in story-time order. */
-function inStoryTime(novel: Novel): Item[] {
+function inStoryTime(novel: Book): Item[] {
   const t = storyTimeline(novel);
   return [
     ...t.items.map((i): Item => (i.kind === "scene" ? { kind: "scene", scene: i.scene, when: when(i) } : { kind: "event", event: i.event, when: when(i) })),
@@ -34,7 +34,7 @@ const noteLine = (e: StoryEvent) => proseText(e.body).replace(/\s+/g, " ").trim(
 const NOT_MOVED = "In story time, nothing is moved: switch to reading order to rearrange the book.";
 const number = new Intl.NumberFormat();
 
-export function OutlineTimeTable({ novelId, novel, workspace }: { novelId: string; novel: Novel; workspace: Workspace }) {
+export function OutlineTimeTable({ novelId, novel, workspace }: { novelId: string; novel: Book; workspace: Workspace }) {
   const items = useMemo(() => inStoryTime(novel), [novel]);
   const edit = useSceneEdit(novelId, workspace);
   const name = (id: string | undefined) => novel.entities.find((e) => e.id === id)?.name;
@@ -122,7 +122,7 @@ export function OutlineTimeTable({ novelId, novel, workspace }: { novelId: strin
 const eventShows = (e: StoryEvent, f: CorkboardFilter) =>
   !f.pov && !f.status && (!f.plotline || (e.plotlines ?? []).includes(f.plotline)) && (!f.character || (e.characters ?? []).includes(f.character));
 
-export function OutlineTimeCards({ novelId, novel }: { novelId: string; novel: Novel }) {
+export function OutlineTimeCards({ novelId, novel }: { novelId: string; novel: Book }) {
   const [params, setParams] = useSearchParams();
   const filter: CorkboardFilter = Object.fromEntries(["pov", "plotline", "status", "character"].flatMap((k) => (params.get(k) ? [[k, params.get(k)!]] : [])));
   const all = useMemo(() => inStoryTime(novel), [novel]);
@@ -152,7 +152,7 @@ export function OutlineTimeCards({ novelId, novel }: { novelId: string; novel: N
         )}
       </div>
       <p role="status" className="text-sm text-muted">
-        {filtered ? `${scenes} of ${novel.scenes.length} scenes match` : `${novel.scenes.length} scenes`}, and {items.length - scenes} off-page {items.length - scenes === 1 ? "event" : "events"}. {NOT_MOVED}
+        {filtered ? `${scenes} of ${novel.pieces.length} scenes match` : `${novel.pieces.length} scenes`}, and {items.length - scenes} off-page {items.length - scenes === 1 ? "event" : "events"}. {NOT_MOVED}
       </p>
       <ol aria-label="In story time" className="grid grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-3">
         {items.map((item) =>

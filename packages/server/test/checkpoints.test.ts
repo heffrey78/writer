@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { countWords, loadNovel } from "@writer/core";
+import { countWords, loadBook } from "@writer/core";
 import { nodeSource } from "@writer/core/node";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Checkpoints, Committer, createServer, Library, sessionCookie, Syncer, type Checkpoint, type RestoreResult } from "../src/index.ts";
@@ -44,7 +44,7 @@ const commitAll = (message: string) => {
   gitIn(dir, "commit", "-qm", message);
 };
 const tree = (rev: string, ...paths: string[]) => gitIn(dir, "ls-tree", "-r", rev, "--", ...paths);
-const manuscriptWords = async (root = dir) => (await loadNovel(nodeSource(root))).allScenes.reduce((n, s) => n + countWords(s.body), 0);
+const manuscriptWords = async (root = dir) => (await loadBook(nodeSource(root))).allPieces.reduce((n, s) => n + countWords(s.body), 0);
 
 describe("creating and listing", () => {
   it("commits pending work, then tags it with the name and the word count", async () => {

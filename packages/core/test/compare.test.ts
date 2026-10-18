@@ -3,7 +3,7 @@ import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { compareNovels, compareProse, proseParagraphs } from "../src/compare.ts";
-import { loadNovel, memorySource } from "../src/index.ts";
+import { loadBook, memorySource } from "../src/index.ts";
 
 const ROOT = fileURLToPath(new URL("../../../examples/sample-novel/", import.meta.url));
 const sample: Record<string, string> = Object.fromEntries(
@@ -18,7 +18,7 @@ const OLD_DEBTS = "manuscript/01-return/02-old-debts/_chapter.yaml";
 const novel = (changes: Record<string, string | undefined> = {}) => {
   const files = { ...sample, ...changes };
   for (const [k, v] of Object.entries(changes)) if (v === undefined) delete files[k];
-  return loadNovel(memorySource(files as Record<string, string>));
+  return loadBook(memorySource(files as Record<string, string>));
 };
 const edit = (path: string, from: string, to: string) => {
   const text = sample[path]!;

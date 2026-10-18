@@ -1,4 +1,4 @@
-import { proseText, relationshipsAt, type Novel, type Scene } from "@writer/core";
+import { proseText, relationshipsAt, type Book, type Piece } from "@writer/core";
 import type { MentionTarget } from "@writer/editor";
 import type { Editor } from "@tiptap/core";
 import { X } from "lucide-react";
@@ -15,7 +15,7 @@ import { useEntryPanel } from "./entry-tab.tsx";
 
 interface Card extends MentionTarget {
   /** The scene the mention is in: relationships are shown as they stand there. */
-  scene: Scene | undefined;
+  scene: Piece | undefined;
   editor: Editor;
 }
 
@@ -55,7 +55,7 @@ const FIELDS = 4;
  * while pointed at) or with Alt+Enter beside a mention, which moves focus into it; Escape closes
  * it and returns to the text. "Open entry" shows the whole entry in a side panel.
  */
-export function MentionCard({ novelId, novel }: { novelId: string; novel: Novel }) {
+export function MentionCard({ novelId, novel }: { novelId: string; novel: Book }) {
   const card = useMentionCard((s) => s.card);
   const hide = useMentionCard((s) => s.hide);
   const openEntry = useEntryPanel((s) => s.open);

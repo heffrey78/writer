@@ -1,4 +1,4 @@
-import { entryPresence, relationshipsAt, relationshipStyle, type Entity, type Novel, type Relationship } from "@writer/core";
+import { entryPresence, relationshipsAt, relationshipStyle, type Entity, type Book, type Relationship } from "@writer/core";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
 import { DropdownMenu } from "radix-ui";
@@ -28,17 +28,17 @@ type Lane = { r: Relationship; start: number; end: number }[];
 
 const BORDER = { solid: "solid", dashed: "dashed", dotted: "dotted" } as const;
 
-export function RelationshipArcs({ novelId, novel, entity, compact }: { novelId: string; novel: Novel; entity: Entity; compact?: boolean }) {
+export function RelationshipArcs({ novelId, novel, entity, compact }: { novelId: string; novel: Book; entity: Entity; compact?: boolean }) {
   /** The name column: narrower in the sidebar. */
   const cols = compact ? "grid-cols-[4.5rem_minmax(0,1fr)]" : "grid-cols-[6.5rem_minmax(0,1fr)]";
   const queryClient = useQueryClient();
   const presence = useMemo(() => entryPresence(novel, entity.id), [novel, entity.id]);
   const n = presence?.scenes.length ?? 0;
   const current = useCurrentScene((s) => s.scene);
-  const [at, setAt] = useState(() => Math.max(0, novel.scenes.findIndex((s) => s.id === current?.id)));
+  const [at, setAt] = useState(() => Math.max(0, novel.pieces.findIndex((s) => s.id === current?.id)));
   // Beside the text, the marker follows the scene the author is in.
   useEffect(() => {
-    const i = novel.scenes.findIndex((s) => s.id === current?.id);
+    const i = novel.pieces.findIndex((s) => s.id === current?.id);
     if (i >= 0) setAt(i);
   }, [current?.id, novel]);
   const [dialog, setDialog] = useState<{ kind: "add" } | { kind: "change" | "end" | "remove"; relationship: Relationship }>();
@@ -48,7 +48,7 @@ export function RelationshipArcs({ novelId, novel, entity, compact }: { novelId:
 
   // By who it's with (in the order they first appear), each in lanes where they overlap.
   const groups = useMemo(() => {
-    const index = new Map(novel.scenes.map((s, i) => [s.id, i]));
+    const index = new Map(novel.pieces.map((s, i) => [s.id, i]));
     const mine = novel.relationships
       .filter((r) => r.from === entity.id || r.to === entity.id)
       .map((r) => ({ r, start: r.since ? (index.get(r.since) ?? 0) : 0, end: r.until ? (index.get(r.until) ?? n) : n }))
@@ -66,7 +66,7 @@ export function RelationshipArcs({ novelId, novel, entity, compact }: { novelId:
     return [...byOther];
   }, [novel, entity.id, n]);
 
-  const scene = novel.scenes[Math.min(at, n - 1)];
+  const scene = novel.pieces[Math.min(at, n - 1)];
   const holding = scene ? relationshipsAt(novel, scene.id).filter((r) => r.from === entity.id || r.to === entity.id) : [];
   const name = (id: string) => novel.entities.find((e) => e.id === id)?.name ?? id;
   const typeLabel = (r: Relationship) => {

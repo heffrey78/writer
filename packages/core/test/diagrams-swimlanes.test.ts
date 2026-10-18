@@ -1,16 +1,16 @@
 import { fileURLToPath } from "node:url";
-import { loadNovel } from "../src/index.ts";
+import { loadBook } from "../src/index.ts";
 import { nodeSource } from "../src/node.ts";
 import { describe, expect, it } from "vitest";
 import { cellKey, gaps, swimlanes, zoomed } from "../src/diagrams.ts";
 
-const novel = await loadNovel(nodeSource(fileURLToPath(new URL("../../../examples/sample-novel/", import.meta.url))));
+const novel = await loadBook(nodeSource(fileURLToPath(new URL("../../../examples/sample-novel/", import.meta.url))));
 
 describe("swimlanes", () => {
   it("lays plotlines, by name, against every scene in reading order, grouped by chapter and part", () => {
     const s = swimlanes(novel);
     expect(s.lanes.map((l) => l.name)).toEqual(["Ben's Debt", "The Sale"]);
-    expect(s.scenes.map((x) => x.id)).toEqual(novel.scenes.map((x) => x.id));
+    expect(s.scenes.map((x) => x.id)).toEqual(novel.pieces.map((x) => x.id));
     expect(s.chapters.map((c) => [c.title, c.span])).toEqual([["Arrival", 2], ["Old Debts", 2], ["Night Crossing", 2], ["Varn Holds", 2]]);
     expect(s.parts.map((p) => [p.part.title, p.span])).toEqual([["Return", 4], ["The Sale", 4]]);
   });
@@ -20,7 +20,7 @@ describe("swimlanes", () => {
     expect(s.marks.get(cellKey("plot_h315tz", "sc_0d9wm4"))).toEqual({ weight: "major", beat: "The plans have been sold" });
     expect(s.marks.get(cellKey("plot_gr1efa", "sc_1edger"))).toEqual({ weight: "major" });
     expect(s.marks.has(cellKey("plot_gr1efa", "sc_5tat1n"))).toBe(false);
-    const total = novel.scenes.reduce((n, scene) => n + scene.plotlines.length, 0);
+    const total = novel.pieces.reduce((n, scene) => n + scene.plotlines.length, 0);
     expect(s.marks.size).toBe(total);
   });
 });
@@ -44,14 +44,14 @@ describe("gaps and zoom", () => {
     expect(gaps(book, { words: ledgerWords }).some((g) => g.from === "sc_1edger")).toBe(false);
     expect(gaps(book, { words: ledgerWords - 1 }).some((g) => g.from === "sc_1edger")).toBe(true);
     // The first four scenes alone: The Sale's last beat is Tomas's Workshop, and Ben's Ledger follows without it.
-    const early = gaps(swimlanes(novel, novel.scenes.slice(0, 4)), { scenes: 0 });
+    const early = gaps(swimlanes(novel, novel.pieces.slice(0, 4)), { scenes: 0 });
     expect(early.find((g) => g.lane === "plot_h315tz")).toMatchObject({ from: "sc_1edger", to: "sc_1edger", scenes: 1, open: true });
   });
 
   it("zooms to a part or a chapter", () => {
-    expect(zoomed(novel, novel.scenes, "pt_5a1e00").map((s) => s.title)).toEqual(["The Betrayal", "The Flood", "Mirela's Offer", "The Last Rivet"]);
-    expect(zoomed(novel, novel.scenes, "ch_arr1va").map((s) => s.title)).toEqual(["The Station", "Walking the Span"]);
-    expect(zoomed(novel, novel.scenes, undefined)).toHaveLength(8);
-    expect(zoomed(novel, novel.scenes, "ch_gone00")).toHaveLength(8);
+    expect(zoomed(novel, novel.pieces, "pt_5a1e00").map((s) => s.title)).toEqual(["The Betrayal", "The Flood", "Mirela's Offer", "The Last Rivet"]);
+    expect(zoomed(novel, novel.pieces, "ch_arr1va").map((s) => s.title)).toEqual(["The Station", "Walking the Span"]);
+    expect(zoomed(novel, novel.pieces, undefined)).toHaveLength(8);
+    expect(zoomed(novel, novel.pieces, "ch_gone00")).toHaveLength(8);
   });
 });

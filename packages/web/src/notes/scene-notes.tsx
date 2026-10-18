@@ -1,5 +1,5 @@
 import { imageUrl } from "@writer/client";
-import { notesOfScene, proseText, readFrontMatter, type Note, type Novel, type Scene } from "@writer/core";
+import { notesOfScene, proseText, readFrontMatter, type Note, type Book, type Piece } from "@writer/core";
 import { joinSceneFile } from "@writer/editor";
 import { SceneEditor, type SpellService } from "@writer/editor/react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -27,7 +27,7 @@ type Spell = { service: SpellService; onAddWord: (w: string) => void } | undefin
  * to edit its title, tags and prose, pin it here, take it off this scene, or open its page. + Note makes
  * one on the scene, opened, with the caret in its prose; Add a note puts one already written on it too (heffrey78/gh-writer#238).
  */
-export function SceneNotes({ novelId, novel, workspace, scene, spell }: { novelId: string; novel: Novel; workspace: Workspace; scene: Scene; spell: Spell }) {
+export function SceneNotes({ novelId, novel, workspace, scene, spell }: { novelId: string; novel: Book; workspace: Workspace; scene: Piece; spell: Spell }) {
   const queryClient = useQueryClient();
   const show = useNotice((n) => n.show);
   const headingId = useId();
@@ -47,7 +47,7 @@ export function SceneNotes({ novelId, novel, workspace, scene, spell }: { novelI
 
   // Notes not on this scene yet: those on none first, then those on others.
   const others = useMemo(() => {
-    const sceneTitle = (id: string) => novel.allScenes.find((x) => x.id === id)?.title ?? id;
+    const sceneTitle = (id: string) => novel.allPieces.find((x) => x.id === id)?.title ?? id;
     const off = novel.notes.filter((n) => !n.scenes.includes(scene.id));
     return [...off.filter((n) => !n.scenes.length), ...off.filter((n) => n.scenes.length)].map((n) => ({
       value: n.id,
@@ -167,10 +167,10 @@ function NoteCard({
   refresh,
 }: {
   novelId: string;
-  novel: Novel;
+  novel: Book;
   workspace: Workspace;
   note: Note;
-  scene: Scene;
+  scene: Piece;
   spell: Spell;
   open: boolean;
   justMade: boolean;

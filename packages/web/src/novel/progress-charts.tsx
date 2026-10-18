@@ -1,4 +1,4 @@
-import { addDays, countWords, unbalanced, type Novel, type WritingDay } from "@writer/core";
+import { addDays, countWords, unbalanced, type Book, type WritingDay } from "@writer/core";
 import { chapterTitle } from "@writer/core/diagrams";
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { cn } from "../ui/cn.ts";
@@ -59,7 +59,7 @@ function column(x: number, w: number, base: number, h: number, up: boolean): str
   return `M${x},${base}V${end + toward}Q${x},${end} ${x + r},${end}H${x + w - r}Q${x + w},${end} ${x + w},${end + toward}V${base}Z`;
 }
 
-export function ProgressCharts({ days, words, target, novel, today }: { days: WritingDay[]; words: number; target: { words?: number; date?: string } | null; novel: Novel; today: string }) {
+export function ProgressCharts({ days, words, target, novel, today }: { days: WritingDay[]; words: number; target: { words?: number; date?: string } | null; novel: Book; today: string }) {
   const [range, setRange] = useState<Range>("30");
   const first = days[0]?.day ?? today;
   const start = range === "all" ? (first < today ? first : today) : addDays(today, -(Number(range) - 1));
@@ -359,12 +359,12 @@ function BookLength({ series, target }: { series: { day: string; words: number }
   );
 }
 
-function ChapterLengths({ novel }: { novel: Novel }) {
+function ChapterLengths({ novel }: { novel: Book }) {
   const [ref, width] = useWidth<HTMLDivElement>();
   const chapters = useMemo(
     () =>
       novel.chapters.map((c) => {
-        const scenes = c.sceneIds.map((id) => novel.allScenes.find((s) => s.id === id)).filter((s) => s !== undefined).map((s) => ({ id: s.id, title: s.title, words: countWords(s.body) }));
+        const scenes = c.sceneIds.map((id) => novel.allPieces.find((s) => s.id === id)).filter((s) => s !== undefined).map((s) => ({ id: s.id, title: s.title, words: countWords(s.body) }));
         return { id: c.id, title: chapterTitle(novel, c), scenes, words: scenes.reduce((n, s) => n + s.words, 0) };
       }),
     [novel],

@@ -1,5 +1,5 @@
 import { ApiError } from "@writer/client";
-import { entityLabel, type Novel } from "@writer/core";
+import { entityLabel, type Book } from "@writer/core";
 import { caretScene } from "@writer/editor";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Editor } from "@tiptap/core";
@@ -29,7 +29,7 @@ export interface Passage {
  * The selected passage: its words (mentions as written, paragraphs apart), within the scene where
  * the selection starts. Undefined with nothing selected.
  */
-export function selectedPassage(editor: Editor, novel: Novel): Passage | undefined {
+export function selectedPassage(editor: Editor, novel: Book): Passage | undefined {
   const { state } = editor;
   const { from, to, empty, $from } = state.selection;
   if (empty) return undefined;
@@ -44,7 +44,7 @@ export function selectedPassage(editor: Editor, novel: Novel): Passage | undefin
     end = Math.min(to, start + scene.nodeSize - 1);
   } else path = caretScene(editor);
   const quote = state.doc.textBetween(from, end, "\n\n", (leaf) => (leaf.type.name === "hardBreak" ? "\n" : String(leaf.attrs.label ?? ""))).trim();
-  const scene = novel.allScenes.find((s) => s.file === path);
+  const scene = novel.allPieces.find((s) => s.file === path);
   if (!quote || !scene) return undefined;
   const mentions = new Set<string>();
   state.doc.nodesBetween(from, end, (node) => void (node.type.name === "mention" && node.attrs.id && mentions.add(String(node.attrs.id))));
@@ -64,13 +64,13 @@ export const useRaise = create<{ passage: Passage | undefined; editor: Editor | 
 }));
 
 /** Raise an issue about the selected passage, beside the text: its kind, a title, a note and labels. */
-export function RaisePanel({ novelId, novel }: { novelId: string; novel: Novel }) {
+export function RaisePanel({ novelId, novel }: { novelId: string; novel: Book }) {
   const { passage, close } = useRaise();
   if (!passage) return null;
   return <Raise key={`${passage.scene}:${passage.quote}`} novelId={novelId} novel={novel} passage={passage} close={close} />;
 }
 
-function Raise({ novelId, novel, passage, close }: { novelId: string; novel: Novel; passage: Passage; close: () => void }) {
+function Raise({ novelId, novel, passage, close }: { novelId: string; novel: Book; passage: Passage; close: () => void }) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const show = useNotice((n) => n.show);
@@ -80,7 +80,7 @@ function Raise({ novelId, novel, passage, close }: { novelId: string; novel: Nov
   const [details, setDetails] = useState("");
   // Who and what the passage is about, to start with: the scene's people, places and threads, and anything it mentions.
   const [labels, setLabels] = useState<string[]>(() => {
-    const scene = novel.allScenes.find((s) => s.id === passage.scene);
+    const scene = novel.allPieces.find((s) => s.id === passage.scene);
     const ids = [
       ...(scene?.pov ? [scene.pov] : []),
       ...(scene?.characters ?? []),

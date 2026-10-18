@@ -1,10 +1,10 @@
 import { reservedPrefixes, type EntityTypeDef } from "./ids.ts";
 import { kindByKey, V2_KIND, type BookKind } from "./kinds.ts";
-import type { Chapter, Entity, Novel, Part, PlotlineRef, Relationship, Scene, StoryEvent, ThemeRef } from "./model.ts";
+import type { Chapter, Entity, Book, Part, PlotlineRef, Relationship, Piece, StoryEvent, ThemeRef } from "./model.ts";
 import { parseMarkdown, parseYaml } from "./parse.ts";
 import { checkSchema, type SchemaKind } from "./schemas.ts";
 import { joinPath, type FileSource } from "./source.ts";
-import type { CompileFile, Diagnostic, NovelFile, RelationshipTypeFile, SceneStatus, StoryTime } from "./types.ts";
+import type { CompileFile, Diagnostic, NovelFile, RelationshipTypeFile, PieceStatus, StoryTime } from "./types.ts";
 
 /** Highest novel repository schema version this build understands. */
 export const SCHEMA_VERSION = 2;
@@ -14,15 +14,15 @@ export const SCHEMA_VERSION = 2;
  *
  * Loading never throws on bad content: parse, schema and structure problems are
  * collected in `novel.diagnostics`, and the model holds whatever could be read.
- * Cross-reference checks are done separately by `validateNovel`.
+ * Cross-reference checks are done separately by `validateBook`.
  */
-export async function loadNovel(source: FileSource): Promise<Novel> {
+export async function loadBook(source: FileSource): Promise<Book> {
   const diagnostics: Diagnostic[] = [];
   // Format v2 has no `kind`: every book in it is a novel.
   const bookKind = kindByKey(V2_KIND);
   const { content, codex, notes: notesFolder, events: eventsFolder } = bookKind.folders;
   const order = `${content}/_order.yaml`;
-  const novel: Novel = {
+  const novel: Book = {
     kind: bookKind,
     config: undefined,
     entityTypes: [...bookKind.entityTypes],
@@ -30,10 +30,10 @@ export async function loadNovel(source: FileSource): Promise<Novel> {
     topLevel: undefined,
     parts: [],
     chapters: [],
-    scenes: [],
+    pieces: [],
     allParts: [],
     allChapters: [],
-    allScenes: [],
+    allPieces: [],
     entities: [],
     relationships: [],
     events: [],
@@ -85,7 +85,7 @@ export async function loadNovel(source: FileSource): Promise<Novel> {
   await loadNotes();
 
   const layouts = await yamlFile("diagrams/layouts.yaml", "layouts");
-  if (layouts && isObject(layouts["layouts"])) novel.layouts = layouts["layouts"] as Novel["layouts"];
+  if (layouts && isObject(layouts["layouts"])) novel.layouts = layouts["layouts"] as Book["layouts"];
 
   // How it's compiled (heffrey78/gh-writer#19): the front and back matter a preset names must be there.
   const compile = await yamlFile("compile.yaml", "compile");
@@ -149,13 +149,13 @@ export async function loadNovel(source: FileSource): Promise<Novel> {
     }
     const orderedChapters = new Set(novel.chapters);
     for (const c of novel.allChapters) {
-      const scenes = resolveOrder(c.sceneIds, novel.allScenes.filter((s) => s.chapterId === c.id && s.file.startsWith(`${c.dir}/`)), c.file, "/scenes", "scene");
-      if (orderedChapters.has(c)) novel.scenes.push(...scenes);
+      const scenes = resolveOrder(c.sceneIds, novel.allPieces.filter((s) => s.chapterId === c.id && s.file.startsWith(`${c.dir}/`)), c.file, "/scenes", "scene");
+      if (orderedChapters.has(c)) novel.pieces.push(...scenes);
     }
-    // Keep novel.scenes in chapter reading order.
+    // Keep the pieces in chapter reading order.
     const chapterRank = new Map(novel.chapters.map((c, i) => [c.id, i]));
-    novel.scenes.sort((a, b) => (chapterRank.get(a.chapterId!) ?? 0) - (chapterRank.get(b.chapterId!) ?? 0));
-    novel.scenes.forEach((s, i) => (s.position = i));
+    novel.pieces.sort((a, b) => (chapterRank.get(a.chapterId!) ?? 0) - (chapterRank.get(b.chapterId!) ?? 0));
+    novel.pieces.forEach((s, i) => (s.position = i));
   }
 
   async function loadPart(dir: string): Promise<Part | undefined> {
@@ -210,11 +210,11 @@ export async function loadNovel(source: FileSource): Promise<Novel> {
     if (!md || !str(md.data["id"])) return;
     const d = md.data;
     const status = str(d["status"]);
-    const scene: Scene = {
+    const scene: Piece = {
       id: str(d["id"])!,
       title: str(d["title"]) ?? "",
       synopsis: str(d["synopsis"]),
-      status: bookKind.statuses.some((s) => s.key === status) ? (status as SceneStatus) : bookKind.statuses[0]!.key,
+      status: bookKind.statuses.some((s) => s.key === status) ? (status as PieceStatus) : bookKind.statuses[0]!.key,
       pov: str(d["pov"]),
       characters: strList(d["characters"]),
       locations: strList(d["locations"]),
@@ -238,7 +238,7 @@ export async function loadNovel(source: FileSource): Promise<Novel> {
       bodyLine: md.bodyLine,
       file,
     };
-    novel.allScenes.push(scene);
+    novel.allPieces.push(scene);
   }
 
   async function loadBible() {

@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
 import { join, posix } from "node:path";
-import { editFrontMatter, editYaml, indexById, levelOf, loadNovel, numberedName, slugify, uniqueId, type Chapter, type Novel, type Part, type Scene } from "@writer/core";
+import { editFrontMatter, editYaml, indexById, levelOf, loadBook, numberedName, slugify, uniqueId, type Chapter, type Book, type Part, type Piece } from "@writer/core";
 import { nodeSource } from "@writer/core/node";
 import { parse, stringify } from "yaml";
 import { git } from "./git.ts";
@@ -90,7 +90,7 @@ export class ManuscriptOperations {
   /** A new scene in a chapter, after `after` (null: first; omitted: last). */
   createScene(chapterId: string, { title, after }: { title: string; after?: string | null }): Promise<OperationResult & { id: string }> {
     return this.#exclusive(async () => {
-      const { id, title: name, writes } = await this.sceneWrites(await loadNovel(nodeSource(this.root)), chapterId, { title, ...(after !== undefined ? { after } : {}) });
+      const { id, title: name, writes } = await this.sceneWrites(await loadBook(nodeSource(this.root)), chapterId, { title, ...(after !== undefined ? { after } : {}) });
       return { ...(await transaction(this.root, writes, `Manuscript: add scene “${name}”`)), id };
     });
   }
@@ -99,7 +99,7 @@ export class ManuscriptOperations {
    * What adding a scene to a chapter writes, for an operation to commit with its own changes: the
    * scene's file, with `front` after its ID, title and status, and the chapter's order and numbering.
    */
-  async sceneWrites(novel: Novel, chapterId: string, { title, after, front = {} }: { title: string; after?: string | null; front?: Record<string, unknown> }): Promise<{ id: string; title: string; file: string; writes: FileWrite[] }> {
+  async sceneWrites(novel: Book, chapterId: string, { title, after, front = {} }: { title: string; after?: string | null; front?: Record<string, unknown> }): Promise<{ id: string; title: string; file: string; writes: FileWrite[] }> {
     const o = new Overlay(this.root);
     const chapter = this.#chapter(novel, chapterId);
     const name = required(title, "title");
@@ -238,7 +238,7 @@ export class ManuscriptOperations {
       const scene = this.#scene(novel, sceneId);
       const chapter = this.#chapter(novel, scene.chapterId!);
       const at = chapter.sceneIds.indexOf(sceneId);
-      const next = novel.allScenes.find((s) => s.id === chapter.sceneIds[at + 1]);
+      const next = novel.allPieces.find((s) => s.id === chapter.sceneIds[at + 1]);
       if (!next) throw new OperationError("BAD_REQUEST", `“${scene.title}” is the last scene of its chapter.`);
       const firstText = (await o.read(scene.file))!;
       const nextText = (await o.read(next.file))!;
@@ -269,7 +269,7 @@ export class ManuscriptOperations {
       const gone = new Set(
         item.kind === "scene"
           ? [id]
-          : novel.allScenes.filter((s) => (item.kind === "chapter" ? s.chapterId === id : novel.allChapters.some((c) => c.id === s.chapterId && c.partId === id))).map((s) => s.id),
+          : novel.allPieces.filter((s) => (item.kind === "chapter" ? s.chapterId === id : novel.allChapters.some((c) => c.id === s.chapterId && c.partId === id))).map((s) => s.id),
       );
       const touched = novel.notes.filter((n) => n.scenes.some((s) => gone.has(s)) || n.pinned.some((s) => gone.has(s)));
       const left = touched.filter((n) => n.scenes.every((s) => gone.has(s)));
@@ -306,7 +306,7 @@ export class ManuscriptOperations {
   async recentlyDeleted(limit = 30): Promise<DeletedItem[]> {
     const g = git(this.root);
     const log = await g.raw(["log", "--diff-filter=D", "--name-only", "--relative", "--format=%x1e%H%x1f%cI", "-n", "200", "--", "manuscript"]).catch(() => "");
-    const present = new Set(indexById(await loadNovel(nodeSource(this.root))).keys());
+    const present = new Set(indexById(await loadBook(nodeSource(this.root))).keys());
     const out: DeletedItem[] = [];
     for (const record of log.split("\x1e").filter((r) => r.trim())) {
       const [head, ...files] = record.trim().split("\n");
@@ -336,7 +336,7 @@ export class ManuscriptOperations {
     return this.#exclusive(async () => {
       const item = (await this.recentlyDeleted(200)).find((d) => d.commit === commit && d.id === id);
       if (!item) throw new OperationError("NOT_FOUND", "That isn't among the recently deleted.");
-      const novel = await loadNovel(nodeSource(this.root));
+      const novel = await loadBook(nodeSource(this.root));
       const o = new Overlay(this.root);
       const before = `${commit}^`;
       // Where it was: its old container (by ID), and the sibling it followed.
@@ -377,9 +377,9 @@ export class ManuscriptOperations {
 
   // ——— Steps ———
 
-  #run<T extends object>(fn: (novel: Novel, o: Overlay) => Promise<T & { message: string }>): Promise<OperationResult & Omit<T, "message">> {
+  #run<T extends object>(fn: (novel: Book, o: Overlay) => Promise<T & { message: string }>): Promise<OperationResult & Omit<T, "message">> {
     return this.#exclusive(async () => {
-      const novel = await loadNovel(nodeSource(this.root));
+      const novel = await loadBook(nodeSource(this.root));
       const o = new Overlay(this.root);
       const { message, ...rest } = await fn(novel, o);
       return { ...(await transaction(this.root, o.changes(), message)), ...(rest as Omit<T, "message">) };
@@ -390,8 +390,8 @@ export class ManuscriptOperations {
     return git(this.root).raw(["show", `${rev}:./${path}`]).catch(() => undefined);
   }
 
-  #find(novel: Novel, id: string): { kind: "scene"; scene: Scene } | { kind: "chapter"; chapter: Chapter } | { kind: "part"; part: Part } {
-    const scene = novel.allScenes.find((s) => s.id === id);
+  #find(novel: Book, id: string): { kind: "scene"; scene: Piece } | { kind: "chapter"; chapter: Chapter } | { kind: "part"; part: Part } {
+    const scene = novel.allPieces.find((s) => s.id === id);
     if (scene) return { kind: "scene", scene };
     const chapter = novel.allChapters.find((c) => c.id === id);
     if (chapter) return { kind: "chapter", chapter };
@@ -400,20 +400,20 @@ export class ManuscriptOperations {
     throw new OperationError("NOT_FOUND", `Nothing in the manuscript has the ID “${id}”.`);
   }
 
-  #scene(novel: Novel, id: string): Scene {
-    const scene = novel.allScenes.find((s) => s.id === id);
+  #scene(novel: Book, id: string): Piece {
+    const scene = novel.allPieces.find((s) => s.id === id);
     if (!scene) throw new OperationError("NOT_FOUND", `No scene “${id}”.`);
     return scene;
   }
 
-  #chapter(novel: Novel, id: string): Chapter {
+  #chapter(novel: Book, id: string): Chapter {
     const chapter = novel.allChapters.find((c) => c.id === id);
     if (!chapter) throw new OperationError("NOT_FOUND", `No chapter “${id}”.`);
     return chapter;
   }
 
   /** The container for chapters: a part, or the top level in a book organised in chapters. */
-  #parentFor(novel: Novel, partId: string | null): Container {
+  #parentFor(novel: Book, partId: string | null): Container {
     if (partId) {
       const part = novel.allParts.find((p) => p.id === partId);
       if (!part) throw new OperationError("NOT_FOUND", `No part “${partId}”.`);
@@ -464,10 +464,10 @@ export class ManuscriptOperations {
    * Give a container's children their numbered names in list order. `paths` has the current path of
    * children that moved or are new in this operation (the model has the rest).
    */
-  async #renumber(o: Overlay, novel: Novel, c: Container, paths: Map<string, string>): Promise<void> {
+  async #renumber(o: Overlay, novel: Book, c: Container, paths: Map<string, string>): Promise<void> {
     const list = await this.#list(o, c);
     const current = (id: string): string | undefined =>
-      paths.get(id) ?? novel.allScenes.find((s) => s.id === id)?.file ?? novel.allChapters.find((x) => x.id === id)?.dir ?? novel.allParts.find((p) => p.id === id)?.dir;
+      paths.get(id) ?? novel.allPieces.find((s) => s.id === id)?.file ?? novel.allChapters.find((x) => x.id === id)?.dir ?? novel.allParts.find((p) => p.id === id)?.dir;
     const fileMoves: [string, string][] = [];
     const dirMoves: [string, string][] = [];
     list.forEach((id, i) => {
@@ -487,7 +487,7 @@ export class ManuscriptOperations {
   }
 
   /** Relationships that start or end at `from` now do at `to`, and notes on it are on `to` (merged scenes). */
-  async #retarget(o: Overlay, novel: Novel, from: string, to: string): Promise<void> {
+  async #retarget(o: Overlay, novel: Book, from: string, to: string): Promise<void> {
     // Notes on it are on the merged scene now (heffrey78/gh-writer#222); a pin goes too, unless that scene has one already.
     const pinnedThere = novel.notes.some((n) => n.pinned.includes(to));
     for (const n of novel.notes.filter((x) => x.scenes.includes(from) || x.pinned.includes(from))) {

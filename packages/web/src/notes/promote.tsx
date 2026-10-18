@@ -1,4 +1,4 @@
-import type { Novel, Note } from "@writer/core";
+import type { Book, Note } from "@writer/core";
 import { chapterTitle } from "@writer/core/diagrams";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog } from "radix-ui";
@@ -14,7 +14,7 @@ import { Button } from "../ui/button.tsx";
  * a chapter (its prose the synopsis), keeping the note (naming what it became) or removing it. What it
  * became opens.
  */
-export function PromoteNoteDialog({ novelId, novel, note, flush, open, onOpenChange }: { novelId: string; novel: Novel; note: Note; flush: () => Promise<void>; open: boolean; onOpenChange: (o: boolean) => void }) {
+export function PromoteNoteDialog({ novelId, novel, note, flush, open, onOpenChange }: { novelId: string; novel: Book; note: Note; flush: () => Promise<void>; open: boolean; onOpenChange: (o: boolean) => void }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const id = useId();

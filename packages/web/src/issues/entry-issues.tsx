@@ -1,17 +1,17 @@
 import type { IssueLabel } from "@writer/client";
-import { entityLabel, entityOfLabel, type Entity, type Novel } from "@writer/core";
+import { entityLabel, entityOfLabel, type Entity, type Book } from "@writer/core";
 import { useId } from "react";
 import { Link } from "react-router";
 import { useGitHubRepo } from "../github/repo.ts";
 import { useIssueList } from "./use-issues.ts";
 
 /** The labels an entry's issues carry: its label, and any of the repository's that stands for it (by ID, before a rename reaches GitHub). */
-export function labelsOf(novel: Novel, entity: Entity, labels: readonly IssueLabel[]): Set<string> {
+export function labelsOf(novel: Book, entity: Entity, labels: readonly IssueLabel[]): Set<string> {
   return new Set([entityLabel(novel, entity).name, ...labels.filter((l) => entityOfLabel(novel, l)?.id === entity.id).map((l) => l.name)]);
 }
 
 /** A bible entry's open issues (those with its label, as label:… finds them on github.com), for a novel on GitHub. */
-export function EntryIssues({ novelId, novel, entity }: { novelId: string; novel: Novel; entity: Entity }) {
+export function EntryIssues({ novelId, novel, entity }: { novelId: string; novel: Book; entity: Entity }) {
   const repo = useGitHubRepo(novelId);
   const list = useIssueList(novelId, { state: "open" }, { enabled: !!repo });
   const headingId = useId();

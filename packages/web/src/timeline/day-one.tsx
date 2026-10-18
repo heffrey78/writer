@@ -1,4 +1,4 @@
-import { apartInTime, storyTimeline, type Novel } from "@writer/core";
+import { apartInTime, storyTimeline, type Book } from "@writer/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { useId, useMemo, useState } from "react";
 import { api, keys } from "../api.ts";
@@ -26,7 +26,7 @@ export function useSetDayOne(novelId: string) {
  * place from a date or the day of a dated scene (its date copied, once). While it has none and the
  * book has both, the days that can't be placed among the dates are counted here.
  */
-export function DayOne({ novelId, novel }: { novelId: string; novel: Novel }) {
+export function DayOne({ novelId, novel }: { novelId: string; novel: Book }) {
   const start = novel.config?.calendar?.start;
   const place = useInPlace();
   const apart = useMemo(() => apartInTime(storyTimeline(novel)), [novel]);
@@ -59,10 +59,10 @@ export function DayOne({ novelId, novel }: { novelId: string; novel: Novel }) {
 }
 
 /** Day 1's date typed, or a dated scene's taken, or none; saved on leaving it too. */
-function DayOneEditor({ novelId, novel, place }: { novelId: string; novel: Novel; place: InPlace }) {
+function DayOneEditor({ novelId, novel, place }: { novelId: string; novel: Book; place: InPlace }) {
   const start = novel.config?.calendar?.start;
   const setDayOne = useSetDayOne(novelId);
-  const dated = novel.scenes.filter((s) => s.when && "at" in s.when);
+  const dated = novel.pieces.filter((s) => s.when && "at" in s.when);
   const id = useId();
   const [draft, setDraft] = useState(start ?? "");
   const [problem, setProblem] = useState<string>();

@@ -1,4 +1,4 @@
-import type { Novel } from "@writer/core";
+import type { Book } from "@writer/core";
 import { useEffect, useRef, type KeyboardEvent, type ReactNode } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router";
 import { PresencePage } from "../presence/presence-page.tsx";
@@ -20,7 +20,7 @@ export const STORY_MAP_TABS = [
 ] as const;
 type Tab = (typeof STORY_MAP_TABS)[number]["key"];
 
-export function StoryMapPage({ novelId, novel, workspace }: { novelId: string; novel: Novel; workspace: Workspace }) {
+export function StoryMapPage({ novelId, novel, workspace }: { novelId: string; novel: Book; workspace: Workspace }) {
   const { tab } = useParams();
   const navigate = useNavigate();
   const { state } = useLocation() as { state: { focusTab?: boolean } | null };

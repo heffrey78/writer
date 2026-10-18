@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { loadNovel, validateNovel } from "@writer/core";
+import { loadBook, validateBook } from "@writer/core";
 import { nodeSource } from "@writer/core/node";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { BibleOperations, createServer, Library, ManuscriptOperations, sessionCookie } from "../src/index.ts";
@@ -30,10 +30,10 @@ const lastCommit = () => gitIn(dir, "log", "-1", "--format=%s").trim();
 const clean = () => expect(gitIn(dir, "status", "--porcelain")).toBe("");
 /** The last commit's changes: status, similarity for renames, paths. */
 const changes = () => gitIn(dir, "show", "-M", "--name-status", "--format=", "HEAD").trim().split("\n").sort();
-const order = async () => (await loadNovel(nodeSource(dir))).scenes.map((s) => s.id);
+const order = async () => (await loadBook(nodeSource(dir))).pieces.map((s) => s.id);
 async function valid() {
-  const novel = await loadNovel(nodeSource(dir));
-  expect([...novel.diagnostics, ...validateNovel(novel)].filter((d) => d.severity === "error")).toEqual([]);
+  const novel = await loadBook(nodeSource(dir));
+  expect([...novel.diagnostics, ...validateBook(novel)].filter((d) => d.severity === "error")).toEqual([]);
   return novel;
 }
 const START = ["sc_5tat1n", "sc_br1dg3", "sc_w0rk5h", "sc_1edger", "sc_0d9wm4", "sc_f100d0", "sc_0ffer5", "sc_r1vet8"];
@@ -115,13 +115,13 @@ describe("creating and renaming", () => {
 
 describe("splitting and merging", () => {
   it("splits a scene between paragraphs and merges it back to the same prose", async () => {
-    const original = await loadNovel(nodeSource(dir));
-    const station = original.allScenes.find((s) => s.id === "sc_5tat1n")!;
+    const original = await loadBook(nodeSource(dir));
+    const station = original.allPieces.find((s) => s.id === "sc_5tat1n")!;
     const { id } = await ops.split("sc_5tat1n", { paragraph: 2, title: "The Flags" });
     let novel = await valid();
-    const first = novel.allScenes.find((s) => s.id === "sc_5tat1n")!;
-    const second = novel.allScenes.find((s) => s.id === id)!;
-    expect(novel.scenes.map((s) => s.id).slice(0, 3)).toEqual(["sc_5tat1n", id, "sc_br1dg3"]);
+    const first = novel.allPieces.find((s) => s.id === "sc_5tat1n")!;
+    const second = novel.allPieces.find((s) => s.id === id)!;
+    expect(novel.pieces.map((s) => s.id).slice(0, 3)).toEqual(["sc_5tat1n", id, "sc_br1dg3"]);
     expect(second).toMatchObject({ title: "The Flags", pov: station.pov, characters: station.characters, status: station.status });
     const paragraphs = (body: string) => body.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
     expect(paragraphs(first.body)).toEqual(paragraphs(station.body).slice(0, 2));
@@ -130,8 +130,8 @@ describe("splitting and merging", () => {
 
     await ops.merge("sc_5tat1n");
     novel = await valid();
-    expect(paragraphs(novel.allScenes.find((s) => s.id === "sc_5tat1n")!.body)).toEqual(paragraphs(station.body));
-    expect(novel.allScenes.some((s) => s.id === id)).toBe(false);
+    expect(paragraphs(novel.allPieces.find((s) => s.id === "sc_5tat1n")!.body)).toEqual(paragraphs(station.body));
+    expect(novel.allPieces.some((s) => s.id === id)).toBe(false);
     expect(await order()).toEqual(START);
     clean();
   });
@@ -218,32 +218,32 @@ describe("through the server", () => {
 describe("random reshaping", () => {
   it("keeps every scene, byte for byte, and the order it was told, through any sequence of moves", async () => {
     const fc = (await import("fast-check")).default;
-    const sceneContent = async () => Object.fromEntries((await loadNovel(nodeSource(dir))).allScenes.map((s) => [s.id, read(s.file)]));
+    const sceneContent = async () => Object.fromEntries((await loadBook(nodeSource(dir))).allPieces.map((s) => [s.id, read(s.file)]));
     await fc.assert(
       fc.asyncProperty(fc.array(fc.tuple(fc.nat(), fc.nat(), fc.nat(), fc.boolean()), { minLength: 1, maxLength: 4 }), async (steps) => {
         dir = novelRepo(fresh("random"));
         ops = new ManuscriptOperations(dir, (fn) => fn());
         const before = await sceneContent();
         for (const [a, b, c, chapterMove] of steps) {
-          const novel = await loadNovel(nodeSource(dir));
+          const novel = await loadBook(nodeSource(dir));
           if (chapterMove) {
             const chapter = novel.allChapters[a % novel.allChapters.length]!;
             const part = novel.allParts[b % novel.allParts.length]!;
             await ops.move(chapter.id, { to: part.id, index: c % (part.chapterIds.length + 1) });
           } else {
-            const scene = novel.allScenes[a % novel.allScenes.length]!;
+            const scene = novel.allPieces[a % novel.allPieces.length]!;
             const chapter = novel.allChapters[b % novel.allChapters.length]!;
             await ops.move(scene.id, { to: chapter.id, index: c % (chapter.sceneIds.length + 1) });
           }
         }
         // Structure must stay valid. A reorder may put a relationship's end before its start
         // (E_REL_RANGE): that's the story's consistency, for the author to fix, not the operation's.
-        const novel = await loadNovel(nodeSource(dir));
-        expect([...novel.diagnostics, ...validateNovel(novel)].filter((d) => d.severity === "error" && d.code !== "E_REL_RANGE")).toEqual([]);
+        const novel = await loadBook(nodeSource(dir));
+        expect([...novel.diagnostics, ...validateBook(novel)].filter((d) => d.severity === "error" && d.code !== "E_REL_RANGE")).toEqual([]);
         expect(await sceneContent()).toEqual(before);
         // Reading order is the order files' order, and every file name's number matches its place.
         for (const chapter of novel.allChapters) {
-          chapter.sceneIds.forEach((id, i) => expect(novel.allScenes.find((s) => s.id === id)!.file).toMatch(new RegExp(`/${String(i + 1).padStart(2, "0")}-[^/]+\\.md$`)));
+          chapter.sceneIds.forEach((id, i) => expect(novel.allPieces.find((s) => s.id === id)!.file).toMatch(new RegExp(`/${String(i + 1).padStart(2, "0")}-[^/]+\\.md$`)));
         }
         clean();
       }),

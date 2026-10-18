@@ -1,17 +1,17 @@
 import { fileURLToPath } from "node:url";
-import { loadNovel, mentions } from "../src/index.ts";
+import { loadBook, mentions } from "../src/index.ts";
 import { nodeSource } from "../src/node.ts";
 import { describe, expect, it } from "vitest";
 import { gaps, gridKey, presence, sceneList, sortRows, totals } from "../src/diagrams.ts";
 
-const novel = await loadNovel(nodeSource(fileURLToPath(new URL("../../../examples/sample-novel/", import.meta.url))));
+const novel = await loadBook(nodeSource(fileURLToPath(new URL("../../../examples/sample-novel/", import.meta.url))));
 
 describe("presence", () => {
   it("matches the scenes' metadata exactly, for every type with a list", () => {
     for (const [type, field] of [["character", "characters"], ["location", "locations"], ["theme", "themes"], ["plotline", "plotlines"], ["artifact", "entities"]] as const) {
       expect(sceneList(type)).toBe(field);
       const m = presence(novel, type);
-      for (const scene of novel.scenes) {
+      for (const scene of novel.pieces) {
         const listed = new Set<string>(
           field === "characters" ? [...(scene.pov ? [scene.pov] : []), ...scene.characters] : field === "locations" || field === "entities" ? scene[field] : scene[field].map((x) => x.id),
         );
@@ -31,7 +31,7 @@ describe("presence", () => {
     expect(artifacts.marks.size).toBeGreaterThan(0);
     for (const [key, mark] of artifacts.marks) {
       const [entry, id] = key.split("|") as [string, string];
-      const scene = novel.scenes.find((s) => s.id === id)!;
+      const scene = novel.pieces.find((s) => s.id === id)!;
       expect(mark).toMatchObject({ listed: scene.entities.includes(entry), mentioned: mentions(scene.body).some((x) => x.id === entry) });
     }
     expect(artifacts.marks.get(gridKey("art_p1an5x", "sc_0d9wm4"))).toMatchObject({ listed: true });

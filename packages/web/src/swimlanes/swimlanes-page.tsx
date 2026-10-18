@@ -1,4 +1,4 @@
-import { editYaml, type Entity, type Novel, type Scene } from "@writer/core";
+import { editYaml, type Entity, type Book, type Piece } from "@writer/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { Popover } from "radix-ui";
 import { useId, useMemo, useState } from "react";
@@ -30,7 +30,7 @@ function cellLabel(scene: string, plotline: string, mark: Mark | undefined, gap?
  * one, with the beat's note on hover or focus. Gaps show where a thread goes quiet. The cells are a
  * grid: arrow keys move between them, Home and End go to a lane's ends.
  */
-export function SwimlanesPage({ novelId, novel, workspace }: { novelId: string; novel: Novel; workspace: Workspace }) {
+export function SwimlanesPage({ novelId, novel, workspace }: { novelId: string; novel: Book; workspace: Workspace }) {
   const [params, setParams] = useViewParams();
   const zoom = params.get("zoom") ?? undefined;
   const size = readSize(params.get("size"));
@@ -38,7 +38,7 @@ export function SwimlanesPage({ novelId, novel, workspace }: { novelId: string; 
   const threshold = readGap(params.get("gap")) ?? saved;
   // Gaps are found in the whole book (a quiet stretch can cross the zoom's edge); the grid shows the zoom.
   const whole = useMemo(() => swimlanes(novel), [novel]);
-  const s = useMemo(() => swimlanes(novel, zoomed(novel, novel.scenes, zoom)), [novel, zoom]);
+  const s = useMemo(() => swimlanes(novel, zoomed(novel, novel.pieces, zoom)), [novel, zoom]);
   const gapList = useMemo(() => gaps(whole, threshold), [whole, writeGap(threshold)]); // eslint-disable-line react-hooks/exhaustive-deps
   const inGap = useMemo(() => {
     const out = new Map<string, Gap>();
@@ -71,9 +71,9 @@ export function SwimlanesPage({ novelId, novel, workspace }: { novelId: string; 
 
   const sceneEdit = useSceneEdit(novelId, workspace);
   /** One change to a scene's link to a plotline, written to its front matter through the workspace. */
-  const change = (scene: Scene, lane: Entity, what: PlotlineChange, done?: string) => sceneEdit(scene, (fm) => plotlineEdits(fm, lane.id, what), done);
+  const change = (scene: Piece, lane: Entity, what: PlotlineChange, done?: string) => sceneEdit(scene, (fm) => plotlineEdits(fm, lane.id, what), done);
   /** A cell chosen (click, Enter or Space): an empty one links its scene to the plotline; a marked one opens its editor. */
-  const choose = (lane: Entity, scene: Scene, el: HTMLElement) => {
+  const choose = (lane: Entity, scene: Piece, el: HTMLElement) => {
     if (s.marks.has(cellKey(lane.id, scene.id))) setEditing({ lane: lane.id, scene: scene.id, el });
     else void change(scene, lane, { link: true }, `“${scene.title}” now advances ${lane.name}.`);
   };
@@ -208,7 +208,7 @@ function CellEditor({
   onClose,
 }: {
   anchor: HTMLElement;
-  scene: Scene;
+  scene: Piece;
   lane: Entity;
   mark: Mark | undefined;
   onChange: (what: PlotlineChange, done?: string) => Promise<void>;

@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { apartInTime, dayOneFor, durationMs, loadNovel, memorySource, overlaps, sceneNeighbours, storyInstant, storyTimeline, validate } from "../src/index.ts";
+import { apartInTime, dayOneFor, durationMs, loadBook, memorySource, overlaps, sceneNeighbours, storyInstant, storyTimeline, validate } from "../src/index.ts";
 import { nodeSource } from "../src/node.ts";
 
 const SAMPLE = fileURLToPath(new URL("../../../examples/sample-novel", import.meta.url));
@@ -41,17 +41,17 @@ describe("story time", () => {
       "bible/events/before.md": "---\nid: evt_bef0re\ntitle: Before\nwhen:\n  day: -100\n---\n",
     });
     const order = (t: ReturnType<typeof storyTimeline>) => t.items.map((i) => (i.kind === "scene" ? i.scene.title : i.event.title));
-    const apart = storyTimeline(await loadNovel(memorySource(files(""))));
+    const apart = storyTimeline(await loadBook(memorySource(files(""))));
     expect(order(apart)).toEqual(["Backstory", "Opening", "Before"]);
     expect(apartInTime(apart).map((i) => (i.kind === "event" ? i.event.title : ""))).toEqual(["Before"]);
-    const together = storyTimeline(await loadNovel(memorySource(files("calendar:\n  start: 2026-10-10\n"))));
+    const together = storyTimeline(await loadBook(memorySource(files("calendar:\n  start: 2026-10-10\n"))));
     expect(order(together)).toEqual(["Backstory", "Before", "Opening"]);
     expect(storyInstant({ day: -100 }, undefined, "2026-10-10")?.start).toBe(Date.UTC(2026, 6, 1));
     expect(apartInTime(together)).toEqual([]);
   });
 
   it("orders the sample's scenes and events by story time: the flashback first", async () => {
-    const novel = await loadNovel(nodeSource(SAMPLE));
+    const novel = await loadBook(nodeSource(SAMPLE));
     const t = storyTimeline(novel);
     const titles = t.items.map((i) => (i.kind === "scene" ? i.scene.title : `[${i.event.title}]`));
     expect(titles).toEqual([
@@ -72,7 +72,7 @@ describe("story time", () => {
   });
 
   it("finds the scenes either side of an event in story time", async () => {
-    const t = storyTimeline(await loadNovel(nodeSource(SAMPLE)));
+    const t = storyTimeline(await loadBook(nodeSource(SAMPLE)));
     const titles = (id: string) => {
       const { before, after } = sceneNeighbours(t, id);
       return [before?.title, after?.title];

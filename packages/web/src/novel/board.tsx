@@ -1,4 +1,4 @@
-import { countWords, type Novel, type Scene, type SceneStatus } from "@writer/core";
+import { countWords, type Book, type Piece, type PieceStatus } from "@writer/core";
 import { GripVertical } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
 import { Link, useSearchParams } from "react-router";
@@ -25,7 +25,7 @@ const number = new Intl.NumberFormat();
 const words = (n: number) => `${number.format(n)} ${n === 1 ? "word" : "words"}`;
 const scenes = (n: number) => `${number.format(n)} ${n === 1 ? "scene" : "scenes"}`;
 
-export function OutlineBoard({ novelId, novel, workspace }: { novelId: string; novel: Novel; workspace: Workspace }) {
+export function OutlineBoard({ novelId, novel, workspace }: { novelId: string; novel: Book; workspace: Workspace }) {
   const statuses = novel.kind.statuses.map((s) => s.key);
   const label = useStatusLabel();
   const edit = useSceneEdit(novelId, workspace);
@@ -34,11 +34,11 @@ export function OutlineBoard({ novelId, novel, workspace }: { novelId: string; n
   const filter: BoardFilter = Object.fromEntries(["pov", "part", "chapter"].flatMap((k) => (params.get(k) ? [[k, params.get(k)!]] : [])));
   const filtered = Object.keys(filter).length > 0;
   const dragging = useRef<string | undefined>(undefined);
-  const [over, setOver] = useState<SceneStatus>();
+  const [over, setOver] = useState<PieceStatus>();
   const name = (id: string | undefined) => novel.entities.find((e) => e.id === id)?.name;
 
-  const counts = useMemo(() => new Map(novel.scenes.map((s) => [s.id, countWords(s.body)])), [novel]);
-  const visible = novel.scenes.filter((s) => {
+  const counts = useMemo(() => new Map(novel.pieces.map((s) => [s.id, countWords(s.body)])), [novel]);
+  const visible = novel.pieces.filter((s) => {
     const chapter = novel.chapters.find((c) => c.id === s.chapterId);
     return (!filter.pov || s.pov === filter.pov) && (!filter.chapter || s.chapterId === filter.chapter) && (!filter.part || chapter?.partId === filter.part);
   });
@@ -51,7 +51,7 @@ export function OutlineBoard({ novelId, novel, workspace }: { novelId: string; n
     setParams(next, { replace: true });
   };
 
-  const move = (scene: Scene, status: SceneStatus) => {
+  const move = (scene: Piece, status: PieceStatus) => {
     if (scene.status === status) return Promise.resolve();
     return edit(scene, () => [{ path: ["status"], value: status }], `Moved “${scene.title}” to ${label(status)}.`);
   };
@@ -63,7 +63,7 @@ export function OutlineBoard({ novelId, novel, workspace }: { novelId: string; n
     if (id && (document.activeElement === document.body || !document.activeElement?.isConnected)) document.querySelector<HTMLElement>(`[data-board-handle="${id}"]`)?.focus();
   }, [novel]);
 
-  const onHandleKey = (e: KeyboardEvent, scene: Scene) => {
+  const onHandleKey = (e: KeyboardEvent, scene: Piece) => {
     if (!e.altKey || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
     e.preventDefault();
     const next = statuses[statuses.indexOf(scene.status) + (e.key === "ArrowLeft" ? -1 : 1)];
@@ -72,14 +72,14 @@ export function OutlineBoard({ novelId, novel, workspace }: { novelId: string; n
     void move(scene, next).then(() => requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-board-handle="${scene.id}"]`)?.focus()));
   };
 
-  const onDragOver = (e: DragEvent, status: SceneStatus) => {
+  const onDragOver = (e: DragEvent, status: PieceStatus) => {
     if (!dragging.current) return;
     e.preventDefault();
     setOver(status);
   };
-  const onDrop = (e: DragEvent, status: SceneStatus) => {
+  const onDrop = (e: DragEvent, status: PieceStatus) => {
     e.preventDefault();
-    const scene = novel.scenes.find((s) => s.id === dragging.current);
+    const scene = novel.pieces.find((s) => s.id === dragging.current);
     dragging.current = undefined;
     setOver(undefined);
     if (scene) void move(scene, status);
@@ -101,7 +101,7 @@ export function OutlineBoard({ novelId, novel, workspace }: { novelId: string; n
         )}
       </div>
       <p role="status" className="text-sm text-muted">
-        {filtered ? `${visible.length} of ${scenes(novel.scenes.length)} match, ${words(total)}.` : `${scenes(visible.length)}, ${words(total)}.`}
+        {filtered ? `${visible.length} of ${scenes(novel.pieces.length)} match, ${words(total)}.` : `${scenes(visible.length)}, ${words(total)}.`}
       </p>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
         {statuses.map((status) => {

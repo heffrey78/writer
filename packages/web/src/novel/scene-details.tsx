@@ -1,4 +1,4 @@
-import { countWords, dayOneFor, readFrontMatter, sceneFacts, type Novel, type YamlEdit } from "@writer/core";
+import { countWords, dayOneFor, readFrontMatter, sceneFacts, type Book, type YamlEdit } from "@writer/core";
 import { chapterTitle } from "@writer/core/diagrams";
 import { joinSceneFile } from "@writer/editor";
 import { ChevronLeft, ChevronRight, Pencil, Pin, Plus, X } from "lucide-react";
@@ -60,7 +60,7 @@ export function whenOf(fm: Record<string, unknown>): { when: string; duration: s
  * Each detail a scene has, as a few words for its pinned line, by row key in the card's order:
  * names for entries, "Day 3, 18:30 · 45 min" for when, the tags as written.
  */
-export function detailTexts(novel: Novel, fm: Record<string, unknown>): Record<string, string> {
+export function detailTexts(novel: Book, fm: Record<string, unknown>): Record<string, string> {
   const name = (id: string) => novel.entities.find((e) => e.id === id)?.name ?? id;
   const names = (ids: string[]) => ids.map(name).join(", ");
   const typeOf = (id: string) => novel.entities.find((e) => e.id === id)?.type ?? novel.entityTypes.find((t) => id.startsWith(`${t.prefix}_`))?.key;
@@ -81,7 +81,7 @@ export function detailTexts(novel: Novel, fm: Record<string, unknown>): Record<s
 }
 
 /** A scene's pinned line: its pinned details that it has, in the card's order. */
-export function pinnedLine(novel: Novel, fm: Record<string, unknown>, keys: readonly string[]): string {
+export function pinnedLine(novel: Book, fm: Record<string, unknown>, keys: readonly string[]): string {
   return Object.entries(detailTexts(novel, fm))
     .filter(([k, v]) => v && keys.includes(k))
     .map(([, v]) => v)
@@ -107,7 +107,7 @@ export function SceneDetails({
   issues,
   onOpenIssue,
 }: {
-  novel: Novel;
+  novel: Book;
   workspace: Workspace;
   path: string;
   title: string;
@@ -193,7 +193,7 @@ export function SceneDetails({
   };
 
   // Where the scene is: its chapter, its place in it, and its neighbours.
-  const scene = novel.allScenes.find((s) => s.file === path);
+  const scene = novel.allPieces.find((s) => s.file === path);
   const chapter = scene && novel.chapters.find((c) => c.sceneIds.includes(scene.id));
   const at = chapter && scene ? chapter.sceneIds.indexOf(scene.id) : -1;
   const prev = chapter && at > 0 ? chapter.sceneIds[at - 1] : undefined;
@@ -603,7 +603,7 @@ export function StoryTimeFields({
   duration: string;
   edit: (edits: YamlEdit[]) => void;
   /** The book, for when Day 1 is: a day changed to a date offers to date Day 1 from it (heffrey78/gh-writer#239). */
-  novel?: Novel;
+  novel?: Book;
 }) {
   const whenKind = when?.at !== undefined ? "date" : when?.day !== undefined ? "day" : "";
   const set = (key: string, value: unknown) => edit([value === undefined || value === "" ? { path: [key], remove: true } : { path: [key], value }]);
@@ -719,7 +719,7 @@ export function readableDuration(iso: string): string {
 }
 
 /** A name in the card: opens its entry on the Entry tab. */
-function EntityLink({ novel, id }: { novel: Novel; id: string }) {
+function EntityLink({ novel, id }: { novel: Book; id: string }) {
   const entity = novel.entities.find((e) => e.id === id);
   if (!entity) return <span className="text-muted">{id}</span>;
   return (

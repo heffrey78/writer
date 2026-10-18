@@ -1,5 +1,5 @@
 import type { IssueLabel, IssueList, IssuesStatus, Milestone } from "@writer/client";
-import { entityLabel, entityOfLabel, issueKindOf, kindLabel, STOCK_LABELS, type IssueKind, type Novel } from "@writer/core";
+import { entityLabel, entityOfLabel, issueKindOf, kindLabel, STOCK_LABELS, type IssueKind, type Book } from "@writer/core";
 import { plural } from "../bible/types.ts";
 import { useQueryClient } from "@tanstack/react-query";
 import { X } from "lucide-react";
@@ -88,7 +88,7 @@ const OTHER = "Other labels";
  * Labels to offer: every bible entry's (whether or not its label is on GitHub yet), by type, then the
  * repository's other labels worth offering (see pickableLabels).
  */
-export function labelChoices(meta: Pick<IssueList, "labels" | "issues"> | undefined, novel: Novel): LabelChoice[] {
+export function labelChoices(meta: Pick<IssueList, "labels" | "issues"> | undefined, novel: Book): LabelChoice[] {
   const entries = novel.entityTypes.flatMap((t) =>
     novel.entities
       .filter((e) => e.type === t.key)

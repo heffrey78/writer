@@ -4,7 +4,7 @@ import { gfmFromMarkdown } from "mdast-util-gfm";
 import { toString } from "mdast-util-to-string";
 import { gfm } from "micromark-extension-gfm";
 import { chapterTitle, describeRelationship } from "./diagrams.ts";
-import type { Chapter, Entity, Novel, Relationship, Scene, StoryEvent } from "./model.ts";
+import type { Chapter, Entity, Book, Relationship, Piece, StoryEvent } from "./model.ts";
 import type { StoryTime } from "./types.ts";
 import { diffParagraphs, diffSequences, type ParagraphDiff } from "./word-diff.ts";
 import { countWords } from "./words.ts";
@@ -93,16 +93,16 @@ export interface Comparison {
 }
 
 /** What changed from `before` to `after`. */
-export function compareNovels(before: Novel, after: Novel): Comparison {
-  const sceneA = new Map(before.allScenes.map((s) => [s.id, s]));
-  const sceneB = new Map(after.allScenes.map((s) => [s.id, s]));
+export function compareNovels(before: Book, after: Book): Comparison {
+  const sceneA = new Map(before.allPieces.map((s) => [s.id, s]));
+  const sceneB = new Map(after.allPieces.map((s) => [s.id, s]));
   const chapterA = new Map(before.chapters.map((c) => [c.id, c]));
   const chapterB = new Map(after.chapters.map((c) => [c.id, c]));
 
   // Moved: scenes (and chapters) both have, out of the longest run they share in reading order.
   const movedScenes = outOfOrder(
-    before.allScenes.map((s) => s.id).filter((id) => sceneB.has(id)),
-    after.allScenes.map((s) => s.id).filter((id) => sceneA.has(id)),
+    before.allPieces.map((s) => s.id).filter((id) => sceneB.has(id)),
+    after.allPieces.map((s) => s.id).filter((id) => sceneA.has(id)),
   );
   const movedChapters = outOfOrder(
     before.chapters.map((c) => c.id).filter((id) => chapterB.has(id)),
@@ -214,7 +214,7 @@ export function proseParagraphs(markdown: string): string[] {
   return out;
 }
 
-const wordsOf = (novel: Novel) => novel.allScenes.reduce((n, s) => n + countWords(s.body), 0);
+const wordsOf = (novel: Book) => novel.allPieces.reduce((n, s) => n + countWords(s.body), 0);
 
 /** Items not in the longest common subsequence of two orders of the same items. */
 function outOfOrder(a: string[], b: string[]): Set<string> {
@@ -251,10 +251,10 @@ function field(label: string, before: string | undefined, after: string | undefi
   return { label, ...(a !== undefined ? { before: a } : {}), ...(b !== undefined ? { after: b } : {}) };
 }
 
-const names = (novel: Novel, ids: readonly string[] | undefined) => (ids ?? []).map((id) => novel.entities.find((e) => e.id === id)?.name ?? id).join(", ") || undefined;
-const nameOf = (novel: Novel, id: string | undefined) => (id ? (novel.entities.find((e) => e.id === id)?.name ?? id) : undefined);
+const names = (novel: Book, ids: readonly string[] | undefined) => (ids ?? []).map((id) => novel.entities.find((e) => e.id === id)?.name ?? id).join(", ") || undefined;
+const nameOf = (novel: Book, id: string | undefined) => (id ? (novel.entities.find((e) => e.id === id)?.name ?? id) : undefined);
 
-function partTitle(novel: Novel, chapter: Chapter): string | undefined {
+function partTitle(novel: Book, chapter: Chapter): string | undefined {
   return chapter.partId ? novel.allParts.find((p) => p.id === chapter.partId)?.title : undefined;
 }
 
@@ -264,12 +264,12 @@ function when(time: StoryTime | undefined): string | undefined {
   return `Day ${time.day}${time.time ? `, ${time.time}` : ""}`;
 }
 
-function sceneFields(novelA: Novel, a: Scene | undefined, novelB: Novel, b: Scene | undefined): FieldChange[] {
+function sceneFields(novelA: Book, a: Piece | undefined, novelB: Book, b: Piece | undefined): FieldChange[] {
   // Added and removed scenes are listed as such; their fields aren't changes.
   if (!a || !b) return [];
-  const plotlines = (novel: Novel, s: Scene) =>
+  const plotlines = (novel: Book, s: Piece) =>
     s.plotlines.map((p) => `${nameOf(novel, p.id)} (${p.weight}${p.beat ? `: ${p.beat}` : ""})`).join(", ") || undefined;
-  const themes = (novel: Novel, s: Scene) => s.themes.map((t) => nameOf(novel, t.id)).join(", ") || undefined;
+  const themes = (novel: Book, s: Piece) => s.themes.map((t) => nameOf(novel, t.id)).join(", ") || undefined;
   return [
     field("Title", a.title, b.title),
     field("Synopsis", a.synopsis, b.synopsis),
@@ -286,11 +286,11 @@ function sceneFields(novelA: Novel, a: Scene | undefined, novelB: Novel, b: Scen
   ].filter((f): f is FieldChange => !!f);
 }
 
-function typeLabel(novel: Novel, entity: Entity): string {
+function typeLabel(novel: Book, entity: Entity): string {
   return novel.entityTypes.find((t) => t.key === entity.type)?.label ?? entity.type;
 }
 
-function compareEntries(before: Novel, after: Novel): EntryComparison[] {
+function compareEntries(before: Book, after: Book): EntryComparison[] {
   const a = new Map(before.entities.map((e) => [e.id, e]));
   const out: EntryComparison[] = [];
   const entryFields = (x: Entity | undefined, y: Entity | undefined) => {
@@ -315,8 +315,8 @@ function compareEntries(before: Novel, after: Novel): EntryComparison[] {
   return out;
 }
 
-function compareRelationships(before: Novel, after: Novel): RelationshipComparison[] {
-  const sentence = (novel: Novel, r: Relationship) => `${nameOf(novel, r.from)}: ${describeRelationship(novel, r.from, r)}`;
+function compareRelationships(before: Book, after: Book): RelationshipComparison[] {
+  const sentence = (novel: Book, r: Relationship) => `${nameOf(novel, r.from)}: ${describeRelationship(novel, r.from, r)}`;
   const same = (x: Relationship, y: Relationship) => x.from === y.from && x.to === y.to && x.type === y.type && x.since === y.since && x.until === y.until && x.note === y.note;
   const a = new Map(before.relationships.map((r) => [r.id, r]));
   const b = new Map(after.relationships.map((r) => [r.id, r]));
@@ -330,7 +330,7 @@ function compareRelationships(before: Novel, after: Novel): RelationshipComparis
   return out;
 }
 
-function compareEvents(before: Novel, after: Novel): EventComparison[] {
+function compareEvents(before: Book, after: Book): EventComparison[] {
   const a = new Map(before.events.map((e) => [e.id, e]));
   const out: EventComparison[] = [];
   const eventFields = (x: StoryEvent, y: StoryEvent) =>

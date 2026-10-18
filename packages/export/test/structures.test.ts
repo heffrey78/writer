@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import { compileBook, loadNovel, memorySource, type CompiledBook } from "@writer/core";
+import { compileBook, loadBook, memorySource, type CompiledBook } from "@writer/core";
 import { strFromU8, unzipSync } from "fflate";
 import { JSDOM } from "jsdom";
 import { getDocument, OPS } from "pdfjs-dist/legacy/build/pdf.mjs";
@@ -31,7 +31,7 @@ const RICH = [
 ].join("\n\n");
 files[STATION] = files[STATION]!.replace(/\n---\n[\s\S]*$/, `\n---\n${RICH}\n`);
 const source = memorySource(files);
-const book: CompiledBook = await compileBook(await loadNovel(source), source);
+const book: CompiledBook = await compileBook(await loadBook(source), source);
 const pictures = new Map<string, CoverImage>([
   ["images/maps/varn.jpg", coverImage(JPEG)!],
   ["images/seal.png", coverImage(ALPHA_PNG)!],

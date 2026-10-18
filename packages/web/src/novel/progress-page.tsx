@@ -1,4 +1,4 @@
-import { projection, streak, type Novel } from "@writer/core";
+import { projection, streak, type Book } from "@writer/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useId, useState, type FormEvent, type ReactNode } from "react";
 import { api, keys } from "../api.ts";
@@ -28,7 +28,7 @@ export function useStats(novelId: string) {
   return useQuery({ queryKey: keys.stats(novelId), queryFn: () => api.stats(novelId) });
 }
 
-export function ProgressPage({ novelId, novel }: { novelId: string; novel: Novel }) {
+export function ProgressPage({ novelId, novel }: { novelId: string; novel: Book }) {
   const stats = useStats(novelId);
   if (stats.isError) return <Page><ErrorAlert title="Couldn't read the novel's history">{stats.error.message}</ErrorAlert></Page>;
   if (!stats.data) return <Page><p className="text-sm text-muted">Reading the novel's history…</p></Page>;

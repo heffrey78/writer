@@ -1,4 +1,4 @@
-import { mentions, readFrontMatter, type Novel, type YamlEdit } from "@writer/core";
+import { mentions, readFrontMatter, type Book, type YamlEdit } from "@writer/core";
 
 /** The scene list a mention of each entity type adds to: plotlines and themes are the author's to list. */
 const listFor = (type: string): "characters" | "locations" | "entities" | undefined =>
@@ -10,7 +10,7 @@ const listFor = (type: string): "characters" | "locations" | "entities" | undefi
  * someone the author took off the list stays off while the old mentions stay, and nothing is
  * ever removed.
  */
-export function mentionEdits(novel: Novel, file: string, before: string, after: string): YamlEdit[] {
+export function mentionEdits(novel: Book, file: string, before: string, after: string): YamlEdit[] {
   const had = new Set(mentions(before).map((m) => m.id));
   const added = [...new Set(mentions(after).map((m) => m.id))].filter((id) => !had.has(id));
   if (!added.length) return [];

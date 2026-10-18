@@ -89,9 +89,9 @@ describe("GET /api/novels/:id", () => {
   it("returns the story model and the hash of each file it read", async () => {
     const r = await api("GET", "");
     expect(r.status).toBe(200);
-    const { novel, files } = json<{ novel: { config: { title: string }; allScenes: { file: string }[] }; files: Record<string, string> }>(r);
+    const { novel, files } = json<{ novel: { config: { title: string }; allPieces: { file: string }[] }; files: Record<string, string> }>(r);
     expect(novel.config.title).toBe("The Bridge at Varn");
-    expect(novel.allScenes.map((s) => s.file)).toContain(SCENE);
+    expect(novel.allPieces.map((s) => s.file)).toContain(SCENE);
     expect(files[SCENE]).toBe(hashText(readFileSync(join(root, SCENE))));
     expect(files["novel.yaml"]).toBeDefined();
   });

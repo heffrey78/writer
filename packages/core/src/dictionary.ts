@@ -1,4 +1,4 @@
-import type { Novel } from "./model.ts";
+import type { Book } from "./model.ts";
 import type { FileSource } from "./source.ts";
 
 /*
@@ -53,7 +53,7 @@ export async function readDictionary(source: FileSource): Promise<string[]> {
  * Words the spell checker should accept for a novel: every word of its entities' names and
  * aliases, plus its dictionary.
  */
-export function knownWords(novel: Pick<Novel, "entities">, dictionary: string[] = []): string[] {
+export function knownWords(novel: Pick<Book, "entities">, dictionary: string[] = []): string[] {
   const words = new Set(dictionary);
   const segmenter = new Intl.Segmenter(undefined, { granularity: "word" });
   for (const entity of novel.entities) {

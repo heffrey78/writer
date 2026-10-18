@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { deflateSync } from "node:zlib";
-import { loadNovel, validate } from "@writer/core";
+import { loadBook, validate } from "@writer/core";
 import { nodeSource } from "@writer/core/node";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { BibleOperations, createServer, hashText, Library, NovelWorkspace, sessionCookie } from "../src/index.ts";
@@ -77,7 +77,7 @@ describe("an entry's picture", () => {
     expect(lastCommit()).toBe("Bible: add a picture of Ada Varn");
     expect(changedInLastCommit()).toEqual(["A\timages/ada-varn.jpg", `M\t${ADA_FILE}`]);
     clean();
-    const novel = await loadNovel(nodeSource(dir));
+    const novel = await loadBook(nodeSource(dir));
     expect(novel.entities.find((e) => e.id === ADA)).toMatchObject({ image: "images/ada-varn.jpg", imageFocus: [0.52, 0.3] });
     expect(await warnings()).toEqual([]);
   });
@@ -160,7 +160,7 @@ describe("the book's cover", () => {
     expect(lastCommit()).toBe("Add a cover to the book");
     expect(changedInLastCommit()).toEqual(["A\timages/cover.jpg", "M\tnovel.yaml"]);
     expect(read("novel.yaml")).toBe(`${yaml}cover: images/cover.jpg\n`);
-    expect((await loadNovel(nodeSource(dir))).config?.cover).toBe("images/cover.jpg");
+    expect((await loadBook(nodeSource(dir))).config?.cover).toBe("images/cover.jpg");
 
     await bible.setCover(png());
     expect(lastCommit()).toBe("Change the book's cover");

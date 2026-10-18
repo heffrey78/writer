@@ -26,7 +26,7 @@ await server.close();
 | `POST /api/library/new` | yes | `{ title, author?, path?, identity?: { name, email } }` → `201 { novel }`, or `400 { code, error }` |
 | `DELETE /api/library/:id` | yes | `204`: forgets the novel; its folder is left alone |
 | `POST /api/library/clone` | yes | `{ repo, path? }` → an event stream (below) |
-| `GET /api/novels/:id` | yes | `{ novel, files, images }`: the story model (core `loadNovel`), the hash of each file it was read from, and a version of each picture it shows from `images/` (see [Pictures](#pictures)) |
+| `GET /api/novels/:id` | yes | `{ novel, files, images }`: the story model (core `loadBook`), the hash of each file it was read from, and a version of each picture it shows from `images/` (see [Pictures](#pictures)) |
 | `GET /api/novels/:id/files/<path>` | yes | `{ path, content, hash }` |
 | `PUT /api/novels/:id/files/<path>` | yes | `{ content, base }` → `{ hash }`, or `409 { current }` |
 | `GET /api/novels/:id/images/<path>` | yes | the image at `images/<path>` (see [Pictures](#pictures)) |

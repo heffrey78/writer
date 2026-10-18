@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { entityLabel, entityOfLabel, issueKindOf, kindByKey, passageIssueBody, V2_KIND, type BookKind, type Novel } from "@writer/core";
+import { entityLabel, entityOfLabel, issueKindOf, kindByKey, passageIssueBody, V2_KIND, type BookKind, type Book } from "@writer/core";
 import { git } from "./git.ts";
 import { GitHubError, unreachable, type GitHub, type GitHubRepo } from "./github.ts";
 
@@ -168,7 +168,7 @@ export class IssueStore {
   #used = new Set<string>();
   #saving: Promise<void> = Promise.resolve();
 
-  #novel: (() => Promise<Novel>) | undefined;
+  #novel: (() => Promise<Book>) | undefined;
   #kind: () => BookKind;
 
   /**
@@ -176,7 +176,7 @@ export class IssueStore {
    * `kind`: the book's kind, for its issue kinds' labels, without reading the whole book (format v2's,
    * a novel, by default).
    */
-  constructor(root: string, github: GitHub, repo: () => Promise<GitHubRepo | null>, novel?: () => Promise<Novel>, kind: () => BookKind = () => kindByKey(V2_KIND)) {
+  constructor(root: string, github: GitHub, repo: () => Promise<GitHubRepo | null>, novel?: () => Promise<Book>, kind: () => BookKind = () => kindByKey(V2_KIND)) {
     this.root = root;
     this.#github = github;
     this.#repo = repo;

@@ -149,7 +149,7 @@ describe("validate", () => {
       "manuscript/01-one/02-b.md": scene("sc_bbbbbb", "B", "entities: [art_aaaaaa]\n"),
     });
     expect(ok.diagnostics).toEqual([]);
-    expect(ok.novel.scenes.find((s) => s.id === "sc_bbbbbb")!.entities).toEqual(["art_aaaaaa"]);
+    expect(ok.novel.pieces.find((s) => s.id === "sc_bbbbbb")!.entities).toEqual(["art_aaaaaa"]);
 
     const wrong = await fixture({ "novel.yaml": custom, "manuscript/01-one/02-b.md": scene("sc_bbbbbb", "B", "entities: [char_aaaaaa, art_zzzzzz]\n") });
     expect(wrong.diagnostics.map((d) => [d.code, d.pointer])).toEqual([

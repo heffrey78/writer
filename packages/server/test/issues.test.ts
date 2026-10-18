@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { loadNovel, readAnchor } from "@writer/core";
+import { loadBook, readAnchor } from "@writer/core";
 import { nodeSource } from "@writer/core/node";
 import { createServer, GitHub, Library, memoryStore, sessionCookie, type TokenStore } from "../src/index.ts";
 import { IssueStore, type IssuesError } from "../src/issues.ts";
@@ -204,7 +204,7 @@ describe("issues", () => {
 });
 
 describe("labels for bible entries", () => {
-  const withNovel = () => new IssueStore(dir, github, async () => ({ owner: "ada", name: repoName(), url: `${fake.url}/ada/${repoName()}` }), () => loadNovel(nodeSource(dir)));
+  const withNovel = () => new IssueStore(dir, github, async () => ({ owner: "ada", name: repoName(), url: `${fake.url}/ada/${repoName()}` }), () => loadBook(nodeSource(dir)));
 
   it("makes an entry's or a kind's label with its colour when an issue first uses it", async () => {
     seed();

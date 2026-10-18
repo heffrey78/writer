@@ -1,10 +1,10 @@
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { gridKey, presence } from "../src/diagrams.ts";
-import { entryPresence, entryPresences, loadNovel, memorySource } from "../src/index.ts";
+import { entryPresence, entryPresences, loadBook, memorySource } from "../src/index.ts";
 import { nodeSource } from "../src/node.ts";
 
-const novel = await loadNovel(nodeSource(fileURLToPath(new URL("../../../examples/sample-novel/", import.meta.url))));
+const novel = await loadBook(nodeSource(fileURLToPath(new URL("../../../examples/sample-novel/", import.meta.url))));
 const strip = (id: string) =>
   entryPresence(novel, id)!
     .scenes.map((s) => ({ carries: "C", present: "p", mentioned: "m", absent: "." })[s.mark])
@@ -43,7 +43,7 @@ describe("entryPresence", () => {
   });
 
   it("knows an entry no scene uses yet, and nothing of an ID the novel doesn't have", async () => {
-    const book = await loadNovel(memorySource({ "novel.yaml": "schema_version: 1\nid: nv_aaaaaa\ntitle: T\n", "bible/characters/x.md": "---\nid: char_xxxxxx\nname: X\n---\n" }));
+    const book = await loadBook(memorySource({ "novel.yaml": "schema_version: 1\nid: nv_aaaaaa\ntitle: T\n", "bible/characters/x.md": "---\nid: char_xxxxxx\nname: X\n---\n" }));
     expect(entryPresence(book, "char_xxxxxx")).toMatchObject({ scenes: [], count: 0, carries: 0 });
     expect(entryPresence(book, "char_xxxxxx")!.first).toBeUndefined();
     expect(entryPresence(novel, "char_nope00")).toBeUndefined();

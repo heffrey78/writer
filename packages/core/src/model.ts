@@ -7,12 +7,12 @@ import type {
   NovelFile,
   RelationshipRecord,
   RelationshipTypeFile,
-  SceneStatus,
+  PieceStatus,
   StoryTime,
 } from "./types.ts";
 
 /** A novel loaded into memory. Collections are in reading order where that applies. */
-export interface Novel {
+export interface Book {
   /** What kind of book it is: data, so it travels with the model to the browser. */
   kind: BookKind;
   config: NovelFile | undefined;
@@ -23,11 +23,11 @@ export interface Novel {
   /** Parts, chapters and scenes listed in order files, in reading order. */
   parts: Part[];
   chapters: Chapter[];
-  scenes: Scene[];
+  pieces: Piece[];
   /** Every part, chapter and scene found on disk, including ones missing from order files. */
   allParts: Part[];
   allChapters: Chapter[];
-  allScenes: Scene[];
+  allPieces: Piece[];
   entities: Entity[];
   relationships: Relationship[];
   events: StoryEvent[];
@@ -72,11 +72,11 @@ export interface ThemeRef {
   note?: string;
 }
 
-export interface Scene {
+export interface Piece {
   id: string;
   title: string;
   synopsis?: string;
-  status: SceneStatus;
+  status: PieceStatus;
   pov?: string;
   characters: string[];
   locations: string[];
@@ -160,12 +160,12 @@ export interface RecordRef {
 }
 
 /** Every record with an ID, in discovery order. Duplicate IDs appear more than once. */
-export function allRecords(novel: Novel): RecordRef[] {
+export function allRecords(novel: Book): RecordRef[] {
   const out: RecordRef[] = [];
   if (novel.config?.id) out.push({ kind: "novel", id: novel.config.id, file: "novel.yaml" });
   for (const p of novel.allParts) out.push({ kind: "part", id: p.id, file: p.file });
   for (const c of novel.allChapters) out.push({ kind: "chapter", id: c.id, file: c.file });
-  for (const s of novel.allScenes) out.push({ kind: "scene", id: s.id, file: s.file });
+  for (const s of novel.allPieces) out.push({ kind: "scene", id: s.id, file: s.file });
   for (const e of novel.entities) out.push({ kind: "entity", id: e.id, file: e.file, type: e.type });
   for (const r of novel.relationships) out.push({ kind: "relationship", id: r.id, file: r.file });
   for (const e of novel.events) out.push({ kind: "event", id: e.id, file: e.file });
@@ -174,23 +174,23 @@ export function allRecords(novel: Novel): RecordRef[] {
 }
 
 /** Index of records by ID (first occurrence wins). */
-export function indexById(novel: Novel): Map<string, RecordRef> {
+export function indexById(novel: Book): Map<string, RecordRef> {
   const map = new Map<string, RecordRef>();
   for (const r of allRecords(novel)) if (!map.has(r.id)) map.set(r.id, r);
   return map;
 }
 
-export function entityById(novel: Novel, id: string): Entity | undefined {
+export function entityById(novel: Book, id: string): Entity | undefined {
   return novel.entities.find((e) => e.id === id);
 }
 
-export function sceneById(novel: Novel, id: string): Scene | undefined {
-  return novel.allScenes.find((s) => s.id === id);
+export function pieceById(novel: Book, id: string): Piece | undefined {
+  return novel.allPieces.find((s) => s.id === id);
 }
 
-function positionOf(novel: Novel, sceneId: string | undefined): number | undefined {
+function positionOf(novel: Book, sceneId: string | undefined): number | undefined {
   if (sceneId === undefined) return undefined;
-  const p = sceneById(novel, sceneId)?.position;
+  const p = pieceById(novel, sceneId)?.position;
   return p === undefined || p < 0 ? undefined : p;
 }
 
@@ -198,7 +198,7 @@ function positionOf(novel: Novel, sceneId: string | undefined): number | undefin
  * Relationships in effect at a scene: `since` is inclusive, `until` exclusive.
  * A bound that does not resolve to an ordered scene is ignored (the validator reports it).
  */
-export function relationshipsAt(novel: Novel, sceneId: string): Relationship[] {
+export function relationshipsAt(novel: Book, sceneId: string): Relationship[] {
   const at = positionOf(novel, sceneId);
   if (at === undefined) return [];
   return novel.relationships.filter((r) => {

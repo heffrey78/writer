@@ -1,4 +1,4 @@
-import { readAnchor, readFrontMatter, type Chapter, type Novel, type Scene } from "@writer/core";
+import { readAnchor, readFrontMatter, type Chapter, type Book, type Piece } from "@writer/core";
 import { countWords } from "@writer/core";
 import {
   appContextMenu,
@@ -60,10 +60,10 @@ import type { Workspace } from "./workspace.ts";
 
 interface Props {
   novelId: string;
-  novel: Novel;
+  novel: Book;
   workspace: Workspace;
   /** A chapter (continuous) or a single scene. */
-  view: { chapter: Chapter } | { scene: Scene; chapter: Chapter | undefined };
+  view: { chapter: Chapter } | { scene: Piece; chapter: Chapter | undefined };
   spell: { service: SpellService; onAddWord: (word: string) => void } | undefined;
   /** Where entries made from the @ menu go (see createQuickEntries). */
   entries?: QuickEntries | undefined;
@@ -77,9 +77,9 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
   const navigate = useNavigate();
   const files = useStore(workspace.store, (s) => s.files);
   const [editor, setEditor] = useState<Editor>();
-  const byId = useMemo(() => new Map(novel.allScenes.map((s) => [s.id, s])), [novel]);
+  const byId = useMemo(() => new Map(novel.allPieces.map((s) => [s.id, s])), [novel]);
   const scenes = useMemo(
-    () => ("scene" in view ? [view.scene] : view.chapter.sceneIds.map((id) => byId.get(id)).filter((s): s is Scene => s !== undefined)),
+    () => ("scene" in view ? [view.scene] : view.chapter.sceneIds.map((id) => byId.get(id)).filter((s): s is Piece => s !== undefined)),
     [view, byId],
   );
   const paths = scenes.map((s) => s.file);
@@ -207,7 +207,7 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
       workspace.onEdit((path, before, after) => {
         const book = latestNovel.current;
         const f = workspace.store.getState().files[path];
-        if (!f || !book.allScenes.some((s) => s.file === path)) return;
+        if (!f || !book.allPieces.some((s) => s.file === path)) return;
         const edits = mentionEdits(book, joinSceneFile(f), before, after);
         if (edits.length) void workspace.editFrontMatter(path, edits);
       }),
@@ -235,7 +235,7 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
       repo
         ? (openIssues.data?.issues ?? []).flatMap((i) => {
             const anchor = readAnchor(i.body);
-            const scene = anchor && novel.allScenes.find((s) => s.id === anchor.scene);
+            const scene = anchor && novel.allPieces.find((s) => s.id === anchor.scene);
             return anchor && scene ? [{ number: i.number, title: i.title, scene: scene.file, quote: anchor.quote }] : [];
           })
         : [],
@@ -264,7 +264,7 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
     () => (repo ? [{ id: "writing.raiseIssue", title: "Raise an issue about the selection…", group: "GitHub", keywords: ["note", "plot hole", "continuity", "research", "github"], run: raiseFromSelection }] : []),
     [repo, editor, novel],
   );
-  const sceneOf = (sceneId: string | undefined) => ("scene" in view ? view.scene : novel.allScenes.find((s) => s.file === sceneId));
+  const sceneOf = (sceneId: string | undefined) => ("scene" in view ? view.scene : novel.allPieces.find((s) => s.file === sceneId));
   const onMention = {
     show: (target: MentionTarget) => editor && useMentionCard.getState().show({ ...target, scene: sceneOf(target.sceneId), editor }),
     leave: leaveMention,
@@ -351,7 +351,7 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
   };
 
   const openScene = (path: string) => {
-    const scene = novel.allScenes.find((s) => s.file === path);
+    const scene = novel.allPieces.find((s) => s.file === path);
     if (!scene) return;
     // In the chapter view, open the chapter holding it; otherwise the scene.
     if (!("scene" in view) && scene.chapterId) void navigate(`/novels/${novelId}/chapter/${scene.chapterId}`);
@@ -384,7 +384,7 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
     editor.on("selectionUpdate", back);
     return () => void editor.off("selectionUpdate", back);
   }, [editor]);
-  const detailsScene = (stepped && stepped.from === atCaret?.id && novel.allScenes.find((s) => s.id === stepped.to)) || atCaret;
+  const detailsScene = (stepped && stepped.from === atCaret?.id && novel.allPieces.find((s) => s.id === stepped.to)) || atCaret;
 
   // The text scrolls on its own, so the sidebar beside it stays put.
   return (

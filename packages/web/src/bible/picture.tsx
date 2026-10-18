@@ -1,5 +1,5 @@
 import { imageUrl } from "@writer/client";
-import type { Novel } from "@writer/core";
+import type { Book } from "@writer/core";
 import { useQuery } from "@tanstack/react-query";
 import { ImagePlus, Pencil } from "lucide-react";
 import { DropdownMenu } from "radix-ui";
@@ -13,7 +13,7 @@ import { objectPosition, pictureAlt, refusal, type PictureShape } from "./pictur
 /** The version of each picture the model shows (from the server's `images`), for its URL. */
 export function useImageVersions(novelId: string): Record<string, string> {
   // The novel's own query, already loaded by the novel's page: only read here, never fetched again.
-  return useQuery({ queryKey: keys.novel(novelId), queryFn: () => api.novel<Novel>(novelId), enabled: false, select: (d) => d.images }).data ?? {};
+  return useQuery({ queryKey: keys.novel(novelId), queryFn: () => api.novel<Book>(novelId), enabled: false, select: (d) => d.images }).data ?? {};
 }
 
 /** Where a picture is shown from, or undefined when it can't be (none, or kept outside images/). */

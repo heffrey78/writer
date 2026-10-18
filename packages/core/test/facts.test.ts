@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { loadNovel, memorySource, readableSpan, sceneFacts } from "../src/index.ts";
+import { loadBook, memorySource, readableSpan, sceneFacts } from "../src/index.ts";
 
 const ROOT = fileURLToPath(new URL("../../../examples/sample-novel/", import.meta.url));
 const sample: Record<string, string> = Object.fromEntries(
@@ -13,7 +13,7 @@ const sample: Record<string, string> = Object.fromEntries(
 const SPAN = "manuscript/01-return/01-arrival/02-the-bridge.md";
 const STATION = "manuscript/01-return/01-arrival/01-the-station.md";
 
-const novel = (changes: Record<string, string> = {}) => loadNovel(memorySource({ ...sample, ...changes }));
+const novel = (changes: Record<string, string> = {}) => loadBook(memorySource({ ...sample, ...changes }));
 const edit = (path: string, from: string, to: string) => {
   const text = sample[path]!;
   if (!text.includes(from)) throw new Error(`${path} has no “${from}”`);
@@ -23,7 +23,7 @@ const edit = (path: string, from: string, to: string) => {
 describe("sceneFacts", () => {
   it("says what holds of each of the sample's scenes", async () => {
     const book = await novel();
-    expect(Object.fromEntries(book.scenes.map((s) => [s.title, sceneFacts(book, s.id)]))).toEqual({
+    expect(Object.fromEntries(book.pieces.map((s) => [s.title, sceneFacts(book, s.id)]))).toEqual({
       // Off-page events right before or after a scene in story time, with no scene between.
       "The Station": ["The book's first scene.", "6 days after the off-page event “The plans are stolen”.", "First appearance of Ada Varn.", "The Sale begins here."],
       "Walking the Span": ["8 h 10 min after “The Station”.", "First appearance of Ben Varn.", "Ben's Debt begins here."],
@@ -56,7 +56,7 @@ describe("sceneFacts", () => {
 
   it("says nothing of story time for a scene without one, and skips it for the next", async () => {
     const book = await novel(edit(SPAN, 'when:\n  day: 1\n  time: "17:40"\nduration: PT40M\n', ""));
-    const facts = (title: string) => sceneFacts(book, book.scenes.find((s) => s.title === title)!.id);
+    const facts = (title: string) => sceneFacts(book, book.pieces.find((s) => s.title === title)!.id);
     expect(facts("Walking the Span")).toEqual(["First appearance of Ben Varn.", "Ben's Debt begins here."]);
     expect(facts("Tomas's Workshop")[0]).toBe("1 day after “The Station”.");
   });
@@ -79,7 +79,7 @@ describe("sceneFacts", () => {
       "manuscript/01-return/_part.yaml": sample["manuscript/01-return/_part.yaml"]!.replace("chapters: [ch_arr1va, ch_01dde6]", "chapters: [ch_arr1va]"),
       "manuscript/01-return/01-arrival/_chapter.yaml": sample["manuscript/01-return/01-arrival/_chapter.yaml"]!.replace("scenes: [sc_5tat1n, sc_br1dg3]", "scenes: [sc_5tat1n]"),
     });
-    expect(book.scenes.map((s) => s.id)).toEqual(["sc_5tat1n"]);
+    expect(book.pieces.map((s) => s.id)).toEqual(["sc_5tat1n"]);
     expect(sceneFacts(book, "sc_5tat1n")).toEqual(["The book's only scene.", "6 days after the off-page event “The plans are stolen”.", "First appearance of Ada Varn.", "The Sale begins and ends here."]);
     expect(sceneFacts(book, "sc_br1dg3")).toEqual([]);
     expect(sceneFacts(book, "sc_nope00")).toEqual([]);

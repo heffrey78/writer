@@ -1,5 +1,5 @@
 import { DEFAULT_GAP, gaps, swimlanes, when, type Gap } from "./diagrams.ts";
-import type { Novel, Scene } from "./model.ts";
+import type { Book, Piece } from "./model.ts";
 import { storyInstant, type TimelineItem } from "./time.ts";
 
 /*
@@ -15,7 +15,7 @@ export interface Tally {
   scenes: number;
 }
 
-function tally(novel: Novel, ids: Iterable<string>[]): Tally[] {
+function tally(novel: Book, ids: Iterable<string>[]): Tally[] {
   const counts = new Map<string, number>();
   for (const list of ids) for (const id of new Set(list)) counts.set(id, (counts.get(id) ?? 0) + 1);
   return [...counts]
@@ -23,10 +23,10 @@ function tally(novel: Novel, ids: Iterable<string>[]): Tally[] {
     .sort((a, b) => b.scenes - a.scenes || a.name.localeCompare(b.name));
 }
 
-const castOf = (s: Scene) => [...(s.pov ? [s.pov] : []), ...s.characters];
+const castOf = (s: Piece) => [...(s.pov ? [s.pov] : []), ...s.characters];
 
 /** The story time a set of scenes covers: its earliest and latest, as read ("Day 1, 09:10"). */
-export function storySpan(novel: Novel, scenes: Scene[]): { from: string; to: string } | undefined {
+export function storySpan(novel: Book, scenes: Piece[]): { from: string; to: string } | undefined {
   const calendar = novel.config?.calendar?.start;
   const timed = scenes
     .flatMap((scene): TimelineItem[] => {
@@ -44,21 +44,21 @@ export interface LocationProfile {
   /** Who's in its scenes (point of view or characters), by how often. */
   visitors: Tally[];
   /** The scenes set there, in reading order. */
-  scenes: Scene[];
+  scenes: Piece[];
   span?: { from: string; to: string };
 }
 
-export function locationProfile(novel: Novel, id: string): LocationProfile {
-  const scenes = novel.scenes.filter((s) => s.locations.includes(id));
+export function locationProfile(novel: Book, id: string): LocationProfile {
+  const scenes = novel.pieces.filter((s) => s.locations.includes(id));
   const span = storySpan(novel, scenes);
   return { visitors: tally(novel, scenes.map(castOf)), scenes, ...(span ? { span } : {}) };
 }
 
 export interface PlotlineProfile {
   /** Its beats in reading order; `beat` is missing where the scene says nothing of what happens. */
-  beats: { scene: Scene; index: number; weight: "major" | "minor"; beat?: string }[];
+  beats: { scene: Piece; index: number; weight: "major" | "minor"; beat?: string }[];
   /** Scenes between its first and last beat that it isn't in. */
-  skips: Scene[];
+  skips: Piece[];
   /** Who's in its scenes, and where they're set, by how often. */
   who: Tally[];
   where: Tally[];
@@ -66,13 +66,13 @@ export interface PlotlineProfile {
   quiet: Gap[];
 }
 
-export function plotlineProfile(novel: Novel, id: string): PlotlineProfile {
-  const scenes = novel.scenes;
+export function plotlineProfile(novel: Book, id: string): PlotlineProfile {
+  const scenes = novel.pieces;
   const beats = scenes.flatMap((scene) =>
     scene.plotlines.flatMap((p, index) => (p.id === id ? [{ scene, index, weight: p.weight, ...(p.beat ? { beat: p.beat } : {}) }] : [])),
   );
-  const first = scenes.indexOf(beats[0]?.scene as Scene);
-  const last = scenes.indexOf(beats.at(-1)?.scene as Scene);
+  const first = scenes.indexOf(beats[0]?.scene as Piece);
+  const last = scenes.indexOf(beats.at(-1)?.scene as Piece);
   const skips = first < 0 ? [] : scenes.slice(first, last + 1).filter((s) => !s.plotlines.some((p) => p.id === id));
   const lanes = swimlanes(novel);
   return {
@@ -86,12 +86,12 @@ export function plotlineProfile(novel: Novel, id: string): PlotlineProfile {
 
 export interface ThemeProfile {
   /** Each scene in reading order: the theme's strength there (0: not listed; listed without one: 2). */
-  strengths: { scene: Scene; strength: 0 | 1 | 2 | 3; note?: string }[];
+  strengths: { scene: Piece; strength: 0 | 1 | 2 | 3; note?: string }[];
 }
 
-export function themeProfile(novel: Novel, id: string): ThemeProfile {
+export function themeProfile(novel: Book, id: string): ThemeProfile {
   return {
-    strengths: novel.scenes.map((scene) => {
+    strengths: novel.pieces.map((scene) => {
       const t = scene.themes.find((x) => x.id === id);
       const strength = !t ? 0 : t.strength === 1 || t.strength === 2 || t.strength === 3 ? t.strength : 2;
       return { scene, strength, ...(t?.note ? { note: t.note } : {}) };

@@ -1,4 +1,4 @@
-import type { Novel } from "@writer/core";
+import type { Book } from "@writer/core";
 import { useEffect, useRef } from "react";
 import { Navigate, useLocation, useNavigate, useParams, useSearchParams } from "react-router";
 import { cn } from "../ui/cn.ts";
@@ -58,7 +58,7 @@ function remember(view: View) {
   }
 }
 
-export function OutlinePage({ novelId, novel, workspace }: { novelId: string; novel: Novel; workspace: Workspace }) {
+export function OutlinePage({ novelId, novel, workspace }: { novelId: string; novel: Book; workspace: Workspace }) {
   const { view } = useParams();
   const navigate = useNavigate();
   const { state } = useLocation() as { state: { focusSwitch?: boolean } | null };

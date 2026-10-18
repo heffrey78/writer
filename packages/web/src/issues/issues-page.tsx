@@ -1,5 +1,5 @@
 import type { IssueFilter } from "@writer/client";
-import type { Novel } from "@writer/core";
+import type { Book } from "@writer/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { MessageSquare, Plus, RefreshCw, Search } from "lucide-react";
 import { useEffect, useId, useState } from "react";
@@ -19,7 +19,7 @@ import { PAGE } from "../ui/page.ts";
 import { cn } from "../ui/cn.ts";
 
 /** The novel's GitHub issues: filtered by state, labels, milestone and words, with the filter in the address. */
-export function IssuesPage({ novelId, novel, workspace }: { novelId: string; novel: Novel; workspace: Workspace }) {
+export function IssuesPage({ novelId, novel, workspace }: { novelId: string; novel: Book; workspace: Workspace }) {
   const [params, setParams] = useViewParams();
   const queryClient = useQueryClient();
   const show = useNotice((n) => n.show);
@@ -187,7 +187,7 @@ export function PassageLine({ novelId, passage }: { novelId: string; passage: Re
 }
 
 /** A new issue: its title, details, labels and milestone. */
-function NewIssue({ novelId, novel, onClose }: { novelId: string; novel: Novel; onClose: () => void }) {
+function NewIssue({ novelId, novel, onClose }: { novelId: string; novel: Book; onClose: () => void }) {
   const navigate = useNavigate();
   const meta = useIssueMeta(novelId);
   const changes = useIssueChanges(novelId);

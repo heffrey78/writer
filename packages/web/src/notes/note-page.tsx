@@ -1,5 +1,5 @@
 import { imageUrl } from "@writer/client";
-import { readFrontMatter, type Novel, type Note } from "@writer/core";
+import { readFrontMatter, type Book, type Note } from "@writer/core";
 import { joinSceneFile } from "@writer/editor";
 import { SceneEditor, type SpellService } from "@writer/editor/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -36,7 +36,7 @@ export function NotePage({
   embedded,
 }: {
   novelId: string;
-  novel: Novel;
+  novel: Book;
   note: Note;
   workspace: Workspace;
   spell?: { service: SpellService; onAddWord: (w: string) => void } | undefined;
@@ -87,7 +87,7 @@ export function NotePage({
       show({ message: `Couldn't change the tags: ${e instanceof Error ? e.message : String(e)}` });
     });
   };
-  const sceneTitle = (id: string) => novel.allScenes.find((x) => x.id === id)?.title ?? id;
+  const sceneTitle = (id: string) => novel.allPieces.find((x) => x.id === id)?.title ?? id;
   const setScenes = async (scenes: string[]) => {
     try {
       await api.notes.update(novelId, note.id, { scenes }, await base());
@@ -106,7 +106,7 @@ export function NotePage({
     },
   });
 
-  const becameScene = note.became ? novel.allScenes.find((s) => s.id === note.became) : undefined;
+  const becameScene = note.became ? novel.allPieces.find((s) => s.id === note.became) : undefined;
   const becameEvent = note.became ? novel.events.find((e) => e.id === note.became) : undefined;
   const Heading = embedded && !embedded.modal ? "h2" : "h1";
   return (

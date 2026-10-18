@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import { compileBook, loadNovel, memorySource, type CompiledBook } from "@writer/core";
+import { compileBook, loadBook, memorySource, type CompiledBook } from "@writer/core";
 import { strFromU8, unzipSync } from "fflate";
 import { JSDOM } from "jsdom";
 import { describe, expect, it } from "vitest";
@@ -18,7 +18,7 @@ files[STATION] = files[STATION]!.replace(/\n---\n[\s\S]*$/, "\n---\nShe said it 
 files["compile.yaml"] = "presets:\n  ebook:\n    title_page: { author: Ada Writer }\n    back: [back/thanks.md]\n";
 files["back/thanks.md"] = "# Thanks\n\nTo Varn.\n";
 const source = memorySource(files);
-const book: CompiledBook = await compileBook(await loadNovel(source), source);
+const book: CompiledBook = await compileBook(await loadBook(source), source);
 const DATE = new Date("2026-10-09T12:00:00Z");
 const bytes = toEpub(book, { date: DATE });
 const epub = Object.fromEntries(Object.entries(unzipSync(bytes)).map(([k, v]) => [k, strFromU8(v)]));

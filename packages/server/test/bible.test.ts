@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { loadNovel, relationshipsAt, relationshipStyle, validateNovel } from "@writer/core";
+import { loadBook, relationshipsAt, relationshipStyle, validateBook } from "@writer/core";
 import { nodeSource } from "@writer/core/node";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { BibleOperations, createServer, hashText, Library, ManuscriptOperations, sessionCookie, transaction } from "../src/index.ts";
@@ -30,10 +30,10 @@ const hash = (path: string) => hashText(readFileSync(join(dir, path)));
 const lastCommit = () => gitIn(dir, "log", "-1", "--format=%s").trim();
 const changedInLastCommit = () => gitIn(dir, "show", "--name-status", "--format=", "HEAD").trim().split("\n").sort();
 const clean = () => expect(gitIn(dir, "status", "--porcelain")).toBe("");
-const model = () => loadNovel(nodeSource(dir));
+const model = () => loadBook(nodeSource(dir));
 async function valid() {
   const novel = await model();
-  expect(validateNovel(novel).filter((d) => d.severity === "error")).toEqual([]);
+  expect(validateBook(novel).filter((d) => d.severity === "error")).toEqual([]);
   return novel;
 }
 
@@ -383,7 +383,7 @@ describe("events", () => {
       clean();
       const novel = await valid();
       expect(novel.config?.schema_version).toBe(2);
-      expect(validateNovel(novel)).toEqual([]);
+      expect(validateBook(novel)).toEqual([]);
     });
 
     it("migrates on its own, from POST /migrate", async () => {
@@ -480,7 +480,7 @@ describe("scene notes (heffrey78/gh-writer#222)", () => {
     await bible.updateNote("note_w1fben", { scenes: [SPAN] });
     expect(front("notes/what-if-ben-never-sold.md")).not.toContain("pinned");
     clean();
-    expect(validateNovel(await valid()).filter((d) => d.code === "W_NOTE_PIN")).toEqual([]);
+    expect(validateBook(await valid()).filter((d) => d.code === "W_NOTE_PIN")).toEqual([]);
   });
 
   it("deleting a scene takes it off its notes; notes left on no scene are kept or deleted as asked", async () => {

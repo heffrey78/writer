@@ -1,6 +1,6 @@
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
-import { loadNovel } from "@writer/core";
+import { loadBook } from "@writer/core";
 import { nodeSource } from "@writer/core/node";
 import { SNAPSHOT_MARKER, snapshots } from "@writer/core/snapshots";
 
@@ -15,7 +15,7 @@ export interface SnapshotsOptions {
  */
 export async function runSnapshots(dir: string, options: SnapshotsOptions = {}, out: (s: string) => void = console.log): Promise<number> {
   const root = resolve(dir);
-  const novel = await loadNovel(nodeSource(root));
+  const novel = await loadBook(nodeSource(root));
   if (!novel.config) {
     out(`No novel here: ${root} has no novel.yaml.`);
     return 1;

@@ -4,7 +4,7 @@
 // Usage: node scripts/compile-sample.ts [outdir]   (default dist/sample)
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { compileBook, loadNovel } from "@writer/core";
+import { compileBook, loadBook } from "@writer/core";
 import { nodeSource } from "@writer/core/node";
 import { coverImage, toDocx, toEpub, toPdf } from "@writer/export";
 import { registerKinds } from "@writer/kinds";
@@ -13,7 +13,7 @@ registerKinds();
 
 const out = process.argv[2] ?? "dist/sample";
 const source = nodeSource(new URL("../examples/sample-novel/", import.meta.url).pathname);
-const book = await compileBook(await loadNovel(source), source);
+const book = await compileBook(await loadBook(source), source);
 const date = new Date("2026-01-01T00:00:00Z");
 const cover = coverImage(readFileSync(new URL("../packages/export/test/fixtures/cover.jpg", import.meta.url)))!;
 book.chapters[0]!.blocks.push(

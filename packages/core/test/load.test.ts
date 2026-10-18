@@ -1,15 +1,15 @@
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { loadNovel, memorySource, mentions, notesMentioning, notesOfScene, relationshipsAt, type Novel } from "../src/index.ts";
+import { loadBook, memorySource, mentions, notesMentioning, notesOfScene, relationshipsAt, type Book } from "../src/index.ts";
 import { nodeSource } from "../src/node.ts";
 
 const SAMPLE = fileURLToPath(new URL("../../../examples/sample-novel", import.meta.url));
 
 describe("loading the sample novel", () => {
-  let novel: Novel;
+  let novel: Book;
 
   it("loads without diagnostics", async () => {
-    novel = await loadNovel(nodeSource(SAMPLE));
+    novel = await loadBook(nodeSource(SAMPLE));
     expect(novel.diagnostics).toEqual([]);
   });
 
@@ -18,11 +18,11 @@ describe("loading the sample novel", () => {
     expect(novel.topLevel).toBe("parts");
     expect(novel.parts.map((p) => p.title)).toEqual(["Return", "The Sale"]);
     expect(novel.chapters.map((c) => c.title)).toEqual(["Arrival", "Old Debts", "Night Crossing", "Varn Holds"]);
-    expect(novel.scenes.map((s) => s.title)).toEqual([
+    expect(novel.pieces.map((s) => s.title)).toEqual([
       "The Station", "Walking the Span", "Tomas's Workshop", "Ben's Ledger",
       "The Betrayal", "The Flood", "Mirela's Offer", "The Last Rivet",
     ]);
-    expect(novel.scenes.map((s) => s.position)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+    expect(novel.pieces.map((s) => s.position)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
   });
 
   it("loads the bible, including the custom entity type", () => {
@@ -34,14 +34,14 @@ describe("loading the sample novel", () => {
   });
 
   it("normalises scene references", () => {
-    const betrayal = novel.scenes.find((s) => s.id === "sc_0d9wm4")!;
+    const betrayal = novel.pieces.find((s) => s.id === "sc_0d9wm4")!;
     expect(betrayal.plotlines).toEqual([
       { id: "plot_h315tz", weight: "major", beat: "The plans have been sold" },
       { id: "plot_gr1efa", weight: "major", beat: "Ben confesses the debt" },
     ]);
     expect(betrayal.when).toEqual({ day: 3, time: "18:30" });
     expect(betrayal.body.startsWith("The wind came off the river")).toBe(true);
-    expect(novel.scenes.find((s) => s.id === "sc_f100d0")!.when).toEqual({ at: "2009-11-02T23:00" });
+    expect(novel.pieces.find((s) => s.id === "sc_f100d0")!.when).toEqual({ at: "2009-11-02T23:00" });
   });
 
   it("resolves time-scoped relationships", () => {
@@ -57,7 +57,7 @@ describe("loading the sample novel", () => {
   });
 
   it("finds mentions in prose", () => {
-    const betrayal = novel.scenes.find((s) => s.id === "sc_0d9wm4")!;
+    const betrayal = novel.pieces.find((s) => s.id === "sc_0d9wm4")!;
     expect(mentions(betrayal.body).map((m) => [m.id, m.line])).toEqual([["char_7f3k2q", 3], ["char_b3n0vs", 7]]);
   });
 });
@@ -74,17 +74,17 @@ function tiny(overrides: Record<string, string | undefined> = {}) {
     ...overrides,
   };
   const defined = Object.fromEntries(Object.entries(files).filter((e): e is [string, string] => e[1] !== undefined));
-  return loadNovel(memorySource(defined));
+  return loadBook(memorySource(defined));
 }
 
-const codes = (n: Novel) => n.diagnostics.map((d) => d.code);
+const codes = (n: Book) => n.diagnostics.map((d) => d.code);
 
 describe("loader structure checks", () => {
   it("loads a novel without parts", async () => {
     const n = await tiny();
     expect(n.diagnostics).toEqual([]);
     expect(n.topLevel).toBe("chapters");
-    expect(n.scenes.map((s) => s.id)).toEqual(["sc_aaaaaa", "sc_bbbbbb"]);
+    expect(n.pieces.map((s) => s.id)).toEqual(["sc_aaaaaa", "sc_bbbbbb"]);
   });
 
   it("reports missing required files", async () => {
@@ -106,8 +106,8 @@ describe("loader structure checks", () => {
   it("reports order problems", async () => {
     const n = await tiny({ "manuscript/01-one/_chapter.yaml": "id: ch_aaaaaa\nscenes: [sc_aaaaaa, sc_aaaaaa, sc_cccccc]\n" });
     expect(codes(n).sort()).toEqual(["E_ORDER_DUPLICATE", "E_ORDER_MISSING", "E_ORDER_UNKNOWN"]);
-    expect(n.scenes.map((s) => s.id)).toEqual(["sc_aaaaaa"]);
-    expect(n.allScenes).toHaveLength(2);
+    expect(n.pieces.map((s) => s.id)).toEqual(["sc_aaaaaa"]);
+    expect(n.allPieces).toHaveLength(2);
   });
 
   it("reports misplaced files and folders", async () => {
@@ -138,7 +138,7 @@ describe("loader structure checks", () => {
 
 describe("notes mentioning a record (heffrey78/gh-writer#205)", () => {
   it("finds the sample's note by the entries and events it mentions", async () => {
-    const novel = await loadNovel(nodeSource(SAMPLE));
+    const novel = await loadBook(nodeSource(SAMPLE));
     expect(notesMentioning(novel, "char_7f3k2q").map((n) => n.id)).toEqual(["note_w1fben"]);
     expect(notesMentioning(novel, "evt_9ab3kd").map((n) => n.id)).toEqual(["note_w1fben"]);
     expect(notesMentioning(novel, "char_b3n0vs")).toEqual([]);
@@ -155,7 +155,7 @@ describe("a scene's notes (heffrey78/gh-writer#222)", () => {
       "notes/c.md": note("note_cccccc", "Pinned", "scenes: [sc_aaaaaa]\npinned: [sc_aaaaaa]\ncreated: 2025-01-01\n"),
       "notes/d.md": note("note_dddddd", "Elsewhere", "scenes: [sc_bbbbbb]\npinned: [sc_bbbbbb]\n"),
     };
-    const novel = await loadNovel(memorySource(files));
+    const novel = await loadBook(memorySource(files));
     expect(notesOfScene(novel, "sc_aaaaaa").map((n) => n.title)).toEqual(["Pinned", "Newer", "Older"]);
     expect(notesOfScene(novel, "sc_bbbbbb").map((n) => n.title)).toEqual(["Elsewhere", "Newer"]);
   });

@@ -1,6 +1,6 @@
 import { idPrefix, RECORD_PREFIXES } from "./ids.ts";
-import { loadNovel } from "./load.ts";
-import { allRecords, mentions, picturePath, pictures, type Novel, type Picture, type RecordRef } from "./model.ts";
+import { loadBook } from "./load.ts";
+import { allRecords, mentions, picturePath, pictures, type Book, type Picture, type RecordRef } from "./model.ts";
 import type { FileSource } from "./source.ts";
 import { overlaps, storyTimeline, type TimelineItem } from "./time.ts";
 import type { Diagnostic, Severity } from "./types.ts";
@@ -38,7 +38,7 @@ export const RULES: Readonly<Record<string, Severity>> = {
 };
 
 export interface ValidationResult {
-  novel: Novel;
+  novel: Book;
   diagnostics: Diagnostic[];
   errors: number;
   warnings: number;
@@ -46,8 +46,8 @@ export interface ValidationResult {
 
 /** Load and fully validate a novel repository. */
 export async function validate(source: FileSource): Promise<ValidationResult> {
-  const novel = await loadNovel(source);
-  const diagnostics = sortDiagnostics([...novel.diagnostics, ...validateNovel(novel), ...(await missingImages(novel, source))]);
+  const novel = await loadBook(source);
+  const diagnostics = sortDiagnostics([...novel.diagnostics, ...validateBook(novel), ...(await missingImages(novel, source))]);
   const errors = diagnostics.filter((d) => d.severity === "error").length;
   return { novel, diagnostics, errors, warnings: diagnostics.length - errors };
 }
@@ -56,7 +56,7 @@ export async function validate(source: FileSource): Promise<ValidationResult> {
 const MENTIONABLE = ["*entity", "event"];
 
 /** Cross-reference checks and advisory warnings on a loaded novel. */
-export function validateNovel(novel: Novel): Diagnostic[] {
+export function validateBook(novel: Book): Diagnostic[] {
   if (novel.diagnostics.some((d) => d.code === "E_SCHEMA_VERSION")) return [];
   const out: Diagnostic[] = [];
   const push = (severity: Severity, code: string, file: string, message: string, extra: Partial<Diagnostic> = {}) =>
@@ -110,7 +110,7 @@ export function validateNovel(novel: Novel): Diagnostic[] {
   }
 
   // Scenes. `entities` holds custom types only: the built-in four have their own lists.
-  for (const s of novel.allScenes) {
+  for (const s of novel.allPieces) {
     ref(s.pov, ["character"], s.file, "/pov", "pov");
     s.characters.forEach((id, i) => ref(id, ["character"], s.file, `/characters/${i}`, "characters"));
     s.locations.forEach((id, i) => ref(id, ["location"], s.file, `/locations/${i}`, "locations"));
@@ -190,7 +190,7 @@ export function validateNovel(novel: Novel): Diagnostic[] {
   }
 
   // Relationships.
-  const scenePos = new Map(novel.scenes.map((s) => [s.id, s.position]));
+  const scenePos = new Map(novel.pieces.map((s) => [s.id, s.position]));
   for (const r of novel.relationships) {
     const p = `/relationships/${r.index}`;
     ref(r.from, ["*entity"], r.file, `${p}/from`, "from");
@@ -234,7 +234,7 @@ export function validateNovel(novel: Novel): Diagnostic[] {
   } else {
     checkPrefixes(novel.chapters, "Chapter folder");
   }
-  for (const c of novel.chapters) checkPrefixes(novel.scenes.filter((s) => s.chapterId === c.id), "Scene file");
+  for (const c of novel.chapters) checkPrefixes(novel.pieces.filter((s) => s.chapterId === c.id), "Scene file");
 
   return out;
 }
@@ -243,7 +243,7 @@ export function validateNovel(novel: Novel): Diagnostic[] {
  * Pictures named by the cover and the bible's entries that aren't in the repository. Found by listing
  * their folders rather than reading them: images can be large, and aren't text.
  */
-async function missingImages(novel: Novel, source: FileSource): Promise<Diagnostic[]> {
+async function missingImages(novel: Book, source: FileSource): Promise<Diagnostic[]> {
   if (novel.diagnostics.some((d) => d.code === "E_SCHEMA_VERSION")) return [];
   const listings = new Map<string, Promise<Set<string>>>();
   const exists = (path: string) => {
@@ -261,7 +261,7 @@ async function missingImages(novel: Novel, source: FileSource): Promise<Diagnost
   const wanted: { path: string; file: string; pointer?: string; line?: number; what: string }[] = [
     ...(novel.config?.cover ? [{ path: novel.config.cover, file: "novel.yaml", pointer: "/cover", what: "The cover" }] : []),
     ...novel.entities.flatMap((e) => (e.image ? [{ path: e.image, file: e.file, pointer: "/image", what: `${e.name}'s picture` }] : [])),
-    ...novel.allScenes.flatMap((s) => inProse(s.body, s.file, s.bodyLine)),
+    ...novel.allPieces.flatMap((s) => inProse(s.body, s.file, s.bodyLine)),
     ...novel.entities.flatMap((e) => inProse(e.body, e.file, e.bodyLine)),
     ...novel.events.flatMap((e) => (e.index === undefined ? inProse(e.body, e.file, e.bodyLine) : [])),
     ...novel.notes.flatMap((n) => inProse(n.body, n.file, n.bodyLine)),

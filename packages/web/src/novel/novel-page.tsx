@@ -1,5 +1,5 @@
 import type { SyncStatus } from "@writer/client";
-import type { Novel } from "@writer/core";
+import type { Book } from "@writer/core";
 import { writingModes } from "@writer/editor";
 import { useWritingModes } from "@writer/editor/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -58,7 +58,7 @@ export function NovelPage() {
   const { pathname } = useLocation();
   const current = /\/(chapter|scene)\/([^/]+)$/.exec(pathname)?.[2];
   const queryClient = useQueryClient();
-  const novel = useQuery({ queryKey: keys.novel(novelId), queryFn: () => api.novel<Novel>(novelId) });
+  const novel = useQuery({ queryKey: keys.novel(novelId), queryFn: () => api.novel<Book>(novelId) });
   const sync = useQuery({ queryKey: keys.sync(novelId), queryFn: () => api.sync(novelId) });
   const library = useQuery({ queryKey: keys.library, queryFn: api.library, staleTime: 30_000 });
   const folder = library.data?.novels.find((n) => n.id === novelId)?.path;
@@ -211,7 +211,7 @@ export function NovelPage() {
       ...(model?.chapters ?? []).flatMap((c): Command[] => [
         { id: `novel.chapter.${c.id}`, title: `Chapter: ${chapterTitle(model!, c)}`, group: "Go to", run: () => void navigate(`/novels/${novelId}/chapter/${c.id}`) },
         ...c.sceneIds.flatMap((id): Command[] => {
-          const s = model!.allScenes.find((x) => x.id === id);
+          const s = model!.allPieces.find((x) => x.id === id);
           return s
             ? [{ id: `novel.scene.${s.id}`, title: `Scene: ${s.title}`, group: "Go to", keywords: [chapterTitle(model!, c)], run: () => void navigate(`/novels/${novelId}/scene/${s.id}`) }]
             : [];
@@ -339,7 +339,7 @@ export function NovelPage() {
 /** A view's address: an item in its modal is its gallery's view, which stays as it was underneath (heffrey78/gh-writer#233). */
 const sameView = (pathname: string) => pathname.replace(/\/note\/[^/]+$/, "/notes").replace(/\/(bible|event)\/[^/]+$/, "/bible");
 
-type RouteProps = { novelId: string; novel: Novel; workspace: Workspace; spell: ReturnType<typeof useSpell>; entries?: QuickEntries | undefined };
+type RouteProps = { novelId: string; novel: Book; workspace: Workspace; spell: ReturnType<typeof useSpell>; entries?: QuickEntries | undefined };
 
 function ChapterRoute(props: RouteProps) {
   const { chapterId } = useParams();
@@ -349,7 +349,7 @@ function ChapterRoute(props: RouteProps) {
 
 function SceneRoute(props: RouteProps) {
   const { sceneId } = useParams();
-  const scene = props.novel.allScenes.find((s) => s.id === sceneId);
+  const scene = props.novel.allPieces.find((s) => s.id === sceneId);
   const chapter = props.novel.allChapters.find((c) => c.id === scene?.chapterId);
   return scene ? <WritingView {...props} view={{ scene, chapter }} /> : <Missing what="scene" />;
 }
@@ -361,7 +361,7 @@ function GitHubOnly({ repo, novelId, children }: { repo: ReturnType<typeof useGi
   return <>{children()}</>;
 }
 
-function IssueRoute({ novelId, novel, workspace }: { novelId: string; novel: Novel; workspace: Workspace }) {
+function IssueRoute({ novelId, novel, workspace }: { novelId: string; novel: Book; workspace: Workspace }) {
   const { number } = useParams();
   const n = Number(number);
   return Number.isInteger(n) && n !== 0 ? <IssuePage key={n} novelId={novelId} novel={novel} workspace={workspace} number={n} /> : <Missing what="issue" />;

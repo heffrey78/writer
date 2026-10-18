@@ -32,7 +32,7 @@ The novel itself is the source of truth: plain Markdown and YAML files ([format 
 
 | Package | What it is |
 |---|---|
-| [`core`](packages/core) | The novel format: JSON Schemas, types, the loader (`loadNovel`) and story model, the validator, word counts, IDs, edits to YAML that keep comments and layout, three-way merge, diagram data and SVG snapshots, issue anchors and labels, the compiler's book model (`compileBook`), and comparing two states of a novel with a word-level diff (`compareNovels`). Runs in the browser and in Node. |
+| [`core`](packages/core) | The novel format: JSON Schemas, types, the loader (`loadBook`) and story model, the validator, word counts, IDs, edits to YAML that keep comments and layout, three-way merge, diagram data and SVG snapshots, issue anchors and labels, the compiler's book model (`compileBook`), and comparing two states of a novel with a word-level diff (`compareNovels`). Runs in the browser and in Node. |
 | [`editor`](packages/editor/README.md) | The prose editor: TipTap schema, lossless Markdown round-trip, the scene and chapter editors, mentions, find and replace, spell check, word counts and the conflict resolver. |
 | [`client`](packages/client/README.md) | The browser side of the server: a typed API client and autosave. |
 | [`server`](packages/server/README.md) | The local server: Hono API, library, file writes, background commits, sync, checkpoints, versions, comparisons, GitHub connection, issue cache and outbox, compile route. Its README documents the API. |

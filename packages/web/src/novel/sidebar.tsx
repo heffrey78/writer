@@ -1,4 +1,4 @@
-import type { Novel } from "@writer/core";
+import type { Book } from "@writer/core";
 import { BookOpen, CircleDot, Columns2, Goal, ListTree, Map as MapIcon, Network, PanelLeftClose, PanelLeftOpen, PenLine, StickyNote, type LucideIcon } from "lucide-react";
 import { Dialog } from "radix-ui";
 import { useEffect, useId, useState, type ReactNode } from "react";
@@ -95,7 +95,7 @@ function useToggleKey(toggle: () => void, collapsed: boolean) {
   useCommands(() => [{ id: "app.sidebar", title: collapsed ? "Expand the sidebar" : "Collapse the sidebar", group: "App", keys: "Mod-\\", run: toggle }], [collapsed, toggle]);
 }
 
-export function Sidebar({ novelId, novel, workspace, current, onGitHub }: { novelId: string; novel: Novel; workspace: Workspace; current: string | undefined; onGitHub: boolean }) {
+export function Sidebar({ novelId, novel, workspace, current, onGitHub }: { novelId: string; novel: Book; workspace: Workspace; current: string | undefined; onGitHub: boolean }) {
   const { collapsed, toggle } = useSidebar();
   // Too narrow for it beside the text: the strip, and the sidebar over the text (a dialog) when it's
   // opened, closed again by going somewhere, Escape or a click beside it.
@@ -136,7 +136,7 @@ function ToggleButton({ collapsed, toggle }: { collapsed: boolean; toggle: () =>
   );
 }
 
-function Expanded({ novelId, novel, workspace, current, onGitHub, toggle }: { novelId: string; novel: Novel; workspace: Workspace; current: string | undefined; onGitHub: boolean; toggle: () => void }) {
+function Expanded({ novelId, novel, workspace, current, onGitHub, toggle }: { novelId: string; novel: Book; workspace: Workspace; current: string | undefined; onGitHub: boolean; toggle: () => void }) {
   const writeId = useId();
   return (
     <aside aria-label="Sidebar" className="flex min-h-0 flex-col border-rule bg-panel md:border-r">

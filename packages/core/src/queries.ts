@@ -1,11 +1,11 @@
-import { mentions, sceneById, type Note, type Novel, type Relationship, type Scene, type StoryEvent } from "./model.ts";
+import { mentions, pieceById, type Note, type Book, type Relationship, type Piece, type StoryEvent } from "./model.ts";
 
 /** How a scene refers to an entity. */
 export type SceneLink = "pov" | "characters" | "locations" | "entities" | "plotlines" | "themes" | "mention";
 
 export interface Backlinks {
   /** Scenes that name the entity, in reading order (scenes outside the order last), with how. */
-  scenes: { scene: Scene; via: SceneLink[] }[];
+  scenes: { scene: Piece; via: SceneLink[] }[];
   /** Relationships it takes part in, from either end. */
   relationships: Relationship[];
   /** Off-page events it's part of. */
@@ -13,8 +13,8 @@ export interface Backlinks {
 }
 
 /** Everywhere an entity is referred to: scene front matter, mentions in prose, relationships, events. */
-export function backlinks(novel: Novel, id: string): Backlinks {
-  const ordered = [...novel.scenes, ...novel.allScenes.filter((s) => s.position < 0)];
+export function backlinks(novel: Book, id: string): Backlinks {
+  const ordered = [...novel.pieces, ...novel.allPieces.filter((s) => s.position < 0)];
   const scenes: Backlinks["scenes"] = [];
   for (const scene of ordered) {
     const via: SceneLink[] = [];
@@ -48,12 +48,12 @@ export interface RelationshipSpan {
  * consecutive spans of reading order, split at every scene where one starts or ends. Bounds that
  * don't resolve to an ordered scene are ignored, as in relationshipsAt.
  */
-export function relationshipHistory(novel: Novel, id: string, other?: string): RelationshipSpan[] {
+export function relationshipHistory(novel: Book, id: string, other?: string): RelationshipSpan[] {
   const involved = novel.relationships.filter(
     (r) => (r.from === id || r.to === id) && (other === undefined || r.from === other || r.to === other),
   );
   const position = (sceneId: string | undefined) => {
-    const p = sceneId === undefined ? undefined : sceneById(novel, sceneId)?.position;
+    const p = sceneId === undefined ? undefined : pieceById(novel, sceneId)?.position;
     return p === undefined || p < 0 ? undefined : p;
   };
   const cuts = [...new Set(involved.flatMap((r) => [position(r.since), position(r.until)]).filter((p): p is number => p !== undefined))].sort((a, b) => a - b);
@@ -67,22 +67,22 @@ export function relationshipHistory(novel: Novel, id: string, other?: string): R
       return (since === undefined || since <= from) && (until === undefined || from < until);
     });
     return {
-      from: start === undefined ? null : novel.scenes[start]!.id,
-      until: end === undefined ? null : novel.scenes[end]!.id,
+      from: start === undefined ? null : novel.pieces[start]!.id,
+      until: end === undefined ? null : novel.pieces[end]!.id,
       relationships: holds,
     };
   });
 }
 
 /** The writer's notes that mention an entry or an event (heffrey78/gh-writer#205), newest first. */
-export function notesMentioning(novel: Novel, id: string): Note[] {
+export function notesMentioning(novel: Book, id: string): Note[] {
   return novel.notes
     .filter((n) => mentions(n.body).some((m) => m.id === id))
     .sort((a, b) => (b.created ?? "").localeCompare(a.created ?? "") || a.title.localeCompare(b.title));
 }
 
 /** A scene's notes (heffrey78/gh-writer#222): the one pinned there first, then newest first. */
-export function notesOfScene(novel: Novel, sceneId: string): Note[] {
+export function notesOfScene(novel: Book, sceneId: string): Note[] {
   const pinned = (n: Note) => (n.pinned.includes(sceneId) ? 1 : 0);
   return novel.notes
     .filter((n) => n.scenes.includes(sceneId))

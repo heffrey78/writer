@@ -1,6 +1,6 @@
 import { readdir, readFile, unlink } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
-import { kindByKey, loadNovel, parseYaml, picturePath, pictures, SCHEMA_VERSION, slugify, uniqueFileName, V2_KIND, type BookKind, type FileSource, type Novel } from "@writer/core";
+import { kindByKey, loadBook, parseYaml, picturePath, pictures, SCHEMA_VERSION, slugify, uniqueFileName, V2_KIND, type BookKind, type FileSource, type Book } from "@writer/core";
 import { nodeSource } from "@writer/core/node";
 import { watch, type FSWatcher } from "chokidar";
 import { BibleOperations } from "./bible.ts";
@@ -189,7 +189,7 @@ export class NovelWorkspace {
     return kindByKey(V2_KIND);
   }
 
-  async loadModel(): Promise<{ novel: Novel; files: Record<string, string>; images: Record<string, string> }> {
+  async loadModel(): Promise<{ novel: Book; files: Record<string, string>; images: Record<string, string> }> {
     const files: Record<string, string> = {};
     const disk = nodeSource(this.root);
     const source: FileSource = {
@@ -204,7 +204,7 @@ export class NovelWorkspace {
         return bytes.toString("utf8");
       },
     };
-    const novel = await loadNovel(source);
+    const novel = await loadBook(source);
     const images: Record<string, string> = {};
     const shown = [novel.config?.cover, ...novel.entities.map((e) => e.image)].filter((p): p is string => !!p);
     await Promise.all(
@@ -285,9 +285,9 @@ export class NovelWorkspace {
     }
     const gone = [...was].filter((p) => !now.has(p) && p.startsWith(`${IMAGES_DIR}/`));
     if (!gone.length) return;
-    const novel = await loadNovel(nodeSource(this.root));
+    const novel = await loadBook(nodeSource(this.root));
     const kept = new Set<string | undefined>([novel.config?.cover, ...novel.entities.map((e) => e.image)]);
-    for (const scene of novel.allScenes) for (const p of pictures(scene.body)) kept.add(picturePath(p.src));
+    for (const scene of novel.allPieces) for (const p of pictures(scene.body)) kept.add(picturePath(p.src));
     for (const picture of gone.filter((p) => !kept.has(p))) {
       const image = await servableImage(this.root, picture).catch(() => undefined);
       const bytes = image && (await readFile(image.full).catch(() => undefined));

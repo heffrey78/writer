@@ -1,4 +1,4 @@
-import { entryPresence, type Entity, type EntryPresence, type Novel, type PresenceMark } from "@writer/core";
+import { entryPresence, type Entity, type EntryPresence, type Book, type PresenceMark } from "@writer/core";
 import { useMemo, type CSSProperties, type ReactNode } from "react";
 import { Link } from "react-router";
 import { cn } from "../ui/cn.ts";
@@ -78,7 +78,7 @@ export function StripHeader({ presence }: { presence: EntryPresence }) {
 }
 
 /** Where an entry is across the book, and the facts that follow from it. */
-export function InTheStory({ novelId, novel, entity, compact }: { novelId: string; novel: Novel; entity: Entity; compact?: boolean }) {
+export function InTheStory({ novelId, novel, entity, compact }: { novelId: string; novel: Book; entity: Entity; compact?: boolean }) {
   const presence = useMemo(() => entryPresence(novel, entity.id), [novel, entity.id]);
   if (!presence) return null;
   const words = markWords(entity.type);

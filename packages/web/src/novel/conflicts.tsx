@@ -1,5 +1,5 @@
 import { type Conflicts, type FileResolution } from "@writer/client";
-import type { Novel } from "@writer/core";
+import type { Book } from "@writer/core";
 import { ConflictResolver, type ResolvedFile } from "@writer/editor/react";
 import { useQuery } from "@tanstack/react-query";
 import { Dialog, VisuallyHidden } from "radix-ui";
@@ -10,8 +10,8 @@ import { ErrorAlert } from "../ui/alert.tsx";
 import type { Workspace } from "./workspace.ts";
 
 /** What to call a file: its scene title or bible entry name, else its path. */
-export function fileTitle(novel: Novel | undefined, path: string): string {
-  return novel?.allScenes.find((s) => s.file === path)?.title ?? novel?.entities.find((e) => e.file === path)?.name ?? path;
+export function fileTitle(novel: Book | undefined, path: string): string {
+  return novel?.allPieces.find((s) => s.file === path)?.title ?? novel?.entities.find((e) => e.file === path)?.name ?? path;
 }
 
 export function Frame({ open, onClose, title, children }: { open: boolean; onClose: () => void; title: string; children: ReactNode }) {
@@ -39,7 +39,7 @@ export function Frame({ open, onClose, title, children }: { open: boolean; onClo
  * A sync conflict: the same passage changed here and on GitHub. Resolving commits the merge and
  * syncs; if things moved on meanwhile, the fresh conflicts are shown instead.
  */
-export function SyncConflicts({ novelId, novel, workspace, open, onClose }: { novelId: string; novel: Novel | undefined; workspace: Workspace; open: boolean; onClose: () => void }) {
+export function SyncConflicts({ novelId, novel, workspace, open, onClose }: { novelId: string; novel: Book | undefined; workspace: Workspace; open: boolean; onClose: () => void }) {
   const query = useQuery({ queryKey: ["conflicts", novelId], queryFn: () => api.conflicts(novelId), enabled: open, staleTime: 0 });
   const [fresh, setFresh] = useState<Conflicts | null>();
   const [error, setError] = useState<string>();
@@ -95,7 +95,7 @@ export function SyncConflicts({ novelId, novel, workspace, open, onClose }: { no
 }
 
 /** A save refused because the scene changed on disk in the same passage. */
-export function SaveConflicts({ novel, workspace }: { novel: Novel | undefined; workspace: Workspace }) {
+export function SaveConflicts({ novel, workspace }: { novel: Book | undefined; workspace: Workspace }) {
   const conflict = useStore(workspace.store, (s) => s.conflicts[0]);
   if (!conflict) return null;
   const title = fileTitle(novel, conflict.path);

@@ -1,5 +1,5 @@
 import { ApiError } from "@writer/client";
-import type { Novel } from "@writer/core";
+import type { Book } from "@writer/core";
 import { slugify } from "@writer/core";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog } from "radix-ui";
@@ -37,7 +37,7 @@ export function NewEntryDialog({
   onCreated,
 }: {
   novelId: string;
-  novel: Novel;
+  novel: Book;
   type: string | undefined;
   open: boolean;
   onOpenChange: (o: boolean) => void;
@@ -94,7 +94,7 @@ export function NewEntryDialog({
 }
 
 /** A custom entity type: a label, and the key, ID prefix and folder derived from it (editable). */
-export function NewTypeDialog({ novelId, novel, open, onOpenChange }: { novelId: string; novel: Novel; open: boolean; onOpenChange: (o: boolean) => void }) {
+export function NewTypeDialog({ novelId, novel, open, onOpenChange }: { novelId: string; novel: Book; open: boolean; onOpenChange: (o: boolean) => void }) {
   const queryClient = useQueryClient();
   const [label, setLabel] = useState("");
   const [prefix, setPrefix] = useState<string>();

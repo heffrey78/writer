@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import { compileBook, loadNovel, memorySource, type CompiledBook } from "@writer/core";
+import { compileBook, loadBook, memorySource, type CompiledBook } from "@writer/core";
 import { strFromU8, unzipSync } from "fflate";
 import { JSDOM } from "jsdom";
 import { describe, expect, it } from "vitest";
@@ -16,7 +16,7 @@ const files: Record<string, string> = Object.fromEntries(
 files["compile.yaml"] = "presets:\n  submission:\n    title_page:\n      author: Ada Writer\n      contact: [Ada Writer, 1 Bridge Street, ada@example.com]\n    front: [front/dedication.md]\n";
 files["front/dedication.md"] = "# For my father\n\nWho set the clock fast.\n";
 const source = memorySource(files);
-const book: CompiledBook = await compileBook(await loadNovel(source), source);
+const book: CompiledBook = await compileBook(await loadBook(source), source);
 const DATE = new Date("2026-10-09T12:00:00Z");
 const parts = (bytes: Uint8Array) => Object.fromEntries(Object.entries(unzipSync(bytes)).map(([k, v]) => [k, strFromU8(v)]));
 const parse = (text: string) => new new JSDOM("").window.DOMParser().parseFromString(text, "application/xml");
@@ -69,7 +69,7 @@ describe("DOCX in standard manuscript format", () => {
   it("keeps italic and bold, escapes what XML needs, and breaks lines", async () => {
     const station = "manuscript/01-return/01-arrival/01-the-station.md";
     const s2 = memorySource({ ...files, [station]: files[station]!.replace(/\n---\n[\s\S]*$/, "\n---\n_Quiet_ & **bold**, 1 < 2 > 0,\\\nthen on.\n") });
-    const one = parts(toDocx(await compileBook(await loadNovel(s2), s2), { date: DATE }))["word/document.xml"]!;
+    const one = parts(toDocx(await compileBook(await loadBook(s2), s2), { date: DATE }))["word/document.xml"]!;
     expect(one).toContain('<w:r><w:rPr><w:i/></w:rPr><w:t xml:space="preserve">Quiet</w:t></w:r><w:r><w:t xml:space="preserve"> &amp; </w:t></w:r><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">bold</w:t></w:r><w:r><w:t xml:space="preserve">, 1 &lt; 2 &gt; 0,</w:t><w:br/><w:t xml:space="preserve">then on.</w:t></w:r>');
   });
 

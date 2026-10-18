@@ -1,4 +1,4 @@
-import { entryPresences, proseText, storyTimeline, type Entity, type EntryPresence, type Novel } from "@writer/core";
+import { entryPresences, proseText, storyTimeline, type Entity, type EntryPresence, type Book } from "@writer/core";
 import { useNewEvent } from "../events/new-event.tsx";
 import { whenOf } from "../novel/scene-details.tsx";
 import { Plus, Search } from "lucide-react";
@@ -28,7 +28,7 @@ const MARK = { carries: "bg-accent", present: "bg-accent/40", mentioned: "bg-acc
  * small strip of the scenes it's in and how many; searchable by name or other name and sorted by
  * first appearance, name or most scenes. An entry or an event opens in a modal over it (`over`, heffrey78/gh-writer#236, heffrey78/gh-writer#237).
  */
-export function BiblePage({ novelId, novel, over }: { novelId: string; novel: Novel; over?: ReactNode }) {
+export function BiblePage({ novelId, novel, over }: { novelId: string; novel: Book; over?: ReactNode }) {
   const [params, setParams] = useSearchParams();
   const query = params.get("q") ?? "";
   const navigate = useNavigate();
@@ -44,7 +44,7 @@ export function BiblePage({ novelId, novel, over }: { novelId: string; novel: No
     const pb = presences.get(b.id);
     if (sort === "most") return (pb?.count ?? 0) - (pa?.count ?? 0) || a.name.localeCompare(b.name);
     if (sort === "first") {
-      const at = (p: EntryPresence | undefined) => (p?.first ? novel.scenes.indexOf(p.first) : Infinity);
+      const at = (p: EntryPresence | undefined) => (p?.first ? novel.pieces.indexOf(p.first) : Infinity);
       return at(pa) - at(pb) || a.name.localeCompare(b.name);
     }
     return a.name.localeCompare(b.name);
@@ -201,7 +201,7 @@ function EntryCard({ novelId, entity, presence }: { novelId: string; entity: Ent
  * Off-page events (heffrey78/gh-writer#223): the story's facts that aren't shown, as a group of cards after the entries,
  * found by title or note. Story-time order, but by title for the Name sort.
  */
-function EventCards({ novelId, novel, query, sort }: { novelId: string; novel: Novel; query: string; sort: Sort }) {
+function EventCards({ novelId, novel, query, sort }: { novelId: string; novel: Book; query: string; sort: Sort }) {
   const add = useNewEvent((s) => s.set);
   const all = useMemo(() => {
     const t = storyTimeline(novel);

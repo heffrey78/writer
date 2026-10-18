@@ -1,13 +1,13 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { editFrontMatter, loadNovel, readFrontMatter } from "@writer/core";
+import { editFrontMatter, loadBook, readFrontMatter } from "@writer/core";
 import { nodeSource } from "@writer/core/node";
 import { describe, expect, it } from "vitest";
 import { mentionEdits } from "../src/novel/mention-sync.ts";
 
 const root = fileURLToPath(new URL("../../../examples/sample-novel/", import.meta.url));
 const STATION = "manuscript/01-return/01-arrival/01-the-station.md";
-const novel = await loadNovel(nodeSource(root));
+const novel = await loadBook(nodeSource(root));
 const file = readFileSync(`${root}${STATION}`, "utf8");
 const body = file.slice(file.indexOf("\n---\n", 4) + 5);
 

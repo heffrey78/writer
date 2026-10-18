@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { bookImages, type CompiledBook, type Novel } from "@writer/core";
+import { bookImages, type CompiledBook, type Book } from "@writer/core";
 import { unzlibSync, zlibSync } from "fflate";
 
 /*
@@ -19,7 +19,7 @@ export interface CoverImage {
  * The novel's cover, read from `root`, or why it can't be used: a missing file, or one that isn't a
  * JPEG or PNG. No cover in novel.yaml: neither.
  */
-export async function readCover(root: string, novel: Novel): Promise<{ cover?: CoverImage; problem?: string }> {
+export async function readCover(root: string, novel: Book): Promise<{ cover?: CoverImage; problem?: string }> {
   const path = novel.config?.cover;
   if (!path) return {};
   if (/^\/|\\|(^|\/)\.\.?(\/|$)/.test(path)) return { problem: `The cover, ${path}, isn't a path in the novel, so the book goes out without it.` };

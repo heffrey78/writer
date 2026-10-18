@@ -1,4 +1,4 @@
-import type { Chapter, Novel } from "@writer/core";
+import type { Chapter, Book } from "@writer/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router";
 import { api, keys } from "../api.ts";
@@ -10,8 +10,8 @@ import type { Workspace } from "./workspace.ts";
 export type ItemKind = "part" | "chapter" | "scene";
 
 /** What an ID is in the manuscript, with its title for messages. */
-export function itemOf(novel: Novel, id: string): { kind: ItemKind; title: string } | undefined {
-  const scene = novel.allScenes.find((s) => s.id === id);
+export function itemOf(novel: Book, id: string): { kind: ItemKind; title: string } | undefined {
+  const scene = novel.allPieces.find((s) => s.id === id);
   if (scene) return { kind: "scene", title: scene.title };
   const chapter = novel.allChapters.find((c) => c.id === id);
   if (chapter) return { kind: "chapter", title: chapterTitle(novel, chapter) };
@@ -20,8 +20,8 @@ export function itemOf(novel: Novel, id: string): { kind: ItemKind; title: strin
 }
 
 /** The ordered list an item sits in, and the container it belongs to (null: the top level). */
-export function siblingsOf(novel: Novel, id: string): { container: string | null; list: string[] } | undefined {
-  const scene = novel.allScenes.find((s) => s.id === id);
+export function siblingsOf(novel: Book, id: string): { container: string | null; list: string[] } | undefined {
+  const scene = novel.allPieces.find((s) => s.id === id);
   if (scene) {
     const chapter = novel.allChapters.find((c) => c.id === scene.chapterId);
     return chapter ? { container: chapter.id, list: chapter.sceneIds } : undefined;
@@ -39,7 +39,7 @@ export function siblingsOf(novel: Novel, id: string): { container: string | null
  * out) and container. A scene at the edge of its chapter goes to the end of the previous chapter or
  * the start of the next; anything else at an edge stays put (undefined).
  */
-export function stepMove(novel: Novel, id: string, direction: -1 | 1): { index: number; to: string | null } | undefined {
+export function stepMove(novel: Book, id: string, direction: -1 | 1): { index: number; to: string | null } | undefined {
   const at = siblingsOf(novel, id);
   if (!at) return undefined;
   const i = at.list.indexOf(id);
@@ -54,7 +54,7 @@ export function stepMove(novel: Novel, id: string, direction: -1 | 1): { index: 
 }
 
 /** Moving `id` to just before or after `target`, an item of the same kind: the server's index and container. */
-export function dropMove(novel: Novel, id: string, target: string, after: boolean): { index: number; to: string | null } | undefined {
+export function dropMove(novel: Book, id: string, target: string, after: boolean): { index: number; to: string | null } | undefined {
   const at = siblingsOf(novel, target);
   if (!at || id === target) return undefined;
   const list = at.list.filter((x) => x !== id);
@@ -75,7 +75,7 @@ function enqueue<T>(novelId: string, task: () => Promise<T>): Promise<T> {
  * Structural changes from the UI: unsaved text is saved first, the model is reloaded after, and the
  * result (or the reason it failed) is announced; a delete offers Undo.
  */
-export function useStructure(novelId: string, novel: Novel, workspace: Workspace) {
+export function useStructure(novelId: string, novel: Book, workspace: Workspace) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const show = useNotice((s) => s.show);
@@ -106,7 +106,7 @@ export function useStructure(novelId: string, novel: Novel, workspace: Workspace
     // two quick presses move two places, not one twice.
     step: (id: string, direction: -1 | 1) =>
       enqueue(novelId, async () => {
-        const now = queryClient.getQueryData<{ novel: Novel }>(keys.novel(novelId))?.novel ?? novel;
+        const now = queryClient.getQueryData<{ novel: Book }>(keys.novel(novelId))?.novel ?? novel;
         const target = stepMove(now, id, direction);
         if (!target) return undefined;
         const into = target.to !== siblingsOf(now, id)?.container ? ` into “${(target.to && itemOf(now, target.to)?.title) || ""}”` : "";
@@ -128,7 +128,7 @@ export function useStructure(novelId: string, novel: Novel, workspace: Workspace
       const item = itemOf(novel, id);
       // Notes on only what's going (heffrey78/gh-writer#222): kept unattached or deleted too, as the author says.
       const gone = new Set(
-        novel.allScenes
+        novel.allPieces
           .filter((s) => s.id === id || s.chapterId === id || novel.allChapters.some((c) => c.id === s.chapterId && c.partId === id))
           .map((s) => s.id),
       );

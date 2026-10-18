@@ -1,10 +1,10 @@
-import type { Novel } from "@writer/core";
+import type { Book } from "@writer/core";
 import { chapterTitle } from "../novel/navigation.tsx";
 import type { PickerItem } from "../ui/picker.tsx";
 
 /** Every scene in reading order, under its chapter, findable by title or chapter. */
-export function sceneItems(novel: Novel): PickerItem[] {
-  return novel.scenes.map((s) => {
+export function sceneItems(novel: Book): PickerItem[] {
+  return novel.pieces.map((s) => {
     const chapter = novel.chapters.find((c) => c.id === s.chapterId);
     const group = chapter ? chapterTitle(novel, chapter) : "";
     return { value: s.id, label: s.title, group, keywords: [group] };
@@ -12,7 +12,7 @@ export function sceneItems(novel: Novel): PickerItem[] {
 }
 
 /** Every entry, under its type, findable by name or alias. */
-export function entityItems(novel: Novel, except?: string): PickerItem[] {
+export function entityItems(novel: Book, except?: string): PickerItem[] {
   return novel.entityTypes.flatMap((t) =>
     novel.entities
       .filter((e) => e.type === t.key && e.id !== except)

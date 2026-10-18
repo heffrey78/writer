@@ -1,5 +1,5 @@
 import type { EntityFields, Reference } from "@writer/client";
-import { entityOfLabel, type Entity, type Novel, type Relationship, type SceneLink } from "@writer/core";
+import { entityOfLabel, type Entity, type Book, type Relationship, type SceneLink } from "@writer/core";
 import { useGitHubRepo } from "../github/repo.ts";
 import { EntryIssues } from "../issues/entry-issues.tsx";
 import { useIssueList } from "../issues/use-issues.ts";
@@ -46,7 +46,7 @@ export function EntryPage({
   size = "page",
 }: {
   novelId: string;
-  novel: Novel;
+  novel: Book;
   entity: Entity;
   workspace: Workspace;
   spell?: { service: SpellService; onAddWord: (w: string) => void } | undefined;

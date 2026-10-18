@@ -1,4 +1,4 @@
-import type { Novel } from "@writer/core";
+import type { Book } from "@writer/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { useId, useState } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router";
@@ -16,7 +16,7 @@ import type { Workspace } from "./workspace.ts";
  * Story bible; /note/new, /event/new and /bible/new (?type=) make one, starting from its title.
  */
 
-type Props = { novelId: string; novel: Novel; workspace: Workspace; spell: ReturnType<typeof useSpell> };
+type Props = { novelId: string; novel: Book; workspace: Workspace; spell: ReturnType<typeof useSpell> };
 
 /** Once made, the item in the same modal, the address naming it (in place of …/new). */
 function useMade(novelId: string, kind: "note" | "event" | "bible") {

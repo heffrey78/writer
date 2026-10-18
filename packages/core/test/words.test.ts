@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
-import { countText, countWords, loadNovel, proseText } from "../src/index.ts";
+import { countText, countWords, loadBook, proseText } from "../src/index.ts";
 import { nodeSource } from "../src/node.ts";
 
 describe("countText", () => {
@@ -52,11 +52,11 @@ describe("countWords", () => {
 
   test("the sample novel's scenes have the expected counts", async () => {
     const root = join(import.meta.dirname, "../../../examples/sample-novel");
-    const novel = await loadNovel(nodeSource(root));
+    const novel = await loadBook(nodeSource(root));
     // The sample's prose is plain: a naive whitespace count, ignoring mention targets, agrees.
     const naive = (body: string) => body.replace(/\]\(#[^)]+\)/g, "]").split(/\s+/).filter((w) => /\p{L}|\d/u.test(w)).length;
-    for (const scene of novel.scenes) expect(countWords(scene.body), scene.file).toBe(naive(scene.body));
-    const station = novel.scenes.find((s) => s.id === "sc_5tat1n")!;
+    for (const scene of novel.pieces) expect(countWords(scene.body), scene.file).toBe(naive(scene.body));
+    const station = novel.pieces.find((s) => s.id === "sc_5tat1n")!;
     // Front matter is never part of a body.
     expect(station.body).not.toContain("title:");
     expect(readFileSync(join(root, station.file), "utf8")).toContain("title:");

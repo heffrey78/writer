@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { editYaml, loadNovel } from "@writer/core";
+import { editYaml, loadBook } from "@writer/core";
 import { nodeSource } from "@writer/core/node";
 import { slug, wordsIn, type Checkpoint, type Checkpoints } from "./checkpoints.ts";
 import { operationInProgress, type Committer } from "./committer.ts";
@@ -289,15 +289,15 @@ export class Versions {
       const version = await this.#get(from);
       if (version.current) throw new VersionError("OPEN", `“${version.name}” is the version open.`);
       const source = await commitSource(this.root, version.commit);
-      const there = await loadNovel(source);
-      const scene = there.allScenes.find((s) => s.id === sceneId);
+      const there = await loadBook(source);
+      const scene = there.allPieces.find((s) => s.id === sceneId);
       if (!scene) throw new VersionError("NOT_FOUND", `“${version.name}” has no scene “${sceneId}”.`);
       const content = (await source.read(scene.file))!;
-      const here = await loadNovel(nodeSource(this.root));
+      const here = await loadBook(nodeSource(this.root));
       const g = git(this.root);
       const undo = await this.#checkpoints.keep(`Before bringing “${scene.title}” from “${version.name}”`, (await g.raw(["rev-parse", "HEAD"])).trim());
 
-      const existing = here.allScenes.find((s) => s.id === sceneId);
+      const existing = here.allPieces.find((s) => s.id === sceneId);
       const files: string[] = [];
       if (existing) {
         await atomicWrite(await writablePath(this.root, existing.file, content), content);
@@ -405,7 +405,7 @@ export class Versions {
   async #wordsAt(commit: string): Promise<number> {
     let words = this.#words.get(commit);
     if (words === undefined) {
-      words = wordsIn(await loadNovel(await commitSource(this.root, commit)));
+      words = wordsIn(await loadBook(await commitSource(this.root, commit)));
       this.#words.set(commit, words);
     }
     return words;

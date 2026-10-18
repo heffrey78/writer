@@ -1,11 +1,11 @@
 import { fileURLToPath } from "node:url";
-import { loadNovel } from "../src/index.ts";
+import { loadBook } from "../src/index.ts";
 import { nodeSource } from "../src/node.ts";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { graphAt, layout } from "../src/diagrams.ts";
 
-const novel = await loadNovel(nodeSource(fileURLToPath(new URL("../../../examples/sample-novel/", import.meta.url))));
+const novel = await loadBook(nodeSource(fileURLToPath(new URL("../../../examples/sample-novel/", import.meta.url))));
 const ADA = "char_7f3k2q";
 const BEN = "char_b3n0vs";
 const between = (view: ReturnType<typeof graphAt>, a: string, b: string) => view.edges.filter((e) => [e.source, e.target].sort().join() === [a, b].sort().join()).map((e) => e.label).sort();

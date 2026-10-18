@@ -1,4 +1,4 @@
-import type { Entity, Novel, Scene, YamlEdit } from "@writer/core";
+import type { Entity, Book, Piece, YamlEdit } from "@writer/core";
 import { Popover } from "radix-ui";
 import { useId, useMemo, useState } from "react";
 import { plural } from "../bible/types.ts";
@@ -45,7 +45,7 @@ function describe(scene: string, name: string, p: Presence | undefined, gap?: Ga
  * reading order, from the scenes' metadata, with mentions in the prose shown apart. The type, zoom
  * and size live in the address.
  */
-export function PresencePage({ novelId, novel, workspace }: { novelId: string; novel: Novel; workspace: Workspace }) {
+export function PresencePage({ novelId, novel, workspace }: { novelId: string; novel: Book; workspace: Workspace }) {
   const [params, setParams] = useViewParams();
   const type = novel.entityTypes.some((t) => t.key === params.get("type")) ? params.get("type")! : "character";
   const zoom = params.get("zoom") ?? undefined;
@@ -55,7 +55,7 @@ export function PresencePage({ novelId, novel, workspace }: { novelId: string; n
   const threshold = readGap(params.get("gap")) ?? DEFAULT_GAP;
   // Absences are found in the whole book (one can cross the zoom's edge); the grid shows the zoom.
   const whole = useMemo(() => presence(novel, type), [novel, type]);
-  const m = useMemo(() => (zoom ? presence(novel, type, zoomed(novel, novel.scenes, zoom)) : whole), [novel, type, zoom, whole]);
+  const m = useMemo(() => (zoom ? presence(novel, type, zoomed(novel, novel.pieces, zoom)) : whole), [novel, type, zoom, whole]);
   const marks = useMemo(() => new Map([...m.marks].map(([k, p]) => [k, markOf(p)])), [m]);
   const rows = useMemo(() => {
     const count = totals(whole);
@@ -76,7 +76,7 @@ export function PresencePage({ novelId, novel, workspace }: { novelId: string; n
   const [editing, setEditing] = useState<{ row: string; scene: string; el: HTMLElement }>();
 
   /** A change to an entry in a scene's list (and, for a character, its point of view). */
-  const change = (scene: Scene, entry: Entity, what: EntryChange | { pov: boolean }, done?: string) =>
+  const change = (scene: Piece, entry: Entity, what: EntryChange | { pov: boolean }, done?: string) =>
     sceneEdit(
       scene,
       (fm): YamlEdit[] => {
@@ -90,7 +90,7 @@ export function PresencePage({ novelId, novel, workspace }: { novelId: string; n
     );
 
   /** A cell chosen: not listed, it's added to the scene's list; listed, its editor opens. */
-  const choose = (row: string, scene: Scene, el: HTMLElement) => {
+  const choose = (row: string, scene: Piece, el: HTMLElement) => {
     const entry = m.rows.find((r) => r.id === row);
     if (!entry) return;
     if (m.marks.get(gridKey(row, scene.id))?.listed) setEditing({ row, scene: scene.id, el });
@@ -171,7 +171,7 @@ export function PresencePage({ novelId, novel, workspace }: { novelId: string; n
           scenes={m.scenes}
           marks={marks}
           shaded={shaded}
-          cellLabel={(row: string, scene: Scene) => describe(scene.title, m.rows.find((r) => r.id === row)?.name ?? row, m.marks.get(gridKey(row, scene.id)), inGap.get(gridKey(row, scene.id)))}
+          cellLabel={(row: string, scene: Piece) => describe(scene.title, m.rows.find((r) => r.id === row)?.name ?? row, m.marks.get(gridKey(row, scene.id)), inGap.get(gridKey(row, scene.id)))}
           onChoose={choose}
           hasPopup={(row, scene) => !!m.marks.get(gridKey(row, scene))?.listed}
           size={size}
@@ -234,7 +234,7 @@ function PresenceEditor({
 }: {
   anchor: HTMLElement;
   type: string;
-  scene: Scene;
+  scene: Piece;
   entry: Entity;
   presence: Presence | undefined;
   onChange: (what: EntryChange | { pov: boolean }, done?: string) => unknown;

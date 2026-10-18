@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import { compileBook, loadNovel, memorySource, type CompiledBook } from "@writer/core";
+import { compileBook, loadBook, memorySource, type CompiledBook } from "@writer/core";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { describe, expect, it } from "vitest";
 import { toPdf } from "../src/index.ts";
@@ -16,7 +16,7 @@ const STATION = "manuscript/01-return/01-arrival/01-the-station.md";
 files[STATION] = files[STATION]!.replace(/\n---\n[\s\S]*$/, "\n---\nShe said it _twice_, “quietly” — café.\n\nThe second paragraph runs on long enough to wrap onto a second line of the page, so the spacing between its lines can be measured.\n");
 files["compile.yaml"] = "presets:\n  submission:\n    title_page:\n      author: Ada Writer\n      contact: [Ada Writer, 1 Bridge Street]\n";
 const source = memorySource(files);
-const book: CompiledBook = await compileBook(await loadNovel(source), source);
+const book: CompiledBook = await compileBook(await loadBook(source), source);
 const DATE = new Date("2026-10-09T12:00:00Z");
 const { pdf, missing } = await toPdf(book, { date: DATE });
 
@@ -76,7 +76,7 @@ describe("PDF", () => {
     expect(text).toMatch(/LiberationSerif-Italic/);
     expect(missing).toEqual([]);
     const s2 = memorySource({ ...files, [STATION]: files[STATION]!.replace("café", "café 漢字") });
-    expect((await toPdf(await compileBook(await loadNovel(s2), s2), { date: DATE })).missing).toEqual(["漢", "字"]);
+    expect((await toPdf(await compileBook(await loadBook(s2), s2), { date: DATE })).missing).toEqual(["漢", "字"]);
   });
 
   it("is the same file, byte for byte, from the same book and date", async () => {

@@ -1,4 +1,4 @@
-import { readFrontMatter, type Scene, type YamlEdit } from "@writer/core";
+import { readFrontMatter, type Piece, type YamlEdit } from "@writer/core";
 import { joinSceneFile } from "@writer/editor";
 import { useQueryClient } from "@tanstack/react-query";
 import { api, keys } from "../api.ts";
@@ -13,7 +13,7 @@ import type { Workspace } from "./workspace.ts";
 export function useSceneEdit(novelId: string, workspace: Workspace) {
   const queryClient = useQueryClient();
   const show = useNotice((n) => n.show);
-  return async (scene: Scene, edits: (fm: Record<string, unknown>) => YamlEdit[], done?: string) => {
+  return async (scene: Piece, edits: (fm: Record<string, unknown>) => YamlEdit[], done?: string) => {
     try {
       const open = workspace.store.getState().files[scene.file];
       const text = open ? joinSceneFile(open) : (await api.readFile(novelId, scene.file)).content;

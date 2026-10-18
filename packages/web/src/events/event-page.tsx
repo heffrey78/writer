@@ -1,6 +1,6 @@
 import type { Reference } from "@writer/client";
 import { imageUrl } from "@writer/client";
-import { readFrontMatter, sceneNeighbours, storyTimeline, type Novel, type StoryEvent, type YamlEdit } from "@writer/core";
+import { readFrontMatter, sceneNeighbours, storyTimeline, type Book, type StoryEvent, type YamlEdit } from "@writer/core";
 import { joinSceneFile } from "@writer/editor";
 import { SceneEditor, type SpellService } from "@writer/editor/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -47,7 +47,7 @@ export function EventPage({
   size = "page",
 }: {
   novelId: string;
-  novel: Novel;
+  novel: Book;
   event: StoryEvent;
   workspace: Workspace;
   spell?: { service: SpellService; onAddWord: (w: string) => void } | undefined;
@@ -121,7 +121,7 @@ export function EventPage({
       “{title}”
     </Link>
   );
-  const dramatized = novel.allScenes.find((s) => s.id === fm.scene);
+  const dramatized = novel.allPieces.find((s) => s.id === fm.scene);
 
   const Heading = embedded && !embedded.modal ? "h2" : "h1";
   return (

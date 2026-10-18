@@ -1,4 +1,4 @@
-import type { Novel } from "@writer/core";
+import type { Book } from "@writer/core";
 import { useState } from "react";
 import { Button } from "../ui/button.tsx";
 import { Modal } from "../ui/dialog.tsx";
@@ -6,7 +6,7 @@ import { Field } from "../ui/field.tsx";
 import { useNaming } from "./quick-entry.ts";
 
 /** "New <type>…" from the @ menu: the new entry's name, asked for in place. */
-export function NameEntryDialog({ novel }: { novel: Novel }) {
+export function NameEntryDialog({ novel }: { novel: Book }) {
   const { type, answer } = useNaming();
   if (!type) return null;
   const label = (novel.entityTypes.find((t) => t.key === type)?.label ?? "entry").toLowerCase();

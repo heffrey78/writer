@@ -1,7 +1,7 @@
 import { copyFile, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import { editYaml, loadNovel, newId } from "@writer/core";
+import { editYaml, loadBook, newId } from "@writer/core";
 import { nodeSource } from "@writer/core/node";
 import { snapshots } from "@writer/core/snapshots";
 import { hasGitIdentity } from "./committer.ts";
@@ -54,7 +54,7 @@ export async function writeNewNovel(template: string, dest: string, { title, aut
   }
   const readme = join(dest, "README.md");
   await writeFile(readme, (await readFile(readme, "utf8")).replace(/^# .*$/m, `# ${title}`));
-  for (const [file, text] of snapshots(await loadNovel(nodeSource(dest)))) await writeFile(join(dest, file), text);
+  for (const [file, text] of snapshots(await loadBook(nodeSource(dest)))) await writeFile(join(dest, file), text);
 
   const g = git(dest);
   await g.raw(["init", "-q", "-b", "main"]);

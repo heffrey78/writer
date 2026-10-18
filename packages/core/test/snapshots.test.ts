@@ -1,11 +1,11 @@
 import { fileURLToPath } from "node:url";
 import { JSDOM } from "jsdom";
 import { describe, expect, it } from "vitest";
-import { loadNovel } from "../src/index.ts";
+import { loadBook } from "../src/index.ts";
 import { nodeSource } from "../src/node.ts";
 import { relationshipMermaid, snapshots, timelineMermaid } from "../src/snapshots.ts";
 
-const novel = await loadNovel(nodeSource(fileURLToPath(new URL("../../../examples/sample-novel", import.meta.url))));
+const novel = await loadBook(nodeSource(fileURLToPath(new URL("../../../examples/sample-novel", import.meta.url))));
 
 describe("snapshots", () => {
   it("say the relationship graph in Mermaid, as the app holds it at a scene", () => {

@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { addToDictionary, knownWords, parseDictionary, readDictionary } from "../src/dictionary.ts";
-import { loadNovel, memorySource } from "../src/index.ts";
+import { loadBook, memorySource } from "../src/index.ts";
 import { nodeSource } from "../src/node.ts";
 
 describe("dictionary.txt", () => {
@@ -32,7 +32,7 @@ describe("dictionary.txt", () => {
 });
 
 test("known words are every word of the bible's names and aliases, plus the dictionary", async () => {
-  const novel = await loadNovel(nodeSource(join(import.meta.dirname, "../../../examples/sample-novel")));
+  const novel = await loadBook(nodeSource(join(import.meta.dirname, "../../../examples/sample-novel")));
   const words = knownWords(novel, ["steamline"]);
   for (const w of ["Ada", "Varn", "Mirela", "Kost", "Tomas", "Hale", "steamline"]) expect(words).toContain(w);
   expect(new Set(words).size).toBe(words.length);

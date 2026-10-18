@@ -1,4 +1,4 @@
-import { entryPresence, locationProfile, plotlineProfile, readFrontMatter, themeProfile, type Entity, type Novel, type Scene, type Tally } from "@writer/core";
+import { entryPresence, locationProfile, plotlineProfile, readFrontMatter, themeProfile, type Entity, type Book, type Piece, type Tally } from "@writer/core";
 import { joinSceneFile } from "@writer/editor";
 import { useMemo } from "react";
 import { Link } from "react-router";
@@ -15,7 +15,7 @@ import { StripHeader, StripRow } from "./strip.tsx";
 
 const LINK = "text-accent underline decoration-accent/35 underline-offset-[3px] hover:decoration-accent";
 
-export function TypeSections({ novelId, novel, entity, workspace }: { novelId: string; novel: Novel; entity: Entity; workspace: Workspace }) {
+export function TypeSections({ novelId, novel, entity, workspace }: { novelId: string; novel: Book; entity: Entity; workspace: Workspace }) {
   if (entity.type === "location") return <LocationSection novelId={novelId} novel={novel} entity={entity} />;
   if (entity.type === "plotline") return <PlotlineSection novelId={novelId} novel={novel} entity={entity} workspace={workspace} />;
   if (entity.type === "theme") return <ThemeSection novel={novel} entity={entity} />;
@@ -40,13 +40,13 @@ function Tallied({ novelId, tally, unit }: { novelId: string; tally: Tally[]; un
   );
 }
 
-const sceneLink = (novelId: string, scene: Scene) => (
+const sceneLink = (novelId: string, scene: Piece) => (
   <Link to={`/novels/${novelId}/scene/${scene.id}`} className={LINK}>
     {scene.title}
   </Link>
 );
 
-function LocationSection({ novelId, novel, entity }: { novelId: string; novel: Novel; entity: Entity }) {
+function LocationSection({ novelId, novel, entity }: { novelId: string; novel: Book; entity: Entity }) {
   const p = useMemo(() => locationProfile(novel, entity.id), [novel, entity.id]);
   return (
     <ProfileSection title="Who comes here">
@@ -56,13 +56,13 @@ function LocationSection({ novelId, novel, entity }: { novelId: string; novel: N
   );
 }
 
-function PlotlineSection({ novelId, novel, entity, workspace }: { novelId: string; novel: Novel; entity: Entity; workspace: Workspace }) {
+function PlotlineSection({ novelId, novel, entity, workspace }: { novelId: string; novel: Book; entity: Entity; workspace: Workspace }) {
   const p = useMemo(() => plotlineProfile(novel, entity.id), [novel, entity.id]);
   const place = useInPlace();
-  const title = (id: string) => novel.allScenes.find((s) => s.id === id)?.title ?? id;
+  const title = (id: string) => novel.allPieces.find((s) => s.id === id)?.title ?? id;
 
   /** Write a beat into its scene's front matter: a bare ID becomes a map holding it. */
-  const writeBeat = async (scene: Scene, index: number, beat: string) => {
+  const writeBeat = async (scene: Piece, index: number, beat: string) => {
     await workspace.open([scene.file]);
     const file = workspace.store.getState().files[scene.file];
     const item = file ? (readFrontMatter(joinSceneFile({ ...file, body: "" }))?.plotlines as unknown[] | undefined)?.[index] : undefined;
@@ -145,7 +145,7 @@ function PlotlineSection({ novelId, novel, entity, workspace }: { novelId: strin
 
 const STRENGTH = ["not there", "faint", "present", "strong"] as const;
 
-function ThemeSection({ novel, entity }: { novel: Novel; entity: Entity }) {
+function ThemeSection({ novel, entity }: { novel: Book; entity: Entity }) {
   const p = useMemo(() => themeProfile(novel, entity.id), [novel, entity.id]);
   const presence = useMemo(() => entryPresence(novel, entity.id), [novel, entity.id]);
   const n = p.strengths.length;

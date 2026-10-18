@@ -1,4 +1,4 @@
-import type { Novel, Relationship } from "@writer/core";
+import type { Book, Relationship } from "@writer/core";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog } from "radix-ui";
 import { api, keys } from "../api.ts";
@@ -21,7 +21,7 @@ export function EdgeDialog({
   onClose,
 }: {
   novelId: string;
-  novel: Novel;
+  novel: Book;
   relationship: Relationship;
   /** The scene the graph is at, for the buttons' wording. */
   sceneTitle: string | undefined;

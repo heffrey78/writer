@@ -1,5 +1,5 @@
 import { ApiError, type Conflicts, type FileResolution, type Version } from "@writer/client";
-import type { Novel } from "@writer/core";
+import type { Book } from "@writer/core";
 import { ConflictResolver, type ResolvedFile } from "@writer/editor/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Split } from "lucide-react";
@@ -61,10 +61,10 @@ export async function reload(queryClient: ReturnType<typeof useQueryClient>, nov
 
 /** Back to the start of the book when the chapter or scene open isn't in the version now open. */
 export function stayIfThere(queryClient: ReturnType<typeof useQueryClient>, novelId: string, pathname: string, navigate: (to: string) => void) {
-  const novel = queryClient.getQueryData<{ novel: Novel }>(keys.novel(novelId))?.novel;
+  const novel = queryClient.getQueryData<{ novel: Book }>(keys.novel(novelId))?.novel;
   const [, kind, id] = /\/(chapter|scene)\/([^/]+)$/.exec(pathname) ?? [];
   if (!novel || !kind) return;
-  const there = kind === "chapter" ? novel.allChapters.some((c) => c.id === id) : novel.allScenes.some((s) => s.id === id);
+  const there = kind === "chapter" ? novel.allChapters.some((c) => c.id === id) : novel.allPieces.some((s) => s.id === id);
   if (!there) void navigate(`/novels/${novelId}`);
 }
 
@@ -76,7 +76,7 @@ export async function undoAdoption(queryClient: ReturnType<typeof useQueryClient
 }
 
 /** Passages the main version and the adopted one both changed: the author chooses, then the adoption is committed. */
-export function AdoptConflicts({ novelId, novel, workspace }: { novelId: string; novel: Novel | undefined; workspace: Workspace }) {
+export function AdoptConflicts({ novelId, novel, workspace }: { novelId: string; novel: Book | undefined; workspace: Workspace }) {
   const { version, conflicts, set } = useAdoption();
   const queryClient = useQueryClient();
   const show = useNotice((s) => s.show);

@@ -1,9 +1,9 @@
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { entityLabel, entityOfLabel, loadNovel, type Novel } from "../src/index.ts";
+import { entityLabel, entityOfLabel, loadBook, type Book } from "../src/index.ts";
 import { nodeSource } from "../src/node.ts";
 
-const novel = await loadNovel(nodeSource(fileURLToPath(new URL("../../../examples/sample-novel/", import.meta.url))));
+const novel = await loadBook(nodeSource(fileURLToPath(new URL("../../../examples/sample-novel/", import.meta.url))));
 const entity = (id: string) => novel.entities.find((e) => e.id === id)!;
 
 describe("entity labels", () => {
@@ -15,7 +15,7 @@ describe("entity labels", () => {
 
   it("tells apart two of a type with the same name, and keeps within GitHub's limits", () => {
     const ben = entity("char_b3n0vs");
-    const twins: Novel = { ...novel, entities: [...novel.entities, { ...ben, id: "char_b3n2zz" }] };
+    const twins: Book = { ...novel, entities: [...novel.entities, { ...ben, id: "char_b3n2zz" }] };
     expect(entityLabel(twins, ben).name).toBe("char/ben-varn-b3n0vs");
     expect(entityLabel(twins, { ...ben, id: "char_b3n2zz" }).name).toBe("char/ben-varn-b3n2zz");
     const long = { ...ben, name: "A".repeat(30) + " " + "B".repeat(60) };

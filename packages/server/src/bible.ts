@@ -8,7 +8,7 @@ import {
   mentions,
   proseText,
   indexById,
-  loadNovel,
+  loadBook,
   nextSeriesSlot,
   SERIES,
   ID_PATTERN,
@@ -17,7 +17,7 @@ import {
   slugify,
   uniqueFileName,
   uniqueId,
-  type Novel,
+  type Book,
   type Relationship,
   type SeriesSlot,
   type YamlEdit,
@@ -302,7 +302,7 @@ export class BibleOperations {
       const newId = uniqueId(RECORD_PREFIXES.relationship, new Set(indexById(novel).keys()));
       const ended = editYaml(await this.#read(RELATIONSHIPS), [{ path: ["relationships", index, "until"], value: at }]);
       const content = await this.#appendRelationship({ id: newId, ...next }, ended);
-      const scene = novel.allScenes.find((s) => s.id === at)!;
+      const scene = novel.allPieces.find((s) => s.id === at)!;
       const result = await transaction(this.root, [{ path: RELATIONSHIPS, content }], `Bible: ${this.#describe(novel, relationship)} becomes ${next.type} at “${scene.title}”`);
       return { ...result, id: newId };
     });
@@ -314,7 +314,7 @@ export class BibleOperations {
       const { index, relationship } = this.#find(novel, id);
       this.#checkSpan(novel, relationship.since, at, "The end must come after the relationship starts.");
       const content = editYaml(await this.#read(RELATIONSHIPS), [{ path: ["relationships", index, "until"], value: at }]);
-      const scene = novel.allScenes.find((s) => s.id === at)!;
+      const scene = novel.allPieces.find((s) => s.id === at)!;
       return transaction(this.root, [{ path: RELATIONSHIPS, content }], `Bible: ${this.#describe(novel, relationship)} ends at “${scene.title}”`);
     });
   }
@@ -459,7 +459,7 @@ export class BibleOperations {
       const note = this.#findNote(novel, id);
       this.#checkScenes(novel, [scene]);
       const writes: FileWrite[] = [];
-      const edit = async (n: Novel["notes"][number], scenes: string[], pins: string[]) => {
+      const edit = async (n: Book["notes"][number], scenes: string[], pins: string[]) => {
         const text = await this.#read(n.file);
         const edits: YamlEdit[] = [];
         if (scenes.join() !== n.scenes.join()) edits.push(scenes.length ? { path: ["scenes"], value: scenes } : { path: ["scenes"], remove: true });
@@ -470,7 +470,7 @@ export class BibleOperations {
         for (const other of novel.notes) if (other.id !== id && other.pinned.includes(scene)) await edit(other, other.scenes, other.pinned.filter((s) => s !== scene));
         await edit(note, note.scenes.includes(scene) ? note.scenes : [...note.scenes, scene], note.pinned.includes(scene) ? note.pinned : [...note.pinned, scene]);
       } else await edit(note, note.scenes, note.pinned.filter((s) => s !== scene));
-      const title = novel.allScenes.find((s) => s.id === scene)?.title ?? scene;
+      const title = novel.allPieces.find((s) => s.id === scene)?.title ?? scene;
       return transaction(this.root, writes, pinned ? `Notes: pin “${note.title}” in “${title}”` : `Notes: unpin “${note.title}” in “${title}”`);
     });
   }
@@ -495,7 +495,7 @@ export class BibleOperations {
     { keep, migrate = false }: { keep: boolean; migrate?: boolean },
     manuscript: ManuscriptOperations,
   ): Promise<OperationResult & { id: string; file: string }> {
-    const noteWrite = async (novel: Novel, read: (path: string) => Promise<string | undefined>, made: string): Promise<FileWrite> => {
+    const noteWrite = async (novel: Book, read: (path: string) => Promise<string | undefined>, made: string): Promise<FileWrite> => {
       const note = this.#findNote(novel, id);
       const text = (await read(note.file)) ?? "";
       return keep ? { path: note.file, content: editFrontMatter(text, [{ path: ["became"], value: made }]), base: hashText(text) } : { path: note.file, content: null, base: hashText(text) };
@@ -535,7 +535,7 @@ export class BibleOperations {
    */
   #eventChange<T extends object>(
     migrate: boolean,
-    fn: (novel: Novel, read: (path: string) => Promise<string | undefined>, migrated: ReadonlySet<string>) => Promise<{ writes: FileWrite[]; message: string; extra: T }>,
+    fn: (novel: Book, read: (path: string) => Promise<string | undefined>, migrated: ReadonlySet<string>) => Promise<{ writes: FileWrite[]; message: string; extra: T }>,
   ): Promise<OperationResult & T> {
     return this.#exclusive(async () => {
       const { migration, writes: moved } = await migrationWrites(this.root);
@@ -544,7 +544,7 @@ export class BibleOperations {
         throw new OperationError("NEEDS_MIGRATION", `Off-page events are kept differently in format v${migration.to}: the novel must move to it first.`, { from: migration.from, to: migration.to });
       }
       const source = overlay(nodeSource(this.root), moved);
-      const { writes, message, extra } = await fn(await loadNovel(source), (path) => source.read(path), new Set(moved.map((w) => w.path)));
+      const { writes, message, extra } = await fn(await loadBook(source), (path) => source.read(path), new Set(moved.map((w) => w.path)));
       // A file the change writes again (an event file the migration made) is written once, as the change has it.
       const again = new Set(writes.map((w) => w.path));
       const all = [...moved.filter((w) => !again.has(w.path)), ...writes];
@@ -554,26 +554,26 @@ export class BibleOperations {
   }
 
   /** Scene IDs that are scenes, each once; anything else is refused. */
-  #checkScenes(novel: Novel, ids: string[]): string[] {
-    for (const id of ids) if (!novel.allScenes.some((s) => s.id === id)) throw new OperationError("BAD_REQUEST", `No scene “${id}”.`);
+  #checkScenes(novel: Book, ids: string[]): string[] {
+    for (const id of ids) if (!novel.allPieces.some((s) => s.id === id)) throw new OperationError("BAD_REQUEST", `No scene “${id}”.`);
     return [...new Set(ids)];
   }
 
-  #findNote(novel: Novel, id: string) {
+  #findNote(novel: Book, id: string) {
     const note = novel.notes.find((n) => n.id === id);
     if (!note) throw new OperationError("NOT_FOUND", `No note “${id}”.`);
     return note;
   }
 
   /** notes/<slug>.md for a title, unused by any other note (`own` is the note's file now, free to keep). */
-  #noteFileName(novel: Novel, title: string, own?: string): string {
+  #noteFileName(novel: Book, title: string, own?: string): string {
     const folder = novel.kind.folders.notes;
     const taken = new Set(novel.notes.filter((n) => n.file !== own).map((n) => n.file.slice(folder.length + 1)));
     return `${folder}/${uniqueFileName(slugify(title), ".md", taken)}`;
   }
 
   /** bible/events/<slug>.md for a title, unused by any other event (`own` is the event's file now, free to keep). */
-  #eventFileName(novel: Novel, title: string, own?: string): string {
+  #eventFileName(novel: Book, title: string, own?: string): string {
     const folder = `${novel.kind.folders.codex}/${novel.kind.folders.events}`;
     const taken = new Set(novel.events.filter((e) => e.file !== own && e.file.startsWith(`${folder}/`)).map((e) => e.file.slice(folder.length + 1)));
     return `${folder}/${uniqueFileName(slugify(title), ".md", taken)}`;
@@ -674,7 +674,7 @@ export class BibleOperations {
    * `image` (the picture of entity `owner`, or of the book for "novel"), if it's one the app may delete
    * along with it: a file in images/ that nothing else shows. A picture kept elsewhere is the author's.
    */
-  #ownPicture(novel: Novel, image: string | undefined, owner: string): string | undefined {
+  #ownPicture(novel: Book, image: string | undefined, owner: string): string | undefined {
     if (!image?.startsWith(`${IMAGES_DIR}/`) || image.split("/").some((s) => s === ".." || s === "." || s.startsWith("."))) return undefined;
     const shared = (owner !== "novel" && novel.config?.cover === image) || novel.entities.some((e) => e.id !== owner && e.image === image);
     return shared ? undefined : image;
@@ -687,39 +687,39 @@ export class BibleOperations {
     return `${IMAGES_DIR}/${uniqueFileName(slug, ext, taken)}`;
   }
 
-  #run<T>(fn: (novel: Novel) => Promise<T>): Promise<T> {
-    return this.#exclusive(async () => fn(await loadNovel(nodeSource(this.root))));
+  #run<T>(fn: (novel: Book) => Promise<T>): Promise<T> {
+    return this.#exclusive(async () => fn(await loadBook(nodeSource(this.root))));
   }
 
   async #read(path: string): Promise<string> {
     return readFile(join(this.root, path), "utf8").catch(() => "");
   }
 
-  #find(novel: Novel, id: string): { index: number; relationship: Relationship } {
+  #find(novel: Book, id: string): { index: number; relationship: Relationship } {
     const relationship = novel.relationships.find((r) => r.id === id);
     if (!relationship) throw new OperationError("NOT_FOUND", `No relationship “${id}”.`);
     return { index: relationship.index, relationship };
   }
 
-  #checkRelationship(novel: Novel, r: RelationshipFields): void {
+  #checkRelationship(novel: Book, r: RelationshipFields): void {
     for (const end of [r.from, r.to]) {
       if (!end || !novel.entities.some((e) => e.id === end)) throw new OperationError("BAD_REQUEST", `No entity “${end ?? ""}”.`);
     }
     if (!r.type || !novel.relationshipTypes.some((t) => t.key === r.type)) throw new OperationError("BAD_REQUEST", `No relationship type “${r.type ?? ""}”.`);
     for (const scene of [r.since, r.until]) {
-      if (scene && !novel.allScenes.some((s) => s.id === scene)) throw new OperationError("BAD_REQUEST", `No scene “${scene}”.`);
+      if (scene && !novel.allPieces.some((s) => s.id === scene)) throw new OperationError("BAD_REQUEST", `No scene “${scene}”.`);
     }
     this.#checkSpan(novel, r.since ?? undefined, r.until ?? undefined, "A relationship must start before it ends.");
   }
 
-  #findEvent(novel: Novel, id: string) {
+  #findEvent(novel: Book, id: string) {
     const event = novel.events.find((e) => e.id === id);
     if (!event) throw new OperationError("NOT_FOUND", `No event “${id}”.`);
     return event;
   }
 
   /** A time, a duration and entries of the right types, where given. */
-  #checkEvent(novel: Novel, f: EventFields): void {
+  #checkEvent(novel: Book, f: EventFields): void {
     const w = f.when;
     if (w) {
       const ok = "at" in w ? /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2})?)?$/.test(w.at) : Number.isInteger(w.day) && (w.time === undefined || /^([01]\d|2[0-3]):[0-5]\d$/.test(w.time));
@@ -728,7 +728,7 @@ export class BibleOperations {
     if (f.duration && !/^P(?!$)(\d+Y)?(\d+M)?(\d+W)?(\d+D)?(T(?=\d)(\d+H)?(\d+M)?(\d+(\.\d+)?S)?)?$/.test(f.duration)) {
       throw new OperationError("BAD_REQUEST", "A duration is ISO 8601, like PT45M or P2D.");
     }
-    if (f.scene && !novel.allScenes.some((sc) => sc.id === f.scene)) throw new OperationError("BAD_REQUEST", `No scene “${f.scene}”.`);
+    if (f.scene && !novel.allPieces.some((sc) => sc.id === f.scene)) throw new OperationError("BAD_REQUEST", `No scene “${f.scene}”.`);
     for (const [key, type] of [["characters", "character"], ["locations", "location"], ["plotlines", "plotline"]] as const) {
       for (const id of f[key] ?? []) {
         if (!novel.entities.some((e) => e.id === id && e.type === type)) throw new OperationError("BAD_REQUEST", `No ${type} “${id}”.`);
@@ -737,14 +737,14 @@ export class BibleOperations {
   }
 
   /** `first` must come strictly before `second` in reading order, where both are given. */
-  #checkSpan(novel: Novel, first: string | null | undefined, second: string | null | undefined, message: string): void {
+  #checkSpan(novel: Book, first: string | null | undefined, second: string | null | undefined, message: string): void {
     if (!first || !second) return;
-    const a = novel.allScenes.find((s) => s.id === first)?.position ?? -1;
-    const b = novel.allScenes.find((s) => s.id === second)?.position ?? -1;
+    const a = novel.allPieces.find((s) => s.id === first)?.position ?? -1;
+    const b = novel.allPieces.find((s) => s.id === second)?.position ?? -1;
     if (a < 0 || b < 0 || a >= b) throw new OperationError("BAD_REQUEST", message);
   }
 
-  #describe(novel: Novel, r: { from?: string; to?: string; type?: string }): string {
+  #describe(novel: Book, r: { from?: string; to?: string; type?: string }): string {
     const name = (id?: string) => novel.entities.find((e) => e.id === id)?.name ?? id ?? "?";
     return `${name(r.from)} ${r.type} ${name(r.to)}`;
   }
@@ -793,10 +793,10 @@ function localDateTime(d: Date): string {
 }
 
 /** The prose that mentions a record: scenes, entries, other events and notes, for a delete to list. */
-function mentionsOf(novel: Novel, id: string) {
+function mentionsOf(novel: Book, id: string) {
   const mentioned = (body: string) => mentions(body).some((m) => m.id === id);
   return [
-    ...novel.allScenes.filter((s) => mentioned(s.body)).map((s) => ({ kind: "scene", id: s.id, title: s.title, via: ["mention"] })),
+    ...novel.allPieces.filter((s) => mentioned(s.body)).map((s) => ({ kind: "scene", id: s.id, title: s.title, via: ["mention"] })),
     ...novel.entities.filter((e) => e.id !== id && mentioned(e.body)).map((e) => ({ kind: "entity", id: e.id, title: e.name })),
     ...novel.events.filter((e) => e.id !== id && mentioned(e.body)).map((e) => ({ kind: "event", id: e.id, title: e.title })),
     ...novel.notes.filter((n) => mentioned(n.body)).map((n) => ({ kind: "note", id: n.id, title: n.title })),

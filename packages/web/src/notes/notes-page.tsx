@@ -1,4 +1,4 @@
-import { proseText, type Novel } from "@writer/core";
+import { proseText, type Book } from "@writer/core";
 import { Pin, Plus, Search } from "lucide-react";
 import { useId, useMemo, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router";
@@ -14,7 +14,7 @@ type Sort = "newest" | "title";
  * scenes (pinned ones marked). Filtered by a tag and by words, sorted newest first or by title; the
  * choices are in the address. A note opens in a modal over it (`over`, heffrey78/gh-writer#235).
  */
-export function NotesPage({ novelId, novel, over }: { novelId: string; novel: Novel; over?: ReactNode }) {
+export function NotesPage({ novelId, novel, over }: { novelId: string; novel: Book; over?: ReactNode }) {
   const [params, setParams] = useSearchParams();
   const query = params.get("q") ?? "";
   const tag = params.get("tag") ?? "";
@@ -32,7 +32,7 @@ export function NotesPage({ novelId, novel, over }: { novelId: string; novel: No
   const shown = novel.notes
     .filter((n) => (!tag || n.tags.includes(tag)) && (!q || [n.title, proseText(n.body), ...n.tags].some((t) => t.toLowerCase().includes(q))))
     .sort((a, b) => (sort === "title" ? a.title.localeCompare(b.title) : (b.created ?? "").localeCompare(a.created ?? "") || a.title.localeCompare(b.title)));
-  const sceneTitle = (id: string) => novel.allScenes.find((s) => s.id === id)?.title ?? id;
+  const sceneTitle = (id: string) => novel.allPieces.find((s) => s.id === id)?.title ?? id;
 
   return (
     <div className={cn(PAGE, "grid gap-6")}>

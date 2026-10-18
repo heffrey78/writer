@@ -1,9 +1,9 @@
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { loadNovel, locationProfile, plotlineProfile, themeProfile } from "../src/index.ts";
+import { loadBook, locationProfile, plotlineProfile, themeProfile } from "../src/index.ts";
 import { nodeSource } from "../src/node.ts";
 
-const novel = await loadNovel(nodeSource(fileURLToPath(new URL("../../../examples/sample-novel/", import.meta.url))));
+const novel = await loadBook(nodeSource(fileURLToPath(new URL("../../../examples/sample-novel/", import.meta.url))));
 const tally = (t: { name: string; scenes: number }[]) => t.map((v) => `${v.name}: ${v.scenes}`);
 
 describe("profiles by type", () => {
@@ -49,7 +49,7 @@ describe("profiles by type", () => {
       if (!path.startsWith("manuscript/") || /01-the-station|02-the-last-rivet/.test(path)) continue;
       files[path] = text.replace(/^  - plot_h315tz\n/m, "").replace(/^  - id: plot_h315tz\n(    .*\n)*/m, "");
     }
-    const book = await loadNovel(memorySource(files));
+    const book = await loadBook(memorySource(files));
     const sale = plotlineProfile(book, "plot_h315tz");
     expect(sale.beats.map((b) => b.scene.title)).toEqual(["The Station", "The Last Rivet"]);
     expect(sale.quiet).toMatchObject([{ scenes: 6, open: false }]);

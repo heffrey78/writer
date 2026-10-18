@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { countWords, editFrontMatter, type Novel, type SceneStatus, type StatusDef } from "@writer/core";
+import { countWords, editFrontMatter, type Book, type PieceStatus, type StatusDef } from "@writer/core";
 import { git } from "./git.ts";
 import { GitHubError, type GitHub, type GitHubRepo } from "./github.ts";
 import type { TextFile } from "./files.ts";
@@ -18,7 +18,7 @@ import type { WriteResult } from "./workspace.ts";
  */
 
 /** A status's name on the board: its label in the book's kind (BookKind.statuses). */
-const statusName = (statuses: readonly StatusDef[], key: SceneStatus) => statuses.find((s) => s.key === key)?.label ?? key;
+const statusName = (statuses: readonly StatusDef[], key: PieceStatus) => statuses.find((s) => s.key === key)?.label ?? key;
 /** The options GitHub gives a new project's Status field: replaced by the scene statuses. */
 const STOCK_STATUS = ["todo", "in progress", "done"];
 /** The field of Writer's own that holds the status where the project's Status field can't be changed. */
@@ -52,8 +52,8 @@ export class BoardError extends Error {
 export interface BoardConflict {
   scene: string;
   title: string;
-  file: SceneStatus;
-  board: SceneStatus;
+  file: PieceStatus;
+  board: PieceStatus;
 }
 
 /** What one sync did. */
@@ -64,7 +64,7 @@ export interface BoardSummary {
   /** Items whose fields were brought up to date from the files. */
   updated: number;
   /** Scenes whose status was changed on the board, now in their files. */
-  fromBoard: { scene: string; title: string; status: SceneStatus }[];
+  fromBoard: { scene: string; title: string; status: PieceStatus }[];
   /** Board edits to fields the files own, put back. */
   putBack: { scene: string; title: string; fields: string[] }[];
 }
@@ -92,7 +92,7 @@ export interface BoardStatus {
 /** What Writer last put on the board for a scene, or read back from it. */
 interface Synced {
   /** Null when unknown (a board found by a fresh clone): then any difference is a conflict. */
-  status: SceneStatus | null;
+  status: PieceStatus | null;
   title: string;
   pov: string | null;
   part: string | null;
@@ -115,7 +115,7 @@ interface State {
 
 export interface BoardDeps {
   /** The story model. */
-  novel: () => Promise<Novel>;
+  novel: () => Promise<Book>;
   /** Whether the main version is open (the board follows it alone). */
   onMain: () => Promise<boolean>;
   read: (path: string) => Promise<TextFile | undefined>;
@@ -501,7 +501,7 @@ export class BoardStore {
   }
 
   /** Change a scene file's status, if it's still as read. Whether it was written. */
-  async #writeStatus(path: string, status: SceneStatus): Promise<boolean> {
+  async #writeStatus(path: string, status: PieceStatus): Promise<boolean> {
     const file = await this.#deps.read(path);
     if (!file) return false;
     const result = await this.#deps.write(path, editFrontMatter(file.content, [{ path: ["status"], value: status }]), file.hash);
@@ -620,7 +620,7 @@ export class BoardStore {
   }
 
   /** The repository's IDs, and the project already marked as this novel's, if one is linked to it. */
-  async #find(repo: GitHubRepo, novel: Novel): Promise<{ repositoryId: string; ownerId: string; project: State["project"] }> {
+  async #find(repo: GitHubRepo, novel: Book): Promise<{ repositoryId: string; ownerId: string; project: State["project"] }> {
     const data = await this.#github.graphql<{ repository: { id: string; owner: { id: string }; projectsV2: { nodes: ({ id: string; number: number; title: string; url: string; readme: string | null } | null)[] } } | null }>(FIND, { owner: repo.owner, name: repo.name });
     if (!data.repository) throw new BoardError("NOT_FOUND", `GitHub doesn't have ${repo.owner}/${repo.name} (or doesn't let this sign-in see it).`);
     const id = novel.config?.id;
@@ -633,7 +633,7 @@ export class BoardStore {
   }
 
   /** Make the novel's project: owned by the repository's owner, linked to it, marked with the novel's ID. */
-  async #create({ repositoryId, ownerId }: { repositoryId: string; ownerId: string }, novel: Novel): Promise<NonNullable<State["project"]>> {
+  async #create({ repositoryId, ownerId }: { repositoryId: string; ownerId: string }, novel: Book): Promise<NonNullable<State["project"]>> {
     const title = novel.config?.title || "Novel";
     const [made] = await this.#mutate([`createProjectV2(input: ${literal({ ownerId, repositoryId, title: `${title}: drafting board` })}) { projectV2 { id number title url } }`]);
     const project = (made as { projectV2: { id: string; number: number; title: string; url: string } }).projectV2;
@@ -692,16 +692,16 @@ interface Fields {
 interface Wanted {
   id: string;
   file: string;
-  synced: Synced & { status: SceneStatus };
+  synced: Synced & { status: PieceStatus };
 }
 
 /** What the board should show for each scene of the book, in reading order. */
-function desired(novel: Novel): Map<string, Wanted> {
+function desired(novel: Book): Map<string, Wanted> {
   const names = uniqueNames(novel.entities.filter((e) => e.type === "character").map((e) => [e.id, e.name]));
   const parts = uniqueNames(novel.parts.map((p, i) => [p.id, p.title ? `${i + 1}. ${p.title}` : `Part ${i + 1}`]));
   const chapters = uniqueNames(novel.chapters.map((c, i) => [c.id, c.title ? `${i + 1}. ${c.title}` : `Chapter ${i + 1}`]));
   const out = new Map<string, Wanted>();
-  novel.scenes.forEach((s, i) => {
+  novel.pieces.forEach((s, i) => {
     const chapter = novel.chapters.find((c) => c.id === s.chapterId);
     out.set(s.id, {
       id: s.id,
@@ -734,7 +734,7 @@ function uniqueNames(pairs: [string, string][]): Map<string, string> {
 }
 
 /** An item's values as Writer reads them. */
-function readItem(item: Item, fields: Fields, statuses: readonly StatusDef[]): { status: SceneStatus | undefined; statusName: string | null } & Record<Mirrored, string | number | null> {
+function readItem(item: Item, fields: Fields, statuses: readonly StatusDef[]): { status: PieceStatus | undefined; statusName: string | null } & Record<Mirrored, string | number | null> {
   const option = (field: Field | undefined) => {
     if (!field) return null;
     const v = item.values.get(field.id);

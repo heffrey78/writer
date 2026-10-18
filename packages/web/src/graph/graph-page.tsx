@@ -1,4 +1,4 @@
-import { backlinks, type Novel } from "@writer/core";
+import { backlinks, type Book } from "@writer/core";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 import { api } from "../api.ts";
@@ -37,12 +37,12 @@ type Editing = { kind: "add"; from: string; to?: string } | { kind: "edge" | "ch
  * placed by dragging or with the arrow keys, and stay put. Beside the graph, the same relationships
  * as a list.
  */
-export function GraphPage({ novelId, novel }: { novelId: string; novel: Novel }) {
+export function GraphPage({ novelId, novel }: { novelId: string; novel: Book }) {
   const [params, set] = useViewParams();
   const theme = useTheme((s) => s.theme);
   const show = useNotice((s) => s.show);
   const id = useId();
-  const scenes = novel.scenes;
+  const scenes = novel.pieces;
   const index = Math.max(0, scenes.findIndex((s) => s.id === params.get("at")));
   const scene = scenes[index];
   const chapter = scene && novel.chapters.find((c) => c.id === scene.chapterId);

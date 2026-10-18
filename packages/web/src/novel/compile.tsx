@@ -1,4 +1,4 @@
-import type { Novel } from "@writer/core";
+import type { Book } from "@writer/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { useId, useState } from "react";
 import { api, keys } from "../api.ts";
@@ -29,7 +29,7 @@ function save(blob: Blob, filename: string) {
 }
 
 /** Compile the manuscript (or some of its chapters) with a preset, to Word, EPUB and PDF: the files download. */
-export function CompileDialog({ novelId, novel, workspace, onClose }: { novelId: string; novel: Novel; workspace: Workspace; onClose: () => void }) {
+export function CompileDialog({ novelId, novel, workspace, onClose }: { novelId: string; novel: Book; workspace: Workspace; onClose: () => void }) {
   const show = useNotice((n) => n.show);
   const presets = Object.keys(novel.compile?.presets ?? { manuscript: {} });
   const [preset, setPreset] = useState(presets[0]!);
@@ -166,7 +166,7 @@ export function CompileDialog({ novelId, novel, workspace, onClose }: { novelId:
  * The book's cover (heffrey78/gh-writer#168): the one in novel.yaml, its file and size, Change… and Remove; or Add a
  * cover…. It goes on the EPUB and the PDF, not the Word manuscript.
  */
-function CoverRow({ novelId, novel }: { novelId: string; novel: Novel }) {
+function CoverRow({ novelId, novel }: { novelId: string; novel: Book }) {
   const queryClient = useQueryClient();
   const path = novel.config?.cover;
   const url = usePictureUrl(novelId, path);

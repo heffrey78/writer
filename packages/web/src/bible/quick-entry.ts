@@ -1,4 +1,4 @@
-import { readFrontMatter, uniqueId, type Novel, type YamlEdit } from "@writer/core";
+import { readFrontMatter, uniqueId, type Book, type YamlEdit } from "@writer/core";
 import { joinSceneFile } from "@writer/editor";
 import { useRef } from "react";
 import { create } from "zustand";
@@ -10,7 +10,7 @@ import type { QuickEntries } from "./quick-entries.ts";
  * `create` picks the new entry's ID and returns it at once, so a mention or a scene's list can use
  * it straight away, and queues the entry to be written (see createQuickEntries).
  */
-export function useQuickEntry(novel: Novel, entries: QuickEntries | undefined) {
+export function useQuickEntry(novel: Book, entries: QuickEntries | undefined) {
   const latest = useRef(novel);
   latest.current = novel;
 

@@ -1,4 +1,4 @@
-import type { Novel, Scene } from "@writer/core";
+import type { Book, Piece } from "@writer/core";
 
 export interface CorkboardFilter {
   pov?: string;
@@ -8,7 +8,7 @@ export interface CorkboardFilter {
 }
 
 /** Whether a scene shows on a board with these filters (all must hold). */
-export function shows(scene: Scene, f: CorkboardFilter): boolean {
+export function shows(scene: Piece, f: CorkboardFilter): boolean {
   return (
     (!f.pov || scene.pov === f.pov) &&
     (!f.plotline || scene.plotlines.some((p) => p.id === f.plotline)) &&
@@ -18,8 +18,8 @@ export function shows(scene: Scene, f: CorkboardFilter): boolean {
 }
 
 /** The scenes a board shows, in reading order. */
-export function visibleScenes(novel: Novel, f: CorkboardFilter): Scene[] {
-  return novel.scenes.filter((s) => shows(s, f));
+export function visibleScenes(novel: Book, f: CorkboardFilter): Piece[] {
+  return novel.pieces.filter((s) => shows(s, f));
 }
 
 /**

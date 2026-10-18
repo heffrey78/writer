@@ -1,5 +1,5 @@
 import { DEFAULT_GAP, presentIn } from "./diagrams.ts";
-import type { Novel, Relationship } from "./model.ts";
+import type { Book, Relationship } from "./model.ts";
 import { storyInstant, storyTimeline } from "./time.ts";
 
 const MINUTE = 60_000;
@@ -29,8 +29,8 @@ export function readableSpan(ms: number): string {
  * that start or end there. Only what holds and is worth saying; nothing for a scene that isn't in
  * the reading order.
  */
-export function sceneFacts(novel: Novel, sceneId: string): string[] {
-  const scenes = novel.scenes;
+export function sceneFacts(novel: Book, sceneId: string): string[] {
+  const scenes = novel.pieces;
   const at = scenes.findIndex((s) => s.id === sceneId);
   if (at < 0) return [];
   const scene = scenes[at]!;

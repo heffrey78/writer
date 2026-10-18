@@ -1,6 +1,6 @@
 import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { loadNovel, validateNovel } from "@writer/core";
+import { loadBook, validateBook } from "@writer/core";
 import { nodeSource } from "@writer/core/node";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createServer, LAYOUTS, Library, sessionCookie, withPositions } from "../src/index.ts";
@@ -46,9 +46,9 @@ describe("saving diagram positions", () => {
       expect(ok.status).toBe(200);
       expect(JSON.parse(ok.body)).toMatchObject({ file: LAYOUTS });
       expect(changed(before, read(LAYOUTS))).toEqual(["      char_7f3k2q: { x: 12, y: -8 }", "      loc_br1dg3: { x: 5, y: 5 }"]);
-      const novelNow = await loadNovel(nodeSource(dir));
+      const novelNow = await loadBook(nodeSource(dir));
       expect(novelNow.layouts["relationship-graph"]!.nodes["char_7f3k2q"]).toEqual({ x: 12, y: -8 });
-      expect(validateNovel(novelNow)).toEqual([]);
+      expect(validateBook(novelNow)).toEqual([]);
 
       expect((await put("relationship-graph", { positions: { "not an id": { x: 1, y: 1 } } })).status).toBe(400);
       expect((await put("relationship-graph", { positions: { char_7f3k2q: { x: "1", y: 1 } } })).status).toBe(400);

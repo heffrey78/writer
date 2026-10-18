@@ -1,7 +1,7 @@
 import type { Editor } from "@tiptap/core";
 import { StrictMode, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { countWords, loadNovel, memorySource, uniqueId } from "@writer/core";
+import { countWords, loadBook, memorySource, uniqueId } from "@writer/core";
 import { registerKinds } from "@writer/kinds";
 import { addToDictionary, knownWords, parseDictionary } from "@writer/core/dictionary";
 import { useStore } from "zustand";
@@ -88,7 +88,7 @@ const chapterOf = (sceneId: string) => [...chapters].find(([, files]) => files.s
 // dictionary.txt, kept for the tab's session.
 const spellService = createWorkerSpellService({ aff, dic });
 const novelFiles: Record<string, string> = import.meta.glob("../../../examples/sample-novel/**/*.{md,yaml}", { query: "?raw", import: "default", eager: true });
-const sampleNovel = loadNovel(memorySource(Object.fromEntries(Object.entries(novelFiles).map(([path, text]) => [path.replace(/^.*?sample-novel\//, ""), text]))));
+const sampleNovel = loadBook(memorySource(Object.fromEntries(Object.entries(novelFiles).map(([path, text]) => [path.replace(/^.*?sample-novel\//, ""), text]))));
 const DICTIONARY_KEY = "playground:dictionary";
 const readStored = () => {
   try {

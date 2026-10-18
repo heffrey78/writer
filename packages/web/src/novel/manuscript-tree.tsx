@@ -1,4 +1,4 @@
-import { countWords, type Novel } from "@writer/core";
+import { countWords, type Book } from "@writer/core";
 import { ChevronDown, ChevronRight, Ellipsis, FilePlus, FolderPlus, History, Layers, Plus } from "lucide-react";
 import { ContextMenu, DropdownMenu } from "radix-ui";
 import { memo, useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
@@ -33,7 +33,7 @@ type Dialog = { kind: "new-part"; after: string | null } | { kind: "rename"; id:
  * F2 renames, Delete deletes (with Undo), Alt+Up/Down moves an item, letters jump; drag and drop
  * reorders; the context menu (right-click, Shift+F10) has the rest.
  */
-export function ManuscriptTree({ novelId, novel, structure, current }: { novelId: string; novel: Novel; structure: Structure; current: string | undefined }) {
+export function ManuscriptTree({ novelId, novel, structure, current }: { novelId: string; novel: Book; structure: Structure; current: string | undefined }) {
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [focused, setFocused] = useState<string>();
@@ -47,11 +47,11 @@ export function ManuscriptTree({ novelId, novel, structure, current }: { novelId
 
   const all = useMemo(() => {
     const out: TreeNode[] = [];
-    const words = new Map(novel.allScenes.map((s) => [s.id, countWords(s.body)]));
+    const words = new Map(novel.allPieces.map((s) => [s.id, countWords(s.body)]));
     const chapterNodes = (chapterIds: string[], level: number, parent: string | null) => {
       const chapters = chapterIds.map((id) => novel.allChapters.find((c) => c.id === id)).filter((c) => c !== undefined);
       chapters.forEach((c, i) => {
-        const scenes = c.sceneIds.map((id) => novel.allScenes.find((s) => s.id === id)).filter((s) => s !== undefined);
+        const scenes = c.sceneIds.map((id) => novel.allPieces.find((s) => s.id === id)).filter((s) => s !== undefined);
         out.push({ id: c.id, kind: "chapter", title: chapterTitle(novel, c), level, parent, pos: i + 1, size: chapters.length, words: scenes.reduce((n, s) => n + (words.get(s.id) ?? 0), 0), hasChildren: scenes.length > 0 });
         scenes.forEach((s, j) => out.push({ id: s.id, kind: "scene", title: s.title, level: level + 1, parent: c.id, pos: j + 1, size: scenes.length, words: words.get(s.id) ?? 0, hasChildren: false }));
       });
@@ -252,7 +252,7 @@ export function ManuscriptTree({ novelId, novel, structure, current }: { novelId
     </ContextMenu.Portal>
   );
 
-  const currentChapter = novel.allScenes.find((s) => s.id === current)?.chapterId ?? (novel.allChapters.some((c) => c.id === current) ? current : novel.chapters[0]?.id);
+  const currentChapter = novel.allPieces.find((s) => s.id === current)?.chapterId ?? (novel.allChapters.some((c) => c.id === current) ? current : novel.chapters[0]?.id);
   const currentNode = all.find((n) => n.id === current);
   const currentPart = novel.allChapters.find((c) => c.id === currentChapter)?.partId;
   // The toolbar's ⋯ acts on the item last focused in the tree, or the open one.
@@ -296,7 +296,7 @@ export function ManuscriptTree({ novelId, novel, structure, current }: { novelId
               <DropdownMenu.Item
                 className={cn(itemClass, "justify-start gap-2")}
                 disabled={!currentChapter}
-                onSelect={() => currentChapter && setDialog({ kind: "new-scene", chapter: currentChapter, ...(current && novel.allScenes.some((s) => s.id === current) ? { after: current } : {}) })}
+                onSelect={() => currentChapter && setDialog({ kind: "new-scene", chapter: currentChapter, ...(current && novel.allPieces.some((s) => s.id === current) ? { after: current } : {}) })}
               >
                 <FilePlus className="size-4" aria-hidden /> Scene
               </DropdownMenu.Item>
@@ -434,8 +434,8 @@ export function ManuscriptTree({ novelId, novel, structure, current }: { novelId
   );
 }
 
-function itemKind(novel: Novel, id: string): ItemKind {
-  return novel.allScenes.some((s) => s.id === id) ? "scene" : novel.allChapters.some((c) => c.id === id) ? "chapter" : "part";
+function itemKind(novel: Book, id: string): ItemKind {
+  return novel.allPieces.some((s) => s.id === id) ? "scene" : novel.allChapters.some((c) => c.id === id) ? "chapter" : "part";
 }
 
 /**
@@ -450,7 +450,7 @@ export const ManuscriptSidebar = memo(function ManuscriptSidebar({
   current,
 }: {
   novelId: string;
-  novel: Novel;
+  novel: Book;
   workspace: Workspace;
   current: string | undefined;
 }) {

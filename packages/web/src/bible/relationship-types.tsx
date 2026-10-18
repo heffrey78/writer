@@ -1,4 +1,4 @@
-import { nextSeriesSlot, relationshipStyle, SERIES, slugify, type Novel, type Relationship, type RelationshipLine, type SeriesSlot } from "@writer/core";
+import { nextSeriesSlot, relationshipStyle, SERIES, slugify, type Book, type Relationship, type RelationshipLine, type SeriesSlot } from "@writer/core";
 import { describeRelationship as describe } from "@writer/core/diagrams";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog } from "radix-ui";
@@ -27,7 +27,7 @@ export function LineSample({ color, line, className }: { color: SeriesSlot; line
 }
 
 /** The kinds of relationship this novel uses: add one, or change one's name, colour and line. */
-export function RelationshipTypes({ novelId, novel }: { novelId: string; novel: Novel }) {
+export function RelationshipTypes({ novelId, novel }: { novelId: string; novel: Book }) {
   const queryClient = useQueryClient();
   const headingId = useId();
   const [editing, setEditing] = useState<Editing>();
@@ -155,7 +155,7 @@ export function RelationshipTypes({ novelId, novel }: { novelId: string; novel: 
 }
 
 /** Relationships as sentences from `entityId`'s side, each beside its kind's line: the same look as the arcs and the graph. */
-export function RelationshipLines({ novel, entityId, relationships }: { novel: Novel; entityId: string; relationships: Relationship[] }) {
+export function RelationshipLines({ novel, entityId, relationships }: { novel: Book; entityId: string; relationships: Relationship[] }) {
   return (
     <ul className="grid gap-0.5">
       {relationships.map((r) => {

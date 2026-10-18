@@ -1,4 +1,4 @@
-import { countWords, type Novel, type Scene } from "@writer/core";
+import { countWords, type Book, type Piece } from "@writer/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { GripVertical } from "lucide-react";
 import { Fragment, useEffect, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
@@ -19,7 +19,7 @@ const number = new Intl.NumberFormat();
  * move with Alt+Up/Down on their handle, or by dragging it.
  */
 /** Outline as a table: every scene in reading order, with its synopsis and status edited in place. */
-export function OutlineTable({ novelId, novel, workspace }: { novelId: string; novel: Novel; workspace: Workspace }) {
+export function OutlineTable({ novelId, novel, workspace }: { novelId: string; novel: Book; workspace: Workspace }) {
   const structure = useStructure(novelId, novel, workspace);
   const dragging = useRef<string | undefined>(undefined);
   const [drop, setDrop] = useState<{ id: string; after: boolean }>();
@@ -35,7 +35,7 @@ export function OutlineTable({ novelId, novel, workspace }: { novelId: string; n
     if (id && (document.activeElement === document.body || !document.activeElement?.isConnected)) document.querySelector<HTMLElement>(`[data-handle="${id}"]`)?.focus();
   }, [novel]);
 
-  const onHandleKey = (e: KeyboardEvent, scene: Scene) => {
+  const onHandleKey = (e: KeyboardEvent, scene: Piece) => {
     if (!e.altKey || (e.key !== "ArrowUp" && e.key !== "ArrowDown")) return;
     e.preventDefault();
     refocus.current = scene.id;
@@ -45,7 +45,7 @@ export function OutlineTable({ novelId, novel, workspace }: { novelId: string; n
     );
   };
 
-  const onDragOver = (e: DragEvent, scene: Scene) => {
+  const onDragOver = (e: DragEvent, scene: Piece) => {
     if (!dragging.current || dragging.current === scene.id) return;
     e.preventDefault();
     const rect = e.currentTarget.getBoundingClientRect();
@@ -64,7 +64,7 @@ export function OutlineTable({ novelId, novel, workspace }: { novelId: string; n
   const groups = novel.chapters.map((c) => ({
     chapter: c,
     part: novel.parts.find((p) => p.id === c.partId),
-    scenes: c.sceneIds.map((id) => novel.allScenes.find((s) => s.id === id)).filter((s): s is Scene => s !== undefined),
+    scenes: c.sceneIds.map((id) => novel.allPieces.find((s) => s.id === id)).filter((s): s is Piece => s !== undefined),
   }));
 
   return (
@@ -179,7 +179,7 @@ export function OutlineTable({ novelId, novel, workspace }: { novelId: string; n
 export function useSceneEdit(novelId: string, workspace: Workspace) {
   const queryClient = useQueryClient();
   const show = useNotice((s) => s.show);
-  return async (scene: Scene, key: "synopsis" | "status", value: string) => {
+  return async (scene: Piece, key: "synopsis" | "status", value: string) => {
     try {
       await workspace.editFrontMatter(scene.file, [value ? { path: [key], value } : { path: [key], remove: true }]);
       await workspace.autosave.flush();
@@ -191,7 +191,7 @@ export function useSceneEdit(novelId: string, workspace: Workspace) {
 }
 
 /** A scene's status, chosen in place. */
-export function StatusSelect({ scene, onChange }: { scene: Scene; onChange: (status: string) => void }) {
+export function StatusSelect({ scene, onChange }: { scene: Piece; onChange: (status: string) => void }) {
   const { statuses } = useBookKind();
   return (
     <select aria-label={`Status of “${scene.title}”`} value={scene.status} onChange={(e) => onChange(e.target.value)} className="h-8 w-full rounded-md border border-rule bg-raised px-1.5">
@@ -205,7 +205,7 @@ export function StatusSelect({ scene, onChange }: { scene: Scene; onChange: (sta
 }
 
 /** The synopsis, editable in place: saved when it loses focus, or on Enter. */
-export function Synopsis({ scene, onSave }: { scene: Scene; onSave: (value: string) => void }) {
+export function Synopsis({ scene, onSave }: { scene: Piece; onSave: (value: string) => void }) {
   const [value, setValue] = useState(scene.synopsis ?? "");
   const [seen, setSeen] = useState(scene.synopsis ?? "");
   // Take the saved value when it changes from outside (another editor, a reload).

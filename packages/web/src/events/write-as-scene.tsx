@@ -1,4 +1,4 @@
-import { mentions, type Novel, type StoryEvent } from "@writer/core";
+import { mentions, type Book, type StoryEvent } from "@writer/core";
 import { chapterTitle } from "@writer/core/diagrams";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog } from "radix-ui";
@@ -13,12 +13,12 @@ import { FORMAT_MOVE, needsFormatMove } from "./format-move.tsx";
  * Write an off-page event as a scene (heffrey78/gh-writer#165): which chapter it ends, and whether the event is kept
  * (naming the scene that dramatizes it) or removed. One the prose mentions is kept. The new scene opens.
  */
-export function WriteAsSceneDialog({ novelId, novel, event, open, onOpenChange }: { novelId: string; novel: Novel; event: StoryEvent; open: boolean; onOpenChange: (o: boolean) => void }) {
+export function WriteAsSceneDialog({ novelId, novel, event, open, onOpenChange }: { novelId: string; novel: Book; event: StoryEvent; open: boolean; onOpenChange: (o: boolean) => void }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const id = useId();
   const [chapter, setChapter] = useState(novel.chapters.at(-1)?.id ?? "");
-  const mentioned = [...novel.allScenes, ...novel.entities, ...novel.events].some((r) => mentions(r.body).some((m) => m.id === event.id));
+  const mentioned = [...novel.allPieces, ...novel.entities, ...novel.events].some((r) => mentions(r.body).some((m) => m.id === event.id));
   const [keep, setKeep] = useState(true);
   const moving = needsFormatMove(novel);
   const write = useMutation({

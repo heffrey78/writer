@@ -1,4 +1,4 @@
-import type { Novel } from "./model.ts";
+import type { Book } from "./model.ts";
 import type { RelationshipStyle } from "./types.ts";
 
 /*
@@ -55,7 +55,7 @@ export function seriesSlot(colour: string | undefined): SeriesSlot | undefined {
  * the slot of its place in the list (until the app saves it one); a type the novel doesn't define,
  * the first.
  */
-export function relationshipStyle(novel: Pick<Novel, "relationshipTypes">, typeKey: string): { slot: SeriesSlot; line: RelationshipLine } {
+export function relationshipStyle(novel: Pick<Book, "relationshipTypes">, typeKey: string): { slot: SeriesSlot; line: RelationshipLine } {
   const index = novel.relationshipTypes.findIndex((t) => t.key === typeKey);
   const type = novel.relationshipTypes[index];
   return {
@@ -65,7 +65,7 @@ export function relationshipStyle(novel: Pick<Novel, "relationshipTypes">, typeK
 }
 
 /** The slot a new relationship type takes: the first no type uses yet, or, all in use, the least used. */
-export function nextSeriesSlot(novel: Pick<Novel, "relationshipTypes">): SeriesSlot {
+export function nextSeriesSlot(novel: Pick<Book, "relationshipTypes">): SeriesSlot {
   const used = new Map<SeriesSlot, number>(SERIES.map((s) => [s.slot, 0]));
   for (const t of novel.relationshipTypes) {
     const slot = relationshipStyle(novel, t.key).slot;

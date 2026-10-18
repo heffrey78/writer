@@ -180,7 +180,7 @@ export function statsRoutes(routes: Hono<Env>): void {
 
   routes.get("/:id/stats", async (c) => {
     const { novel } = await c.var.ws.loadModel();
-    const words = novel.allScenes.reduce((n, s) => n + countWords(s.body), 0);
+    const words = novel.allPieces.reduce((n, s) => n + countWords(s.body), 0);
     const days = writingDays(await writingHistory(c.var.ws.root), words);
     return c.json({ days, words, target: novel.config?.target ?? null, pending: await uncommittedChange(c.var.ws.root) });
   });

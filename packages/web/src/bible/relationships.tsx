@@ -1,4 +1,4 @@
-import type { Entity, Novel, Relationship } from "@writer/core";
+import type { Entity, Book, Relationship } from "@writer/core";
 import { describeRelationship as describe } from "@writer/core/diagrams";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog } from "radix-ui";
@@ -19,7 +19,7 @@ interface Role {
 }
 
 /** The relationship types that fit between entries of these types, each from this side (and the other way, if not symmetric). */
-export function roles(novel: Novel, mine: string, theirs: string | undefined): Role[] {
+export function roles(novel: Book, mine: string, theirs: string | undefined): Role[] {
   const fits = (types: string[] | undefined, t: string | undefined) => !types?.length || (t !== undefined && types.includes(t)) || t === undefined;
   return novel.relationshipTypes.flatMap((t): Role[] => {
     const label = t.label ?? t.key;
@@ -58,7 +58,7 @@ export function AddRelationshipDialog({
   since: initialSince,
 }: {
   novelId: string;
-  novel: Novel;
+  novel: Book;
   entity: Entity;
   onClose: () => void;
   other?: string | undefined;
@@ -123,7 +123,7 @@ export function RelationshipAtSceneDialog({
   at: initialAt,
 }: {
   novelId: string;
-  novel: Novel;
+  novel: Book;
   entity: Entity;
   kind: "change" | "end";
   relationship: Relationship;

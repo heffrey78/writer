@@ -1,4 +1,4 @@
-import type { Novel } from "@writer/core";
+import type { Book } from "@writer/core";
 import { useQuery } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { api } from "../api.ts";
@@ -40,7 +40,7 @@ export function TitleDialog({ title, label = "Title", initial = "", required = t
 }
 
 /** Move a scene to another chapter (at its end), or a chapter to another part. */
-export function MoveToDialog({ novel, id, kind, structure, onClose }: { novel: Novel; id: string; kind: "scene" | "chapter"; structure: Structure; onClose: () => void }) {
+export function MoveToDialog({ novel, id, kind, structure, onClose }: { novel: Book; id: string; kind: "scene" | "chapter"; structure: Structure; onClose: () => void }) {
   const items =
     kind === "scene"
       ? novel.chapters.map((c) => ({ value: c.id, label: chapterTitle(novel, c), group: novel.parts.find((p) => p.id === c.partId)?.title ?? "" }))

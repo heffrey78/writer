@@ -1,4 +1,4 @@
-import { overlaps, storyTimeline, type Novel, type TimelineItem } from "@writer/core";
+import { overlaps, storyTimeline, type Book, type TimelineItem } from "@writer/core";
 import { Fragment, useMemo } from "react";
 import { Link } from "react-router";
 import { Button } from "../ui/button.tsx";
@@ -26,12 +26,12 @@ const MODES: [LaneMode, string][] = [
  * across the others. Overlaps (someone in two places at once) and undated scenes are listed, and
  * everything is in a table too.
  */
-export function TimelinePage({ novelId, novel }: { novelId: string; novel: Novel }) {
+export function TimelinePage({ novelId, novel }: { novelId: string; novel: Book }) {
   const [params, setParams] = useViewParams();
   const mode: LaneMode = MODES.some(([m]) => m === params.get("lanes")) ? (params.get("lanes") as LaneMode) : "pov";
   const t = useMemo(() => timeline(novel, mode), [novel, mode]);
   const conflicts = useMemo(() => overlaps(storyTimeline(novel)), [novel]);
-  const reading = novel.scenes.filter((s) => t.storyRank.has(s.id));
+  const reading = novel.pieces.filter((s) => t.storyRank.has(s.id));
   const n = t.items.length;
   const readSlot = reading.length ? (n * SLOT) / reading.length : SLOT;
   const name = (id: string) => novel.entities.find((e) => e.id === id)?.name ?? id;
@@ -104,7 +104,7 @@ export function TimelinePage({ novelId, novel }: { novelId: string; novel: Novel
                         novelId={novelId}
                         item={item}
                         flashback={item.kind === "scene" && t.flashbacks.has(item.scene.id)}
-                        reading={item.kind === "scene" ? novel.scenes.indexOf(item.scene) + 1 : undefined}
+                        reading={item.kind === "scene" ? novel.pieces.indexOf(item.scene) + 1 : undefined}
                       />
                     )}
                   </div>
@@ -213,7 +213,7 @@ export function TimelinePage({ novelId, novel }: { novelId: string; novel: Novel
                   <ItemLink novelId={novelId} item={item} />
                   {item.kind === "scene" && t.flashbacks.has(item.scene.id) && " (flashback)"}
                 </td>
-                <td className="py-1 pr-3 tabular-nums">{item.kind === "scene" ? `${novel.scenes.indexOf(item.scene) + 1} of ${novel.scenes.length}` : "off page"}</td>
+                <td className="py-1 pr-3 tabular-nums">{item.kind === "scene" ? `${novel.pieces.indexOf(item.scene) + 1} of ${novel.pieces.length}` : "off page"}</td>
                 <td className="py-1">{lanesText(item)}</td>
               </tr>
             ))}

@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
-import { compileBook, CompileError, loadNovel } from "@writer/core";
+import { compileBook, CompileError, loadBook } from "@writer/core";
 import { nodeSource } from "@writer/core/node";
 import { commitDate, fileName, FORMATS, isFormat, readCover, readPictures, render, type Format, type PdfFonts } from "@writer/export";
 
@@ -30,7 +30,7 @@ export async function runCompile(dir: string, options: CompileOptions = {}, out:
     return 1;
   }
   const source = nodeSource(root);
-  const novel = await loadNovel(source);
+  const novel = await loadBook(source);
   if (!novel.config) {
     out(`No novel here: ${root} has no novel.yaml.`);
     return 1;

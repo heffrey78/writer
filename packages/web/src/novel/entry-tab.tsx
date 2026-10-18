@@ -1,4 +1,4 @@
-import type { Novel } from "@writer/core";
+import type { Book } from "@writer/core";
 import type { SpellService } from "@writer/editor/react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useId, useRef } from "react";
@@ -59,7 +59,7 @@ export function EntryTab({
   spell,
 }: {
   novelId: string;
-  novel: Novel;
+  novel: Book;
   workspace: Workspace;
   spell: { service: SpellService; onAddWord: (w: string) => void } | undefined;
 }) {

@@ -3,7 +3,7 @@ import { join } from "node:path";
 import fc from "fast-check";
 import { isMap, parseDocument, type Node, type Pair } from "yaml";
 import { describe, expect, it } from "vitest";
-import { backlinks, editFrontMatter, editYaml, loadNovel, numberedName, readFrontMatter, relationshipHistory, relationshipsAt, slugify, uniqueFileName, uniqueId, type YamlEdit } from "../src/index.ts";
+import { backlinks, editFrontMatter, editYaml, loadBook, numberedName, readFrontMatter, relationshipHistory, relationshipsAt, slugify, uniqueFileName, uniqueId, type YamlEdit } from "../src/index.ts";
 import { nodeSource } from "../src/node.ts";
 
 const sample = new URL("../../../examples/sample-novel/", import.meta.url).pathname;
@@ -145,11 +145,11 @@ describe("names", () => {
 });
 
 describe("queries", async () => {
-  const novel = await loadNovel(nodeSource(sample));
+  const novel = await loadBook(nodeSource(sample));
 
   it("backlinks find every scene that names an entity, in front matter or prose", () => {
     for (const entity of novel.entities) {
-      const expected = novel.scenes.filter((s) => readFileSync(join(sample, s.file), "utf8").includes(entity.id)).map((s) => s.id);
+      const expected = novel.pieces.filter((s) => readFileSync(join(sample, s.file), "utf8").includes(entity.id)).map((s) => s.id);
       expect(backlinks(novel, entity.id).scenes.map((b) => b.scene.id), entity.name).toEqual(expected);
     }
     const ada = backlinks(novel, "char_7f3k2q");
@@ -160,10 +160,10 @@ describe("queries", async () => {
   it("relationship history agrees with relationshipsAt at every scene", () => {
     for (const entity of novel.entities) {
       const spans = relationshipHistory(novel, entity.id);
-      for (const scene of novel.scenes) {
+      for (const scene of novel.pieces) {
         const span = spans.find((s) => {
-          const from = s.from === null ? -1 : novel.scenes.findIndex((x) => x.id === s.from);
-          const until = s.until === null ? Infinity : novel.scenes.findIndex((x) => x.id === s.until);
+          const from = s.from === null ? -1 : novel.pieces.findIndex((x) => x.id === s.from);
+          const until = s.until === null ? Infinity : novel.pieces.findIndex((x) => x.id === s.until);
           return from <= scene.position && scene.position < until;
         })!;
         const expected = relationshipsAt(novel, scene.id).filter((r) => r.from === entity.id || r.to === entity.id);

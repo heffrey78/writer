@@ -3,7 +3,7 @@ import { fromMarkdown } from "mdast-util-from-markdown";
 import { gfmFromMarkdown } from "mdast-util-gfm";
 import { toString } from "mdast-util-to-string";
 import { gfm } from "micromark-extension-gfm";
-import { picturePath, type Novel } from "./model.ts";
+import { picturePath, type Book } from "./model.ts";
 import { parseMarkdown } from "./parse.ts";
 import type { FileSource } from "./source.ts";
 import type { CompilePreset } from "./types.ts";
@@ -90,12 +90,12 @@ export class CompileError extends Error {
 }
 
 /** The presets to choose from: compile.yaml's, or Writer's own "manuscript". */
-export function presets(novel: Novel): Record<string, CompilePreset> {
+export function presets(novel: Book): Record<string, CompilePreset> {
   return novel.compile?.presets ?? { manuscript: {} };
 }
 
 /** Compile the novel (or chapters `from`…`to`) with a preset into a book. Reads front and back matter through `source`. */
-export async function compileBook(novel: Novel, source: Pick<FileSource, "read">, options: CompileOptions = {}): Promise<CompiledBook> {
+export async function compileBook(novel: Book, source: Pick<FileSource, "read">, options: CompileOptions = {}): Promise<CompiledBook> {
   const all = presets(novel);
   const name = options.preset ?? Object.keys(all)[0]!;
   const preset = all[name];
@@ -109,7 +109,7 @@ export async function compileBook(novel: Novel, source: Pick<FileSource, "read">
   if (first < 0 || last < 0) throw new CompileError("The range names a chapter that isn't in the book.");
   if (first > last) throw new CompileError("The range ends before it starts.");
 
-  const byId = new Map(novel.allScenes.map((s) => [s.id, s]));
+  const byId = new Map(novel.allPieces.map((s) => [s.id, s]));
   const parts = new Map(novel.parts.map((p, i) => [p.id, { ...p, number: i + 1 }]));
   const chapterOut: CompiledChapter[] = [];
   let words = 0;

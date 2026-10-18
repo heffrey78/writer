@@ -3,7 +3,7 @@ import "./dom.ts";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { Editor } from "@tiptap/core";
-import { loadNovel } from "@writer/core";
+import { loadBook } from "@writer/core";
 import { knownWords } from "@writer/core/dictionary";
 import { nodeSource } from "@writer/core/node";
 import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
@@ -44,10 +44,10 @@ describe("SpellEngine", () => {
 });
 
 test("no name or alias in the sample novel's bible is ever flagged", async () => {
-  const novel = await loadNovel(nodeSource(join(import.meta.dirname, "../../../examples/sample-novel")));
+  const novel = await loadBook(nodeSource(join(import.meta.dirname, "../../../examples/sample-novel")));
   const known = knownWords(novel);
   const engine = new SpellEngine(dictionary, known);
-  const flagged = novel.scenes.flatMap((s) => engine.misspellings(s.body).map(([a, b]) => s.body.slice(a, b)));
+  const flagged = novel.pieces.flatMap((s) => engine.misspellings(s.body).map(([a, b]) => s.body.slice(a, b)));
   for (const name of known) expect(engine.misspellings(name)).toEqual([]);
   expect(flagged.filter((w) => known.includes(w.replace(/[’']s$/, "")))).toEqual([]);
   // The sample's prose is otherwise clean, apart from mention targets (IDs never reach the editor's checker).

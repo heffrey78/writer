@@ -1,13 +1,13 @@
-import type { Entity, Novel } from "@writer/core";
+import type { Entity, Book } from "@writer/core";
 import type { MentionEntity } from "@writer/editor";
 
 /** A type's name for a list of its entries: "Characters". */
 export const plural = (label: string) => (/(s|x|ch|sh)$/i.test(label) ? `${label}es` : /[^aeiou]y$/i.test(label) ? `${label.slice(0, -1)}ies` : `${label}s`);
 
-export const typeOf = (novel: Novel, entity: Entity) => novel.entityTypes.find((t) => t.key === entity.type);
+export const typeOf = (novel: Book, entity: Entity) => novel.entityTypes.find((t) => t.key === entity.type);
 
 /** Entries of each type, sorted by name. */
-export function entriesByType(novel: Novel): { type: Novel["entityTypes"][number]; entries: Entity[] }[] {
+export function entriesByType(novel: Book): { type: Book["entityTypes"][number]; entries: Entity[] }[] {
   return novel.entityTypes.map((type) => ({
     type,
     entries: novel.entities.filter((e) => e.type === type.key).sort((a, b) => a.name.localeCompare(b.name)),
@@ -24,7 +24,7 @@ export const matches = (entity: Entity, query: string) => {
 export const OFF_THE_PAGE = "Off the page";
 
 /** Every entry, for @ suggestions: by type in the bible's order, then by name; then the off-page events (heffrey78/gh-writer#165). */
-export function mentionEntities(novel: Novel): MentionEntity[] {
+export function mentionEntities(novel: Book): MentionEntity[] {
   return [
     ...novel.entityTypes.flatMap((t) =>
       novel.entities

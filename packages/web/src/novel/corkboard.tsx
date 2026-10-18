@@ -1,4 +1,4 @@
-import type { Novel, Scene } from "@writer/core";
+import type { Book, Piece } from "@writer/core";
 import { GripVertical } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
 import { Link, useSearchParams } from "react-router";
@@ -23,7 +23,7 @@ export const STATUS_TONE: Record<string, string> = {
  * Alt+Right on a card's handle step it past its visible neighbour the same way.
  */
 /** Outline as cards (the corkboard): scenes as cards by chapter, filtered, dragged to reorder. */
-export function OutlineCards({ novelId, novel, workspace }: { novelId: string; novel: Novel; workspace: Workspace }) {
+export function OutlineCards({ novelId, novel, workspace }: { novelId: string; novel: Book; workspace: Workspace }) {
   const structure = useStructure(novelId, novel, workspace);
   const [params, setParams] = useSearchParams();
   const filter: CorkboardFilter = Object.fromEntries(["pov", "plotline", "status", "character"].flatMap((k) => (params.get(k) ? [[k, params.get(k)!]] : [])));
@@ -53,7 +53,7 @@ export function OutlineCards({ novelId, novel, workspace }: { novelId: string; n
     if (id && (document.activeElement === document.body || !document.activeElement?.isConnected)) document.querySelector<HTMLElement>(`[data-card-handle="${id}"]`)?.focus();
   }, [novel]);
 
-  const onHandleKey = (e: KeyboardEvent, scene: Scene) => {
+  const onHandleKey = (e: KeyboardEvent, scene: Piece) => {
     if (!e.altKey || (e.key !== "ArrowLeft" && e.key !== "ArrowRight" && e.key !== "ArrowUp" && e.key !== "ArrowDown")) return;
     e.preventDefault();
     const step = visibleStep(
@@ -68,7 +68,7 @@ export function OutlineCards({ novelId, novel, workspace }: { novelId: string; n
     );
   };
 
-  const onDragOver = (e: DragEvent, scene: Scene) => {
+  const onDragOver = (e: DragEvent, scene: Piece) => {
     if (!dragging.current || dragging.current === scene.id) return;
     e.preventDefault();
     const rect = e.currentTarget.getBoundingClientRect();
@@ -101,7 +101,7 @@ export function OutlineCards({ novelId, novel, workspace }: { novelId: string; n
         )}
       </div>
       <p role="status" className="text-sm text-muted">
-        {filtered ? `${visible.length} of ${novel.scenes.length} scenes match.` : `${novel.scenes.length} scenes.`}
+        {filtered ? `${visible.length} of ${novel.pieces.length} scenes match.` : `${novel.pieces.length} scenes.`}
       </p>
       {chapters.map(({ chapter, scenes }) => (
         <section key={chapter.id} aria-labelledby={`cork-${chapter.id}`} className="grid gap-2">
