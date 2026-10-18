@@ -56,9 +56,10 @@ describe("schemas", () => {
       when: { day: 1, tiem: "10:00" },
     });
     expect(ds.map((d) => [d.code, d.pointer])).toEqual([
+      // In the order the kind declares its fields.
       ["W_UNKNOWN_KEY", "/povv"],
-      ["W_UNKNOWN_KEY", "/plotlines/0/wieght"],
       ["W_UNKNOWN_KEY", "/when/tiem"],
+      ["W_UNKNOWN_KEY", "/plotlines/0/wieght"],
     ]);
   });
 

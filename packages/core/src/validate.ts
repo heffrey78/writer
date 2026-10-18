@@ -114,14 +114,21 @@ export function validateBook(novel: Book): Diagnostic[] {
     push("warning", "W_IMAGE_OUTSIDE", file, `The picture “${p.alt || p.src}” isn't in the novel's images folder: use /images/<name> (from the repository's root, as github.com reads it)`, { line: bodyLine + p.line - 1 });
   }
 
-  // Scenes. `entities` holds custom types only: the built-in four have their own lists.
+  // Pieces: each declared field's entries are of its type. The own-entities field holds the book's
+  // own types only: the kind's have their own fields.
   for (const s of novel.allPieces) {
-    ref(s.pov, ["character"], s.file, "/pov", "pov");
-    s.characters.forEach((id, i) => ref(id, ["character"], s.file, `/characters/${i}`, "characters"));
-    s.locations.forEach((id, i) => ref(id, ["location"], s.file, `/locations/${i}`, "locations"));
-    s.entities.forEach((id, i) => ref(id, ["*custom"], s.file, `/entities/${i}`, "entities"));
-    s.plotlines.forEach((p, i) => ref(p.id, ["plotline"], s.file, `/plotlines/${i}`, "plotlines"));
-    s.themes.forEach((t, i) => ref(t.id, ["theme"], s.file, `/themes/${i}`, "themes"));
+    for (const f of novel.kind.fields) {
+      const t = f.type;
+      const value = s.fields[f.key];
+      if (t.kind === "entity") ref(typeof value === "string" ? value : undefined, [t.entityType], s.file, `/${f.key}`, f.key);
+      else if (t.kind === "entities" || t.kind === "own-entities") {
+        const allowed = t.kind === "entities" ? [t.entityType] : ["*custom"];
+        (Array.isArray(value) ? value : []).forEach((item: unknown, i) => {
+          const id = typeof item === "string" ? item : item && typeof item === "object" ? (item as { id?: unknown }).id : undefined;
+          if (typeof id === "string") ref(id, allowed, s.file, `/${f.key}/${i}`, f.key);
+        });
+      }
+    }
     if (s.pov && !s.characters.includes(s.pov)) {
       push("warning", "W_POV_NOT_PRESENT", s.file, `POV character ${s.pov} is not listed in characters`, { pointer: "/pov" });
     }

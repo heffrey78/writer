@@ -24,6 +24,37 @@ export const novel: BookKind = {
     { key: "revised", label: "Revised", description: "Rewritten after a draft", color: "ORANGE" },
     { key: "final", label: "Final", description: "Done", color: "GREEN" },
   ],
+  fields: [
+    { key: "pov", label: "Point of view", type: { kind: "entity", entityType: "character" } },
+    { key: "locations", label: "Where", group: "Locations", type: { kind: "entities", entityType: "location" }, mentionAdds: true },
+    { key: "characters", label: "Characters", type: { kind: "entities", entityType: "character" }, mentionAdds: true },
+    { key: "when", label: "When", type: { kind: "story-time", durationKey: "duration" } },
+    {
+      key: "plotlines",
+      label: "Plotlines",
+      type: {
+        kind: "entities",
+        entityType: "plotline",
+        item: [
+          { key: "weight", label: "Weight", kind: "choice", values: ["major", "minor"], default: "major" },
+          { key: "beat", label: "Beat", kind: "text" },
+        ],
+      },
+    },
+    { key: "entities", label: "Other entries", type: { kind: "own-entities" }, mentionAdds: true },
+    {
+      key: "themes",
+      label: "Themes",
+      type: {
+        kind: "entities",
+        entityType: "theme",
+        item: [
+          { key: "strength", label: "Strength", kind: "scale", min: 1, max: 3, labels: { "1": "faint", "2": "medium", "3": "strong" }, options: { "1": "1 (faint)", "2": "2", "3": "3 (strong)" } },
+          { key: "note", label: "Note", kind: "text", onCard: false },
+        ],
+      },
+    },
+  ],
   issueKinds: [
     { key: "plot-hole", label: "Plot hole", color: "d73a4a", description: "Something in the story that can't happen" },
     { key: "continuity", label: "Continuity", color: "fbca04", description: "Facts that don't agree" },

@@ -15,6 +15,8 @@ export const diary: BookKind = {
   levels: [{ key: "month", label: "Month", prefix: "mon", list: "months" }],
   piece: { key: "day", label: "Day", prefix: "day", list: "days" },
   folders: { ...novel.folders, content: "pages", codex: "index" },
+  // A field of its own, in place of the novel's: who was there that day.
+  fields: [{ key: "people", label: "People", type: { kind: "entities", entityType: "character" }, mentionAdds: true }],
 };
 
 /** Three levels: volumes and parts (both optional, from the outside in), then chapters of scenes. */

@@ -87,6 +87,12 @@ export interface Piece {
   when?: StoryTime;
   duration?: string;
   tags: string[];
+  /**
+   * The values of its kind's declared fields (BookKind.fields), as its front matter has them, by key:
+   * what the card, the validator, comparisons and commit messages read. The properties above are the
+   * Novel's same fields, typed, for the code that reads them as a novel's (until its modules own them).
+   */
+  fields: Record<string, unknown>;
   sectionId?: string;
   /** Position in reading order, or -1 if the scene is not in any order file. */
   position: number;

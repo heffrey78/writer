@@ -3,7 +3,7 @@ export * from "./types.ts";
 export * from "./model.ts";
 export { loadBook } from "./load.ts";
 export { EVENT_FILES_FORMAT, MANIFEST, NOVEL_MANIFEST, readManifest, SCHEMA_VERSION, type Manifest } from "./manifest.ts";
-export { kindByKey, knownKind, levelOf, registerKind, startLevels, V2_KIND, type BookKind, type LevelDef, type StatusDef } from "./kinds.ts";
+export { kindByKey, knownKind, levelOf, registerKind, startLevels, V2_KIND, type BookKind, type FieldDef, type ItemProp, type LevelDef, type StatusDef } from "./kinds.ts";
 export { eventFile, migration, type Migration, type MigrationWrite } from "./migrate.ts";
 export { parseMarkdown, parseYaml } from "./parse.ts";
 export { checkSchema, schemaFor, SCHEMAS, type SchemaKind } from "./schemas.ts";

@@ -22,6 +22,8 @@ export async function loadBook(source: FileSource, kind?: BookKind): Promise<Boo
   const named = manifest?.kind === undefined ? undefined : knownKind(manifest.kind);
   const bookKind = kind ?? named ?? kindByKey(V2_KIND);
   const { content, codex, notes: notesFolder, events: eventsFolder } = bookKind.folders;
+  // The front-matter keys of the kind's fields (story time's two).
+  const fieldKeys = bookKind.fields.flatMap((f) => (f.type.kind === "story-time" ? [f.key, f.type.durationKey] : [f.key]));
   const order = `${content}/_order.yaml`;
   const novel: Book = {
     kind: bookKind,
@@ -232,6 +234,7 @@ export async function loadBook(source: FileSource, kind?: BookKind): Promise<Boo
       when: storyTime(d["when"]),
       duration: str(d["duration"]),
       tags: strList(d["tags"]),
+      fields: Object.fromEntries(fieldKeys.filter((k) => d[k] !== undefined).map((k) => [k, d[k]])),
       sectionId: chapterId,
       position: -1,
       body: md.body,

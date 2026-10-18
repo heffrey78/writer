@@ -27,6 +27,43 @@ export interface LevelDef {
   titled?: boolean;
 }
 
+/**
+ * Something each item of a list field may carry, as `{ id, <key>: … }` in place of a plain ID: a
+ * plotline's weight and beat, a theme's strength.
+ */
+export type ItemProp = { key: string; label: string; onCard?: boolean } & (
+  /** One of some words: `default` is what an item without it means (a plotline is "major"). */
+  | { kind: "choice"; values: readonly string[]; default?: string }
+  /** A whole number from `min` to `max`: `labels` say what each means on the card, `options` how the choice lists it. */
+  | { kind: "scale"; min: number; max: number; labels: Readonly<Record<string, string>>; options: Readonly<Record<string, string>> }
+  | { kind: "text" }
+);
+
+/**
+ * A field of a piece's front matter, declared by its kind (D15): what it holds, how the piece's card
+ * shows and edits it, and how the rest of the app reads it. The kind's fields are the card's rows, in
+ * order; a piece's id, title, synopsis, status and tags are every kind's.
+ */
+export interface FieldDef {
+  /** Its key in the front matter: "characters". */
+  key: string;
+  /** Its row's label on the card: "Point of view", "Where". */
+  label: string;
+  /** What its entries are called where they're chosen and added: "Locations". Default the label. */
+  group?: string;
+  type:
+    /** One entry of a type: a point of view. */
+    | { kind: "entity"; entityType: string }
+    /** Entries of a type, each an ID or `{ id, … }` carrying `item`'s properties. */
+    | { kind: "entities"; entityType: string; item?: readonly ItemProp[] }
+    /** Entries of the book's own types (not its kind's), all in one list: a row on the card for each type. */
+    | { kind: "own-entities" }
+    /** When it happens (`{ at }` or `{ day, time }`), with how long under `durationKey`, read and edited together. */
+    | { kind: "story-time"; durationKey: string };
+  /** Whether mentioning an entry in a piece's prose adds it here, so the list keeps up with the text. */
+  mentionAdds?: boolean;
+}
+
 /** A stage a piece moves through, in order: idea, outlined, drafted… */
 export interface StatusDef {
   key: string;
@@ -58,6 +95,8 @@ export interface BookKind {
   entityTypes: readonly EntityTypeDef[];
   /** In order: a new piece starts at the first. */
   statuses: readonly StatusDef[];
+  /** A piece's fields beyond those every kind has, in the order its card shows them. */
+  fields: readonly FieldDef[];
   /** What a book's issues are about: a label kind/<key> each. */
   issueKinds: readonly IssueKind[];
 }

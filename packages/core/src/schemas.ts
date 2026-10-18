@@ -42,7 +42,7 @@ export function schemaFor(name: SchemaKind | string, bookKind: BookKind): object
   if (level) return sectionSchema(bookKind, level);
   if (name === "manuscript-order") return orderSchema(bookKind);
   if (name === "book") return bookSchema();
-  if (name === "scene") return { ...scene, properties: { ...scene.properties, status: { enum: bookKind.statuses.map((s) => s.key) } } };
+  if (name === "scene") return pieceSchema(bookKind);
   return SCHEMAS[name as SchemaKind];
 }
 
@@ -63,6 +63,37 @@ function sectionSchema(kind: BookKind, level: LevelDef): object {
     required: ["id", ...(level.titled ? ["title"] : []), list],
     additionalProperties: false,
   };
+}
+
+/** A piece's front matter: what every kind's has (id, title, synopsis, status, tags), then the kind's fields. */
+function pieceSchema(kind: BookKind): object {
+  const properties: Record<string, object> = {
+    id: ref("id"),
+    title: ref("nonEmptyText"),
+    synopsis: ref("text"),
+    status: { enum: kind.statuses.map((s) => s.key) },
+  };
+  for (const f of kind.fields) {
+    const t = f.type;
+    if (t.kind === "entity") properties[f.key] = ref("id");
+    else if (t.kind === "own-entities") properties[f.key] = ref("idList");
+    else if (t.kind === "story-time") {
+      properties[f.key] = ref("storyTime");
+      properties[t.durationKey] = ref("duration");
+    } else if (!t.item?.length) properties[f.key] = ref("idList");
+    else {
+      // Each item a plain ID, or an object with its ID and what it carries.
+      const item = Object.fromEntries(
+        t.item.map((p) => [p.key, p.kind === "choice" ? { enum: [...p.values] } : p.kind === "scale" ? { type: "integer", minimum: p.min, maximum: p.max } : ref("text")]),
+      );
+      properties[f.key] = {
+        type: "array",
+        items: { if: { type: "string" }, then: ref("id"), else: { type: "object", properties: { id: ref("id"), ...item }, required: ["id"], additionalProperties: false } },
+      };
+    }
+  }
+  properties["tags"] = ref("tags");
+  return { $schema: scene.$schema, $id: scene.$id, title: scene.title, type: "object", properties, required: ["id", "title"], additionalProperties: false };
 }
 
 /** book.yaml (format 3): novel.yaml's settings, and the kind of book it is. */
