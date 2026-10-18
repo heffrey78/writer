@@ -86,7 +86,7 @@ describe("writer snapshots", () => {
     const again = run(main, "snapshots", novel);
     expect(again.out).toContain("Wrote diagrams/relationships.svg, diagrams/README.md");
     expect(readFileSync(join(novel, "diagrams/README.md"), "utf8")).toContain('-.-|"Rivals with"|');
-  }, 15_000); // Runs the CLI five times: about 3.5 s alone, past 5 s on a busy machine.
+  }, 30_000); // Runs the CLI five times: about 3.5 s alone, past 5 s on a busy machine.
 
   it("removes a snapshot it drew once a diagram has nothing to show, and never a file it didn't write", () => {
     const novel = join(tmp, "snapshots-stale");
@@ -139,14 +139,14 @@ describe("writer serve", () => {
     child.kill("SIGTERM");
     expect(await exited).toBe(0);
     expect(out()).toContain("SIGTERM: stopping…\nStopped.");
-  }, 15_000);
+  }, 30_000);
 
   it("refuses a folder that isn't a novel repository, a missing folder and a bad port", () => {
     expect(run(main, "serve", broken, "--no-open")).toMatchObject({ code: 1, err: expect.stringContaining("isn't a git repository") });
     expect(run(main, "serve", join(tmp, "missing"), "--no-open").err).toContain("isn't a folder");
     expect(run(main, "serve", sample, "--port", "70000")).toMatchObject({ code: 1 });
     expect(run(main, "serve", sample, "--sync-every", "soon")).toMatchObject({ code: 1, err: expect.stringContaining("--sync-every") });
-  }, 15_000); // Runs the CLI four times: past 5 s on a busy machine.
+  }, 30_000); // Runs the CLI four times: past 5 s on a busy machine.
 });
 
 describe("writer serve --sidecar", () => {
@@ -260,7 +260,7 @@ describe("server bundle", () => {
     expect(library.novels.map((n) => n.path)).toContain(realpathSync(sample));
     child.kill("SIGTERM");
     expect(await exited).toBe(0);
-  }, 15_000);
+  }, 30_000);
 
   it("compiles the same bytes as the source, with the type beside it", () => {
     const novel = join(tmp, "compile-bundled");

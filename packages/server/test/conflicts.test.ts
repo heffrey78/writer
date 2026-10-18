@@ -1,7 +1,7 @@
 import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { resolveMerge, type Resolution } from "@writer/core";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Committer, createServer, Library, sessionCookie, Syncer, type Conflicts, type FileResolution } from "../src/index.ts";
 import { gitIn, novelRepo, sample, scratch } from "./fixtures.ts";
 import { send } from "./http.ts";
@@ -9,8 +9,6 @@ import { send } from "./http.ts";
 const SCENE = "manuscript/01-return/01-arrival/01-the-station.md";
 const SCENE2 = "manuscript/01-return/01-arrival/02-the-bridge.md";
 
-// Each scenario runs a few full syncs on two clones: dozens of git processes.
-vi.setConfig({ testTimeout: 20_000 });
 
 let fresh: (name: string) => string;
 let cleanUp: () => void;

@@ -99,7 +99,8 @@ describe("PUT /api/identity", () => {
       const before = readFileSync(join(novel, path));
       const put = await call("PUT", `/api/novels/${id}/files/${path}`, { content: `${before.toString("utf8")}\nOne more line.\n`, base: createHash("sha256").update(before).digest("hex") });
       expect(put.status).toBe(200);
-      await expect.poll(async () => (await call("GET", `/api/novels/${id}/sync`)).json.commit).toMatchObject({ state: "blocked", blocked: { code: "IDENTITY" } });
+      // The commit is tried with git, which can take longer than poll's default second on a busy machine (#18).
+      await expect.poll(async () => (await call("GET", `/api/novels/${id}/sync`)).json.commit, { timeout: 10_000 }).toMatchObject({ state: "blocked", blocked: { code: "IDENTITY" } });
 
       const { suggestion } = (await call("GET", "/api/identity")).json as { suggestion: { name: string; email: string } };
       expect(await call("PUT", "/api/identity", suggestion)).toMatchObject({ status: 200, json: { identity: suggestion } });

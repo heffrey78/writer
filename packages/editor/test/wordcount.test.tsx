@@ -7,7 +7,7 @@ import { Editor } from "@tiptap/core";
 import { Transform } from "@tiptap/pm/transform";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import fc from "fast-check";
-import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import {
   chapterContent,
   countNode,
@@ -199,4 +199,3 @@ describe("WordCount", () => {
   });
 });
 
-vi.setConfig({ testTimeout: 20_000 });

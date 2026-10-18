@@ -2,12 +2,11 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadNovel, validateNovel } from "@writer/core";
 import { nodeSource } from "@writer/core/node";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { BibleOperations, createServer, Library, ManuscriptOperations, sessionCookie } from "../src/index.ts";
 import { gitIn, novelRepo, scratch } from "./fixtures.ts";
 import { send } from "./http.ts";
 
-vi.setConfig({ testTimeout: 20_000 });
 
 const ARRIVAL = "manuscript/01-return/01-arrival";
 const OLD_DEBTS = "manuscript/01-return/02-old-debts";

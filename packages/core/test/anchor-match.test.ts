@@ -55,13 +55,16 @@ describe("finding an anchored passage again", () => {
     const paragraphs = Array.from({ length: 400 }, (_, i) => `Paragraph ${i} of the chapter goes on about the bridge, the river and the people of Varn, number ${i * 7}.`);
     const chapter = paragraphs.join("\n\n");
     const quotes = Array.from({ length: 20 }, (_, i) => paragraphs[i * 19]!.replace("bridge", "old bridge"));
-    const start = performance.now();
+    // The CPU it takes, not the time on the clock: about 350 ms alone; while the rest of the suite
+    // runs alongside, the clock says up to five times that and the CPU about twice (#18).
+    const start = process.cpuUsage();
     quotes.forEach((q, i) => {
       const m = resolveAnchor(chapter, q);
       expect(m?.kind).toBe("approximate");
       // In the right paragraph, not a look-alike.
       expect(chapter.slice(m!.from, m!.to)).toBe(paragraphs[i * 19]);
     });
-    expect(performance.now() - start).toBeLessThan(1500);
+    const { user, system } = process.cpuUsage(start);
+    expect((user + system) / 1000).toBeLessThan(1500);
   });
 });
