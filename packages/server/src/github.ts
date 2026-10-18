@@ -1,0 +1,512 @@
+import { execFile } from "node:child_process";
+import type { GitAuth } from "./git.ts";
+
+/*
+ * The author's GitHub connection (D5): an OAuth App's device flow, or the gh CLI's account, with the
+ * token kept in the operating system's keychain. The token never leaves the server: not in a
+ * response, a log line, a file, or a repository's git config.
+ */
+
+/** The gh-writer OAuth App's client ID (#100): public, and shipped in the app. GH_WRITER_GITHUB_CLIENT_ID overrides it. */
+export const GITHUB_CLIENT_ID: string | undefined = "Ov23lidsTX79zar9Gxxv";
+
+/**
+ * Classic OAuth scopes: private repositories (contents, issues, creating them); the novel's GitHub
+ * workflows, which GitHub won't let a push add or change without `workflow`; who the author is; and
+ * Projects, for the drafting board (#11).
+ */
+export const SCOPES = ["repo", "workflow", "read:user", "project"];
+/** What a push of a novel needs: a token without them can't publish or sync it. */
+const NEEDED = ["repo", "workflow"];
+/** What the drafting board needs as well: without it, only the board asks for a reconnect. */
+const BOARD = ["project"];
+
+const SERVICE = "gh-writer";
+/** A request to GitHub that takes longer is given up (as offline). */
+const TIMEOUT_MS = 15_000;
+const ACCOUNT = "github";
+
+/** Where the token lives. */
+export interface TokenStore {
+  get(): Promise<string | undefined>;
+  set(token: string): Promise<void>;
+  delete(): Promise<void>;
+}
+
+export type GitHubErrorCode = "NO_CLIENT_ID" | "NO_KEYCHAIN" | "NO_SIGN_IN" | "NO_GH" | "NEEDS_SCOPE" | "NOT_FOUND" | "RATE_LIMITED" | "OFFLINE" | "GITHUB";
+
+export class GitHubError extends Error {
+  readonly code: GitHubErrorCode;
+  /** For RATE_LIMITED: when GitHub will answer again (ISO), when it says. */
+  readonly resetAt: string | undefined;
+
+  constructor(code: GitHubErrorCode, message: string, resetAt?: string) {
+    super(message);
+    this.name = "GitHubError";
+    this.code = code;
+    this.resetAt = resetAt;
+  }
+}
+
+/** The OS keychain (macOS Keychain, Windows Credential Manager, the Secret Service on Linux). Never a plain-text file. */
+export function keychainStore(): TokenStore {
+  const entry = async () => {
+    try {
+      const { AsyncEntry } = await import("@napi-rs/keyring");
+      return new AsyncEntry(SERVICE, ACCOUNT);
+    } catch {
+      throw noKeychain();
+    }
+  };
+  const call = async <T>(fn: () => Promise<T>): Promise<T> => {
+    try {
+      return await fn();
+    } catch {
+      throw noKeychain();
+    }
+  };
+  return {
+    get: async () => {
+      const e = await entry();
+      return (await call(() => e.getPassword())) ?? undefined;
+    },
+    set: async (token) => {
+      const e = await entry();
+      await call(() => e.setPassword(token));
+    },
+    delete: async () => {
+      const e = await entry();
+      await call(() => e.deletePassword());
+    },
+  };
+}
+
+const noKeychain = () =>
+  new GitHubError(
+    "NO_KEYCHAIN",
+    "gh-writer keeps your GitHub sign-in in the system keychain, and couldn't reach it. On Linux, install and unlock a Secret Service keyring (GNOME Keyring or KWallet), then try again.",
+  );
+
+/** The status of a signed-in account: who, and any permission gh-writer needs that the token lacks. */
+function signedInStatus({ scopes, ...account }: GitHubAccount, deviceFlow: boolean): AccountStatus {
+  const missing = scopes ? NEEDED.filter((s) => !scopes.includes(s)) : [];
+  const board = scopes ? BOARD.filter((s) => !scopes.includes(s)) : [];
+  return { signedIn: true, account, deviceFlow, ...(missing.length ? { missingScopes: missing } : {}), ...(board.length ? { missingBoardScopes: board } : {}) };
+}
+
+/** Whether `e` is fetch failing to reach GitHub (no network, refused, timed out) rather than a bug. */
+export function unreachable(e: unknown): boolean {
+  return e instanceof TypeError || (e instanceof DOMException && (e.name === "TimeoutError" || e.name === "AbortError"));
+}
+
+/** A store in memory, gone when the server stops: for tests (GH_WRITER_TOKEN_STORE=memory). */
+export function memoryStore(): TokenStore {
+  let token: string | undefined;
+  return {
+    get: async () => token,
+    set: async (t) => void (token = t),
+    delete: async () => void (token = undefined),
+  };
+}
+
+/** The token of the gh CLI's signed-in account, if there is one. */
+export function ghToken(): Promise<string | undefined> {
+  return new Promise((resolve) => {
+    execFile("gh", ["auth", "token", "--hostname", "github.com"], { timeout: 10_000, env: { ...process.env, GH_PROMPT_DISABLED: "1" } }, (error, stdout) =>
+      resolve(error ? undefined : stdout.trim() || undefined),
+    );
+  });
+}
+
+export interface GitHubAccount {
+  login: string;
+  /** GitHub's number for the account, which its noreply email address carries. */
+  id?: number;
+  name?: string;
+  avatarUrl?: string;
+  /** The token's scopes as GitHub reports them (X-OAuth-Scopes), when it does. */
+  scopes?: string[];
+}
+
+/** What the app shows about the connection. */
+export interface AccountStatus {
+  signedIn: boolean;
+  /** Who, when signed in (unknown while offline, until GitHub has been reached once). */
+  account?: GitHubAccount;
+  /** Whether sign-in with a code on github.com is available (an OAuth App client ID is set). */
+  deviceFlow: boolean;
+  /** The gh CLI's account, offered as a shortcut while signed out. */
+  gh?: { login: string };
+  /** Set once after GitHub stopped accepting the stored token (revoked or expired): it has been forgotten. */
+  expired?: boolean;
+  /** Signed in, but GitHub couldn't be reached to say who as. */
+  offline?: boolean;
+  /** Why the keychain couldn't be read, when it couldn't. */
+  keychain?: string;
+  /** Signed in, but without permissions gh-writer needs (e.g. an older sign-in without `workflow`): reconnect. */
+  missingScopes?: string[];
+  /** Signed in, but without what the drafting board needs (`project`): only the board asks for a reconnect. */
+  missingBoardScopes?: string[];
+}
+
+export interface DeviceCode {
+  userCode: string;
+  verificationUri: string;
+  /** Seconds until the code expires. */
+  expiresIn: number;
+  /** Seconds to wait between polls. */
+  interval: number;
+}
+
+/** One of the author's repositories, for cloning. */
+export interface RepoSummary {
+  fullName: string;
+  description?: string;
+  private: boolean;
+  /** ISO time of the last push. */
+  pushedAt?: string;
+  cloneUrl: string;
+}
+
+export type PollResult =
+  | { status: "pending"; interval: number }
+  | { status: "expired" | "denied" | "none" }
+  | { status: "done"; account: AccountStatus };
+
+export interface GitHubOptions {
+  clientId?: string | undefined;
+  /** github.com, or a fake GitHub in tests. */
+  webUrl?: string;
+  /** api.github.com, or a fake GitHub in tests. */
+  apiUrl?: string;
+  store?: TokenStore;
+  /** The gh CLI's token, if it has one. */
+  gh?: () => Promise<string | undefined>;
+  fetch?: typeof fetch;
+}
+
+/**
+ * The connection to GitHub. Signed out, it offers the device flow and, if gh is signed in, its
+ * account. Signed in, it knows who the author is; when GitHub refuses the token, it forgets it and
+ * reports `expired` once, rather than failing again and again.
+ */
+export class GitHub {
+  readonly clientId: string | undefined;
+  readonly webUrl: string;
+  readonly apiUrl: string;
+  #store: TokenStore;
+  #gh: () => Promise<string | undefined>;
+  #fetch: typeof fetch;
+  #account: GitHubAccount | undefined;
+  #expired = false;
+  #device: { deviceCode: string; interval: number; expiresAt: number } | undefined;
+  /** The gh CLI's account, looked up at most once a minute. */
+  #ghCache: { at: number; value: Promise<{ token: string; account: GitHubAccount } | undefined> } | undefined;
+
+  constructor({ clientId = GITHUB_CLIENT_ID, webUrl = "https://github.com", apiUrl = "https://api.github.com", store = keychainStore(), gh = ghToken, fetch: f = fetch }: GitHubOptions = {}) {
+    this.clientId = clientId || undefined;
+    this.webUrl = webUrl.replace(/\/$/, "");
+    this.apiUrl = apiUrl.replace(/\/$/, "");
+    this.#store = store;
+    this.#gh = gh;
+    this.#fetch = f;
+  }
+
+  /** From the environment: GH_WRITER_GITHUB_CLIENT_ID, GH_WRITER_GITHUB_URL, GH_WRITER_GITHUB_API_URL, GH_WRITER_TOKEN_STORE=memory. */
+  static fromEnv(env: NodeJS.ProcessEnv = process.env): GitHub {
+    return new GitHub({
+      clientId: env.GH_WRITER_GITHUB_CLIENT_ID || GITHUB_CLIENT_ID,
+      ...(env.GH_WRITER_GITHUB_URL ? { webUrl: env.GH_WRITER_GITHUB_URL } : {}),
+      ...(env.GH_WRITER_GITHUB_API_URL ? { apiUrl: env.GH_WRITER_GITHUB_API_URL } : {}),
+      ...(env.GH_WRITER_TOKEN_STORE === "memory" ? { store: memoryStore() } : {}),
+    });
+  }
+
+  /** The stored token, for git and the API. Undefined when signed out (or the keychain can't be read). */
+  async token(): Promise<string | undefined> {
+    return this.#store.get().catch(() => undefined);
+  }
+
+  /**
+   * A name and email for git from the signed-in account: its name (or login), and its noreply
+   * address (<id>+<login>@users.noreply.github.com), which GitHub links to the account and which keeps
+   * the writer's own address out of the book's history. None when signed out.
+   */
+  async suggestedIdentity(): Promise<{ name: string; email: string } | undefined> {
+    const status = await this.status();
+    const account = status.signedIn ? status.account : undefined;
+    if (!account) return undefined;
+    const host = new URL(this.webUrl).hostname;
+    const user = account.id !== undefined ? `${account.id}+${account.login}` : account.login;
+    return { name: account.name ?? account.login, email: `${user}@users.noreply.${host}` };
+  }
+
+  async status(): Promise<AccountStatus> {
+    const deviceFlow = Boolean(this.clientId);
+    let keychain: string | undefined;
+    const token = await this.#store.get().catch((e: unknown) => void (keychain = e instanceof Error ? e.message : String(e)));
+    if (token) {
+      try {
+        const account = await this.#who(token);
+        if (account) return signedInStatus(account, deviceFlow);
+      } catch {
+        // Offline, or GitHub is down: still signed in, as far as anyone knows.
+        return { signedIn: true, ...(this.#account ? { account: this.#account } : {}), deviceFlow, offline: true };
+      }
+    }
+    const expired = this.#expired;
+    this.#expired = false;
+    const gh = await this.#ghAccount();
+    return { signedIn: false, deviceFlow, ...(gh ? { gh: { login: gh.account.login } } : {}), ...(expired ? { expired } : {}), ...(keychain ? { keychain } : {}) };
+  }
+
+  /** Start the device flow: the author enters the code at the verification address. */
+  async startDevice(): Promise<DeviceCode> {
+    if (!this.clientId) throw new GitHubError("NO_CLIENT_ID", "Signing in with a code isn't set up in this copy of gh-writer (it has no GitHub OAuth App client ID). Sign in with the gh CLI instead: gh auth login.");
+    const res = await this.#post(`${this.webUrl}/login/device/code`, { client_id: this.clientId, scope: SCOPES.join(" ") });
+    const body = (await res.json()) as { device_code?: string; user_code?: string; verification_uri?: string; expires_in?: number; interval?: number; error_description?: string };
+    if (!res.ok || !body.device_code || !body.user_code || !body.verification_uri) {
+      throw new GitHubError("GITHUB", `GitHub didn't start the sign-in: ${body.error_description ?? res.statusText}`);
+    }
+    const interval = body.interval ?? 5;
+    const expiresIn = body.expires_in ?? 900;
+    this.#device = { deviceCode: body.device_code, interval, expiresAt: Date.now() + expiresIn * 1000 };
+    return { userCode: body.user_code, verificationUri: body.verification_uri, expiresIn, interval };
+  }
+
+  /** Ask GitHub once whether the author has entered the code. */
+  async pollDevice(): Promise<PollResult> {
+    const device = this.#device;
+    if (!device || !this.clientId) return { status: "none" };
+    if (Date.now() > device.expiresAt) {
+      this.#device = undefined;
+      return { status: "expired" };
+    }
+    const res = await this.#post(`${this.webUrl}/login/oauth/access_token`, {
+      client_id: this.clientId,
+      device_code: device.deviceCode,
+      grant_type: "urn:ietf:params:oauth:grant-type:device_code",
+    });
+    const body = (await res.json()) as { access_token?: string; error?: string; interval?: number; error_description?: string };
+    if (body.access_token) {
+      this.#device = undefined;
+      return { status: "done", account: await this.#signIn(body.access_token) };
+    }
+    switch (body.error) {
+      case "authorization_pending":
+        return { status: "pending", interval: device.interval };
+      case "slow_down":
+        device.interval = body.interval ?? device.interval + 5;
+        return { status: "pending", interval: device.interval };
+      case "expired_token":
+        this.#device = undefined;
+        return { status: "expired" };
+      case "access_denied":
+        this.#device = undefined;
+        return { status: "denied" };
+      default:
+        throw new GitHubError("GITHUB", `GitHub didn't finish the sign-in: ${body.error_description ?? body.error ?? res.statusText}`);
+    }
+  }
+
+  /** Sign in with the gh CLI's account. */
+  async useGh(): Promise<AccountStatus> {
+    this.#ghCache = undefined;
+    const gh = await this.#ghAccount();
+    if (!gh) throw new GitHubError("NO_GH", "The gh CLI isn't signed in to GitHub on this computer. Run gh auth login, or sign in with a code.");
+    return this.#signIn(gh.token, gh.account);
+  }
+
+  /** The author's repositories (their own and those they collaborate on), most recently pushed first: up to 300. */
+  async repos(): Promise<RepoSummary[]> {
+    const out: RepoSummary[] = [];
+    for (let page = 1; page <= 3; page++) {
+      const res = await this.api(`/user/repos?per_page=100&sort=pushed&affiliation=owner,collaborator&page=${page}`);
+      if (!res.ok) throw new GitHubError("GITHUB", `GitHub answered ${res.status} when asked for your repositories.`);
+      const repos = (await res.json()) as { full_name: string; description: string | null; private: boolean; pushed_at: string | null; clone_url: string }[];
+      for (const r of repos) {
+        out.push({ fullName: r.full_name, private: r.private, cloneUrl: r.clone_url, ...(r.description ? { description: r.description } : {}), ...(r.pushed_at ? { pushedAt: r.pushed_at } : {}) });
+      }
+      if (repos.length < 100) break;
+    }
+    return out;
+  }
+
+  /**
+   * Credentials for git, for an http(s) remote on this GitHub when signed in. Other hosts, ssh
+   * remotes, and signed-out use get none: git then uses the author's own setup, as it always has.
+   */
+  async gitAuth(url: string): Promise<GitAuth | undefined> {
+    let origin: string;
+    try {
+      const u = new URL(url);
+      if (u.protocol !== "https:" && u.protocol !== "http:") return undefined;
+      origin = u.origin;
+    } catch {
+      return undefined;
+    }
+    if (origin !== new URL(this.webUrl).origin) return undefined;
+    const token = await this.token();
+    return token ? { origin, token } : undefined;
+  }
+
+  /** Ask GitHub again whether the token is good (after git was refused with it): a refused one is forgotten. */
+  async recheck(): Promise<void> {
+    this.#account = undefined;
+    const token = await this.token();
+    if (token) await this.#who(token).catch(() => {});
+  }
+
+  /** Forget the token. gh-writer has no client secret, so it can't revoke it: github.com → Settings → Applications can. */
+  async signOut(): Promise<void> {
+    this.#device = undefined;
+    this.#account = undefined;
+    await this.#store.delete();
+  }
+
+  /**
+   * A request to the GitHub API as the author. A 401 means the token is no longer good: it is
+   * forgotten, and NO_SIGN_IN is thrown.
+   */
+  async api(path: string, init: { method?: string; body?: unknown; headers?: Record<string, string> } = {}): Promise<Response> {
+    const token = await this.#store.get();
+    if (!token) throw new GitHubError("NO_SIGN_IN", "Connect gh-writer to GitHub first.");
+    const res = await this.#request(token, path, init);
+    if (res.status === 401) {
+      await this.#forget();
+      throw new GitHubError("NO_SIGN_IN", "GitHub no longer accepts gh-writer's sign-in (it was revoked or has expired). Connect to GitHub again.");
+    }
+    return res;
+  }
+
+  /**
+   * A GraphQL request as the author (Projects have no REST API). Resolves to its data; any error in
+   * the answer is thrown as a GitHubError: NEEDS_SCOPE (the token lacks a scope), NOT_FOUND,
+   * RATE_LIMITED, OFFLINE (unreachable), NO_SIGN_IN (401, and the token is forgotten), else GITHUB.
+   */
+  async graphql<T>(query: string, variables: Record<string, unknown> = {}): Promise<T> {
+    let res: Response;
+    try {
+      res = await this.api("/graphql", { method: "POST", body: { query, variables } });
+    } catch (e) {
+      if (unreachable(e)) throw new GitHubError("OFFLINE", "GitHub can't be reached right now.");
+      throw e;
+    }
+    const body = (await res.json().catch(() => ({}))) as { data?: T; errors?: { type?: string; message?: string }[]; message?: string };
+    const limited = res.status === 429 || (res.status === 403 && res.headers.get("x-ratelimit-remaining") === "0");
+    const error = body.errors?.[0];
+    if (limited || error?.type === "RATE_LIMITED") {
+      const reset = Number(res.headers.get("x-ratelimit-reset"));
+      throw new GitHubError("RATE_LIMITED", "GitHub has had enough requests from gh-writer for now.", Number.isFinite(reset) && reset > 0 ? new Date(reset * 1000).toISOString() : undefined);
+    }
+    if (error?.type === "INSUFFICIENT_SCOPES") throw new GitHubError("NEEDS_SCOPE", "This GitHub sign-in doesn't allow gh-writer to use Projects. Reconnect GitHub to grant it.");
+    if (error?.type === "NOT_FOUND") throw new GitHubError("NOT_FOUND", error.message ?? "GitHub doesn't have that (or doesn't let this sign-in see it).");
+    if (error || !res.ok || body.data === undefined) {
+      const message = error?.message ?? body.message ?? res.statusText;
+      throw new GitHubError("GITHUB", `GitHub answered${res.ok ? "" : ` ${res.status}`}: ${message}`);
+    }
+    return body.data;
+  }
+
+  async #signIn(token: string, known?: GitHubAccount): Promise<AccountStatus> {
+    const account = known ?? (await this.#who(token, { remember: false }));
+    if (!account) throw new GitHubError("GITHUB", "GitHub didn't accept the new sign-in. Try again.");
+    await this.#store.set(token);
+    this.#account = account;
+    this.#expired = false;
+    return signedInStatus(account, Boolean(this.clientId));
+  }
+
+  /** Who the token belongs to; undefined (and the token forgotten) when GitHub refuses it. */
+  async #who(token: string, { remember = true } = {}): Promise<GitHubAccount | undefined> {
+    if (remember && this.#account) return this.#account;
+    const res = await this.#request(token, "/user");
+    if (res.status === 401) {
+      if (remember) await this.#forget();
+      return undefined;
+    }
+    if (!res.ok) throw new GitHubError("GITHUB", `GitHub answered ${res.status} when asked who you are.`);
+    const user = (await res.json()) as { login: string; id?: number; name?: string | null; avatar_url?: string };
+    const scopes = res.headers.get("x-oauth-scopes");
+    const account: GitHubAccount = {
+      login: user.login,
+      ...(typeof user.id === "number" ? { id: user.id } : {}),
+      ...(user.name ? { name: user.name } : {}),
+      ...(user.avatar_url ? { avatarUrl: user.avatar_url } : {}),
+      ...(scopes !== null ? { scopes: scopes.split(",").map((x) => x.trim()).filter(Boolean) } : {}),
+    };
+    if (remember) this.#account = account;
+    return account;
+  }
+
+  #ghAccount(): Promise<{ token: string; account: GitHubAccount } | undefined> {
+    if (this.#ghCache && Date.now() - this.#ghCache.at < 60_000) return this.#ghCache.value;
+    const value = (async () => {
+      const token = await this.#gh().catch(() => undefined);
+      if (!token) return undefined;
+      const account = await this.#who(token, { remember: false }).catch(() => undefined);
+      return account && { token, account };
+    })();
+    this.#ghCache = { at: Date.now(), value };
+    return value;
+  }
+
+  async #forget(): Promise<void> {
+    this.#account = undefined;
+    this.#expired = true;
+    await this.#store.delete().catch(() => {});
+  }
+
+  #request(token: string, path: string, { method = "GET", body, headers = {} }: { method?: string; body?: unknown; headers?: Record<string, string> } = {}): Promise<Response> {
+    return this.#fetch(`${this.apiUrl}${path}`, {
+      method,
+      headers: {
+        ...headers,
+        Accept: "application/vnd.github+json",
+        Authorization: `Bearer ${token}`,
+        "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "gh-writer",
+        ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
+      },
+      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+  }
+
+  #post(url: string, form: Record<string, string>): Promise<Response> {
+    return this.#fetch(url, {
+      method: "POST",
+      headers: { Accept: "application/json", "Content-Type": "application/x-www-form-urlencoded", "User-Agent": "gh-writer" },
+      body: new URLSearchParams(form).toString(),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+  }
+}
+
+/** A repository on GitHub: who owns it, its name, and its page. */
+export interface GitHubRepo {
+  owner: string;
+  name: string;
+  /** Its page, e.g. https://github.com/ada/the-salt-road. */
+  url: string;
+}
+
+/**
+ * The GitHub repository a git remote URL points at, if it's on GitHub (`webUrl`'s host: github.com,
+ * or a stand-in in tests): https (with or without .git, credentials or a trailing slash), and ssh
+ * (git@github.com:owner/name.git or ssh://git@github.com/owner/name.git). Null for any other host.
+ */
+export function githubRepoOf(remote: string, webUrl = "https://github.com"): GitHubRepo | null {
+  const web = new URL(webUrl);
+  const url = remote.trim();
+  const https = /^https?:\/\/(?:[^@/]+@)?([^/]+)\/([^/]+)\/([^/]+?)(?:\.git)?\/?$/i.exec(url);
+  const ssh = https ? null : /^(?:ssh:\/\/)?(?:[^@/]+@)?([^:/]+)(?::\d+)?[:/]([^/]+)\/([^/]+?)(?:\.git)?\/?$/i.exec(url);
+  const m = https ?? ssh;
+  if (!m) return null;
+  // Over https the host must match exactly (a stand-in has a port); ssh never has the web port.
+  const host = m[1]!.toLowerCase();
+  if (https ? host !== web.host.toLowerCase() : host !== web.hostname.toLowerCase()) return null;
+  const owner = m[2]!;
+  const name = m[3]!;
+  return { owner, name, url: `${web.origin}/${owner}/${name}` };
+}

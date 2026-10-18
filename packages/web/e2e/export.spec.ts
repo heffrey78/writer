@@ -1,0 +1,70 @@
+import { readFileSync } from "node:fs";
+import type { Page } from "@playwright/test";
+import { axe, expect, test, type App, openView, type View } from "./fixtures.ts";
+
+async function open(page: Page, app: App, view: View) {
+  await app.restart(app.novelRepo("varn"));
+  await page.goto(app.launchUrl);
+  await expect(page.getByRole("textbox", { name: "Chapter text" })).toBeFocused();
+  await openView(page, view);
+}
+
+async function downloaded(page: Page): Promise<{ name: string; text: string }> {
+  const [file] = await Promise.all([page.waitForEvent("download"), page.getByRole("menuitem", { name: "Download SVG" }).click()]);
+  return { name: file.suggestedFilename(), text: readFileSync((await file.path())!, "utf8") };
+}
+
+test("the graph exports as SVG and as Mermaid, as it stands at the page's scene", async ({ page, app, context, browserName }) => {
+  // Chromium reads the clipboard back once allowed. WebKit has no clipboard permissions to grant and
+  // reads it only on a gesture, so there the test notes what the app writes.
+  if (browserName === "chromium") await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  else
+    await page.addInitScript(() => {
+      const write = navigator.clipboard.writeText.bind(navigator.clipboard);
+      navigator.clipboard.writeText = (text) => ((window as unknown as { __copied: string }).__copied = text, write(text));
+    });
+  await open(page, app, "Relationships");
+  const slider = page.getByRole("slider", { name: "Story position" });
+  await slider.focus();
+  for (let i = 0; i < 4; i++) await page.keyboard.press("ArrowRight");
+  await expect(page.getByRole("heading", { name: "At “The Betrayal”" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Export" }).click();
+  await axe(page);
+  const svg = await downloaded(page);
+  expect(svg.name).toBe("relationships-at-the-betrayal.svg");
+  expect(svg.text).toContain("<title>Relationships at “The Betrayal”</title>");
+  expect(svg.text).toContain(">Rivals with<");
+  expect(svg.text).not.toContain(">Allied with<");
+
+  await page.getByRole("button", { name: "Export" }).click();
+  const [mmd] = await Promise.all([page.waitForEvent("download"), page.getByRole("menuitem", { name: "Download Mermaid (.mmd)" }).click()]);
+  expect(mmd.suggestedFilename()).toBe("relationships-at-the-betrayal.mmd");
+  expect(readFileSync((await mmd.path())!, "utf8")).toContain('char_7f3k2q -.-|"Rivals with"| char_b3n0vs');
+
+  await page.getByRole("button", { name: "Export" }).click();
+  await page.getByRole("menuitem", { name: "Copy Mermaid" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Copied the diagram as Mermaid" })).toBeVisible();
+  const mermaid = await page.evaluate(() => (window as unknown as { __copied?: string }).__copied ?? navigator.clipboard.readText());
+  expect(mermaid).toMatch(/^flowchart LR\n/);
+  expect(mermaid).toContain('char_7f3k2q -.-|"Rivals with"| char_b3n0vs');
+});
+
+test("plotlines, presence and the timeline export as SVG; the timeline as Mermaid too", async ({ page, app }) => {
+  await open(page, app, "Plotlines");
+  await page.getByRole("button", { name: "Export" }).click();
+  await expect(page.getByRole("menuitem", { name: /Mermaid/ })).toHaveCount(0);
+  expect((await downloaded(page)).text).toContain("<title>Plotlines by scene</title>");
+
+  await openView(page, "Presence");
+  await page.getByRole("combobox", { name: "Rows" }).selectOption({ label: "Themes" });
+  await page.getByRole("button", { name: "Export" }).click();
+  const themes = await downloaded(page);
+  expect(themes.name).toBe("presence-themes.svg");
+  expect(themes.text).toContain(">Trust<");
+
+  await openView(page, "Timeline");
+  await page.getByRole("button", { name: "Export" }).click();
+  await expect(page.getByRole("menuitem", { name: "Copy Mermaid" })).toBeVisible();
+  expect((await downloaded(page)).text).toContain("6th · flashback");
+});

@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/heffrey78/gh-writer/schemas/v1/entity.schema.json",
+  "title": "Bible entry front matter",
+  "type": "object",
+  "properties": {
+    "id": { "$ref": "common.schema.json#/$defs/id" },
+    "name": { "$ref": "common.schema.json#/$defs/nonEmptyText" },
+    "aliases": { "$ref": "common.schema.json#/$defs/tags" },
+    "summary": { "$ref": "common.schema.json#/$defs/text" },
+    "image": { "$ref": "common.schema.json#/$defs/repoPath" },
+    "image_focus": {
+      "description": "Where thumbnails of the picture centre: x and y, as fractions of its width and height.",
+      "type": "array",
+      "items": { "type": "number", "minimum": 0, "maximum": 1 },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "fields": {
+      "type": "object",
+      "additionalProperties": { "type": ["string", "number", "boolean"] }
+    },
+    "tags": { "$ref": "common.schema.json#/$defs/tags" }
+  },
+  "required": ["id", "name"],
+  "additionalProperties": false
+}

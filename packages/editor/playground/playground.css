@@ -1,0 +1,191 @@
+:root {
+  --pg-bg: #faf8f4;
+  --pg-panel: #f1ede5;
+  --pg-ink: #1f1d1a;
+  --pg-muted: #5f5a52;
+  --pg-line: #ddd6ca;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --pg-bg: #1b1a18;
+    --pg-panel: #24221f;
+    --pg-ink: #e8e4dc;
+    --pg-muted: #a9a399;
+    --pg-line: #3a3732;
+  }
+}
+
+:root[data-theme="dark"] {
+  --pg-bg: #1b1a18;
+  --pg-panel: #24221f;
+  --pg-ink: #e8e4dc;
+  --pg-muted: #a9a399;
+  --pg-line: #3a3732;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--pg-bg);
+  color: var(--pg-ink);
+  font: 15px/1.5 system-ui, sans-serif;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(18rem, 30rem);
+  grid-template-rows: auto 1fr;
+  min-height: 100vh;
+}
+
+header {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--pg-line);
+}
+
+h1 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+h2 {
+  margin: 0 0 0.5rem;
+  font-size: 0.875rem;
+}
+
+select {
+  font: inherit;
+  max-width: 100%;
+}
+
+main {
+  padding: 0 1.5rem;
+  min-width: 0;
+}
+
+aside {
+  padding: 1rem;
+  background: var(--pg-panel);
+  border-left: 1px solid var(--pg-line);
+  min-width: 0;
+}
+
+aside p {
+  margin: 0 0 0.5rem;
+  color: var(--pg-muted);
+}
+
+aside pre {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: 12px/1.5 ui-monospace, Menlo, Consolas, monospace;
+}
+
+@media (max-width: 52rem) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  aside {
+    border-left: none;
+    border-top: 1px solid var(--pg-line);
+  }
+}
+
+h3 {
+  display: flex;
+  justify-content: space-between;
+  margin: 1rem 0 0.25rem;
+  font-size: 0.75rem;
+}
+
+h3 span {
+  font-weight: normal;
+  color: var(--pg-muted);
+}
+
+.modes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.modes button {
+  font: inherit;
+  font-size: 0.8125rem;
+  padding: 0.25rem 0.6rem;
+  border: 1px solid var(--pg-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--pg-ink);
+  cursor: pointer;
+}
+
+.modes button[aria-pressed="true"] {
+  background: var(--pg-ink);
+  color: var(--pg-bg);
+  border-color: var(--pg-ink);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Focus mode: only the text. */
+.layout.focus {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: 1fr;
+}
+
+.layout.focus header,
+.layout.focus aside {
+  display: none;
+}
+
+main .counts {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 0.6rem 0;
+  background: var(--pg-bg);
+  border-bottom: 1px solid var(--pg-line);
+}
+
+main .find {
+  position: sticky;
+  top: 2.75rem;
+  z-index: 1;
+  margin: 0.5rem 0;
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.08);
+}
+
+.resolver-demo {
+  max-width: 60rem;
+  margin: 0 auto;
+  padding: 1.5rem 1rem;
+}
+
+.resolver-demo pre {
+  white-space: pre-wrap;
+  background: var(--pg-panel);
+  padding: 0.75rem;
+  border-radius: 0.375rem;
+}

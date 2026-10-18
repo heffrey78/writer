@@ -1,0 +1,210 @@
+@import "tailwindcss";
+@import "@gh-writer/editor/styles.css";
+
+/*
+ * One palette for the app and the editor: the editor's --ghw-* properties (light, dark, and
+ * data-theme overrides) plus the few the app adds here, in the same three places.
+ */
+:root {
+  --ghw-panel: #f1ede5;
+  --ghw-raised: #ffffff;
+  --ghw-danger: #a3271d;
+  --ghw-danger-soft: rgb(163 39 29 / 0.09);
+  --ghw-ok: #2f6b3a;
+  --ghw-warn: #8a5300;
+  --ghw-warn-soft: rgb(138 83 0 / 0.1);
+  --ghw-shelf: #dccfb8;
+  --ghw-shelf-edge: #c2b294;
+  /* Chart series: the data-viz reference palette's eight slots, validated (CVD, contrast) on these surfaces.
+     Relationship types take them too (core palette.ts); keep the two in step. */
+  --ghw-series-1: #2a78d6;
+  --ghw-series-2: #eb6834;
+  --ghw-series-3: #1baf7a;
+  --ghw-series-4: #eda100;
+  --ghw-series-5: #e87ba4;
+  --ghw-series-6: #008300;
+  --ghw-series-7: #6250d6;
+  --ghw-series-8: #e34948;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ghw-panel: #24221f;
+    --ghw-raised: #2b2925;
+    --ghw-danger: #f2978e;
+    --ghw-danger-soft: rgb(242 151 142 / 0.12);
+    --ghw-ok: #8fd19e;
+    --ghw-warn: #f0bf6c;
+    --ghw-warn-soft: rgb(240 191 108 / 0.12);
+    --ghw-shelf: #3a342c;
+    --ghw-shelf-edge: #4a4238;
+    --ghw-series-1: #3987e5;
+    --ghw-series-2: #d95926;
+    --ghw-series-3: #199e70;
+    --ghw-series-4: #c98500;
+    --ghw-series-5: #d55181;
+    --ghw-series-6: #008300;
+    --ghw-series-7: #9085e9;
+    --ghw-series-8: #e66767;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --ghw-panel: #24221f;
+  --ghw-raised: #2b2925;
+  --ghw-danger: #f2978e;
+  --ghw-danger-soft: rgb(242 151 142 / 0.12);
+  --ghw-ok: #8fd19e;
+  --ghw-warn: #f0bf6c;
+  --ghw-warn-soft: rgb(240 191 108 / 0.12);
+  --ghw-shelf: #3a342c;
+  --ghw-shelf-edge: #4a4238;
+  --ghw-series-1: #3987e5;
+  --ghw-series-2: #d95926;
+  --ghw-series-3: #199e70;
+  --ghw-series-4: #c98500;
+  --ghw-series-5: #d55181;
+  --ghw-series-6: #008300;
+  --ghw-series-7: #9085e9;
+  --ghw-series-8: #e66767;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-ink: var(--ghw-ink);
+  --color-muted: var(--ghw-muted);
+  --color-paper: var(--ghw-paper);
+  --color-panel: var(--ghw-panel);
+  --color-raised: var(--ghw-raised);
+  --color-rule: var(--ghw-rule);
+  --color-accent: var(--ghw-accent);
+  --color-accent-soft: var(--ghw-accent-soft);
+  --color-danger: var(--ghw-danger);
+  --color-danger-soft: var(--ghw-danger-soft);
+  --color-ok: var(--ghw-ok);
+  --color-warn: var(--ghw-warn);
+  --color-warn-soft: var(--ghw-warn-soft);
+  --font-prose: var(--ghw-prose-font);
+  --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+html,
+body {
+  background: var(--ghw-paper);
+  color: var(--ghw-ink);
+  font-family: var(--font-ui);
+}
+
+:focus-visible {
+  outline: 2px solid var(--ghw-accent);
+  outline-offset: 2px;
+}
+
+/* The writing surface shows focus with its caret; a ring around the whole text distracts. */
+.ghw-prose:focus-visible {
+  outline: none;
+}
+
+/* What takes the focus only to hold it (a modal as it opens, the page after Skip to content): no ring
+   around it all. A new item's title shows focus by its underline. */
+[role="dialog"][tabindex="-1"]:focus-visible,
+main[tabindex="-1"]:focus-visible,
+.ghw-title-field:focus-visible {
+  outline: none;
+}
+
+::selection {
+  background: var(--ghw-selection);
+}
+
+/* The relationship graph: an edge that comes into being (moving through the story) fades in. */
+@media (prefers-reduced-motion: no-preference) {
+  .ghw-graph .react-flow__edge {
+    animation: ghw-edge-in 400ms ease-out;
+  }
+}
+
+@keyframes ghw-edge-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Markdown from GitHub (issues and comments): readable, in the app's colours. */
+.ghw-markdown {
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+.ghw-markdown > * + * {
+  margin-top: 0.6em;
+}
+.ghw-markdown h1,
+.ghw-markdown h2,
+.ghw-markdown h3 {
+  font-weight: 600;
+}
+.ghw-markdown a {
+  color: var(--ghw-accent);
+  text-decoration: underline;
+}
+.ghw-markdown ul {
+  list-style: disc;
+  padding-left: 1.4em;
+}
+.ghw-markdown ol {
+  list-style: decimal;
+  padding-left: 1.4em;
+}
+.ghw-markdown blockquote {
+  border-left: 3px solid var(--ghw-rule);
+  padding-left: 0.8em;
+  color: var(--ghw-muted);
+}
+.ghw-markdown code {
+  font-family: ui-monospace, monospace;
+  font-size: 0.9em;
+  background: var(--ghw-panel);
+  border-radius: 0.25em;
+  padding: 0.1em 0.3em;
+}
+.ghw-markdown pre {
+  background: var(--ghw-panel);
+  border-radius: 0.4em;
+  padding: 0.6em 0.8em;
+  overflow-x: auto;
+}
+.ghw-markdown pre code {
+  background: none;
+  padding: 0;
+}
+.ghw-markdown table {
+  border-collapse: collapse;
+}
+.ghw-markdown th,
+.ghw-markdown td {
+  border: 1px solid var(--ghw-rule);
+  padding: 0.25em 0.5em;
+}
+
+/* An entry's notes, as part of its profile: without the writing view's room above and below the text
+   (the editor's own rule, outside Tailwind's layers, would win over a utility). */
+.ghw-notes .ghw-prose {
+  padding: 0.25rem 0;
+  min-height: 4rem;
+  max-width: none;
+}
+
+/* A scene's note just made (#222): a moment's outline draws the eye to it, unless motion is unwanted. */
+@media (prefers-reduced-motion: no-preference) {
+  .ghw-just-made {
+    animation: ghw-just-made 900ms ease-out;
+  }
+}
+
+@keyframes ghw-just-made {
+  from {
+    box-shadow: 0 0 0 3px var(--ghw-accent);
+  }
+}

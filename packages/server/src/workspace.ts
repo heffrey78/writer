@@ -1,0 +1,427 @@
+import { readdir, readFile, unlink } from "node:fs/promises";
+import { join, relative, sep } from "node:path";
+import { loadNovel, parseYaml, picturePath, pictures, SCHEMA_VERSION, slugify, uniqueFileName, type FileSource, type Novel } from "@gh-writer/core";
+import { nodeSource } from "@gh-writer/core/node";
+import { watch, type FSWatcher } from "chokidar";
+import { BibleOperations } from "./bible.ts";
+import { BoardStore } from "./board.ts";
+import { Checkpoints } from "./checkpoints.ts";
+import { ManuscriptOperations } from "./manuscript.ts";
+import { Committer, type CommitStatus, type CommitterOptions } from "./committer.ts";
+import { atomicWrite, FileError, hashText, IMAGES_DIR, imageVersion, isVisible, readText, servableImage, sniffImage, writableImagePath, writablePath, type TextFile, type WriteHooks } from "./files.ts";
+import type { Library } from "./library.ts";
+import { git } from "./git.ts";
+import { githubRepoOf, type GitHub, type GitHubRepo } from "./github.ts";
+import { IssueStore } from "./issues.ts";
+import { Syncer, type SyncerOptions, type SyncStatus } from "./sync.ts";
+import { Versions } from "./versions.ts";
+
+/** A file that changed on disk. `hash` is null once the file is gone. */
+export interface FileEvent {
+  type: "add" | "change" | "unlink";
+  path: string;
+  hash: string | null;
+}
+
+export type WriteResult = { ok: true; hash: string } | { ok: false; current: TextFile | undefined };
+
+/** What GET /sync reports: the sync state ("off" when sync is turned off), with the background commit status. */
+export type NovelSyncStatus = (SyncStatus | { state: "off" }) & {
+  commit: CommitStatus | { state: "off" };
+  /** The GitHub repository the novel syncs with, or null when it isn't on GitHub. */
+  github: GitHubRepo | null;
+};
+
+export interface WorkspaceOptions {
+  /** Background commits; false turns them off. */
+  commit?: CommitterOptions | false;
+  /** Sync with the remote; false turns it off. */
+  sync?: SyncerOptions | false;
+  /** gh-writer's GitHub sign-in, used for GitHub remotes when there is one. */
+  github?: GitHub;
+}
+
+/**
+ * One open novel: reads, conflict-checked atomic writes, and a watcher that tells subscribers about
+ * changes made outside the app (another editor, a git pull) but not about the server's own writes.
+ */
+export class NovelWorkspace {
+  readonly root: string;
+  /** Commits saved work in the background, unless turned off. */
+  readonly committer: Committer | undefined;
+  /** Syncs with the remote in the background, unless turned off. */
+  readonly syncer: Syncer | undefined;
+  readonly checkpoints: Checkpoints;
+  /** Alternate versions of the novel: one open at a time. */
+  readonly versions: Versions;
+  /** Story bible changes, one commit each. */
+  readonly bible: BibleOperations;
+  /** Manuscript structure changes, one commit each. */
+  readonly manuscript: ManuscriptOperations;
+  /** The novel's GitHub issues, cached in the clone (with a GitHub connection; empty unless the novel is on GitHub). */
+  readonly issues: IssueStore | undefined;
+  /** The drafting board on GitHub (with a GitHub connection; inert until set up, D8). */
+  readonly board: BoardStore | undefined;
+  /** Resolves when the workspace stops: event streams end then. */
+  readonly stopped: Promise<void>;
+  #stop!: () => void;
+  #locks = new Map<string, Promise<unknown>>();
+  /** path → hash of what the server last wrote there: a watcher event with that hash is an echo. */
+  #written = new Map<string, string>();
+  #listeners = new Set<(e: FileEvent) => void>();
+  #watcher?: FSWatcher;
+  #ready?: Promise<void>;
+  /** Writes under way, and the exclusive task (sync, restore) that new writes wait for. */
+  #writing = 0;
+  #drained?: () => void;
+  #exclusive?: Promise<unknown>;
+
+  #github: GitHub | undefined;
+  /** Pictures the prose stopped naming, their files deleted: kept so a save that names one again (an Undo) brings it back. */
+  #dropped = new Map<string, { full: string; bytes: Uint8Array }>();
+
+  constructor(root: string, { commit = {}, sync = {}, github }: WorkspaceOptions = {}) {
+    this.root = root;
+    this.#github = github;
+    this.committer = commit === false ? undefined : new Committer(root, commit);
+    this.syncer =
+      sync === false
+        ? undefined
+        : new Syncer(root, sync, {
+            ...(this.committer ? { committer: this.committer } : {}),
+            exclusive: (fn) => this.exclusive(fn),
+            ...(github ? { auth: (url: string) => github.gitAuth(url), onAuthRefused: () => void github.recheck() } : {}),
+          });
+    this.checkpoints = new Checkpoints(root, {
+      // Checkpoints commit saved work even when background commits are off.
+      committer: this.committer ?? new Committer(root),
+      exclusive: (fn) => this.exclusive(fn),
+      onCreate: () => this.syncer?.tagsChanged(),
+    });
+    this.versions = new Versions(root, {
+      committer: this.committer ?? new Committer(root),
+      checkpoints: this.checkpoints,
+      exclusive: (fn) => this.exclusive(fn),
+      onChange: () => this.syncer?.branchChanged(),
+    });
+    this.bible = new BibleOperations(root, (fn) => this.exclusive(fn));
+    this.manuscript = new ManuscriptOperations(root, (fn) => this.exclusive(fn));
+    this.issues = github ? new IssueStore(root, github, () => this.githubRepo(), async () => (await this.loadModel()).novel) : undefined;
+    this.board = github
+      ? new BoardStore(root, github, () => this.githubRepo(), {
+          novel: async () => (await this.loadModel()).novel,
+          onMain: async () => (await this.versions.current()) === "main",
+          read: (path) => this.read(path),
+          write: (path, content, base) => this.write(path, content, base, undefined, { announce: true }),
+        })
+      : undefined;
+    // Issues and a board that's set up are brought up to date with each sync with GitHub, so a change on
+    // github.com shows within one cycle. (A board another clone made is looked for when the board is opened.)
+    let lastSync: string | null | undefined;
+    this.syncer?.onChange(() => {
+      void this.syncer
+        ?.status()
+        .then(async (s) => {
+          if (s.lastSync === lastSync || !s.lastSync) return;
+          lastSync = s.lastSync;
+          void this.issues?.refresh().catch(() => {});
+          if (await this.board?.isSetUp()) await this.board!.sync();
+        })
+        .catch(() => {});
+    });
+    this.stopped = new Promise((resolve) => (this.#stop = resolve));
+    this.syncer?.start();
+  }
+
+  async syncStatus(): Promise<NovelSyncStatus> {
+    const [sync, commit, github] = await Promise.all([this.syncer?.status() ?? { state: "off" as const }, this.committer?.status() ?? { state: "off" as const }, this.githubRepo()]);
+    return { ...sync, commit, github };
+  }
+
+  /** The GitHub repository the novel's remote (origin, or the one it syncs with) is, if it's on GitHub. */
+  async githubRepo(): Promise<GitHubRepo | null> {
+    const remote = (this.syncer ? (await this.syncer.status()).remote : null) ?? "origin";
+    const url = (await git(this.root).raw(["remote", "get-url", remote]).catch(() => "")).trim();
+    return url ? githubRepoOf(url, this.#github?.webUrl) : null;
+  }
+
+  /** Listen for changes to the sync or commit status. Returns a function that removes the listener. */
+  onSyncChange(listener: () => void): () => void {
+    const off = [this.syncer?.onChange(listener), this.committer?.onChange(listener)];
+    return () => off.forEach((f) => f?.());
+  }
+
+  /**
+   * Run `fn` alone: writes under way finish first, new ones wait until it's done, and background commits
+   * are held off. For changes to the work tree that mustn't interleave with saves (a rebase, a restore).
+   */
+  async exclusive<T>(fn: () => Promise<T>): Promise<T> {
+    while (this.#exclusive) await this.#exclusive.catch(() => {});
+    const run = (async () => {
+      if (this.#writing) await new Promise<void>((resolve) => (this.#drained = resolve));
+      return this.committer ? this.committer.hold(fn) : fn();
+    })();
+    this.#exclusive = run;
+    try {
+      return await run;
+    } finally {
+      this.#exclusive = undefined;
+    }
+  }
+
+  /**
+   * The format the novel is in (novel.yaml's schema_version), when it's newer than this server reads:
+   * nothing may be written to it then, lest it be written as an older format (D11). Undefined otherwise.
+   */
+  async tooNew(): Promise<number | undefined> {
+    const text = await readFile(join(this.root, "novel.yaml"), "utf8").catch(() => undefined);
+    const data = text === undefined ? undefined : parseYaml(text, "novel.yaml").data;
+    const version = typeof data === "object" && data !== null ? (data as Record<string, unknown>)["schema_version"] : undefined;
+    return typeof version === "number" && version > SCHEMA_VERSION ? version : undefined;
+  }
+
+  /**
+   * The story model, with the hash of every file it was read from (the bases for writes), and a
+   * version of each picture it shows from images/ (its size and time), so a replaced one is fetched anew.
+   */
+  async loadModel(): Promise<{ novel: Novel; files: Record<string, string>; images: Record<string, string> }> {
+    const files: Record<string, string> = {};
+    const disk = nodeSource(this.root);
+    const source: FileSource = {
+      list: (dir) => disk.list(dir),
+      read: async (path) => {
+        const bytes = await readFile(join(this.root, path)).catch((e: NodeJS.ErrnoException) => {
+          if (e.code === "ENOENT" || e.code === "ENOTDIR" || e.code === "EISDIR") return undefined;
+          throw e;
+        });
+        if (bytes === undefined) return undefined;
+        files[path] = hashText(bytes);
+        return bytes.toString("utf8");
+      },
+    };
+    const novel = await loadNovel(source);
+    const images: Record<string, string> = {};
+    const shown = [novel.config?.cover, ...novel.entities.map((e) => e.image)].filter((p): p is string => !!p);
+    await Promise.all(
+      [...new Set(shown)].map(async (path) => {
+        const version = await imageVersion(this.root, path);
+        if (version) images[path] = version;
+      }),
+    );
+    return { novel, files, images };
+  }
+
+  read(path: string): Promise<TextFile | undefined> {
+    return readText(this.root, path);
+  }
+
+  /**
+   * Write `content` to `path` if the file on disk is still the one the client read: `base` is the hash
+   * it read, or null for a file it expects not to exist. Otherwise nothing is written and the current
+   * file comes back. Writes to one path run one at a time. `announce`: subscribers hear of it as of a
+   * change made outside the app (one the server makes for GitHub, which open editors must take in).
+   */
+  write(path: string, content: string, base: string | null, hooks?: WriteHooks, { announce = false } = {}): Promise<WriteResult> {
+    return this.#locked(path, () => this.#shared(async () => {
+      const full = await writablePath(this.root, path, content);
+      const current = await readText(this.root, path);
+      if ((current?.hash ?? null) !== base) return { ok: false, current };
+      const hash = hashText(content);
+      if (current?.hash === hash) return { ok: true, hash };
+      // Recorded before the write, since the watcher may see the file before atomicWrite returns.
+      if (announce) this.#written.delete(path);
+      else this.#written.set(path, hash);
+      try {
+        await atomicWrite(full, content, hooks);
+      } catch (e) {
+        this.#written.delete(path);
+        throw e;
+      }
+      await this.#prosePictures(path, current?.content ?? "", content);
+      this.committer?.notify();
+      return { ok: true, hash };
+    }));
+  }
+
+  /**
+   * Save a picture for the prose (#203): `bytes` (JPEG or PNG, resized by the app) at images/<slug>.jpg
+   * or .png, the slug from `name` (with -2, -3… if taken). It isn't committed on its own: the scene that
+   * names it is saved next, and the two go in one commit.
+   */
+  addPicture(name: string, bytes: Uint8Array): Promise<{ path: string }> {
+    return this.#locked(IMAGES_DIR, () => this.#shared(async () => {
+      const format = sniffImage(bytes);
+      if (!format) throw new FileError("NOT_IMAGE", "That isn't a JPEG or PNG image.");
+      const names = await readdir(join(this.root, IMAGES_DIR)).catch(() => [] as string[]);
+      // A dropped picture's name stays taken, so an Undo can bring it back.
+      const taken = new Set([...names, ...[...this.#dropped.keys()].map((p) => p.slice(IMAGES_DIR.length + 1))]);
+      const path = `${IMAGES_DIR}/${uniqueFileName(name.trim() ? slugify(name) : "picture", format.ext, taken)}`;
+      await atomicWrite(await writableImagePath(this.root, path, bytes), bytes);
+      this.committer?.notify();
+      return { path };
+    }));
+  }
+
+  /**
+   * After a scene is saved: a picture it no longer names, that no other scene, entry or the cover does,
+   * has its file deleted (no picture is left behind in images/); one it names again whose file this
+   * deleted is put back.
+   */
+  async #prosePictures(path: string, before: string, after: string): Promise<void> {
+    if (!path.startsWith("manuscript/") || !path.endsWith(".md")) return;
+    const named = (text: string) => new Set(pictures(text).flatMap((p) => picturePath(p.src) ?? []));
+    const was = named(before);
+    const now = named(after);
+    for (const picture of now) {
+      const dropped = this.#dropped.get(picture);
+      if (!dropped) continue;
+      this.#dropped.delete(picture);
+      if (!(await servableImage(this.root, picture).catch(() => undefined))) await atomicWrite(dropped.full, dropped.bytes);
+    }
+    const gone = [...was].filter((p) => !now.has(p) && p.startsWith(`${IMAGES_DIR}/`));
+    if (!gone.length) return;
+    const novel = await loadNovel(nodeSource(this.root));
+    const kept = new Set<string | undefined>([novel.config?.cover, ...novel.entities.map((e) => e.image)]);
+    for (const scene of novel.allScenes) for (const p of pictures(scene.body)) kept.add(picturePath(p.src));
+    for (const picture of gone.filter((p) => !kept.has(p))) {
+      const image = await servableImage(this.root, picture).catch(() => undefined);
+      const bytes = image && (await readFile(image.full).catch(() => undefined));
+      if (!image || !bytes) continue;
+      await unlink(image.full);
+      this.#dropped.set(picture, { full: image.full, bytes });
+      // A few at most: enough for the Undo history of a session.
+      if (this.#dropped.size > 20) this.#dropped.delete(this.#dropped.keys().next().value!);
+    }
+  }
+
+  async #shared<T>(task: () => Promise<T>): Promise<T> {
+    while (this.#exclusive) await this.#exclusive.catch(() => {});
+    this.#writing++;
+    try {
+      return await task();
+    } finally {
+      if (--this.#writing === 0) {
+        this.#drained?.();
+        this.#drained = undefined;
+      }
+    }
+  }
+
+  /** Listen for outside changes. Resolves once the watcher is ready: changes from then on are reported. */
+  async subscribe(listener: (e: FileEvent) => void): Promise<() => void> {
+    this.#listeners.add(listener);
+    await this.#watch();
+    return () => {
+      this.#listeners.delete(listener);
+      if (!this.#listeners.size) void this.#unwatch();
+    };
+  }
+
+  /** End the event streams. */
+  stop(): void {
+    this.#listeners.clear();
+    this.#stop();
+  }
+
+  /** End the event streams, stop syncing and watching, and commit any saved work still waiting. */
+  async close(): Promise<void> {
+    this.stop();
+    await this.syncer?.close();
+    await Promise.all([this.#unwatch(), this.committer?.close()]);
+  }
+
+  #watch(): Promise<void> {
+    if (this.#ready) return this.#ready;
+    const watcher = watch(this.root, {
+      ignoreInitial: true,
+      ignored: (abs) => {
+        const rel = this.#relative(abs);
+        return rel !== "" && !isVisible(rel);
+      },
+    });
+    this.#watcher = watcher;
+    for (const type of ["add", "change", "unlink"] as const) {
+      watcher.on(type, (abs: string) => void this.#onChange(type, this.#relative(abs)));
+    }
+    this.#ready = new Promise((resolve) => watcher.once("ready", () => resolve()));
+    return this.#ready;
+  }
+
+  async #unwatch(): Promise<void> {
+    const watcher = this.#watcher;
+    this.#watcher = undefined;
+    this.#ready = undefined;
+    await watcher?.close();
+  }
+
+  async #onChange(type: FileEvent["type"], path: string): Promise<void> {
+    let hash: string | null = null;
+    if (type !== "unlink") {
+      const bytes = await readFile(join(this.root, path)).catch(() => undefined);
+      if (bytes === undefined) return; // gone again; its unlink follows
+      hash = hashText(bytes);
+      if (this.#written.get(path) === hash) return;
+    }
+    this.#written.delete(path);
+    for (const listener of this.#listeners) listener({ type, path, hash });
+  }
+
+  #relative(abs: string): string {
+    return relative(this.root, abs).split(sep).join("/");
+  }
+
+  #locked<T>(path: string, task: () => Promise<T>): Promise<T> {
+    const previous = this.#locks.get(path) ?? Promise.resolve();
+    const run = previous.catch(() => {}).then(task);
+    const settled = run.catch(() => {});
+    this.#locks.set(path, settled);
+    void settled.then(() => {
+      if (this.#locks.get(path) === settled) this.#locks.delete(path);
+    });
+    return run;
+  }
+}
+
+/** The open workspaces, one per library novel. */
+export class Workspaces {
+  #library: Library;
+  #options: WorkspaceOptions;
+  #open = new Map<string, NovelWorkspace>();
+
+  constructor(library: Library, options: WorkspaceOptions = {}) {
+    this.#library = library;
+    this.#options = options;
+  }
+
+  /** The workspace for a library novel, or undefined if there is no such novel. */
+  get(id: string): NovelWorkspace | undefined {
+    const entry = this.#library.get(id);
+    if (!entry) return undefined;
+    let ws = this.#open.get(id);
+    if (ws?.root !== entry.path) {
+      void ws?.close();
+      ws = new NovelWorkspace(entry.path, this.#options);
+      this.#open.set(id, ws);
+    }
+    return ws;
+  }
+
+  /** Commit now wherever a commit was blocked for want of a git identity: one has just been given. */
+  async retryIdentity(): Promise<void> {
+    await Promise.all(
+      [...this.#open.values()].map(async (ws) => {
+        if ((await ws.committer?.status())?.blocked?.code === "IDENTITY") await ws.committer?.commit();
+      }),
+    );
+  }
+
+  /** End every event stream, so that the HTTP server can finish its requests. */
+  stop(): void {
+    for (const ws of this.#open.values()) ws.stop();
+  }
+
+  async close(): Promise<void> {
+    await Promise.all([...this.#open.values()].map((ws) => ws.close()));
+    this.#open.clear();
+  }
+}

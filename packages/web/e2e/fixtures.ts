@@ -1,0 +1,261 @@
+import { execFileSync, spawn, type ChildProcess } from "node:child_process";
+import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { AxeBuilder } from "@axe-core/playwright";
+import { test as base, expect, type Locator, type Page } from "@playwright/test";
+import { fakeGitHub, type FakeGitHub } from "../../server/test/fake-github.ts";
+
+const repo = fileURLToPath(new URL("../../..", import.meta.url));
+export const sample = join(repo, "examples/sample-novel");
+const cli = join(repo, "packages/cli/src/main.ts");
+
+/** A running `gh-writer serve`. */
+export interface Server {
+  launchUrl: string;
+  url: string;
+  stop: () => Promise<void>;
+  kill: () => Promise<void>;
+}
+
+export interface App {
+  /** A temp folder standing in for the author's home: config, clones and novels live here. */
+  home: string;
+  /** The GitHub the server talks to: a fake, with its repositories under home/github. */
+  github: FakeGitHub;
+  /** The launch URL, with its token. */
+  launchUrl: string;
+  /** The server's own address. */
+  url: string;
+  env: NodeJS.ProcessEnv;
+  /** Start (or restart) the server; options are `gh-writer serve` arguments. */
+  restart: (...args: string[]) => Promise<void>;
+  /** Stop the server (SIGTERM, a clean shutdown). */
+  stop: () => Promise<void>;
+  /** Kill the server outright (SIGKILL): no shutdown, no last commit, as in a crash. */
+  kill: () => Promise<void>;
+  /** Another gh-writer on this machine (another "computer" when given its own config dir), stopped after the test. */
+  serveAnother: (args: string[], env?: Record<string, string>) => Promise<Server>;
+  /** A git repository holding a copy of the sample novel, committed. */
+  novelRepo: (name?: string) => string;
+  /** A bare repository with the sample novel, for cloning from. */
+  bareRepo: (name?: string) => string;
+  git: (dir: string, ...args: string[]) => string;
+}
+
+/** What the stand-in for the desktop app's shell answers. */
+export interface Shell {
+  /** What page_ready answers: commands kept for the page. */
+  pending?: { name: string; arg?: string }[];
+  /** What pick_folder answers. */
+  folder?: string | null;
+  /** What clipboard_text answers: the clipboard's text. */
+  clipboard?: string | null;
+  /** What can_inspect answers. */
+  inspect?: boolean;
+}
+
+/**
+ * Stand in for the desktop app's shell before the page loads; its calls are kept in window.__calls.
+ * Its `edit` answers false (as on macOS and Windows), so the page cuts, copies and pastes itself.
+ */
+export async function asDesktop(page: Page, shell: Shell = {}) {
+  await page.addInitScript((s: Shell) => {
+    const calls: [string, unknown][] = [];
+    (window as unknown as { __calls: typeof calls }).__calls = calls;
+    (window as unknown as { __TAURI__: unknown }).__TAURI__ = {
+      core: {
+        invoke: (command: string, args?: unknown) => {
+          calls.push([command, args]);
+          if (command === "page_ready") return Promise.resolve(s.pending ?? []);
+          if (command === "pick_folder") return Promise.resolve(s.folder ?? null);
+          if (command === "show_library") return Promise.resolve(true);
+          if (command === "edit") return Promise.resolve(false);
+          if (command === "clipboard_text") return Promise.resolve(s.clipboard ?? null);
+          if (command === "can_inspect") return Promise.resolve(s.inspect ?? false);
+          return Promise.resolve(null);
+        },
+      },
+    };
+  }, shell);
+}
+
+/** The arguments of each call the page made to the stand-in shell's `command`. */
+export const calls = (page: Page, command: string) =>
+  page.evaluate((c) => (window as unknown as { __calls: [string, unknown][] }).__calls.filter(([name]) => name === c).map(([, args]) => args), command);
+
+export const git = (dir: string, ...args: string[]) => execFileSync("git", ["-C", dir, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+
+/**
+ * No axe violations on the page as it settles: colour transitions (a theme switch, a hover) finish
+ * first, or axe would measure the colours halfway.
+ */
+export async function axe(page: Page) {
+  await page.waitForFunction(() => document.getAnimations().every((a) => !(a instanceof CSSTransition) || a.playState !== "running"));
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+}
+
+/**
+ * The caret at the end of a text box, by keyboard (Ctrl+End), checked: in WebKit a Ctrl+End pressed
+ * as the box takes focus can be lost, and the typing that follows lands where the caret was.
+ */
+export async function caretAtEnd(page: Page, box: Locator) {
+  await box.focus();
+  await expect(async () => {
+    await page.keyboard.press("Control+End");
+    const atEnd = await box.evaluate((el) => {
+      const selection = getSelection();
+      if (!selection?.rangeCount || !selection.isCollapsed || !el.contains(selection.focusNode) || !el.lastChild) return false;
+      const after = document.createRange();
+      after.setStart(selection.focusNode!, selection.focusOffset);
+      after.setEndAfter(el.lastChild);
+      return after.toString().trim() === "";
+    });
+    expect(atEnd).toBe(true);
+  }).toPass({ timeout: 5_000 });
+}
+
+/** Open the app with its launch URL, and wait until it has traded the token for a session. */
+export async function launch(page: Page, app: App, path = "/") {
+  await page.goto(app.launchUrl.replace("/?", `${path}?`));
+  await expect(page).not.toHaveURL(/token=/);
+}
+
+export const test = base.extend<{ app: App; csp: void }>({
+  // Every test fails on a Content Security Policy violation: the page must work within its own policy.
+  csp: [
+    async ({ page }, use) => {
+      const violations: string[] = [];
+      page.on("console", (m) => /Content Security Policy/i.test(m.text()) && violations.push(m.text().slice(0, 300)));
+      await use();
+      expect(violations, "Content Security Policy violations").toEqual([]);
+    },
+    { auto: true },
+  ],
+  app: async ({}, use, testInfo) => {
+    const home = mkdtempSync(join(tmpdir(), "gh-writer-web-"));
+    writeFileSync(join(home, ".gitconfig"), "[user]\n\tname = Test Author\n\temail = author@example.com\n[init]\n\tdefaultBranch = main\n");
+    const github = await fakeGitHub({ gitRoot: join(home, "github") });
+    const { GH_TOKEN: _gh, GITHUB_TOKEN: _github, ...outside } = process.env;
+    const env: NodeJS.ProcessEnv = {
+      ...outside,
+      // Never the author's keychain or github.com: a fake GitHub, and the sign-in kept in memory.
+      GH_WRITER_GITHUB_URL: github.url,
+      GH_WRITER_GITHUB_API_URL: github.url,
+      GH_WRITER_GITHUB_CLIENT_ID: github.clientId,
+      GH_WRITER_TOKEN_STORE: "memory",
+      HOME: home,
+      GH_WRITER_CONFIG_DIR: join(home, "config"),
+      GIT_CONFIG_GLOBAL: join(home, ".gitconfig"),
+      GIT_CONFIG_NOSYSTEM: "1",
+      FORCE_COLOR: "0",
+    };
+    const gitHere = (dir: string, ...args: string[]) => execFileSync("git", ["-C", dir, ...args], { encoding: "utf8", env, stdio: ["ignore", "pipe", "pipe"] });
+    let n = 0;
+    let child: ChildProcess | undefined;
+    /** Everything the servers printed, for a failed test's report. */
+    let log = "";
+    const app: App = {
+      home,
+      github,
+      launchUrl: "",
+      url: "",
+      env,
+      git: gitHere,
+      novelRepo: (name = `novel-${++n}`) => {
+        const dir = join(home, "novels", name);
+        mkdirSync(join(home, "novels"), { recursive: true });
+        cpSync(sample, dir, { recursive: true });
+        gitHere(dir, "init", "-q");
+        gitHere(dir, "add", "-A");
+        gitHere(dir, "commit", "-qm", "Start");
+        return dir;
+      },
+      bareRepo: (name = `remote-${++n}.git`) => {
+        const seed = app.novelRepo(`seed-${n}`);
+        const bare = join(home, "remotes", name);
+        mkdirSync(join(home, "remotes"), { recursive: true });
+        gitHere(home, "clone", "-q", "--bare", seed, bare);
+        return bare;
+      },
+      restart: async (...args) => {
+        await stop(child);
+        const started = await serve(args, env, (s) => (log += s));
+        child = started.child;
+        app.launchUrl = started.launchUrl;
+        app.url = new URL(started.launchUrl).origin;
+      },
+      stop: () => stop(child),
+      kill: () => stop(child, "SIGKILL"),
+      serveAnother: async (args, extra = {}) => {
+        const started = await serve(args, { ...env, ...extra }, (s) => (log += `[another] ${s}`));
+        others.push(started.child);
+        return { launchUrl: started.launchUrl, url: new URL(started.launchUrl).origin, stop: () => stop(started.child), kill: () => stop(started.child, "SIGKILL") };
+      },
+    };
+    const others: ChildProcess[] = [];
+    await app.restart();
+    await use(app);
+    await Promise.all([stop(child), ...others.map((o) => stop(o))]);
+    await github.close();
+    if (testInfo.status !== testInfo.expectedStatus) await testInfo.attach("gh-writer serve output", { body: log, contentType: "text/plain" });
+    rmSync(home, { recursive: true, force: true });
+  },
+});
+
+/** Start `gh-writer serve` and wait for its launch URL. */
+function serve(args: string[], env: NodeJS.ProcessEnv, log: (s: string) => void): Promise<{ child: ChildProcess; launchUrl: string }> {
+  const child = spawn("node", [cli, "serve", "--no-open", ...args], { cwd: env.HOME, env, stdio: ["ignore", "pipe", "pipe"] });
+  return new Promise((resolve, reject) => {
+    let out = "";
+    child.stdout!.on("data", (chunk: Buffer) => {
+      out += chunk.toString();
+      log(chunk.toString());
+      const m = /(http:\/\/127\.0\.0\.1:\d+\/\S*\?token=\S+)/.exec(out);
+      if (m) resolve({ child, launchUrl: m[1]! });
+    });
+    child.stderr!.on("data", (chunk: Buffer) => {
+      out += chunk.toString();
+      log(chunk.toString());
+    });
+    child.once("exit", (code, signal) => log(`[gh-writer serve exited: ${code ?? signal}]\n`));
+    child.once("exit", (code) => reject(new Error(`gh-writer serve exited (${code}):\n${out}`)));
+  });
+}
+
+async function stop(child: ChildProcess | undefined, signal: NodeJS.Signals = "SIGTERM"): Promise<void> {
+  if (!child || child.exitCode !== null || child.signalCode !== null) return;
+  const exited = new Promise((resolve) => child.once("exit", resolve));
+  child.kill(signal);
+  await exited;
+}
+
+export { expect };
+
+/**
+ * Wait until the editor has taken in a click's caret. ProseMirror reads the selection on the
+ * browser's selectionchange event, which comes after the click; a key pressed sooner (as
+ * Playwright can, and no person does) acts on the old selection.
+ */
+export async function selectionSettled(page: Page): Promise<void> {
+  await expect.poll(() => page.evaluate(() => document.activeElement?.contains(getSelection()?.anchorNode ?? null) ?? false)).toBe(true);
+  await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
+}
+
+/** A view of the open novel, as the sidebar reaches it. */
+export type View = "Outline" | "Cards" | "Board" | "Plotlines" | "Presence" | "Timeline" | "Relationships" | "Compare";
+
+/** Open a view from the sidebar: the story map's views through its tabs. */
+export async function openView(page: Page, view: View) {
+  const views = page.getByRole("navigation", { name: "Views" });
+  if (view === "Cards" || view === "Board") {
+    await views.getByRole("link", { name: "Outline" }).click();
+    // The switch's radios are drawn as their labels: click the one that shows.
+    await page.getByRole("radiogroup", { name: "Show the outline as" }).getByText(view, { exact: true }).click();
+  } else if (view === "Plotlines" || view === "Presence" || view === "Timeline") {
+    await views.getByRole("link", { name: "Story map" }).click();
+    await page.getByRole("tab", { name: view }).click();
+    await expect(page.getByRole("tab", { name: view, selected: true })).toBeVisible();
+  } else await views.getByRole("link", { name: view }).click();
+}
