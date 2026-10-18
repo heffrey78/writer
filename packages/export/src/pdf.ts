@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import nodeZlib from "node:zlib";
-import { numberWords, type Block, type Book, type Run } from "@writer/core";
+import { numberWords, type Block, type CompiledBook, type Run } from "@writer/core";
 import { zlibSync } from "fflate";
 import * as fontkit from "fontkit";
 import PDFDocument from "pdfkit";
@@ -80,7 +80,7 @@ function portableDeflate<T>(fn: () => T): T {
   }
 }
 
-export function toPdf(book: Book, { date = new Date(0), fonts = defaultFonts(), cover, pictures = new Map() }: PdfOptions = {}): Promise<PdfResult> {
+export function toPdf(book: CompiledBook, { date = new Date(0), fonts = defaultFonts(), cover, pictures = new Map() }: PdfOptions = {}): Promise<PdfResult> {
   const doc = new PDFDocument({
     size: [PAGE.width, PAGE.height],
     margins: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN },

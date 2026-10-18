@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { slugify, type Book } from "@writer/core";
+import { slugify, type CompiledBook } from "@writer/core";
 import type { CoverImage } from "./cover.ts";
 import { toDocx } from "./docx.ts";
 import { toEpub } from "./epub.ts";
@@ -33,7 +33,7 @@ export interface Rendered {
  * as agents and editors expect. `pictures` are the text's own (readPictures), by repository path.
  */
 export async function render(
-  book: Book,
+  book: CompiledBook,
   format: Format,
   { date, fonts, cover, pictures }: { date: Date; fonts?: PdfFonts; cover?: CoverImage | undefined; pictures?: Map<string, CoverImage> },
 ): Promise<Rendered> {
@@ -44,7 +44,7 @@ export async function render(
 }
 
 /** "the-bridge-at-varn.docx"; for some of its `total` chapters "the-bridge-at-varn-chapters-1-2.docx", or "…-chapter-3.docx". */
-export function fileName(book: Book, total: number, format: Format): string {
+export function fileName(book: CompiledBook, total: number, format: Format): string {
   const whole = book.chapters.length === total || !book.chapters.length;
   const [first, last] = [book.chapters[0]?.number, book.chapters.at(-1)?.number];
   const range = whole ? "" : first === last ? `-chapter-${first}` : `-chapters-${first}-${last}`;

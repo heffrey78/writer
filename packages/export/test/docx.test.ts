@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import { compileBook, loadNovel, memorySource, type Book } from "@writer/core";
+import { compileBook, loadNovel, memorySource, type CompiledBook } from "@writer/core";
 import { strFromU8, unzipSync } from "fflate";
 import { JSDOM } from "jsdom";
 import { describe, expect, it } from "vitest";
@@ -16,7 +16,7 @@ const files: Record<string, string> = Object.fromEntries(
 files["compile.yaml"] = "presets:\n  submission:\n    title_page:\n      author: Ada Writer\n      contact: [Ada Writer, 1 Bridge Street, ada@example.com]\n    front: [front/dedication.md]\n";
 files["front/dedication.md"] = "# For my father\n\nWho set the clock fast.\n";
 const source = memorySource(files);
-const book: Book = await compileBook(await loadNovel(source), source);
+const book: CompiledBook = await compileBook(await loadNovel(source), source);
 const DATE = new Date("2026-10-09T12:00:00Z");
 const parts = (bytes: Uint8Array) => Object.fromEntries(Object.entries(unzipSync(bytes)).map(([k, v]) => [k, strFromU8(v)]));
 const parse = (text: string) => new new JSDOM("").window.DOMParser().parseFromString(text, "application/xml");

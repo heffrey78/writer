@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { bookImages, type Book, type Novel } from "@writer/core";
+import { bookImages, type CompiledBook, type Novel } from "@writer/core";
 import { unzlibSync, zlibSync } from "fflate";
 
 /*
@@ -36,7 +36,7 @@ export async function readCover(root: string, novel: Novel): Promise<{ cover?: C
  * the formats to embed. A picture missing, or not a JPEG or PNG, is left out (its caption stays), and
  * named in `problems`.
  */
-export async function readPictures(root: string, book: Book): Promise<{ pictures: Map<string, CoverImage>; problems: string[] }> {
+export async function readPictures(root: string, book: CompiledBook): Promise<{ pictures: Map<string, CoverImage>; problems: string[] }> {
   const pictures = new Map<string, CoverImage>();
   const problems: string[] = [];
   for (const path of bookImages(book)) {

@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { bookImages, compileBook, countWords, flatBlocks, loadNovel, memorySource, numberWords, type Book, type FileSource } from "../src/index.ts";
+import { bookImages, compileBook, countWords, flatBlocks, loadNovel, memorySource, numberWords, type CompiledBook, type FileSource } from "../src/index.ts";
 
 const ROOT = fileURLToPath(new URL("../../../examples/sample-novel/", import.meta.url));
 const sample: Record<string, string> = Object.fromEntries(
@@ -17,8 +17,8 @@ async function open(overrides: Record<string, string> = {}) {
   const novel = await loadNovel(source);
   return { novel, source };
 }
-const text = (book: Book) => JSON.stringify(book);
-const words = (b: Book["chapters"][number]) => b.blocks.flatMap((x) => (x.kind === "paragraph" ? x.runs.map((r) => r.text) : ["#"])).join(" ");
+const text = (book: CompiledBook) => JSON.stringify(book);
+const words = (b: CompiledBook["chapters"][number]) => b.blocks.flatMap((x) => (x.kind === "paragraph" ? x.runs.map((r) => r.text) : ["#"])).join(" ");
 
 describe("compiling the manuscript", () => {
   it("keeps a scene's headings, lists, tables and pictures as blocks of their own (D10)", async () => {

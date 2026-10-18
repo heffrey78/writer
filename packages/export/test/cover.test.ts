@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import { compileBook, loadNovel, memorySource, type Book } from "@writer/core";
+import { compileBook, loadNovel, memorySource, type CompiledBook } from "@writer/core";
 import { nodeSource } from "@writer/core/node";
 import { strFromU8, unzipSync, unzlibSync } from "fflate";
 import { JSDOM } from "jsdom";
@@ -19,7 +19,7 @@ const files: Record<string, string> = Object.fromEntries(
     .map((e) => [relative(ROOT, join(e.parentPath, e.name)), readFileSync(join(e.parentPath, e.name), "utf8")]),
 );
 const source = memorySource(files);
-const book: Book = await compileBook(await loadNovel(source), source);
+const book: CompiledBook = await compileBook(await loadNovel(source), source);
 const DATE = new Date("2026-10-09T12:00:00Z");
 const cover = coverImage(JPEG)!;
 const window = new JSDOM("").window;

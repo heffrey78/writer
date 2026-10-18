@@ -1,4 +1,4 @@
-import { bookImages, numberWords, type Align, type Block, type Book, type Run } from "@writer/core";
+import { bookImages, numberWords, type Align, type Block, type CompiledBook, type Run } from "@writer/core";
 import type { CoverImage } from "./cover.ts";
 import { isoSeconds, xml } from "./xml.ts";
 import { zip, type ZipEntry } from "./zip.ts";
@@ -38,7 +38,7 @@ interface Page {
   toc: boolean;
 }
 
-export function toEpub(book: Book, { date = new Date(0), cover, pictures = new Map() }: EpubOptions = {}): Uint8Array {
+export function toEpub(book: CompiledBook, { date = new Date(0), cover, pictures = new Map() }: EpubOptions = {}): Uint8Array {
   const pages: Page[] = [];
   // The text's pictures under pictures/ (the cover is images/cover.*): images/maps/varn.jpg is pictures/maps/varn.jpg.
   const files = new Map<string, PictureFile>();
@@ -176,7 +176,7 @@ function nav(pages: Page[]): string {
   return toc + landmarks;
 }
 
-function opf(book: Book, pages: Page[], date: Date, image: { href: string; type: string } | undefined, pictures: PictureFile[]): string {
+function opf(book: CompiledBook, pages: Page[], date: Date, image: { href: string; type: string } | undefined, pictures: PictureFile[]): string {
   const id = book.id ? `urn:gh-writer:${book.id}` : `urn:gh-writer:${xml(book.title)}`;
   return `<?xml version="1.0" encoding="UTF-8"?>
 <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="book-id" xml:lang="${xml(book.language)}"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:identifier id="book-id">${xml(id)}</dc:identifier><dc:title>${xml(book.title)}</dc:title>${book.author ? `<dc:creator>${xml(book.author)}</dc:creator>` : ""}<dc:language>${xml(book.language)}</dc:language><meta property="dcterms:modified">${isoSeconds(date)}</meta>${image ? '<meta name="cover" content="cover-image"/>' : ""}</metadata><manifest><item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/><item id="style" href="style.css" media-type="text/css"/>${image ? `<item id="cover-image" href="${image.href}" media-type="${image.type}" properties="cover-image"/>` : ""}${pictures.map((p) => `<item id="${p.id}" href="${p.href}" media-type="${p.type}"/>`).join("")}${pages.map((p) => `<item id="${p.id}" href="${p.file}" media-type="application/xhtml+xml"/>`).join("")}</manifest><spine>${pages.map((p) => `<itemref idref="${p.id}"/>`).join("")}</spine></package>`;

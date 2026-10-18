@@ -37,7 +37,7 @@ export type Block =
   /** A picture on a line of its own: its repository path (images/…), alt text and caption. */
   | { kind: "image"; path: string; alt: string; caption?: string };
 
-export interface BookChapter {
+export interface CompiledChapter {
   id: string;
   /** Its number in the whole book (a range keeps the numbers), and its heading as the preset has it. */
   number: number;
@@ -48,12 +48,12 @@ export interface BookChapter {
 }
 
 /** Front or back matter: a page with a title (its first heading) and its text. */
-export interface BookSection {
+export interface Matter {
   title: string;
   blocks: Block[];
 }
 
-export interface Book {
+export interface CompiledBook {
   /** The novel's ID: e-books' identifier. */
   id: string;
   title: string;
@@ -67,9 +67,9 @@ export interface Book {
   /** The running header: Surname / SHORT TITLE / page. */
   header: { surname: string; shortTitle: string };
   sceneBreak: string;
-  front: BookSection[];
-  chapters: BookChapter[];
-  back: BookSection[];
+  front: Matter[];
+  chapters: CompiledChapter[];
+  back: Matter[];
   /** Words in the chapters compiled (exact). */
   words: number;
 }
@@ -95,7 +95,7 @@ export function presets(novel: Novel): Record<string, CompilePreset> {
 }
 
 /** Compile the novel (or chapters `from`…`to`) with a preset into a book. Reads front and back matter through `source`. */
-export async function compileBook(novel: Novel, source: Pick<FileSource, "read">, options: CompileOptions = {}): Promise<Book> {
+export async function compileBook(novel: Novel, source: Pick<FileSource, "read">, options: CompileOptions = {}): Promise<CompiledBook> {
   const all = presets(novel);
   const name = options.preset ?? Object.keys(all)[0]!;
   const preset = all[name];
@@ -111,7 +111,7 @@ export async function compileBook(novel: Novel, source: Pick<FileSource, "read">
 
   const byId = new Map(novel.allScenes.map((s) => [s.id, s]));
   const parts = new Map(novel.parts.map((p, i) => [p.id, { ...p, number: i + 1 }]));
-  const chapterOut: BookChapter[] = [];
+  const chapterOut: CompiledChapter[] = [];
   let words = 0;
   for (let i = first; i <= last; i++) {
     const chapter = chapters[i]!;
@@ -138,7 +138,7 @@ export async function compileBook(novel: Novel, source: Pick<FileSource, "read">
   }
 
   const matter = async (paths: string[] | undefined) => {
-    const out: BookSection[] = [];
+    const out: Matter[] = [];
     for (const path of paths ?? []) {
       const text = await source.read(path);
       if (text === undefined) throw new CompileError(`The preset names ${path}, which is missing.`);
@@ -201,7 +201,7 @@ export function numberWords(n: number): string {
 }
 
 /** A front- or back-matter file: its first heading is its title, the rest its text. */
-function section(text: string, path: string): BookSection {
+function section(text: string, path: string): Matter {
   // Front matter of its own, if it has any, isn't part of the page.
   const body = /^---\r?\n/.test(text) ? parseMarkdown(text, path).body : text;
   const tree = mdast(body);
@@ -280,7 +280,7 @@ function pictureOf(children: PhrasingContent[]): Block | undefined {
 }
 
 /** Every picture a book shows (their repository paths), in order, each once: what the formats embed. */
-export function bookImages(book: Pick<Book, "front" | "chapters" | "back">): string[] {
+export function bookImages(book: Pick<CompiledBook, "front" | "chapters" | "back">): string[] {
   const paths = new Set<string>();
   const visit = (list: Block[]) => {
     for (const b of list) {
