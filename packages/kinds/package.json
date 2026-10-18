@@ -1,0 +1,13 @@
+{
+  "name": "@writer/kinds",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The kinds of book Writer ships, as data the base reads (D14, D15): the Novel first.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@writer/core": "0.1.0"
+  }
+}

@@ -32,7 +32,7 @@ export function IssuesPage({ novelId, novel, workspace }: { novelId: string; nov
   const milestone = params.get("milestone") ?? "";
   const q = params.get("q") ?? "";
   const kind = params.get("kind") ?? "";
-  const filter: IssueFilter = { state, ...(labels.length || kind ? { labels: withKind(labels, kind) } : {}), ...(milestone ? { milestone: milestone === "none" ? "none" : Number(milestone) } : {}), ...(q ? { q } : {}) };
+  const filter: IssueFilter = { state, ...(labels.length || kind ? { labels: withKind(labels, kind, novel.kind.issueKinds) } : {}), ...(milestone ? { milestone: milestone === "none" ? "none" : Number(milestone) } : {}), ...(q ? { q } : {}) };
   const list = useIssueList(novelId, filter);
   const [creating, setCreating] = useState(params.get("new") === "1");
 
@@ -109,7 +109,7 @@ export function IssuesPage({ novelId, novel, workspace }: { novelId: string; nov
           <Picker
             className="w-56"
             label="Filter by label"
-            items={[...new Set([...choices.map((l) => l.name), ...labels])].map((name) => ({ value: name, label: displayLabel(name, choices), group: choices.find((c) => c.name === name)?.group ?? "Other labels", keywords: [name] }))}
+            items={[...new Set([...choices.map((l) => l.name), ...labels])].map((name) => ({ value: name, label: displayLabel(name, choices, novel.kind.issueKinds), group: choices.find((c) => c.name === name)?.group ?? "Other labels", keywords: [name] }))}
             value={undefined}
             chosen={labels}
             onChange={(v) => v && setParams({ labels: (labels.includes(v) ? labels.filter((x) => x !== v) : [...labels, v]).join(",") })}
@@ -204,8 +204,8 @@ function NewIssue({ novelId, novel, onClose }: { novelId: string; novel: Novel; 
         onSubmit={async (e) => {
           e.preventDefault();
           if (!title.trim()) return;
-          if (kind) await ensureKind(novelId, kind);
-          const made = await changes.create({ title, body, labels: withKind(labels, kind), ...(milestone !== "none" ? { milestone: Number(milestone) } : {}) });
+          if (kind) await ensureKind(novelId, kind, novel.kind.issueKinds);
+          const made = await changes.create({ title, body, labels: withKind(labels, kind, novel.kind.issueKinds), ...(milestone !== "none" ? { milestone: Number(milestone) } : {}) });
           if (!made) return;
           onClose();
           void navigate(`/novels/${novelId}/issues/${made.number}`);

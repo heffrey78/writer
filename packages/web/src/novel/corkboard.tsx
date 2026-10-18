@@ -6,7 +6,6 @@ import { Button } from "../ui/button.tsx";
 import { cn } from "../ui/cn.ts";
 import { visibleScenes, visibleStep, type CorkboardFilter } from "./corkboard-order.ts";
 import { chapterTitle } from "./navigation.tsx";
-import { STATUSES } from "./outline.tsx";
 import { dropMove, useStructure } from "./structure.ts";
 import type { Workspace } from "./workspace.ts";
 
@@ -94,7 +93,7 @@ export function OutlineCards({ novelId, novel, workspace }: { novelId: string; n
         <FilterSelect label="Point of view" value={filter.pov} onChange={(v) => setFilter("pov", v)} options={characters.map((c) => [c.id, c.name])} />
         <FilterSelect label="Character" value={filter.character} onChange={(v) => setFilter("character", v)} options={characters.map((c) => [c.id, c.name])} />
         <FilterSelect label="Plotline" value={filter.plotline} onChange={(v) => setFilter("plotline", v)} options={plotlines.map((p) => [p.id, p.name])} />
-        <FilterSelect label="Status" value={filter.status} onChange={(v) => setFilter("status", v)} options={STATUSES.map((s) => [s, s])} />
+        <FilterSelect label="Status" value={filter.status} onChange={(v) => setFilter("status", v)} options={novel.kind.statuses.map((s) => [s.key, s.key])} />
         {filtered && (
           <Button size="sm" onClick={() => setParams({}, { replace: true })}>
             Clear filters

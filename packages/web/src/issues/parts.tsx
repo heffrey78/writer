@@ -1,10 +1,11 @@
 import type { IssueLabel, IssueList, IssuesStatus, Milestone } from "@writer/client";
-import { entityLabel, entityOfLabel, ISSUE_KINDS, kindLabel, kindOf, STOCK_LABELS, type Novel } from "@writer/core";
+import { entityLabel, entityOfLabel, issueKindOf, kindLabel, STOCK_LABELS, type IssueKind, type Novel } from "@writer/core";
 import { plural } from "../bible/types.ts";
 import { useQueryClient } from "@tanstack/react-query";
 import { X } from "lucide-react";
 import { useId, useState } from "react";
 import { api, keys } from "../api.ts";
+import { useBookKind } from "../novel/kind.ts";
 import { useNotice } from "../novel/notice.tsx";
 import { Modal } from "../ui/dialog.tsx";
 import { Field } from "../ui/field.tsx";
@@ -16,8 +17,8 @@ const time = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle
 export const when = (iso: string) => time.format(new Date(iso));
 
 /** A label for the author: a kind by its name ("Plot hole"), a bible entry's by the entry's name ("Ada Varn"). */
-export function displayLabel(name: string, labels: readonly IssueLabel[]): string {
-  const kind = kindOf(name);
+export function displayLabel(name: string, labels: readonly IssueLabel[], kinds: readonly IssueKind[]): string {
+  const kind = issueKindOf(kinds, name);
   if (kind) return kind.label;
   const entry = /^(.+) · [a-z]{2,8}_[0-9a-hjkmnp-tv-z]{6}$/.exec(labels.find((l) => l.name === name)?.description ?? "");
   return entry ? entry[1]! : name;
@@ -25,9 +26,10 @@ export function displayLabel(name: string, labels: readonly IssueLabel[]): strin
 
 /** A label as GitHub colours it, by the name the author knows it by, optionally with a button to take it off. */
 export function LabelChip({ name, labels, onRemove }: { name: string; labels: readonly IssueLabel[]; onRemove?: () => void }) {
-  const kind = kindOf(name);
+  const kinds = useBookKind().issueKinds;
+  const kind = issueKindOf(kinds, name);
   const color = labels.find((l) => l.name === name)?.color ?? kind?.color ?? "ededed";
-  const shown = displayLabel(name, labels);
+  const shown = displayLabel(name, labels, kinds);
   return (
     <span className="inline-flex items-center gap-1 rounded-full border border-rule bg-raised px-2 py-0.5 text-xs">
       <span className="inline-block size-2 rounded-full" style={{ background: `#${color}` }} aria-hidden />
@@ -46,6 +48,7 @@ export function LabelChip({ name, labels, onRemove }: { name: string; labels: re
  * one adds it or takes it off; a name no label has can be made a new label.
  */
 export function LabelsField({ label, chosen, labels, onChange }: { label: string; chosen: string[]; labels: readonly LabelChoice[]; onChange: (labels: string[]) => void }) {
+  const kinds = useBookKind().issueKinds;
   // The chosen ones are listed even when they're not among those offered (a stock label already on it).
   const names = [...labels.map((l) => l.name), ...chosen.filter((c) => !labels.some((l) => l.name === c))];
   const groupOf = (name: string) => labels.find((l) => l.name === name)?.group ?? OTHER;
@@ -63,7 +66,7 @@ export function LabelsField({ label, chosen, labels, onChange }: { label: string
       <Picker
         label={`Add to ${label.toLowerCase()}`}
         items={names
-          .map((name) => ({ value: name, label: displayLabel(name, labels), group: groupOf(name), keywords: [name, labels.find((l) => l.name === name)?.description ?? ""] }))
+          .map((name) => ({ value: name, label: displayLabel(name, labels, kinds), group: groupOf(name), keywords: [name, labels.find((l) => l.name === name)?.description ?? ""] }))
           // Bible entries by type first, then the other labels.
           .sort((a, b) => Number(a.group === OTHER) - Number(b.group === OTHER))}
         value={undefined}
@@ -106,26 +109,27 @@ export function labelChoices(meta: Pick<IssueList, "labels" | "issues"> | undefi
 export function pickableLabels(meta: Pick<IssueList, "labels" | "issues"> | undefined): IssueLabel[] {
   if (!meta) return [];
   const used = new Set(meta.issues.flatMap((i) => i.labels));
-  return meta.labels.filter((l) => !kindOf(l.name) && !l.name.startsWith("kind/") && (!STOCK_LABELS.has(l.name) || used.has(l.name)));
+  return meta.labels.filter((l) => !l.name.startsWith("kind/") && (!STOCK_LABELS.has(l.name) || used.has(l.name)));
 }
 
 /** The kind of an issue, from its labels. */
-export const kindIn = (labels: string[]) => ISSUE_KINDS.find((k) => labels.includes(kindLabel(k)))?.key ?? "";
+export const kindIn = (labels: string[], kinds: readonly IssueKind[]) => kinds.find((k) => labels.includes(kindLabel(k)))?.key ?? "";
 
 /** Labels with the kind changed to `key` ("" for none). */
-export const withKind = (labels: string[], key: string) => [...labels.filter((l) => !kindOf(l)), ...(key ? [`kind/${key}`] : [])];
+export const withKind = (labels: string[], key: string, kinds: readonly IssueKind[]) => [...labels.filter((l) => !issueKindOf(kinds, l)), ...(key ? [`kind/${key}`] : [])];
 
 /** Make sure a kind's label is on the repository with its colour (best effort). */
-export async function ensureKind(novelId: string, key: string): Promise<void> {
-  const kind = ISSUE_KINDS.find((k) => k.key === key);
+export async function ensureKind(novelId: string, key: string, kinds: readonly IssueKind[]): Promise<void> {
+  const kind = kinds.find((k) => k.key === key);
   if (kind) await api.issues.ensureLabel(novelId, { name: kindLabel(kind), color: kind.color, description: kind.description }).catch(() => {});
 }
 
 export function KindSelect({ id, value, onChange, any }: { id: string; value: string; onChange: (key: string) => void; any?: boolean }) {
+  const kinds = useBookKind().issueKinds;
   return (
     <select id={id} value={value} onChange={(e) => onChange(e.target.value)} className="h-9 rounded-md border border-rule bg-raised px-2 text-sm">
       <option value="">{any ? "Any kind" : "No kind"}</option>
-      {ISSUE_KINDS.map((k) => (
+      {kinds.map((k) => (
         <option key={k.key} value={k.key}>
           {k.label}
         </option>

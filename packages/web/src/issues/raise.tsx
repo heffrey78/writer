@@ -1,5 +1,5 @@
 import { ApiError } from "@writer/client";
-import { entityLabel, ISSUE_KINDS, type Novel } from "@writer/core";
+import { entityLabel, type Novel } from "@writer/core";
 import { caretScene } from "@writer/editor";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Editor } from "@tiptap/core";
@@ -14,9 +14,6 @@ import { Button } from "../ui/button.tsx";
 import { Field } from "../ui/field.tsx";
 import { labelChoices, LabelsField } from "./parts.tsx";
 import { useIssueMeta } from "./use-issues.ts";
-
-/** The kinds of note about a passage: each a label (kind/…) with its colour. */
-export const KINDS = ISSUE_KINDS;
 
 export interface Passage {
   /** The scene file, its ID and title. */
@@ -78,7 +75,7 @@ function Raise({ novelId, novel, passage, close }: { novelId: string; novel: Nov
   const navigate = useNavigate();
   const show = useNotice((n) => n.show);
   const meta = useIssueMeta(novelId);
-  const [kind, setKind] = useState<string>(KINDS[0]!.key);
+  const [kind, setKind] = useState<string>(novel.kind.issueKinds[0]!.key);
   const [title, setTitle] = useState("");
   const [details, setDetails] = useState("");
   // Who and what the passage is about, to start with: the scene's people, places and threads, and anything it mentions.
@@ -105,7 +102,7 @@ function Raise({ novelId, novel, passage, close }: { novelId: string; novel: Nov
 
   const raise = async () => {
     if (!title.trim() || busy) return;
-    const k = KINDS.find((x) => x.key === kind)!;
+    const k = novel.kind.issueKinds.find((x) => x.key === kind)!;
     setBusy(true);
     try {
       const issue = await api.issues.raise(novelId, { ...passage, title, details, kind: { name: `kind/${k.key}`, color: k.color, description: k.description }, labels });
@@ -159,7 +156,7 @@ function Raise({ novelId, novel, passage, close }: { novelId: string; novel: Nov
         <fieldset className="grid gap-1.5">
           <legend className="mb-1.5 font-medium">Kind</legend>
           <div className="flex flex-wrap gap-1.5">
-            {KINDS.map((k) => (
+            {novel.kind.issueKinds.map((k) => (
               <label key={k.key} className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-rule bg-raised px-2.5 py-1 has-[:checked]:border-accent has-[:checked]:bg-accent-soft">
                 <input type="radio" name="kind" value={k.key} checked={kind === k.key} onChange={() => setKind(k.key)} className="sr-only" />
                 <span className="inline-block size-2 rounded-full" style={{ background: `#${k.color}` }} aria-hidden />

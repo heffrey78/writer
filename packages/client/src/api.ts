@@ -730,7 +730,8 @@ function issuesApi(root: (novelId: string) => string, request: Request) {
   };
 }
 
-export type SceneStatusName = "idea" | "outlined" | "drafted" | "revised" | "final";
+/** One of the book's kind's statuses (BookKind.statuses), by its key. */
+export type SceneStatusName = string;
 
 /** A scene whose status was changed both in its file and on the GitHub board, to different values. */
 export interface BoardConflict {

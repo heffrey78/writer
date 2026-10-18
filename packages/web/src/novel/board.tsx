@@ -6,8 +6,8 @@ import { Button } from "../ui/button.tsx";
 import { cn } from "../ui/cn.ts";
 import { BoardOnGitHub, ConflictNote, useBoardStatus } from "./board-github.tsx";
 import { FilterSelect, STATUS_TONE } from "./corkboard.tsx";
+import { useStatusLabel } from "./kind.ts";
 import { chapterTitle } from "./navigation.tsx";
-import { STATUSES } from "./outline.tsx";
 import { useSceneEdit } from "./scene-edit.ts";
 import type { Workspace } from "./workspace.ts";
 
@@ -18,7 +18,6 @@ import type { Workspace } from "./workspace.ts";
  * on GitHub, it can be mirrored to a project there (board-github.tsx).
  */
 
-export const STATUS_LABEL: Record<SceneStatus, string> = { idea: "Idea", outlined: "Outlined", drafted: "Drafted", revised: "Revised", final: "Final" };
 
 type BoardFilter = { pov?: string; part?: string; chapter?: string };
 
@@ -27,6 +26,8 @@ const words = (n: number) => `${number.format(n)} ${n === 1 ? "word" : "words"}`
 const scenes = (n: number) => `${number.format(n)} ${n === 1 ? "scene" : "scenes"}`;
 
 export function OutlineBoard({ novelId, novel, workspace }: { novelId: string; novel: Novel; workspace: Workspace }) {
+  const statuses = novel.kind.statuses.map((s) => s.key);
+  const label = useStatusLabel();
   const edit = useSceneEdit(novelId, workspace);
   const conflicts = useBoardStatus(novelId)?.conflicts ?? [];
   const [params, setParams] = useSearchParams();
@@ -52,7 +53,7 @@ export function OutlineBoard({ novelId, novel, workspace }: { novelId: string; n
 
   const move = (scene: Scene, status: SceneStatus) => {
     if (scene.status === status) return Promise.resolve();
-    return edit(scene, () => [{ path: ["status"], value: status }], `Moved “${scene.title}” to ${STATUS_LABEL[status]}.`);
+    return edit(scene, () => [{ path: ["status"], value: status }], `Moved “${scene.title}” to ${label(status)}.`);
   };
 
   // A card moved by keyboard keeps focus once the model reloads and draws it in its new column.
@@ -65,7 +66,7 @@ export function OutlineBoard({ novelId, novel, workspace }: { novelId: string; n
   const onHandleKey = (e: KeyboardEvent, scene: Scene) => {
     if (!e.altKey || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
     e.preventDefault();
-    const next = STATUSES[STATUSES.indexOf(scene.status) + (e.key === "ArrowLeft" ? -1 : 1)];
+    const next = statuses[statuses.indexOf(scene.status) + (e.key === "ArrowLeft" ? -1 : 1)];
     if (!next) return;
     refocus.current = scene.id;
     void move(scene, next).then(() => requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-board-handle="${scene.id}"]`)?.focus()));
@@ -103,7 +104,7 @@ export function OutlineBoard({ novelId, novel, workspace }: { novelId: string; n
         {filtered ? `${visible.length} of ${scenes(novel.scenes.length)} match, ${words(total)}.` : `${scenes(visible.length)}, ${words(total)}.`}
       </p>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        {STATUSES.map((status) => {
+        {statuses.map((status) => {
           const column = visible.filter((s) => s.status === status);
           const columnWords = column.reduce((n, s) => n + (counts.get(s.id) ?? 0), 0);
           return (
@@ -117,7 +118,7 @@ export function OutlineBoard({ novelId, novel, workspace }: { novelId: string; n
             >
               <header className={cn("border-l-4 pl-2", STATUS_TONE[status])}>
                 <h2 id={`board-${status}`} className="font-semibold">
-                  {STATUS_LABEL[status]}
+                  {label(status)}
                 </h2>
                 <p className="text-xs text-muted">
                   {scenes(column.length)} · {words(columnWords)}
@@ -144,7 +145,7 @@ export function OutlineBoard({ novelId, novel, workspace }: { novelId: string; n
                               setOver(undefined);
                             }}
                             onKeyDown={(e) => onHandleKey(e, scene)}
-                            aria-label={`Move “${scene.title}”, ${STATUS_LABEL[scene.status]}`}
+                            aria-label={`Move “${scene.title}”, ${label(scene.status)}`}
                             aria-keyshortcuts="Alt+ArrowLeft Alt+ArrowRight"
                             className="-ml-1 cursor-grab rounded p-0.5 text-muted hover:bg-panel"
                           >

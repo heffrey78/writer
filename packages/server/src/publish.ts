@@ -1,4 +1,4 @@
-import { ISSUE_KINDS, kindLabel, STOCK_LABELS } from "@writer/core";
+import { kindLabel, STOCK_LABELS, type IssueKind } from "@writer/core";
 import { classifyGitError, git } from "./git.ts";
 import { GitHubError, type GitHub } from "./github.ts";
 import type { NovelWorkspace } from "./workspace.ts";
@@ -58,7 +58,7 @@ export async function publish(ws: NovelWorkspace, github: GitHub, { name, descri
     }
     remote = body.clone_url;
     await g.raw(["remote", "add", "origin", remote]);
-    await writingLabels(github, login, name);
+    await writingLabels(github, login, name, ws.kind.issueKinds);
   }
 
   const failed = (message: string, detail?: string) =>
@@ -84,13 +84,13 @@ export async function publish(ws: NovelWorkspace, github: GitHub, { name, descri
  * A new repository's labels for a novel: GitHub's stock ones (bug, enhancement, …) taken out, the
  * writing kinds put in. Best effort: a label left over is only hidden in Writer.
  */
-async function writingLabels(github: GitHub, owner: string, name: string): Promise<void> {
+async function writingLabels(github: GitHub, owner: string, name: string, kinds: readonly IssueKind[]): Promise<void> {
   const repo = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}`;
   try {
     const res = await github.api(`${repo}/labels?per_page=100`);
     const have = res.ok ? ((await res.json()) as { name: string }[]).map((l) => l.name) : [];
     for (const label of have.filter((l) => STOCK_LABELS.has(l))) await github.api(`${repo}/labels/${encodeURIComponent(label)}`, { method: "DELETE" });
-    for (const kind of ISSUE_KINDS) {
+    for (const kind of kinds) {
       if (!have.includes(kindLabel(kind))) await github.api(`${repo}/labels`, { method: "POST", body: { name: kindLabel(kind), color: kind.color, description: kind.description } });
     }
   } catch {

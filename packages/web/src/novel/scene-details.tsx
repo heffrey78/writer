@@ -13,7 +13,6 @@ import { cn } from "../ui/cn.ts";
 import { Picker, type PickerItem, type PickerProps } from "../ui/picker.tsx";
 import { useEntryPanel } from "./entry-tab.tsx";
 import { useNotice } from "./notice.tsx";
-import { STATUSES } from "./outline.tsx";
 import type { Workspace } from "./workspace.ts";
 import { readDate, useSetDayOne } from "../timeline/day-one.tsx";
 import { storyDate } from "../format.ts";
@@ -206,7 +205,8 @@ export function SceneDetails({
   const when = fm.when && typeof fm.when === "object" ? (fm.when as { at?: string; day?: number; time?: string }) : undefined;
   const whenKind = when?.at !== undefined ? "date" : when?.day !== undefined ? "day" : "";
   const tags = Array.isArray(fm.tags) ? (fm.tags as string[]) : [];
-  const status = STATUSES.includes(fm.status as never) ? (fm.status as string) : "idea";
+  const statuses = novel.kind.statuses.map((s) => s.key);
+  const status = statuses.includes(fm.status as string) ? (fm.status as string) : statuses[0]!;
   const synopsis = str(fm.synopsis);
 
   const link = (id: string) => <EntityLink key={id} novel={novel} id={id} />;
@@ -498,12 +498,12 @@ export function SceneDetails({
       )}
 
       {editing === "status" ? (
-        editorOf(<SelectField label="Status" value={status} options={STATUSES.map((s) => [s, s])} onChange={(v) => set("status", v)} />)
+        editorOf(<SelectField label="Status" value={status} options={statuses.map((s) => [s, s])} onChange={(v) => set("status", v)} />)
       ) : (
         <div className="group flex items-center gap-2">
           <div role="img" aria-label={`Status: ${status}`} className="flex gap-1" onClick={() => start("status")}>
-            {STATUSES.map((s, i) => (
-              <span key={s} title={s} className={cn("h-1.5 w-5 rounded-full", i <= STATUSES.indexOf(status as never) ? "bg-accent" : "bg-rule")} />
+            {statuses.map((s, i) => (
+              <span key={s} title={s} className={cn("h-1.5 w-5 rounded-full", i <= statuses.indexOf(status) ? "bg-accent" : "bg-rule")} />
             ))}
           </div>
           <span className="flex-1 text-xs text-muted">{status}</span>

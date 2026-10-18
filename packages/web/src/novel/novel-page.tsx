@@ -18,6 +18,7 @@ import { useNewEvent } from "../events/new-event.tsx";
 import { useNewNote } from "../notes/new-note.tsx";
 import { NotesPage } from "../notes/notes-page.tsx";
 import { NotesLeftDialog } from "../notes/notes-left.tsx";
+import { BookKindContext } from "./kind.ts";
 import { EntryOver, EventOver, NoteOver } from "./item-modals.tsx";
 import { cn } from "../ui/cn.ts";
 import { DraftsButton, useDrafts } from "./drafts.tsx";
@@ -280,56 +281,58 @@ export function NovelPage() {
     );
   }
   return (
-    <Shell wide heading={heading} actions={actions} menu={menu} chrome={!focus} title={book.config?.title ?? "Untitled"}>
-      {!connected && (
-        <p role="alert" className="border-b border-warn/40 bg-warn-soft px-4 py-2 text-sm">
-          Writer isn't answering. Your unsaved text is kept in this tab; start Writer again and it will be saved.
-        </p>
-      )}
-      <div className={focus ? "h-full" : cn("grid h-full", collapsed ? "grid-cols-[3.25rem_minmax(0,1fr)]" : "grid-cols-[3.25rem_minmax(0,1fr)] md:grid-cols-[16rem_minmax(0,1fr)]")}>
-        {!focus && (
-          <Sidebar novelId={novelId} novel={book} workspace={workspace} current={current} onGitHub={!!repo} />
+    <BookKindContext.Provider value={book.kind}>
+      <Shell wide heading={heading} actions={actions} menu={menu} chrome={!focus} title={book.config?.title ?? "Untitled"}>
+        {!connected && (
+          <p role="alert" className="border-b border-warn/40 bg-warn-soft px-4 py-2 text-sm">
+            Writer isn't answering. Your unsaved text is kept in this tab; start Writer again and it will be saved.
+          </p>
         )}
-        <div className="md:overflow-y-auto">
-          <ErrorBoundary what="this view" remount={sameView}>
-            <Routes>
-              <Route index element={book.chapters[0] ? <Navigate to={`/novels/${novelId}/chapter/${book.chapters[0].id}`} replace /> : <EmptyManuscript />} />
-              <Route path="chapter/:chapterId" element={<ChapterRoute novelId={novelId} novel={book} workspace={workspace} spell={spell} entries={entries} />} />
-              <Route path="scene/:sceneId" element={<SceneRoute novelId={novelId} novel={book} workspace={workspace} spell={spell} entries={entries} />} />
-              <Route
-                path="relationships"
-                element={
-                  <Suspense fallback={<p className="px-6 py-6 text-muted">Opening the graph…</p>}>
-                    <GraphPage novelId={novelId} novel={book} />
-                  </Suspense>
-                }
-              />
-              <Route path="story-map" element={<Navigate to={`/novels/${novelId}/story-map/plotlines`} replace />} />
-              <Route path="story-map/:tab" element={<StoryMapPage novelId={novelId} novel={book} workspace={workspace} />} />
-              <Route path="outline" element={<OutlinePage novelId={novelId} novel={book} workspace={workspace} />} />
-              <Route path="outline/:view" element={<OutlinePage novelId={novelId} novel={book} workspace={workspace} />} />
-              <Route path="bible" element={<BiblePage novelId={novelId} novel={book} />} />
-              {/* An entry or an event opens over the Story bible, a note over Notes (heffrey78/gh-writer#233): the gallery stays as it was underneath. */}
-              <Route path="bible/:entityId" element={<BiblePage novelId={novelId} novel={book} over={<EntryOver novelId={novelId} novel={book} workspace={workspace} spell={spell} />} />} />
-              <Route path="event/:eventId" element={<BiblePage novelId={novelId} novel={book} over={<EventOver novelId={novelId} novel={book} workspace={workspace} spell={spell} />} />} />
-              <Route path="note/:noteId" element={<NotesPage novelId={novelId} novel={book} over={<NoteOver novelId={novelId} novel={book} workspace={workspace} spell={spell} />} />} />
-              <Route path="progress" element={<ProgressPage novelId={novelId} novel={book} />} />
-              <Route path="compare" element={<ComparePage novelId={novelId} workspace={workspace} />} />
-              <Route path="issues" element={<GitHubOnly repo={repo} novelId={novelId}>{() => <IssuesPage novelId={novelId} novel={book} workspace={workspace} />}</GitHubOnly>} />
-              <Route path="issues/:number" element={<GitHubOnly repo={repo} novelId={novelId}>{() => <IssueRoute novelId={novelId} novel={book} workspace={workspace} />}</GitHubOnly>} />
-              <Route path="notes" element={<NotesPage novelId={novelId} novel={book} />} />
-              <Route path="*" element={<Missing what="page" />} />
-            </Routes>
-          </ErrorBoundary>
+        <div className={focus ? "h-full" : cn("grid h-full", collapsed ? "grid-cols-[3.25rem_minmax(0,1fr)]" : "grid-cols-[3.25rem_minmax(0,1fr)] md:grid-cols-[16rem_minmax(0,1fr)]")}>
+          {!focus && (
+            <Sidebar novelId={novelId} novel={book} workspace={workspace} current={current} onGitHub={!!repo} />
+          )}
+          <div className="md:overflow-y-auto">
+            <ErrorBoundary what="this view" remount={sameView}>
+              <Routes>
+                <Route index element={book.chapters[0] ? <Navigate to={`/novels/${novelId}/chapter/${book.chapters[0].id}`} replace /> : <EmptyManuscript />} />
+                <Route path="chapter/:chapterId" element={<ChapterRoute novelId={novelId} novel={book} workspace={workspace} spell={spell} entries={entries} />} />
+                <Route path="scene/:sceneId" element={<SceneRoute novelId={novelId} novel={book} workspace={workspace} spell={spell} entries={entries} />} />
+                <Route
+                  path="relationships"
+                  element={
+                    <Suspense fallback={<p className="px-6 py-6 text-muted">Opening the graph…</p>}>
+                      <GraphPage novelId={novelId} novel={book} />
+                    </Suspense>
+                  }
+                />
+                <Route path="story-map" element={<Navigate to={`/novels/${novelId}/story-map/plotlines`} replace />} />
+                <Route path="story-map/:tab" element={<StoryMapPage novelId={novelId} novel={book} workspace={workspace} />} />
+                <Route path="outline" element={<OutlinePage novelId={novelId} novel={book} workspace={workspace} />} />
+                <Route path="outline/:view" element={<OutlinePage novelId={novelId} novel={book} workspace={workspace} />} />
+                <Route path="bible" element={<BiblePage novelId={novelId} novel={book} />} />
+                {/* An entry or an event opens over the Story bible, a note over Notes (heffrey78/gh-writer#233): the gallery stays as it was underneath. */}
+                <Route path="bible/:entityId" element={<BiblePage novelId={novelId} novel={book} over={<EntryOver novelId={novelId} novel={book} workspace={workspace} spell={spell} />} />} />
+                <Route path="event/:eventId" element={<BiblePage novelId={novelId} novel={book} over={<EventOver novelId={novelId} novel={book} workspace={workspace} spell={spell} />} />} />
+                <Route path="note/:noteId" element={<NotesPage novelId={novelId} novel={book} over={<NoteOver novelId={novelId} novel={book} workspace={workspace} spell={spell} />} />} />
+                <Route path="progress" element={<ProgressPage novelId={novelId} novel={book} />} />
+                <Route path="compare" element={<ComparePage novelId={novelId} workspace={workspace} />} />
+                <Route path="issues" element={<GitHubOnly repo={repo} novelId={novelId}>{() => <IssuesPage novelId={novelId} novel={book} workspace={workspace} />}</GitHubOnly>} />
+                <Route path="issues/:number" element={<GitHubOnly repo={repo} novelId={novelId}>{() => <IssueRoute novelId={novelId} novel={book} workspace={workspace} />}</GitHubOnly>} />
+                <Route path="notes" element={<NotesPage novelId={novelId} novel={book} />} />
+                <Route path="*" element={<Missing what="page" />} />
+              </Routes>
+            </ErrorBoundary>
+          </div>
         </div>
-      </div>
-      <SyncConflicts novelId={novelId} novel={book} workspace={workspace} open={resolving} onClose={() => setResolving(false)} />
-      <AdoptConflicts novelId={novelId} novel={book} workspace={workspace} />
-      {compiling && <CompileDialog novelId={novelId} novel={book} workspace={workspace} onClose={() => setCompiling(false)} />}
-      <SaveConflicts novel={book} workspace={workspace} />
-      <NoticeBar />
-      <NotesLeftDialog />
-    </Shell>
+        <SyncConflicts novelId={novelId} novel={book} workspace={workspace} open={resolving} onClose={() => setResolving(false)} />
+        <AdoptConflicts novelId={novelId} novel={book} workspace={workspace} />
+        {compiling && <CompileDialog novelId={novelId} novel={book} workspace={workspace} onClose={() => setCompiling(false)} />}
+        <SaveConflicts novel={book} workspace={workspace} />
+        <NoticeBar />
+        <NotesLeftDialog />
+      </Shell>
+    </BookKindContext.Provider>
   );
 }
 

@@ -1,4 +1,4 @@
-import { type BoardConflict, type BoardStatus, type SceneStatusName } from "@writer/client";
+import { type BoardConflict, type BoardStatus } from "@writer/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ExternalLink } from "lucide-react";
 import { useEffect, useRef, type ReactNode } from "react";
@@ -6,6 +6,7 @@ import { api, keys } from "../api.ts";
 import { GitHubMark, useConnect, useGitHub } from "../github/connect.tsx";
 import { useGitHubRepo } from "../github/repo.ts";
 import { when } from "../issues/parts.tsx";
+import { useStatusLabel } from "./kind.ts";
 import { ErrorAlert } from "../ui/alert.tsx";
 import { Button } from "../ui/button.tsx";
 
@@ -15,7 +16,6 @@ import { Button } from "../ui/button.tsx";
  * file and GitHub, each settled by the author. Shown only for a novel on GitHub.
  */
 
-const LABEL: Record<SceneStatusName, string> = { idea: "Idea", outlined: "Outlined", drafted: "Drafted", revised: "Revised", final: "Final" };
 
 /** The board's status on GitHub, for a novel on GitHub; undefined otherwise or while it loads. */
 export function useBoardStatus(novelId: string) {
@@ -133,17 +133,18 @@ function Row({ text, children }: { text: string; children: ReactNode }) {
 }
 
 function ConflictRow({ conflict, busy, onKeep }: { conflict: BoardConflict; busy: boolean; onKeep: (side: "file" | "board") => void }) {
+  const label = useStatusLabel();
   return (
     <li className="flex flex-wrap items-center justify-between gap-2">
       <span>
-        “{conflict.title}” is <strong>{LABEL[conflict.file]}</strong> here and <strong>{LABEL[conflict.board]}</strong> on GitHub.
+        “{conflict.title}” is <strong>{label(conflict.file)}</strong> here and <strong>{label(conflict.board)}</strong> on GitHub.
       </span>
       <span className="flex gap-2">
-        <Button size="sm" disabled={busy} onClick={() => onKeep("file")} aria-label={`Keep ${LABEL[conflict.file]} for “${conflict.title}”`}>
-          Keep {LABEL[conflict.file]}
+        <Button size="sm" disabled={busy} onClick={() => onKeep("file")} aria-label={`Keep ${label(conflict.file)} for “${conflict.title}”`}>
+          Keep {label(conflict.file)}
         </Button>
-        <Button size="sm" disabled={busy} onClick={() => onKeep("board")} aria-label={`Use GitHub's ${LABEL[conflict.board]} for “${conflict.title}”`}>
-          Use GitHub's: {LABEL[conflict.board]}
+        <Button size="sm" disabled={busy} onClick={() => onKeep("board")} aria-label={`Use GitHub's ${label(conflict.board)} for “${conflict.title}”`}>
+          Use GitHub's: {label(conflict.board)}
         </Button>
       </span>
     </li>
@@ -152,11 +153,12 @@ function ConflictRow({ conflict, busy, onKeep }: { conflict: BoardConflict; busy
 
 /** What the last sync brought from GitHub, and what it put back. */
 function Summary({ status }: { status: BoardStatus }) {
+  const label = useStatusLabel();
   const last = status.last;
   if (!last || (!last.fromBoard.length && !last.putBack.length)) return null;
   return (
     <div role="status" className="grid gap-0.5 text-muted">
-      {last.fromBoard.length > 0 && <p>From GitHub: {last.fromBoard.map((m) => `“${m.title}” to ${LABEL[m.status]}`).join(", ")}.</p>}
+      {last.fromBoard.length > 0 && <p>From GitHub: {last.fromBoard.map((m) => `“${m.title}” to ${label(m.status)}`).join(", ")}.</p>}
       {last.putBack.length > 0 && (
         <p>
           Put back from the novel (these come from its files): {last.putBack.map((p) => `“${p.title}” ${p.fields.join(" and ")}`).join("; ")}.
@@ -181,6 +183,7 @@ function Problem({ status }: { status: BoardStatus }) {
 
 /** A card's note when its status differs on GitHub. */
 export function ConflictNote({ conflict }: { conflict: BoardConflict | undefined }) {
+  const label = useStatusLabel();
   if (!conflict) return null;
-  return <p className="text-xs font-medium text-warn">{LABEL[conflict.board]} on GitHub: choose above</p>;
+  return <p className="text-xs font-medium text-warn">{label(conflict.board)} on GitHub: choose above</p>;
 }

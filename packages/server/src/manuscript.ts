@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
 import { join, posix } from "node:path";
-import { editFrontMatter, editYaml, indexById, loadNovel, numberedName, slugify, uniqueId, type Chapter, type Novel, type Part, type Scene } from "@writer/core";
+import { editFrontMatter, editYaml, indexById, levelOf, loadNovel, numberedName, slugify, uniqueId, type Chapter, type Novel, type Part, type Scene } from "@writer/core";
 import { nodeSource } from "@writer/core/node";
 import { parse, stringify } from "yaml";
 import { git } from "./git.ts";
@@ -103,7 +103,7 @@ export class ManuscriptOperations {
     const o = new Overlay(this.root);
     const chapter = this.#chapter(novel, chapterId);
     const name = required(title, "title");
-    const id = uniqueId("sc", new Set(indexById(novel).keys()));
+    const id = uniqueId(novel.kind.piece.prefix, new Set(indexById(novel).keys()));
     const path = `${chapter.dir}/${slugify(name)}.md`;
     // In a scene's usual order: ID, title, synopsis and status, then the rest.
     const { synopsis, status = "idea", ...rest } = front;
@@ -120,7 +120,7 @@ export class ManuscriptOperations {
   createChapter(partId: string | null, { title, after }: { title?: string; after?: string | null }): Promise<OperationResult & { id: string }> {
     return this.#run(async (novel, o) => {
       const parent = this.#parentFor(novel, partId);
-      const id = uniqueId("ch", new Set(indexById(novel).keys()));
+      const id = uniqueId(levelOf(novel.kind, "chapter").prefix, new Set(indexById(novel).keys()));
       const dir = `${parent.kind === "part" ? parent.part.dir : "manuscript"}/${slugify(title?.trim() || "chapter")}`;
       o.set(`${dir}/_chapter.yaml`, stringify({ id, ...(title?.trim() ? { title: title.trim() } : {}), scenes: [] }, { lineWidth: 0, flowCollectionPadding: false }));
       await this.#insert(o, parent, id, after);
@@ -134,7 +134,7 @@ export class ManuscriptOperations {
     return this.#run(async (novel, o) => {
       if (novel.topLevel !== "parts") throw new OperationError("BAD_REQUEST", "This book is organised in chapters, not parts.");
       const name = required(title, "title");
-      const id = uniqueId("pt", new Set(indexById(novel).keys()));
+      const id = uniqueId(levelOf(novel.kind, "part").prefix, new Set(indexById(novel).keys()));
       const dir = `manuscript/${slugify(name)}`;
       o.set(`${dir}/_part.yaml`, stringify({ id, title: name, chapters: [] }, { lineWidth: 0, flowCollectionPadding: false }));
       await this.#insert(o, { kind: "top" }, id, after);
@@ -213,7 +213,7 @@ export class ManuscriptOperations {
       if (paragraph < 1 || paragraph >= starts.length) throw new OperationError("BAD_REQUEST", "Split between two paragraphs of the scene.");
       const cut = starts[paragraph]!;
       const first = text.slice(0, fmEnd) + body.slice(0, cut).replace(/\s*$/, "\n");
-      const id = uniqueId("sc", new Set(indexById(novel).keys()));
+      const id = uniqueId(novel.kind.piece.prefix, new Set(indexById(novel).keys()));
       const keep = Object.fromEntries(
         Object.entries(parse(text.slice(0, fmEnd).replace(/^﻿?---\r?\n/, "").replace(/---[ \t]*\r?\n?$/, "")) ?? {}).filter(([k]) =>
           ["status", "pov", "characters", "locations", "plotlines", "themes", "tags"].includes(k),

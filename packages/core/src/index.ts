@@ -1,10 +1,11 @@
 export * from "./ids.ts";
 export * from "./types.ts";
 export * from "./model.ts";
-export { EVENTS_FOLDER, loadNovel, NOTES_FOLDER, SCHEMA_VERSION } from "./load.ts";
+export { loadNovel, SCHEMA_VERSION } from "./load.ts";
+export { kindByKey, levelOf, registerKind, V2_KIND, type BookKind, type LevelDef, type StatusDef } from "./kinds.ts";
 export { eventFile, migration, type Migration, type MigrationWrite } from "./migrate.ts";
 export { parseMarkdown, parseYaml } from "./parse.ts";
-export { checkSchema, SCHEMAS, type SchemaKind } from "./schemas.ts";
+export { checkSchema, schemaFor, SCHEMAS, type SchemaKind } from "./schemas.ts";
 export { joinPath, memorySource, type DirEntry, type FileSource } from "./source.ts";
 export { hardWrappedLines, RULES, sortDiagnostics, validate, validateNovel, type ValidationResult } from "./validate.ts";
 export { countText, countWords, markdownWords, proseText, wordList } from "./words.ts";
@@ -15,7 +16,7 @@ export { backlinks, notesMentioning, notesOfScene, relationshipHistory, type Bac
 export { apartInTime, dayOneFor, durationMs, overlaps, sceneNeighbours, storyInstant, storyTimeline, type Overlap, type StoryInstant, type StoryTimeline, type TimelineItem } from "./time.ts";
 export { passageIssueBody, readAnchor, writeAnchor, type IssueAnchor, type PassageIssue } from "./issue-anchor.ts";
 export { resolveAnchor, type AnchorMatch, type AnchorOptions } from "./anchor-match.ts";
-export { ISSUE_KINDS, kindLabel, kindOf, STOCK_LABELS, type IssueKind } from "./issue-kinds.ts";
+export { issueKindOf, kindLabel, STOCK_LABELS, type IssueKind } from "./issue-kinds.ts";
 export { entityLabel, entityOfLabel, type LabelDef } from "./entity-labels.ts";
 export { bookImages, compileBook, CompileError, flatBlocks, numberWords, presets, type Align, type Block, type CompiledBook, type CompiledChapter, type Matter, type CompileOptions, type Run } from "./compile.ts";
 export { readableSpan, sceneFacts } from "./facts.ts";

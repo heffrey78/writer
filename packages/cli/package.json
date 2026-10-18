@@ -10,6 +10,7 @@
   "dependencies": {
     "@writer/core": "0.1.0",
     "@writer/export": "0.1.0",
+    "@writer/kinds": "0.1.0",
     "@writer/server": "0.1.0"
   }
 }

@@ -13,6 +13,7 @@ import event from "../schemas/event.schema.json" with { type: "json" };
 import note from "../schemas/note.schema.json" with { type: "json" };
 import layouts from "../schemas/layouts.schema.json" with { type: "json" };
 import compile from "../schemas/compile.schema.json" with { type: "json" };
+import { kindByKey, V2_KIND, type BookKind } from "./kinds.ts";
 import type { Diagnostic } from "./types.ts";
 
 export const SCHEMAS = {
@@ -32,25 +33,38 @@ export const SCHEMAS = {
 
 export type SchemaKind = keyof typeof SCHEMAS;
 
-let compiled: Map<SchemaKind, ValidateFunction> | undefined;
+/**
+ * A schema as books of `bookKind` have it. The committed schemas are a novel's; a scene's statuses
+ * are its kind's.
+ */
+export function schemaFor(name: SchemaKind, bookKind: BookKind): object {
+  if (name !== "scene") return SCHEMAS[name];
+  return { ...scene, properties: { ...scene.properties, status: { enum: bookKind.statuses.map((s) => s.key) } } };
+}
 
-function validators(): Map<SchemaKind, ValidateFunction> {
-  if (compiled) return compiled;
+/** The compiled schemas, for each kind of book: one Ajv each, since the schemas share their $ids. */
+const compiled = new Map<string, Map<SchemaKind, ValidateFunction>>();
+
+function validators(bookKind: BookKind): Map<SchemaKind, ValidateFunction> {
+  const done = compiled.get(bookKind.key);
+  if (done) return done;
   const ajv = new Ajv2020.default({ allErrors: true, strict: true, strictRequired: false, allowUnionTypes: true });
   ajv.addSchema(common);
   const map = new Map<SchemaKind, ValidateFunction>();
-  for (const [kind, schema] of Object.entries(SCHEMAS) as [SchemaKind, object][]) {
-    map.set(kind, ajv.compile(schema));
+  for (const kind of Object.keys(SCHEMAS) as SchemaKind[]) {
+    map.set(kind, ajv.compile(schemaFor(kind, bookKind)));
   }
-  return (compiled = map);
+  compiled.set(bookKind.key, map);
+  return map;
 }
 
 /**
- * Check parsed file data against its schema. Unknown fields are reported as
- * W_UNKNOWN_KEY warnings; every other violation is an E_SCHEMA error.
+ * Check parsed file data against its schema, as a book of `bookKind` has it (by default format v2's,
+ * a novel). Unknown fields are reported as W_UNKNOWN_KEY warnings; every other violation is an
+ * E_SCHEMA error.
  */
-export function checkSchema(kind: SchemaKind, data: unknown, file?: string): Diagnostic[] {
-  const validate = validators().get(kind)!;
+export function checkSchema(kind: SchemaKind, data: unknown, file?: string, bookKind: BookKind = kindByKey(V2_KIND)): Diagnostic[] {
+  const validate = validators(bookKind).get(kind)!;
   if (validate(data)) return [];
   return (validate.errors ?? []).flatMap((e) => toDiagnostic(kind, e, file));
 }

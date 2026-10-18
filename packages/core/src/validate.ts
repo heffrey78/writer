@@ -1,4 +1,4 @@
-import { idPrefix, STRUCTURE_PREFIXES } from "./ids.ts";
+import { idPrefix, RECORD_PREFIXES } from "./ids.ts";
 import { loadNovel } from "./load.ts";
 import { allRecords, mentions, picturePath, pictures, type Novel, type Picture, type RecordRef } from "./model.ts";
 import type { FileSource } from "./source.ts";
@@ -66,6 +66,10 @@ export function validateNovel(novel: Novel): Diagnostic[] {
   const index = new Map<string, RecordRef>();
   for (const r of records) if (!index.has(r.id)) index.set(r.id, r);
   const typeByKey = new Map(novel.entityTypes.map((t) => [t.key, t]));
+  // The book's own prefix, its levels' and its pieces' are its kind's; the rest every book shares.
+  const { kind } = novel;
+  const recordPrefix = (k: RecordRef["kind"]) =>
+    k === "novel" ? kind.prefix : k === "scene" ? kind.piece.prefix : (kind.levels.find((l) => l.key === k)?.prefix ?? RECORD_PREFIXES[k as keyof typeof RECORD_PREFIXES]);
 
   // IDs: duplicates and prefixes.
   for (const r of records) {
@@ -74,7 +78,7 @@ export function validateNovel(novel: Novel): Diagnostic[] {
       const where = first.file === r.file ? "earlier in this file" : `in ${first.file}`;
       push("error", "E_DUPLICATE_ID", r.file, `ID ${r.id} is already used ${where}`);
     }
-    const expected = r.kind === "entity" ? typeByKey.get(r.type!)?.prefix : STRUCTURE_PREFIXES[r.kind];
+    const expected = r.kind === "entity" ? typeByKey.get(r.type!)?.prefix : recordPrefix(r.kind);
     const actual = idPrefix(r.id);
     if (expected && actual && actual !== expected) {
       push("error", "E_ID_PREFIX", r.file, `${describe(r)} ID ${r.id} should start with "${expected}_"`);

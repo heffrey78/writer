@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { countWords, editFrontMatter, type Novel, type SceneStatus } from "@writer/core";
+import { countWords, editFrontMatter, type Novel, type SceneStatus, type StatusDef } from "@writer/core";
 import { git } from "./git.ts";
 import { GitHubError, type GitHub, type GitHubRepo } from "./github.ts";
 import type { TextFile } from "./files.ts";
@@ -17,16 +17,8 @@ import type { WriteResult } from "./workspace.ts";
  * committed: deleting it, or the project, loses no story data.
  */
 
-export const STATUSES: SceneStatus[] = ["idea", "outlined", "drafted", "revised", "final"];
-const STATUS_NAMES: Record<SceneStatus, string> = { idea: "Idea", outlined: "Outlined", drafted: "Drafted", revised: "Revised", final: "Final" };
-const STATUS_COLOURS: Record<SceneStatus, string> = { idea: "GRAY", outlined: "BLUE", drafted: "YELLOW", revised: "ORANGE", final: "GREEN" };
-const STATUS_DESCRIPTIONS: Record<SceneStatus, string> = {
-  idea: "A scene not yet planned",
-  outlined: "Planned, not yet written",
-  drafted: "Written in a first draft",
-  revised: "Rewritten after a draft",
-  final: "Done",
-};
+/** A status's name on the board: its label in the book's kind (BookKind.statuses). */
+const statusName = (statuses: readonly StatusDef[], key: SceneStatus) => statuses.find((s) => s.key === key)?.label ?? key;
 /** The options GitHub gives a new project's Status field: replaced by the scene statuses. */
 const STOCK_STATUS = ["todo", "in progress", "done"];
 /** The field of Writer's own that holds the status where the project's Status field can't be changed. */
@@ -396,7 +388,7 @@ export class BoardStore {
     state.project = { id: board.id, number: board.number, title: board.title, url: board.url };
 
     const wanted = desired(novel);
-    const fields = await this.#ensureFields(board, wanted);
+    const fields = await this.#ensureFields(board, wanted, novel.kind.statuses);
     const summary: BoardSummary = { added: 0, removed: 0, updated: 0, fromBoard: [], putBack: [] };
     const mutations: string[] = [];
     const projectId = board.id;
@@ -451,7 +443,7 @@ export class BoardStore {
       const item = byScene.get(w.id)!;
       const isNew = missing.includes(w);
       const base = state.base[w.id];
-      const onBoard = readItem(item, fields);
+      const onBoard = readItem(item, fields, novel.kind.statuses);
       let status = w.synced.status;
 
       // Status, three ways: whichever side changed since the last sync wins; both, to different values, is a conflict.
@@ -469,7 +461,7 @@ export class BoardStore {
           } else status = boardStatus; // the file changed meanwhile: the next sync sees it
         }
       }
-      let changed = set(item, fields.status, STATUS_NAMES[status]);
+      let changed = set(item, fields.status, statusName(novel.kind.statuses, status));
 
       // Everything else is the files': board edits are put back, and said so.
       const edited: string[] = [];
@@ -521,18 +513,18 @@ export class BoardStore {
    * need. Changing a field's options may clear the values that used them (GitHub gives options new
    * IDs): those items' values are forgotten here, so they're set again.
    */
-  async #ensureFields(board: Board, wanted: Map<string, Wanted>): Promise<Fields> {
+  async #ensureFields(board: Board, wanted: Map<string, Wanted>, statuses: readonly StatusDef[]): Promise<Fields> {
     const byName = (name: string) => board.fields.find((f) => f.name.toLowerCase() === name.toLowerCase());
     const forget = (field: Field) => board.items.forEach((i) => i.values.delete(field.id));
-    const statusOptions = STATUSES.map((s) => ({ name: STATUS_NAMES[s], color: new Enum(STATUS_COLOURS[s]), description: STATUS_DESCRIPTIONS[s] }));
+    const statusOptions = statuses.map((s) => ({ name: s.label, color: new Enum(s.color), description: s.description }));
 
     // Status: the project's own field, with the scene statuses as its options; else one of Writer's.
     let status = byName(OWN_STATUS) ?? byName("Status");
     if (status?.dataType !== "SINGLE_SELECT") status = undefined;
     const has = (f: Field, names: string[]) => names.every((n) => f.options?.some((o) => o.name.toLowerCase() === n.toLowerCase()));
-    if (status && !has(status, STATUSES.map((s) => STATUS_NAMES[s]))) {
+    if (status && !has(status, statuses.map((s) => s.label))) {
       // The author's own options stay, after the statuses; GitHub's stock ones go.
-      const keep = (status.options ?? []).filter((o) => !STOCK_STATUS.includes(o.name.toLowerCase()) && !STATUSES.some((s) => STATUS_NAMES[s].toLowerCase() === o.name.toLowerCase()));
+      const keep = (status.options ?? []).filter((o) => !STOCK_STATUS.includes(o.name.toLowerCase()) && !statuses.some((s) => s.label.toLowerCase() === o.name.toLowerCase()));
       const options = [...statusOptions, ...keep.map((o) => ({ name: o.name, color: new Enum(o.color), description: o.description }))];
       try {
         status = await this.#updateOptions(status, options);
@@ -742,20 +734,20 @@ function uniqueNames(pairs: [string, string][]): Map<string, string> {
 }
 
 /** An item's values as Writer reads them. */
-function readItem(item: Item, fields: Fields): { status: SceneStatus | undefined; statusName: string | null } & Record<Mirrored, string | number | null> {
+function readItem(item: Item, fields: Fields, statuses: readonly StatusDef[]): { status: SceneStatus | undefined; statusName: string | null } & Record<Mirrored, string | number | null> {
   const option = (field: Field | undefined) => {
     if (!field) return null;
     const v = item.values.get(field.id);
     if (v === undefined) return null;
     return field.dataType === "SINGLE_SELECT" ? (field.options?.find((o) => o.id === v)?.name ?? null) : v;
   };
-  const statusName = option(fields.status);
-  const status = STATUSES.find((s) => typeof statusName === "string" && STATUS_NAMES[s].toLowerCase() === statusName.toLowerCase());
+  const name = option(fields.status);
+  const status = statuses.find((s) => typeof name === "string" && s.label.toLowerCase() === name.toLowerCase())?.key;
   const number = (field: Field) => {
     const v = item.values.get(field.id);
     return typeof v === "number" ? v : null;
   };
-  return { status, statusName: typeof statusName === "string" ? statusName : null, title: item.title, pov: option(fields.pov), part: option(fields.part), chapter: option(fields.chapter), words: number(fields.words), order: number(fields.order) };
+  return { status, statusName: typeof name === "string" ? name : null, title: item.title, pov: option(fields.pov), part: option(fields.part), chapter: option(fields.chapter), words: number(fields.words), order: number(fields.order) };
 }
 
 function fieldOf(f: GhField): Field {

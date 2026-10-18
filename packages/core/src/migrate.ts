@@ -1,5 +1,6 @@
 import { editYaml, slugify, uniqueFileName, type YamlEdit } from "./edit.ts";
-import { EVENTS_FOLDER, SCHEMA_VERSION } from "./load.ts";
+import { kindByKey, V2_KIND } from "./kinds.ts";
+import { SCHEMA_VERSION } from "./load.ts";
 import { parseYaml } from "./parse.ts";
 import type { FileSource } from "./source.ts";
 
@@ -26,6 +27,8 @@ const EVENT_FIELDS = ["id", "title", "when", "duration", "characters", "location
 
 /** What moving the novel in `source` to the newest format would write, or why it can't be. */
 export async function migration(source: FileSource): Promise<Migration> {
+  // Only novels were ever in format v1.
+  const { codex, events: eventsFolder } = kindByKey(V2_KIND).folders;
   const novelText = await source.read("novel.yaml");
   if (novelText === undefined) return { status: "refused", reason: "There's no novel.yaml here." };
   const novel = parseYaml(novelText, "novel.yaml");
@@ -35,11 +38,11 @@ export async function migration(source: FileSource): Promise<Migration> {
   if (from === SCHEMA_VERSION) return { status: "current" };
 
   const types = Array.isArray(novel.data["entity_types"]) ? novel.data["entity_types"].filter(isObject) : [];
-  const clash = types.find((t) => t["folder"] === EVENTS_FOLDER);
+  const clash = types.find((t) => t["folder"] === eventsFolder);
   if (clash) {
     return {
       status: "refused",
-      reason: `The entry type “${String(clash["label"] ?? clash["key"])}” keeps its entries in bible/${EVENTS_FOLDER}/, where format v2 keeps off-page events. Give that type another folder (in novel.yaml, and move its files), then migrate.`,
+      reason: `The entry type “${String(clash["label"] ?? clash["key"])}” keeps its entries in ${codex}/${eventsFolder}/, where format v2 keeps off-page events. Give that type another folder (in novel.yaml, and move its files), then migrate.`,
     };
   }
 
@@ -49,7 +52,7 @@ export async function migration(source: FileSource): Promise<Migration> {
     const parsed = parseYaml(eventsText, EVENTS_YAML);
     if (parsed.diagnostics.length) return { status: "refused", reason: `${EVENTS_YAML} can't be read: fix it first (writer validate).` };
     const list = isObject(parsed.data) && Array.isArray(parsed.data["events"]) ? parsed.data["events"] : [];
-    const folder = `bible/${EVENTS_FOLDER}`;
+    const folder = `${codex}/${eventsFolder}`;
     const taken = new Set((await source.list(folder)).map((e) => e.name));
     for (const item of list) {
       if (!isObject(item) || typeof item["id"] !== "string") return { status: "refused", reason: `${EVENTS_YAML} has an event without an ID: fix it first (writer validate).` };

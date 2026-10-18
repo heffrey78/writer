@@ -2,6 +2,7 @@ import type { Editor } from "@tiptap/core";
 import { StrictMode, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { countWords, loadNovel, memorySource, uniqueId } from "@writer/core";
+import { registerKinds } from "@writer/kinds";
 import { addToDictionary, knownWords, parseDictionary } from "@writer/core/dictionary";
 import { useStore } from "zustand";
 import {
@@ -25,6 +26,8 @@ import aff from "../../../node_modules/dictionary-en/index.aff?raw";
 import dic from "../../../node_modules/dictionary-en/index.dic?raw";
 import "../src/styles.css";
 import "./playground.css";
+
+registerKinds(); // The kinds of book the app ships (D14): the sample is read as a novel.
 
 declare global {
   interface Window {

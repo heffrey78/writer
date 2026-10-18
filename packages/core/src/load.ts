@@ -1,4 +1,5 @@
-import { BUILTIN_ENTITY_TYPES, RESERVED_PREFIXES, type EntityTypeDef } from "./ids.ts";
+import { reservedPrefixes, type EntityTypeDef } from "./ids.ts";
+import { kindByKey, V2_KIND, type BookKind } from "./kinds.ts";
 import type { Chapter, Entity, Novel, Part, PlotlineRef, Relationship, Scene, StoryEvent, ThemeRef } from "./model.ts";
 import { parseMarkdown, parseYaml } from "./parse.ts";
 import { checkSchema, type SchemaKind } from "./schemas.ts";
@@ -7,14 +8,6 @@ import type { CompileFile, Diagnostic, NovelFile, RelationshipTypeFile, SceneSta
 
 /** Highest novel repository schema version this build understands. */
 export const SCHEMA_VERSION = 2;
-
-/** The folder of the writer's notes, at the top of the novel (D12). */
-export const NOTES_FOLDER = "notes";
-
-/** The folder under bible/ that holds event files (format v2), reserved from entity types. */
-export const EVENTS_FOLDER = "events";
-
-const SCENE_STATUSES: readonly SceneStatus[] = ["idea", "outlined", "drafted", "revised", "final"];
 
 /**
  * Load a novel repository into a story model.
@@ -25,9 +18,14 @@ const SCENE_STATUSES: readonly SceneStatus[] = ["idea", "outlined", "drafted", "
  */
 export async function loadNovel(source: FileSource): Promise<Novel> {
   const diagnostics: Diagnostic[] = [];
+  // Format v2 has no `kind`: every book in it is a novel.
+  const bookKind = kindByKey(V2_KIND);
+  const { content, codex, notes: notesFolder, events: eventsFolder } = bookKind.folders;
+  const order = `${content}/_order.yaml`;
   const novel: Novel = {
+    kind: bookKind,
     config: undefined,
-    entityTypes: [...BUILTIN_ENTITY_TYPES],
+    entityTypes: [...bookKind.entityTypes],
     relationshipTypes: [],
     topLevel: undefined,
     parts: [],
@@ -51,7 +49,7 @@ export async function loadNovel(source: FileSource): Promise<Novel> {
     const parsed = parseYaml(text, path);
     diagnostics.push(...parsed.diagnostics);
     if (parsed.diagnostics.length) return undefined;
-    diagnostics.push(...checkSchema(kind, parsed.data, path));
+    diagnostics.push(...checkSchema(kind, parsed.data, path, bookKind));
     return isObject(parsed.data) ? parsed.data : {};
   }
 
@@ -59,7 +57,7 @@ export async function loadNovel(source: FileSource): Promise<Novel> {
     const parsed = parseMarkdown((await source.read(path)) ?? "", path);
     diagnostics.push(...parsed.diagnostics);
     if (parsed.diagnostics.length) return undefined;
-    diagnostics.push(...checkSchema(kind, parsed.data, path));
+    diagnostics.push(...checkSchema(kind, parsed.data, path, bookKind));
     return { data: isObject(parsed.data) ? parsed.data : {}, body: parsed.body, bodyLine: parsed.bodyLine };
   }
 
@@ -78,7 +76,7 @@ export async function loadNovel(source: FileSource): Promise<Novel> {
       return novel;
     }
     novel.config = config as unknown as NovelFile;
-    novel.entityTypes = entityTypes(config["entity_types"], diagnostics);
+    novel.entityTypes = entityTypes(config["entity_types"], diagnostics, bookKind);
     novel.relationshipTypes = objList(config["relationship_types"]).filter((t) => str(t["key"])) as unknown as RelationshipTypeFile[];
   }
 
@@ -103,17 +101,17 @@ export async function loadNovel(source: FileSource): Promise<Novel> {
   return novel;
 
   async function loadManuscript() {
-    const order = await yamlFile("manuscript/_order.yaml", "manuscript-order");
-    if (order === undefined && (await source.read("manuscript/_order.yaml")) === undefined) {
-      diagnostics.push(error("E_MISSING_FILE", "manuscript/_order.yaml", "manuscript/_order.yaml is missing"));
+    const orderData = await yamlFile(order, "manuscript-order");
+    if (orderData === undefined && (await source.read(order)) === undefined) {
+      diagnostics.push(error("E_MISSING_FILE", order, `${order} is missing`));
     }
-    const topLevel = order && "parts" in order ? "parts" : order && "chapters" in order ? "chapters" : undefined;
+    const topLevel = orderData && "parts" in orderData ? "parts" : orderData && "chapters" in orderData ? "chapters" : undefined;
     novel.topLevel = topLevel;
 
     const discoveredParts: Part[] = [];
     const discoveredChapters: Chapter[] = [];
-    for (const entry of await source.list("manuscript")) {
-      const path = joinPath("manuscript", entry.name);
+    for (const entry of await source.list(content)) {
+      const path = joinPath(content, entry.name);
       if (!entry.dir) {
         if (entry.name.endsWith(".md")) diagnostics.push(error("E_MISPLACED", path, "Scene files must be inside a chapter folder"));
         continue;
@@ -137,13 +135,13 @@ export async function loadNovel(source: FileSource): Promise<Novel> {
     }
 
     // Reading order.
-    const orderList = topLevel ? strList(order?.[topLevel]) : [];
+    const orderList = topLevel ? strList(orderData?.[topLevel]) : [];
     if (topLevel === "parts") {
-      novel.parts = resolveOrder(orderList, discoveredParts, "manuscript/_order.yaml", "/parts", "part");
+      novel.parts = resolveOrder(orderList, discoveredParts, order, "/parts", "part");
       novel.chapters = novel.parts.flatMap((p) =>
         resolveOrder(p.chapterIds, novel.allChapters.filter((c) => c.partId === p.id), p.file, "/chapters", "chapter"));
     } else if (topLevel === "chapters") {
-      novel.chapters = resolveOrder(orderList, discoveredChapters, "manuscript/_order.yaml", "/chapters", "chapter");
+      novel.chapters = resolveOrder(orderList, discoveredChapters, order, "/chapters", "chapter");
     }
     // Chapters inside parts that are not themselves ordered still need their scenes checked.
     for (const p of novel.allParts) {
@@ -216,7 +214,7 @@ export async function loadNovel(source: FileSource): Promise<Novel> {
       id: str(d["id"])!,
       title: str(d["title"]) ?? "",
       synopsis: str(d["synopsis"]),
-      status: SCENE_STATUSES.includes(status as SceneStatus) ? (status as SceneStatus) : "idea",
+      status: bookKind.statuses.some((s) => s.key === status) ? (status as SceneStatus) : bookKind.statuses[0]!.key,
       pov: str(d["pov"]),
       characters: strList(d["characters"]),
       locations: strList(d["locations"]),
@@ -244,27 +242,28 @@ export async function loadNovel(source: FileSource): Promise<Novel> {
   }
 
   async function loadBible() {
-    for (const entry of await source.list("bible")) {
-      const path = joinPath("bible", entry.name);
+    for (const entry of await source.list(codex)) {
+      const path = joinPath(codex, entry.name);
       if (!entry.dir) continue;
-      if (entry.name === EVENTS_FOLDER) {
+      if (entry.name === eventsFolder) {
         for (const f of await source.list(path)) if (!f.dir && f.name.endsWith(".md")) await loadEvent(joinPath(path, f.name));
         continue;
       }
       const type = novel.entityTypes.find((t) => t.folder === entry.name);
       const files = (await source.list(path)).filter((f) => !f.dir && f.name.endsWith(".md"));
       if (!type) {
-        if (files.length) diagnostics.push(error("E_UNKNOWN_FOLDER", path, `bible/${entry.name} is not the folder of any entity type`));
+        if (files.length) diagnostics.push(error("E_UNKNOWN_FOLDER", path, `${codex}/${entry.name} is not the folder of any entity type`));
         continue;
       }
       for (const f of files) await loadEntity(joinPath(path, f.name), type.key);
     }
 
-    const rels = await yamlFile("bible/relationships.yaml", "relationships");
+    const relationshipsFile = `${codex}/relationships.yaml`;
+    const rels = await yamlFile(relationshipsFile, "relationships");
     objList(rels?.["relationships"]).forEach((r, index) => {
       const id = str(r["id"]), from = str(r["from"]), to = str(r["to"]), type = str(r["type"]);
       if (!id || !from || !to || !type) return;
-      const rel: Relationship = { id, from, to, type, file: "bible/relationships.yaml", index };
+      const rel: Relationship = { id, from, to, type, file: relationshipsFile, index };
       const since = str(r["since"]), until = str(r["until"]), note = str(r["note"]);
       if (since) rel.since = since;
       if (until) rel.until = until;
@@ -272,7 +271,8 @@ export async function loadNovel(source: FileSource): Promise<Novel> {
       novel.relationships.push(rel);
     });
 
-    const events = await yamlFile("bible/events.yaml", "events");
+    const eventsYaml = `${codex}/events.yaml`;
+    const events = await yamlFile(eventsYaml, "events");
     objList(events?.["events"]).forEach((e, index) => {
       const id = str(e["id"]);
       if (!id) return;
@@ -286,7 +286,7 @@ export async function loadNovel(source: FileSource): Promise<Novel> {
         plotlines: strList(e["plotlines"]),
         body: str(e["note"]) ?? "",
         bodyLine: 0,
-        file: "bible/events.yaml",
+        file: eventsYaml,
         index,
       };
       novel.events.push(ev);
@@ -317,9 +317,9 @@ export async function loadNovel(source: FileSource): Promise<Novel> {
 
   /** The writer's notes (D12): notes/*.md. */
   async function loadNotes() {
-    for (const f of await source.list(NOTES_FOLDER)) {
+    for (const f of await source.list(notesFolder)) {
       if (f.dir || !f.name.endsWith(".md")) continue;
-      const file = joinPath(NOTES_FOLDER, f.name);
+      const file = joinPath(notesFolder, f.name);
       const md = await markdownFile(file, "note");
       if (!md || !str(md.data["id"])) continue;
       const d = md.data;
@@ -396,15 +396,16 @@ export async function loadNovel(source: FileSource): Promise<Novel> {
   }
 }
 
-function entityTypes(raw: unknown, diagnostics: Diagnostic[]): EntityTypeDef[] {
-  const types = [...BUILTIN_ENTITY_TYPES];
+function entityTypes(raw: unknown, diagnostics: Diagnostic[], kind: BookKind): EntityTypeDef[] {
+  const types = [...kind.entityTypes];
+  const reserved = reservedPrefixes(kind);
   objList(raw).forEach((t, i) => {
     const key = str(t["key"]), prefix = str(t["prefix"]), folder = str(t["folder"]);
     if (!key || !prefix || !folder) return;
     const clash =
       types.find((x) => x.key === key) ? `key "${key}"` :
-      RESERVED_PREFIXES.has(prefix) || types.find((x) => x.prefix === prefix) ? `prefix "${prefix}"` :
-      folder === EVENTS_FOLDER || types.find((x) => x.folder === folder) ? `folder "${folder}"` : undefined;
+      reserved.has(prefix) || types.find((x) => x.prefix === prefix) ? `prefix "${prefix}"` :
+      folder === kind.folders.events || types.find((x) => x.folder === folder) ? `folder "${folder}"` : undefined;
     if (clash) {
       diagnostics.push({ ...error("E_ENTITY_TYPE", "novel.yaml", `Entity type ${clash} is reserved or already used`), pointer: `/entity_types/${i}` });
       return;

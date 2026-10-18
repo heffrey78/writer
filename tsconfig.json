@@ -16,5 +16,5 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["packages/core/src", "packages/core/test", "packages/cli/src", "packages/cli/test", "packages/server/src", "packages/server/test", "packages/client/src", "packages/client/test", "packages/export/src", "packages/export/test", "scripts", "vitest.config.ts"]
+  "include": ["packages/core/src", "packages/core/test", "packages/cli/src", "packages/cli/test", "packages/server/src", "packages/server/test", "packages/client/src", "packages/client/test", "packages/export/src", "packages/export/test", "packages/kinds/src", "packages/kinds/test", "scripts", "vitest.config.ts", "vitest.setup.ts"]
 }

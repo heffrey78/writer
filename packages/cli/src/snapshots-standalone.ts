@@ -1,7 +1,10 @@
 // Entry point for the single-file snapshot writer vendored into novel repositories as
 // .github/gh-writer/snapshots.mjs. Usage: node snapshots.mjs [dir] [--check]
 import { parseArgs } from "node:util";
+import { registerKinds } from "@writer/kinds";
 import { runSnapshots } from "./snapshots-command.ts";
+
+registerKinds(); // The kinds of book the app ships (D14).
 
 const { values, positionals } = parseArgs({
   args: process.argv.slice(2),

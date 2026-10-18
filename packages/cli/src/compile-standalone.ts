@@ -2,8 +2,11 @@
 // .github/gh-writer/compile.mjs, with its type in .github/gh-writer/fonts/.
 // Usage: node compile.mjs [dir] [--format docx,epub,pdf] [--preset <name>] [--from <chapter>] [--to <chapter>] [--out <dir>]
 import { parseArgs } from "node:util";
+import { registerKinds } from "@writer/kinds";
 import { readFonts } from "@writer/export";
 import { runCompile } from "./compile-command.ts";
+
+registerKinds(); // The kinds of book the app ships (D14).
 
 const { values, positionals } = parseArgs({
   args: process.argv.slice(2),

@@ -52,7 +52,7 @@ export function IssuePage({ novelId, novel, workspace, number }: { novelId: stri
   if (!data) return <p className="px-6 py-6 text-muted">Loading the issue…</p>;
 
   const labels = labelChoices(meta, novel);
-  const kind = kindIn(data.labels);
+  const kind = kindIn(data.labels, novel.kind.issueKinds);
   const submitComment = async () => {
     if (!comment.trim() || changes.busy) return;
     if (await changes.comment(data.number, comment)) {
@@ -165,8 +165,8 @@ export function IssuePage({ novelId, novel, workspace, number }: { novelId: stri
             id={ids.kind}
             value={kind}
             onChange={async (k) => {
-              if (k) await ensureKind(novelId, k);
-              void changes.update(data.number, { labels: withKind(data.labels, k) });
+              if (k) await ensureKind(novelId, k, novel.kind.issueKinds);
+              void changes.update(data.number, { labels: withKind(data.labels, k, novel.kind.issueKinds) });
             }}
           />
         </div>
@@ -174,7 +174,7 @@ export function IssuePage({ novelId, novel, workspace, number }: { novelId: stri
           label="Labels"
           chosen={data.labels.filter((l) => !l.startsWith("kind/"))}
           labels={labels}
-          onChange={(next) => void changes.update(data.number, { labels: withKind(next, kind) })}
+          onChange={(next) => void changes.update(data.number, { labels: withKind(next, kind, novel.kind.issueKinds) })}
         />
         <div className="grid gap-1.5">
           <label htmlFor={ids.milestone} className="font-medium">

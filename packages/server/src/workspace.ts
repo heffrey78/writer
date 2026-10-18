@@ -1,6 +1,6 @@
 import { readdir, readFile, unlink } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
-import { loadNovel, parseYaml, picturePath, pictures, SCHEMA_VERSION, slugify, uniqueFileName, type FileSource, type Novel } from "@writer/core";
+import { kindByKey, loadNovel, parseYaml, picturePath, pictures, SCHEMA_VERSION, slugify, uniqueFileName, V2_KIND, type BookKind, type FileSource, type Novel } from "@writer/core";
 import { nodeSource } from "@writer/core/node";
 import { watch, type FSWatcher } from "chokidar";
 import { BibleOperations } from "./bible.ts";
@@ -106,7 +106,7 @@ export class NovelWorkspace {
     });
     this.bible = new BibleOperations(root, (fn) => this.exclusive(fn));
     this.manuscript = new ManuscriptOperations(root, (fn) => this.exclusive(fn));
-    this.issues = github ? new IssueStore(root, github, () => this.githubRepo(), async () => (await this.loadModel()).novel) : undefined;
+    this.issues = github ? new IssueStore(root, github, () => this.githubRepo(), async () => (await this.loadModel()).novel, () => this.kind) : undefined;
     this.board = github
       ? new BoardStore(root, github, () => this.githubRepo(), {
           novel: async () => (await this.loadModel()).novel,
@@ -184,6 +184,11 @@ export class NovelWorkspace {
    * The story model, with the hash of every file it was read from (the bases for writes), and a
    * version of each picture it shows from images/ (its size and time), so a replaced one is fetched anew.
    */
+  /** The book's kind, without reading the book. Format v2 has no `kind`: every book in it is a novel. */
+  get kind(): BookKind {
+    return kindByKey(V2_KIND);
+  }
+
   async loadModel(): Promise<{ novel: Novel; files: Record<string, string>; images: Record<string, string> }> {
     const files: Record<string, string> = {};
     const disk = nodeSource(this.root);

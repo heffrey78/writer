@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { entityLabel, entityOfLabel, ISSUE_KINDS, kindLabel, kindOf, passageIssueBody, type Novel } from "@writer/core";
+import { entityLabel, entityOfLabel, issueKindOf, kindByKey, passageIssueBody, V2_KIND, type BookKind, type Novel } from "@writer/core";
 import { git } from "./git.ts";
 import { GitHubError, unreachable, type GitHub, type GitHubRepo } from "./github.ts";
 
@@ -169,13 +169,19 @@ export class IssueStore {
   #saving: Promise<void> = Promise.resolve();
 
   #novel: (() => Promise<Novel>) | undefined;
+  #kind: () => BookKind;
 
-  /** `novel`: the story model, for the labels of kinds and bible entries (made, renamed to follow their entries). */
-  constructor(root: string, github: GitHub, repo: () => Promise<GitHubRepo | null>, novel?: () => Promise<Novel>) {
+  /**
+   * `novel`: the story model, for the labels of bible entries (made, renamed to follow their entries).
+   * `kind`: the book's kind, for its issue kinds' labels, without reading the whole book (format v2's,
+   * a novel, by default).
+   */
+  constructor(root: string, github: GitHub, repo: () => Promise<GitHubRepo | null>, novel?: () => Promise<Novel>, kind: () => BookKind = () => kindByKey(V2_KIND)) {
     this.root = root;
     this.#github = github;
     this.#repo = repo;
     this.#novel = novel;
+    this.#kind = kind;
   }
 
   /** Hear when the cached issues change. Returns a function that stops it. */
@@ -316,7 +322,7 @@ export class IssueStore {
 
   /** What a label of Writer's should be: a kind's, or a bible entry's (by its current name). */
   async #known(name: string): Promise<Label | undefined> {
-    const kind = kindOf(name);
+    const kind = issueKindOf(this.#kind().issueKinds, name);
     if (kind) return { name, color: kind.color, description: kind.description };
     if (!this.#novel || !name.includes("/")) return undefined;
     const novel = await this.#novel().catch(() => undefined);
@@ -343,7 +349,7 @@ export class IssueStore {
     const novel = this.#novel ? await this.#novel().catch(() => undefined) : undefined;
     let changed = false;
     for (const label of [...cache.labels]) {
-      const kind = kindOf(label.name);
+      const kind = issueKindOf(this.#kind().issueKinds, label.name);
       const entity = !kind && novel ? entityOfLabel(novel, label) : undefined;
       const want = kind ? { name: label.name, color: kind.color, description: kind.description } : entity && novel ? entityLabel(novel, entity) : undefined;
       if (!want || (want.name === label.name && want.color === label.color && want.description === label.description)) continue;

@@ -1,6 +1,7 @@
 /*
  * What a novel's issues are about (heffrey78/gh-writer#8, heffrey78/gh-writer#9): writing kinds rather than GitHub's software labels. A
- * kind is the label kind/<key> on GitHub, with its own colour.
+ * kind is the label kind/<key> on GitHub, with its own colour. Which kinds there are is the book's
+ * kind's to say (BookKind.issueKinds).
  */
 
 export interface IssueKind {
@@ -12,20 +13,12 @@ export interface IssueKind {
   description: string;
 }
 
-export const ISSUE_KINDS: readonly IssueKind[] = [
-  { key: "plot-hole", label: "Plot hole", color: "d73a4a", description: "Something in the story that can't happen" },
-  { key: "continuity", label: "Continuity", color: "fbca04", description: "Facts that don't agree" },
-  { key: "research", label: "Research", color: "0075ca", description: "Something to look up" },
-  { key: "idea", label: "Idea", color: "a2eeef", description: "Something to try" },
-  { key: "revision", label: "Revision", color: "7057ff", description: "Something to rewrite" },
-];
-
 /** The label on GitHub for a kind. */
 export const kindLabel = (kind: IssueKind) => `kind/${kind.key}`;
 
-/** The kind a label stands for, if it's a kind's. */
-export function kindOf(label: string): IssueKind | undefined {
-  return label.startsWith("kind/") ? ISSUE_KINDS.find((k) => kindLabel(k) === label) : undefined;
+/** The kind a label stands for, of those a book's kind has (BookKind.issueKinds), if it's a kind's. */
+export function issueKindOf(kinds: readonly IssueKind[], label: string): IssueKind | undefined {
+  return label.startsWith("kind/") ? kinds.find((k) => kindLabel(k) === label) : undefined;
 }
 
 /** The labels GitHub gives every new repository: for software, not novels. */

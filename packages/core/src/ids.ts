@@ -1,14 +1,12 @@
+import type { BookKind } from "./kinds.ts";
+
 /** Lowercase Crockford base32: digits and letters without i, l, o, u. */
 export const ID_ALPHABET = "0123456789abcdefghjkmnpqrstvwxyz";
 export const ID_LENGTH = 6;
 export const ID_PATTERN = /^([a-z]{2,8})_([0-9a-hjkmnp-tv-z]{6})$/;
 
-/** Prefixes for records that are not bible entities. */
-export const STRUCTURE_PREFIXES = {
-  novel: "nv",
-  part: "pt",
-  chapter: "ch",
-  scene: "sc",
+/** Prefixes of the records every kind of book has; the book's own, its sections' and pieces' are its kind's. */
+export const RECORD_PREFIXES = {
   relationship: "rel",
   event: "evt",
   note: "note",
@@ -23,18 +21,16 @@ export interface EntityTypeDef {
   builtin: boolean;
 }
 
-export const BUILTIN_ENTITY_TYPES: readonly EntityTypeDef[] = [
-  { key: "character", prefix: "char", folder: "characters", label: "Character", color: "1f77b4", builtin: true },
-  { key: "location", prefix: "loc", folder: "locations", label: "Location", color: "2ca02c", builtin: true },
-  { key: "plotline", prefix: "plot", folder: "plotlines", label: "Plotline", color: "d62728", builtin: true },
-  { key: "theme", prefix: "theme", folder: "themes", label: "Theme", color: "9467bd", builtin: true },
-];
-
-/** Prefixes custom entity types may not use. */
-export const RESERVED_PREFIXES: ReadonlySet<string> = new Set([
-  ...Object.values(STRUCTURE_PREFIXES),
-  ...BUILTIN_ENTITY_TYPES.map((t) => t.prefix),
-]);
+/** Prefixes a book's own entry types may not use: its kind's and every kind's records'. */
+export function reservedPrefixes(kind: BookKind): ReadonlySet<string> {
+  return new Set([
+    kind.prefix,
+    ...kind.levels.map((l) => l.prefix),
+    kind.piece.prefix,
+    ...Object.values(RECORD_PREFIXES),
+    ...kind.entityTypes.map((t) => t.prefix),
+  ]);
+}
 
 export function isId(value: unknown): value is string {
   return typeof value === "string" && ID_PATTERN.test(value);

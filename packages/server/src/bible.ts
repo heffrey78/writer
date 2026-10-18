@@ -5,16 +5,15 @@ import {
   editFrontMatter,
   editYaml,
   eventFile,
-  EVENTS_FOLDER,
   mentions,
-  NOTES_FOLDER,
   proseText,
   indexById,
   loadNovel,
   nextSeriesSlot,
   SERIES,
   ID_PATTERN,
-  RESERVED_PREFIXES,
+  RECORD_PREFIXES,
+  reservedPrefixes,
   slugify,
   uniqueFileName,
   uniqueId,
@@ -260,7 +259,7 @@ export class BibleOperations {
   createRelationship(fields: RelationshipFields & { from: string; to: string; type: string }): Promise<OperationResult & { id: string }> {
     return this.#run(async (novel) => {
       this.#checkRelationship(novel, fields);
-      const id = uniqueId("rel", new Set(indexById(novel).keys()));
+      const id = uniqueId(RECORD_PREFIXES.relationship, new Set(indexById(novel).keys()));
       const record = { id, ...clean(fields) };
       const content = await this.#appendRelationship(record);
       const result = await transaction(this.root, [{ path: RELATIONSHIPS, content }], `Bible: ${this.#describe(novel, fields)}`);
@@ -300,7 +299,7 @@ export class BibleOperations {
         note: changes.note === undefined ? relationship.note : changes.note,
       });
       this.#checkRelationship(novel, next as RelationshipFields);
-      const newId = uniqueId("rel", new Set(indexById(novel).keys()));
+      const newId = uniqueId(RECORD_PREFIXES.relationship, new Set(indexById(novel).keys()));
       const ended = editYaml(await this.#read(RELATIONSHIPS), [{ path: ["relationships", index, "until"], value: at }]);
       const content = await this.#appendRelationship({ id: newId, ...next }, ended);
       const scene = novel.allScenes.find((s) => s.id === at)!;
@@ -336,7 +335,7 @@ export class BibleOperations {
     return this.#eventChange(migrate, async (novel) => {
       const title = required(fields.title, "title");
       this.#checkEvent(novel, fields);
-      const id = uniqueId("evt", new Set(indexById(novel).keys()));
+      const id = uniqueId(RECORD_PREFIXES.event, new Set(indexById(novel).keys()));
       const { note, ...front } = clean({ ...fields, title });
       const file = this.#eventFileName(novel, title);
       return { writes: [{ path: file, content: eventFile({ id, ...front }, note), base: null }], message: `Bible: add event “${title}”`, extra: { id, file } };
@@ -410,7 +409,7 @@ export class BibleOperations {
   createNote(fields: NoteFields): Promise<OperationResult & { id: string; file: string }> {
     return this.#run(async (novel) => {
       const title = required(fields.title, "title");
-      const id = uniqueId("note", new Set(indexById(novel).keys()));
+      const id = uniqueId(RECORD_PREFIXES.note, new Set(indexById(novel).keys()));
       const file = this.#noteFileName(novel, title);
       const front = editYaml("", [
         { path: ["id"], value: id },
@@ -504,7 +503,7 @@ export class BibleOperations {
     if (to.to === "event") {
       return this.#eventChange(migrate, async (novel, read) => {
         const note = this.#findNote(novel, id);
-        const made = uniqueId("evt", new Set(indexById(novel).keys()));
+        const made = uniqueId(RECORD_PREFIXES.event, new Set(indexById(novel).keys()));
         const file = this.#eventFileName(novel, note.title);
         const writes = [{ path: file, content: eventFile({ id: made, title: note.title }, note.body), base: null }, await noteWrite(novel, read, made)];
         return { writes, message: `Notes: promote “${note.title}” to an off-page event${keep ? "" : ", removing the note"}`, extra: { id: made, file } };
@@ -568,13 +567,14 @@ export class BibleOperations {
 
   /** notes/<slug>.md for a title, unused by any other note (`own` is the note's file now, free to keep). */
   #noteFileName(novel: Novel, title: string, own?: string): string {
-    const taken = new Set(novel.notes.filter((n) => n.file !== own).map((n) => n.file.slice(NOTES_FOLDER.length + 1)));
-    return `${NOTES_FOLDER}/${uniqueFileName(slugify(title), ".md", taken)}`;
+    const folder = novel.kind.folders.notes;
+    const taken = new Set(novel.notes.filter((n) => n.file !== own).map((n) => n.file.slice(folder.length + 1)));
+    return `${folder}/${uniqueFileName(slugify(title), ".md", taken)}`;
   }
 
   /** bible/events/<slug>.md for a title, unused by any other event (`own` is the event's file now, free to keep). */
   #eventFileName(novel: Novel, title: string, own?: string): string {
-    const folder = `bible/${EVENTS_FOLDER}`;
+    const folder = `${novel.kind.folders.codex}/${novel.kind.folders.events}`;
     const taken = new Set(novel.events.filter((e) => e.file !== own && e.file.startsWith(`${folder}/`)).map((e) => e.file.slice(folder.length + 1)));
     return `${folder}/${uniqueFileName(slugify(title), ".md", taken)}`;
   }
@@ -618,7 +618,7 @@ export class BibleOperations {
       if (!/^[a-z][a-z0-9_-]*$/.test(key)) throw new OperationError("BAD_REQUEST", "A type's key is lowercase letters, digits, - or _.");
       if (!/^[a-z]{2,8}$/.test(fields.prefix)) throw new OperationError("BAD_REQUEST", "A prefix is 2 to 8 lowercase letters.");
       if (novel.entityTypes.some((t) => t.key === key)) throw new OperationError("BAD_REQUEST", `There's already a type “${key}”.`);
-      if (RESERVED_PREFIXES.has(fields.prefix) || novel.entityTypes.some((t) => t.prefix === fields.prefix)) {
+      if (reservedPrefixes(novel.kind).has(fields.prefix) || novel.entityTypes.some((t) => t.prefix === fields.prefix)) {
         throw new OperationError("BAD_REQUEST", `The prefix “${fields.prefix}” is taken.`);
       }
       const folder = fields.folder ?? `${key}s`;

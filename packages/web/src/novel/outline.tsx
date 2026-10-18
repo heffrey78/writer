@@ -1,4 +1,4 @@
-import { countWords, type Novel, type Scene, type SceneStatus } from "@writer/core";
+import { countWords, type Novel, type Scene } from "@writer/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { GripVertical } from "lucide-react";
 import { Fragment, useEffect, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
@@ -8,9 +8,9 @@ import { cn } from "../ui/cn.ts";
 import { chapterTitle } from "./navigation.tsx";
 import { useNotice } from "./notice.tsx";
 import { dropMove, useStructure } from "./structure.ts";
+import { useBookKind } from "./kind.ts";
 import type { Workspace } from "./workspace.ts";
 
-export const STATUSES: SceneStatus[] = ["idea", "outlined", "drafted", "revised", "final"];
 const number = new Intl.NumberFormat();
 
 /**
@@ -192,9 +192,10 @@ export function useSceneEdit(novelId: string, workspace: Workspace) {
 
 /** A scene's status, chosen in place. */
 export function StatusSelect({ scene, onChange }: { scene: Scene; onChange: (status: string) => void }) {
+  const { statuses } = useBookKind();
   return (
     <select aria-label={`Status of “${scene.title}”`} value={scene.status} onChange={(e) => onChange(e.target.value)} className="h-8 w-full rounded-md border border-rule bg-raised px-1.5">
-      {STATUSES.map((s) => (
+      {statuses.map(({ key: s }) => (
         <option key={s} value={s}>
           {s}
         </option>

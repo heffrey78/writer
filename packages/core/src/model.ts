@@ -1,4 +1,5 @@
 import type { EntityTypeDef } from "./ids.ts";
+import type { BookKind } from "./kinds.ts";
 import type {
   CompileFile,
   Diagnostic,
@@ -12,6 +13,8 @@ import type {
 
 /** A novel loaded into memory. Collections are in reading order where that applies. */
 export interface Novel {
+  /** What kind of book it is: data, so it travels with the model to the browser. */
+  kind: BookKind;
   config: NovelFile | undefined;
   entityTypes: EntityTypeDef[];
   relationshipTypes: RelationshipTypeFile[];

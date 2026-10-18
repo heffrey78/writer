@@ -1,7 +1,8 @@
 // File shapes of the v1 novel repository format, mirroring packages/core/schemas.
 // Keep these in sync with the JSON Schemas; test/schemas.test.ts checks the examples.
 
-export type SceneStatus = "idea" | "outlined" | "drafted" | "revised" | "final";
+/** One of the book's kind's statuses (BookKind.statuses): a novel's are idea, outlined, drafted, revised and final. */
+export type SceneStatus = string;
 
 export type StoryTime = { at: string } | { day: number; time?: string };
 

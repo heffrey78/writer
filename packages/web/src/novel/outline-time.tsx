@@ -6,7 +6,7 @@ import { Button } from "../ui/button.tsx";
 import { cn } from "../ui/cn.ts";
 import { FilterSelect, STATUS_TONE } from "./corkboard.tsx";
 import { shows, type CorkboardFilter } from "./corkboard-order.ts";
-import { STATUSES, StatusSelect, Synopsis, useSceneEdit } from "./outline.tsx";
+import { StatusSelect, Synopsis, useSceneEdit } from "./outline.tsx";
 import type { Workspace } from "./workspace.ts";
 
 /*
@@ -144,7 +144,7 @@ export function OutlineTimeCards({ novelId, novel }: { novelId: string; novel: N
         <FilterSelect label="Point of view" value={filter.pov} onChange={(v) => setFilter("pov", v)} options={characters.map((c) => [c.id, c.name])} />
         <FilterSelect label="Character" value={filter.character} onChange={(v) => setFilter("character", v)} options={characters.map((c) => [c.id, c.name])} />
         <FilterSelect label="Plotline" value={filter.plotline} onChange={(v) => setFilter("plotline", v)} options={plotlines.map((p) => [p.id, p.name])} />
-        <FilterSelect label="Status" value={filter.status} onChange={(v) => setFilter("status", v)} options={STATUSES.map((s) => [s, s])} />
+        <FilterSelect label="Status" value={filter.status} onChange={(v) => setFilter("status", v)} options={novel.kind.statuses.map((s) => [s.key, s.key])} />
         {filtered && (
           <Button size="sm" onClick={() => setParams({ order: "time" }, { replace: true })}>
             Clear filters
