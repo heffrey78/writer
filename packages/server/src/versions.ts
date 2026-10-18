@@ -10,7 +10,7 @@ import { commitSource } from "./git-source.ts";
 import { git, gitPlumbing } from "./git.ts";
 
 /*
- * Alternate versions of a novel (#17, D7): a different ending, a cut subplot, written alongside the
+ * Alternate versions of a novel (heffrey78/gh-writer#17, D7): a different ending, a cut subplot, written alongside the
  * main version. Each is a git branch version/<slug> in the novel's clone, its name kept as the
  * branch's description; the main version is the branch the novel lives on. Only one is open at a
  * time: switching checks the other out, and the app sees the files change as it would after a sync.

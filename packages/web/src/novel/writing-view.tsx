@@ -126,7 +126,7 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
 
   // Pictures in the text load from the server's images route.
   const pictureUrl = useCallback((path: string) => imageUrl(novelId, path), [novelId]);
-  // A picture to add (dropped, pasted or from the palette) or change (Enter or a double-click on it): asked about in a dialog (#203).
+  // A picture to add (dropped, pasted or from the palette) or change (Enter or a double-click on it): asked about in a dialog (heffrey78/gh-writer#203).
   const [pictureRequest, setPictureRequest] = useState<PictureRequest>();
   const pictures: PictureCallbacks = {
     add: (files, at) => setPictureRequest({ kind: "add", at, ...(files[0] ? { file: files[0] } : {}) }),
@@ -224,7 +224,7 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
     [viewId],
   );
 
-  // Issues about a passage (#9), for a novel on GitHub: from a command, or the selection's context menu.
+  // Issues about a passage (heffrey78/gh-writer#9), for a novel on GitHub: from a command, or the selection's context menu.
   const repo = useGitHubRepo(novelId);
   const raising = useRaise((s) => s.passage !== undefined);
   const issueOpen = useIssuePanel((s) => s.numbers.length > 0);

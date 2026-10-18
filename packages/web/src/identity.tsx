@@ -22,7 +22,7 @@ const ASKED = "ghw:identity-asked";
 
 /**
  * The first time the app opens on a computer where git doesn't know the writer, and they're signed
- * in to GitHub, ask once, with the account's name and noreply address filled in (#186).
+ * in to GitHub, ask once, with the account's name and noreply address filled in (heffrey78/gh-writer#186).
  */
 export function FirstRunIdentity() {
   const identity = useIdentity().data;

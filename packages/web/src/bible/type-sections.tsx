@@ -8,7 +8,7 @@ import { AddButton, PencilButton, ProfileSection, TextEditor, useInPlace } from 
 import { StripHeader, StripRow } from "./strip.tsx";
 
 /*
- * The parts of a profile shaped by its type (#161): who comes to a location and when, a plotline's
+ * The parts of a profile shaped by its type (heffrey78/gh-writer#161): who comes to a location and when, a plotline's
  * beats (and the ones still to write), a theme's strength scene by scene. A character's are its
  * strip and arcs, shared with every type.
  */

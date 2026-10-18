@@ -84,9 +84,9 @@ Failures are classified into stable codes with a message that says what to do; g
 
 ## GitHub connection
 
-The author signs in to GitHub once, in the app (D5, #90). `GitHub` (in `github.ts`) holds the connection; `createServer({ github })` takes one, and by default builds it with `GitHub.fromEnv()`.
+The author signs in to GitHub once, in the app (D5, heffrey78/gh-writer#90). `GitHub` (in `github.ts`) holds the connection; `createServer({ github })` takes one, and by default builds it with `GitHub.fromEnv()`.
 
-- **Device flow**: `POST /api/github/device` asks github.com for a code, with the scopes `repo`, `workflow` (GitHub refuses a push that adds or changes `.github/workflows` without it, and every novel has workflows), `read:user` and `project` (the drafting board). A sign-in without `repo` or `workflow` (an older one, or gh's) is reported in the status as `missingScopes`; one without `project` as `missingBoardScopes`, which only the drafting board asks to reconnect for. Reconnecting grants them. The app shows the code and the address where the author enters it. It then calls `POST /api/github/device/poll` every `interval` seconds, which answers `pending` (with the interval, longer after a `slow_down`), `expired`, `denied`, `none` (no sign-in waiting) or `done` with the status. The device code stays on the server. It uses the Writer OAuth App's public client ID (`GITHUB_CLIENT_ID`, registered by the owner in #100); `WRITER_GITHUB_CLIENT_ID` overrides it. Without a client ID (`clientId: ""`), it fails with `NO_CLIENT_ID`.
+- **Device flow**: `POST /api/github/device` asks github.com for a code, with the scopes `repo`, `workflow` (GitHub refuses a push that adds or changes `.github/workflows` without it, and every novel has workflows), `read:user` and `project` (the drafting board). A sign-in without `repo` or `workflow` (an older one, or gh's) is reported in the status as `missingScopes`; one without `project` as `missingBoardScopes`, which only the drafting board asks to reconnect for. Reconnecting grants them. The app shows the code and the address where the author enters it. It then calls `POST /api/github/device/poll` every `interval` seconds, which answers `pending` (with the interval, longer after a `slow_down`), `expired`, `denied`, `none` (no sign-in waiting) or `done` with the status. The device code stays on the server. It uses the Writer OAuth App's public client ID (`GITHUB_CLIENT_ID`, registered by the owner in heffrey78/gh-writer#100); `WRITER_GITHUB_CLIENT_ID` overrides it. Without a client ID (`clientId: ""`), it fails with `NO_CLIENT_ID`.
 - **gh shortcut**: while signed out, the status names the gh CLI's account (`gh auth token`, checked against `GET /user`) if there is one, and `POST /api/github/gh` signs in with it.
 - **The token** lives in the OS keychain (`keychainStore()`, @napi-rs/keyring: the macOS Keychain, Windows Credential Manager, or a Secret Service keyring on Linux). It is never written to a file and never sent to the browser. If the keychain can't be reached, the status says why (`keychain`) and signing in fails with `NO_KEYCHAIN`; there is no plain-text fallback. `WRITER_TOKEN_STORE=memory` keeps it in memory instead, for tests.
 - **Status**: `GET /api/github/account` returns `{ signedIn, account?: { login, name?, avatarUrl? }, deviceFlow, gh?, expired?, offline?, keychain? }`. Who the author is gets asked once and then remembered. When GitHub refuses the token (401: revoked or expired), it is forgotten and the next status says `expired: true`, once. If GitHub can't be reached, the author stays signed in (`offline: true`).
@@ -270,7 +270,7 @@ The writer's notes ([D12](https://github.com/heffrey78/gh-writer/issues/215)) ar
 
 | Endpoint | Does | Commit |
 |---|---|---|
-| `POST /notes` `{ title, tags?, scenes?, note? }` → `{ id, file }` | Adds a note, dated today, named from its title, on the scenes given (#222) | `Notes: add “…”` |
+| `POST /notes` `{ title, tags?, scenes?, note? }` → `{ id, file }` | Adds a note, dated today, named from its title, on the scenes given (heffrey78/gh-writer#222) | `Notes: add “…”` |
 | `PATCH /notes/:id` `{ changes: { title?, tags?, scenes?, note? }, base? }` → `{ file }` | Edits it (null removes tags or scenes; a scene taken off takes its pin; `note` replaces the prose). A new title moves the file. With `base`, the file must be as it was read (`409 STALE`) | `Notes: edit “…”`, or `Notes: rename “…” to “…”` |
 | `POST /notes/:id/pin` `{ scene, pinned }` | Pins it to the top of a scene's notes (putting it on the scene if it isn't), unpinning the scene's other pinned note in the same commit; or unpins it | `Notes: pin “…” in “…”`, or `Notes: unpin …` |
 | `POST /notes/:id/delete` `{ base? }` | Removes the file | `Notes: remove “…”` |
@@ -294,7 +294,7 @@ Deleting an entry or an event that a note mentions is refused (`409 REFERENCED`)
 | `GET /manuscript/deleted` | `{ deleted }`: scenes, chapters and parts deleted from the manuscript (by any commit), newest first, that aren't back already | |
 | `POST /manuscript/deleted/restore` `{ commit, id }` | Brings one back, from just before `commit` deleted it, after the sibling it followed (if that's still there) | `Manuscript: restore scene “…”` |
 
-IDs never change, so references never break. Order files are edited in place. After each operation, the numbered names of the files and folders involved follow the order. Only the number changes, except for a renamed item, which takes its new slug. So moving a scene to another chapter edits two order files, and every other change is a pure rename (git's similarity 100%). Reading order (core's `novel.scenes`) is the order files' order; that's the order a compiled manuscript (#19) will use.
+IDs never change, so references never break. Order files are edited in place. After each operation, the numbered names of the files and folders involved follow the order. Only the number changes, except for a renamed item, which takes its new slug. So moving a scene to another chapter edits two order files, and every other change is a pure rename (git's similarity 100%). Reading order (core's `novel.scenes`) is the order files' order; that's the order a compiled manuscript (heffrey78/gh-writer#19) will use.
 
 ### Diagrams
 
@@ -306,7 +306,7 @@ Unlike the operations above, a layout is saved like typing: through the workspac
 
 ## Drafting board
 
-The novel's scenes on a GitHub Project (#11, decision [D8](https://github.com/heffrey78/gh-writer/issues/177)), for GitHub's board, table and roadmap views of drafting progress. `BoardStore` (in `board.ts`) keeps it; the scene files stay authoritative.
+The novel's scenes on a GitHub Project (heffrey78/gh-writer#11, decision [D8](https://github.com/heffrey78/gh-writer/issues/177)), for GitHub's board, table and roadmap views of drafting progress. `BoardStore` (in `board.ts`) keeps it; the scene files stay authoritative.
 
 | Endpoint | Returns |
 |---|---|

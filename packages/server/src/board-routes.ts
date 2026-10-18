@@ -3,7 +3,7 @@ import { body, type Env } from "./bible-routes.ts";
 import { BoardError } from "./board.ts";
 
 /*
- * The open novel's drafting board on GitHub (#11, D8):
+ * The open novel's drafting board on GitHub (heffrey78/gh-writer#11, D8):
  *
  * GET  /:id/board                       → the board's status
  * POST /:id/board                       → makes the novel's project on GitHub (or adopts the one it has), syncs it: the status

@@ -64,7 +64,7 @@ export function MentionCard({ novelId, novel }: { novelId: string; novel: Novel 
   const [place, setPlace] = useState<{ left: number; top: number }>();
 
   const entity = card && novel.entities.find((e) => e.id === card.id);
-  // An off-page event (#165): when, who and where, and its note.
+  // An off-page event (heffrey78/gh-writer#165): when, who and where, and its note.
   const event = card && !entity ? novel.events.find((e) => e.id === card.id) : undefined;
   const picture = usePictureUrl(novelId, entity?.image);
 

@@ -10,9 +10,9 @@ import { cn } from "../ui/cn.ts";
 type Sort = "newest" | "title";
 
 /**
- * Every note at a glance (#223), as cards like the Story bible's: title, an excerpt, its tags and its
+ * Every note at a glance (heffrey78/gh-writer#223), as cards like the Story bible's: title, an excerpt, its tags and its
  * scenes (pinned ones marked). Filtered by a tag and by words, sorted newest first or by title; the
- * choices are in the address. A note opens in a modal over it (`over`, #235).
+ * choices are in the address. A note opens in a modal over it (`over`, heffrey78/gh-writer#235).
  */
 export function NotesPage({ novelId, novel, over }: { novelId: string; novel: Novel; over?: ReactNode }) {
   const [params, setParams] = useSearchParams();

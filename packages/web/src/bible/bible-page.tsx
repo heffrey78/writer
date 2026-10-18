@@ -24,9 +24,9 @@ const SORTS: { key: Sort; label: string }[] = [
 const MARK = { carries: "bg-accent", present: "bg-accent/40", mentioned: "bg-accent/15", absent: "bg-rule/60" } as const;
 
 /**
- * The story bible (#162): every entry as a card, grouped by type, with its picture (#168), its summary, a fact or two, a
+ * The story bible (heffrey78/gh-writer#162): every entry as a card, grouped by type, with its picture (heffrey78/gh-writer#168), its summary, a fact or two, a
  * small strip of the scenes it's in and how many; searchable by name or other name and sorted by
- * first appearance, name or most scenes. An entry or an event opens in a modal over it (`over`, #236, #237).
+ * first appearance, name or most scenes. An entry or an event opens in a modal over it (`over`, heffrey78/gh-writer#236, heffrey78/gh-writer#237).
  */
 export function BiblePage({ novelId, novel, over }: { novelId: string; novel: Novel; over?: ReactNode }) {
   const [params, setParams] = useSearchParams();
@@ -198,7 +198,7 @@ function EntryCard({ novelId, entity, presence }: { novelId: string; entity: Ent
 }
 
 /**
- * Off-page events (#223): the story's facts that aren't shown, as a group of cards after the entries,
+ * Off-page events (heffrey78/gh-writer#223): the story's facts that aren't shown, as a group of cards after the entries,
  * found by title or note. Story-time order, but by title for the Name sort.
  */
 function EventCards({ novelId, novel, query, sort }: { novelId: string; novel: Novel; query: string; sort: Sort }) {

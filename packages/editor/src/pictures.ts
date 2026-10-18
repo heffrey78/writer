@@ -3,7 +3,7 @@ import { NodeSelection, Plugin, PluginKey, TextSelection } from "@tiptap/pm/stat
 import { insertBlock } from "./structure.ts";
 
 /*
- * Pictures in the prose (D10, #203): the editor hands image files dropped or pasted in, and a picture
+ * Pictures in the prose (D10, heffrey78/gh-writer#203): the editor hands image files dropped or pasted in, and a picture
  * to change (Enter on it, or a double-click), to the app, which asks for its description and caption
  * and saves its file; then puts it in, or changes it, with these commands. Backspace and Delete remove
  * a selected picture like any other block.

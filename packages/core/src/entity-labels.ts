@@ -2,7 +2,7 @@ import { slugify } from "./edit.ts";
 import type { Entity, Novel } from "./model.ts";
 
 /*
- * Every story bible entry has a GitHub label (#10, D1): <type prefix>/<slug of its name>, such as
+ * Every story bible entry has a GitHub label (heffrey78/gh-writer#10, D1): <type prefix>/<slug of its name>, such as
  * char/ada-varn or loc/the-varn-bridge, in its type's colour. Its description holds the entry's name
  * and ID, so the label finds its entry after a rename (and is renamed to match).
  */

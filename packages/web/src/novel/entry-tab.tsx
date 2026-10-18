@@ -31,7 +31,7 @@ export const useEntryPanel = create<EntryState>((set, get) => ({
   opened: 0,
   focus: false,
   open: (id, options) => {
-    // Nothing holds the tab: whatever is opened shows (#222).
+    // Nothing holds the tab: whatever is opened shows (heffrey78/gh-writer#222).
     const { history, at } = get();
     const current = history[at];
     const opened = get().opened + 1;
@@ -48,9 +48,9 @@ export const useEntryPanel = create<EntryState>((set, get) => ({
 
 
 /**
- * The right sidebar's Entry tab (#155, #163): a story bible entry's profile at the sidebar's size,
+ * The right sidebar's Entry tab (heffrey78/gh-writer#155, heffrey78/gh-writer#163): a story bible entry's profile at the sidebar's size,
  * read first and edited in place as on its page, with its strip and arcs; Back and Forward through
- * the entries opened. Nothing holds it: whatever is opened shows (the pin went with #222).
+ * the entries opened. Nothing holds it: whatever is opened shows (the pin went with heffrey78/gh-writer#222).
  */
 export function EntryTab({
   novelId,
@@ -68,7 +68,7 @@ export function EntryTab({
   const headingId = useId();
   const ref = useRef<HTMLElement>(null);
   const entity = id ? novel.entities.find((e) => e.id === id) : undefined;
-  // An off-page event opens here too (#165). Notes don't: a scene's are on the Notes tab (#222).
+  // An off-page event opens here too (heffrey78/gh-writer#165). Notes don't: a scene's are on the Notes tab (heffrey78/gh-writer#222).
   const event = id && !entity ? novel.events.find((e) => e.id === id) : undefined;
 
   // To the profile as it opens; or, with its name ready to edit, the profile has put the focus there.

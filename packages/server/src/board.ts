@@ -8,7 +8,7 @@ import type { TextFile } from "./files.ts";
 import type { WriteResult } from "./workspace.ts";
 
 /*
- * The drafting board (#11, D8): the main version's scenes mirrored to a GitHub Project, one draft
+ * The drafting board (heffrey78/gh-writer#11, D8): the main version's scenes mirrored to a GitHub Project, one draft
  * item per scene, so drafting progress has GitHub's board, table and roadmap views. The scene files
  * stay authoritative (D1). Only Status flows back from the board, merged three ways against the
  * status last synced from this clone; a status changed on both sides to different values is a

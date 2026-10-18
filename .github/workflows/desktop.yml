@@ -1,6 +1,6 @@
 name: Desktop
 
-# The desktop app's Linux packages (#193): the .deb, built on Ubuntu, and the Arch package made from
+# The desktop app's Linux packages (heffrey78/gh-writer#193): the .deb, built on Ubuntu, and the Arch package made from
 # it; each installed on a clean machine with no git and smoke-tested (scripts/smoke-desktop.ts). A
 # release tag (v1.2.3, or v1.2.3-rc.1 for a pre-release) also drafts a GitHub Release with them and
 # git's source. Publishing the draft is the owner's: the app offers the latest published release.

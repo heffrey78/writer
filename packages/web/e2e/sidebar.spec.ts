@@ -9,7 +9,7 @@ test("the sidebar groups the views, collapses to a strip of icons with Ctrl+\\, 
 
   await expect(sidebar.getByRole("heading", { name: "Write" })).toBeVisible();
   await expect(sidebar.getByRole("tree", { name: "Manuscript" })).toBeVisible();
-  // Write is the manuscript alone (#232): events and notes are in their galleries.
+  // Write is the manuscript alone (heffrey78/gh-writer#232): events and notes are in their galleries.
   await expect(sidebar.getByRole("region", { name: /Off the page|Notes/ })).toHaveCount(0);
   await expect(views.getByRole("group")).toHaveCount(2);
   for (const [group, places] of [

@@ -8,7 +8,7 @@ import { proseSchema } from "./schema.ts";
 import { editorScenes } from "./search.ts";
 
 /*
- * Notes on passages in the margin (#9): each open issue raised about a passage is found in the text
+ * Notes on passages in the margin (heffrey78/gh-writer#9): each open issue raised about a passage is found in the text
  * (resolveAnchor, after whatever editing since) and shown with a marker beside its paragraph. The
  * marker opens it; while hovered or focused, its passage is highlighted.
  */

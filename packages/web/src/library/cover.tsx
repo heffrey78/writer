@@ -57,7 +57,7 @@ function titleSize(title: string): string {
 const SHADOW = "0 1px 0 rgb(0 0 0 / 0.2), 5px 6px 12px -6px rgb(0 0 0 / 0.55)";
 
 /**
- * A book cover: the novel's own (`image`, #168), or one generated from its ID, the title and author
+ * A book cover: the novel's own (`image`, heffrey78/gh-writer#168), or one generated from its ID, the title and author
  * over one of a few designs. A generated cover's patterns are hidden from assistive technology; its
  * text is real text.
  */

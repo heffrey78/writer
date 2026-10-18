@@ -4,7 +4,7 @@ import { Link } from "react-router";
 import { ProfileSection } from "../bible/profile.tsx";
 
 /**
- * The writer's notes that mention an entry or an event (#205), on its profile: each opens its page.
+ * The writer's notes that mention an entry or an event (heffrey78/gh-writer#205), on its profile: each opens its page.
  * Nothing when no note mentions it.
  */
 export function NotesAbout({ novelId, novel, id }: { novelId: string; novel: Novel; id: string }) {

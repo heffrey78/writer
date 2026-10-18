@@ -10,7 +10,7 @@ import { Button } from "../ui/button.tsx";
 import { FORMAT_MOVE, needsFormatMove } from "./format-move.tsx";
 
 /**
- * Write an off-page event as a scene (#165): which chapter it ends, and whether the event is kept
+ * Write an off-page event as a scene (heffrey78/gh-writer#165): which chapter it ends, and whether the event is kept
  * (naming the scene that dramatizes it) or removed. One the prose mentions is kept. The new scene opens.
  */
 export function WriteAsSceneDialog({ novelId, novel, event, open, onOpenChange }: { novelId: string; novel: Novel; event: StoryEvent; open: boolean; onOpenChange: (o: boolean) => void }) {

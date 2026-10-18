@@ -6,7 +6,7 @@ import type { Command } from "@tiptap/pm/state";
 import type { EditorCommand } from "./modes.ts";
 
 /*
- * Headings, lists and tables from the keyboard and the palette (D10, #202). The keys that work as you
+ * Headings, lists and tables from the keyboard and the palette (D10, heffrey78/gh-writer#202). The keys that work as you
  * type (Enter, Tab and Backspace in lists; Tab between cells; # and - at a line's start) are with their
  * nodes in extensions.ts; these are the commands to name them by.
  */

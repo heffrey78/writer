@@ -53,7 +53,7 @@ export function storyInstant(when: StoryTime | undefined, duration: string | und
 }
 
 /**
- * The date Day 1 is when `date` is day `day` (#239): Day 3 on 2026-10-12 makes Day 1 2026-10-10. Day 0
+ * The date Day 1 is when `date` is day `day` (heffrey78/gh-writer#239): Day 3 on 2026-10-12 makes Day 1 2026-10-10. Day 0
  * is the day before Day 1, as everywhere in story time.
  */
 export function dayOneFor(date: string, day: number): string {

@@ -16,7 +16,7 @@ cd "$here"
 # --nodeps: only the binaries are repackaged; pacman checks the dependencies when it installs.
 makepkg --force --cleanbuild --nodeps
 
-# The installer budget (#169): 100 MB.
+# The installer budget (heffrey78/gh-writer#169): 100 MB.
 size=$(stat -c %s "$here/writer-$version-$release-x86_64.pkg.tar.zst")
 if [ "$size" -gt 100000000 ]; then
   echo "The package is $((size / 1000000)) MB, over the 100 MB budget." >&2

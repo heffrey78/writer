@@ -23,7 +23,7 @@ export function readableSpan(ms: number): string {
 }
 
 /**
- * What the rest of the book says about a scene, worked out from the model (#154): where it stands
+ * What the rest of the book says about a scene, worked out from the model (heffrey78/gh-writer#154): where it stands
  * in the book, how it sits in story time against the scene before, who appears for the first time
  * or comes back after a long absence, the plotlines that begin or end in it, and the relationships
  * that start or end there. Only what holds and is worth saying; nothing for a scene that isn't in
@@ -43,7 +43,7 @@ export function sceneFacts(novel: Novel, sceneId: string): string[] {
   else if (at === 0) facts.push("The book's first scene.");
   else if (at === scenes.length - 1) facts.push("The book's last scene.");
 
-  // Off-page events it was written from, and kept (#165).
+  // Off-page events it was written from, and kept (heffrey78/gh-writer#165).
   for (const e of novel.events) if (e.scene === sceneId) facts.push(`Dramatizes the off-page event “${e.title}”.`);
 
   // Story time, against the latest point the story had reached before it (the scene before, or
@@ -64,7 +64,7 @@ export function sceneFacts(novel: Novel, sceneId: string): string[] {
     }
   }
 
-  // An off-page event right before or after it in story time, with no scene between (#165).
+  // An off-page event right before or after it in story time, with no scene between (heffrey78/gh-writer#165).
   if (here) {
     const items = storyTimeline(novel).items;
     const i = items.findIndex((x) => x.kind === "scene" && x.scene.id === sceneId);

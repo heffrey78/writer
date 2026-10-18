@@ -1,7 +1,7 @@
 import { expect, test, axe, type App } from "./fixtures.ts";
 import type { Page } from "@playwright/test";
 
-/** Back and Forward through the app's pages (#224). */
+/** Back and Forward through the app's pages (heffrey78/gh-writer#224). */
 
 async function openNovel(page: Page, app: App) {
   const dir = app.novelRepo("varn");
@@ -37,7 +37,7 @@ test("Back and Forward by button and by Alt+Left/Right, but not in text", async 
   await expect(page.getByRole("heading", { level: 1, name: "Notes" })).toBeVisible();
   await expect(forward).toBeDisabled();
 
-  // An entry and an event open in modals over the Story bible (#233); the keys walk them too, away from text.
+  // An entry and an event open in modals over the Story bible (heffrey78/gh-writer#233); the keys walk them too, away from text.
   await palette(page, "character: ada");
   await expect(page.getByRole("dialog", { name: "Ada Varn" })).toBeVisible();
   await palette(page, "off the page: the flood");

@@ -3,7 +3,7 @@ import { join } from "node:path";
 import type { Page } from "@playwright/test";
 import { axe, expect, openView, test, type App } from "./fixtures.ts";
 
-/** When Day 1 is (#239): days of the story and dates on one timeline. */
+/** When Day 1 is (heffrey78/gh-writer#239): days of the story and dates on one timeline. */
 
 /** The sample novel with Day 1 undated: its days and its dates can't be placed together. */
 async function openUndated(page: Page, app: App) {
@@ -23,7 +23,7 @@ async function palette(page: Page, query: string) {
   await page.keyboard.press("Enter");
 }
 
-test("the Timeline says when Day 1 is: a date, the day of a dated scene, or none; until then the days are apart (#241)", async ({ page, app }) => {
+test("the Timeline says when Day 1 is: a date, the day of a dated scene, or none; until then the days are apart (heffrey78/gh-writer#241)", async ({ page, app }) => {
   const novel = await openUndated(page, app);
   await openView(page, "Timeline");
   const dayOne = page.getByRole("region", { name: "When Day 1 is" });
@@ -67,7 +67,7 @@ test("the Timeline says when Day 1 is: a date, the day of a dated scene, or none
   await expect.poll(novel.yaml).not.toContain("calendar");
 });
 
-test("a scene moved from a day to a date offers to make that date its day, dating Day 1 (#242)", async ({ page, app }) => {
+test("a scene moved from a day to a date offers to make that date its day, dating Day 1 (heffrey78/gh-writer#242)", async ({ page, app }) => {
   const novel = await openUndated(page, app);
   const tree = page.getByRole("tree", { name: "Manuscript" });
   await tree.getByRole("treeitem", { name: /^The Betrayal,/ }).click();

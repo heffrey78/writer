@@ -196,7 +196,7 @@ main[tabindex="-1"]:focus-visible,
   max-width: none;
 }
 
-/* A scene's note just made (#222): a moment's outline draws the eye to it, unless motion is unwanted. */
+/* A scene's note just made (heffrey78/gh-writer#222): a moment's outline draws the eye to it, unless motion is unwanted. */
 @media (prefers-reduced-motion: no-preference) {
   .ghw-just-made {
     animation: ghw-just-made 900ms ease-out;

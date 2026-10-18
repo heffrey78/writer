@@ -10,8 +10,8 @@ import type { Workspace } from "./workspace.ts";
 import { PAGE } from "../ui/page.ts";
 
 /*
- * The outline (#136): every scene in reading order, as a table, as cards (the corkboard), or on the
- * drafting board by status (#11), switched in place. The choice is in the address (/outline/table,
+ * The outline (heffrey78/gh-writer#136): every scene in reading order, as a table, as cards (the corkboard), or on the
+ * drafting board by status (heffrey78/gh-writer#11), switched in place. The choice is in the address (/outline/table,
  * /outline/cards, /outline/board) and remembered for /outline.
  */
 
@@ -25,7 +25,7 @@ const KEY = "ghw.outlineView";
 
 const isView = (v: string | null | undefined): v is View => VIEWS.some((x) => x.key === v);
 
-/** The table and the cards in reading order, or in story time with the off-page events among the scenes (#165): ?order=time, remembered. */
+/** The table and the cards in reading order, or in story time with the off-page events among the scenes (heffrey78/gh-writer#165): ?order=time, remembered. */
 const ORDERS = [
   { key: "reading", label: "Reading order" },
   { key: "time", label: "Story time" },

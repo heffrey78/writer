@@ -38,7 +38,7 @@ test("the Entry tab: a sheet to read, Back and Forward through names opened, a p
   await ada.getByRole("button", { name: "Next entry" }).click();
   await expect(place).toBeVisible();
 
-  // Nothing holds the tab (#222): a name opened elsewhere replaces what's there, and there's no pin.
+  // Nothing holds the tab (heffrey78/gh-writer#222): a name opened elsewhere replaces what's there, and there's no pin.
   await expect(place.getByRole("button", { name: /^Keep this/ })).toHaveCount(0);
   await sceneTab.click();
   await station.getByRole("button", { name: "Ada Varn" }).first().click();

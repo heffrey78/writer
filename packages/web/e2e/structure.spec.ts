@@ -3,7 +3,7 @@ import { join } from "node:path";
 import type { Page } from "@playwright/test";
 import { axe, caretAtEnd, expect, test } from "./fixtures.ts";
 
-/** Headings, lists and tables from the command palette, saved to the scene's file (D10, #202). The palette runs its command a frame after it closes, so each step waits for the command's work before typing on. */
+/** Headings, lists and tables from the command palette, saved to the scene's file (D10, heffrey78/gh-writer#202). The palette runs its command a frame after it closes, so each step waits for the command's work before typing on. */
 
 const BRIDGE = "manuscript/01-return/01-arrival/02-the-bridge.md";
 

@@ -27,7 +27,7 @@ const refId = (r: Ref) => (typeof r === "string" ? r : r.id);
 
 const PINS = "ghw.pinnedDetails";
 
-/** The details pinned under each scene's title in the text (#153), by row key: remembered in this browser. */
+/** The details pinned under each scene's title in the text (heffrey78/gh-writer#153), by row key: remembered in this browser. */
 export const usePins = create<{ keys: string[]; toggle: (key: string) => void }>((set, get) => ({
   keys: (() => {
     try {
@@ -90,7 +90,7 @@ export function pinnedLine(novel: Novel, fm: Record<string, unknown>, keys: read
 }
 
 /**
- * A scene's planning details as a card on the right sidebar's Scene tab (#150): its title and place
+ * A scene's planning details as a card on the right sidebar's Scene tab (heffrey78/gh-writer#150): its title and place
  * in the chapter, the synopsis as a lead, the status as five steps, then a row for each detail it
  * has (point of view, where, when, plotlines, characters, other entries, themes, tags); the ones it
  * hasn't are behind "Add…". Each row's pencil edits it in place; Escape (or Done) returns to the row.
@@ -602,7 +602,7 @@ export function StoryTimeFields({
   when: { at?: string; day?: number; time?: string } | undefined;
   duration: string;
   edit: (edits: YamlEdit[]) => void;
-  /** The book, for when Day 1 is: a day changed to a date offers to date Day 1 from it (#239). */
+  /** The book, for when Day 1 is: a day changed to a date offers to date Day 1 from it (heffrey78/gh-writer#239). */
   novel?: Novel;
 }) {
   const whenKind = when?.at !== undefined ? "date" : when?.day !== undefined ? "day" : "";
@@ -666,7 +666,7 @@ export function StoryTimeFields({
   );
 }
 
-/** "This was Day 3: make 12 Oct 2026 Day 3, so Day 1 is 10 Oct 2026?" Once, in place (#239). */
+/** "This was Day 3: make 12 Oct 2026 Day 3, so Day 1 is 10 Oct 2026?" Once, in place (heffrey78/gh-writer#239). */
 function DateDayOne({ day, date, onDone }: { day: number; date: string; onDone: () => void }) {
   const { novelId } = useParams<{ novelId: string }>();
   const setDayOne = useSetDayOne(novelId!);

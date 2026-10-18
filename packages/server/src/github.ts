@@ -8,7 +8,7 @@ import type { GitAuth } from "./git.ts";
  */
 
 /**
- * The OAuth App's client ID (#100): public, and shipped in the app. WRITER_GITHUB_CLIENT_ID overrides it.
+ * The OAuth App's client ID (heffrey78/gh-writer#100): public, and shipped in the app. WRITER_GITHUB_CLIENT_ID overrides it.
  * It's still gh-writer's app, so GitHub's sign-in page names gh-writer until Writer registers its own.
  */
 export const GITHUB_CLIENT_ID: string | undefined = "Ov23lidsTX79zar9Gxxv";
@@ -16,7 +16,7 @@ export const GITHUB_CLIENT_ID: string | undefined = "Ov23lidsTX79zar9Gxxv";
 /**
  * Classic OAuth scopes: private repositories (contents, issues, creating them); the novel's GitHub
  * workflows, which GitHub won't let a push add or change without `workflow`; who the author is; and
- * Projects, for the drafting board (#11).
+ * Projects, for the drafting board (heffrey78/gh-writer#11).
  */
 export const SCOPES = ["repo", "workflow", "read:user", "project"];
 /** What a push of a novel needs: a token without them can't publish or sync it. */

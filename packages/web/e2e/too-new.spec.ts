@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { axe, expect, test } from "./fixtures.ts";
 
-/** A novel saved in a newer format than this copy reads is never shown as an empty book to write in (D11, #208). */
+/** A novel saved in a newer format than this copy reads is never shown as an empty book to write in (D11, heffrey78/gh-writer#208). */
 
 test("a novel in a newer format says to update Writer, and nothing in it can be changed", async ({ page, app }) => {
   const dir = app.novelRepo("varn");

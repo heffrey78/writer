@@ -149,7 +149,7 @@ export function NovelPage() {
 
   const navigate = useNavigate();
   latest.current.navigate = (to) => void navigate(to);
-  /** A new note, event or entry, in its modal over its gallery (#233): closed, back to the gallery if it was opened there. */
+  /** A new note, event or entry, in its modal over its gallery (heffrey78/gh-writer#233): closed, back to the gallery if it was opened there. */
   const openNew = (path: string, gallery: string) => void navigate(`/novels/${novelId}/${path}`, { state: { fromGallery: pathname === `/novels/${novelId}/${gallery}` } });
   // New note and New off-page event, asked for from the palette, a gallery or the Timeline.
   useEffect(() => {
@@ -162,7 +162,7 @@ export function NovelPage() {
     useNewEvent.getState().set(false);
     openNew("event/new", "bible");
   }, [newEvent]); // eslint-disable-line react-hooks/exhaustive-deps
-  // GitHub work tracking shows only for a novel on GitHub (#8).
+  // GitHub work tracking shows only for a novel on GitHub (heffrey78/gh-writer#8).
   const repo = useGitHubRepo(novelId);
   const model = novel.data?.novel;
   const conflict = sync.data?.state === "conflict";
@@ -309,7 +309,7 @@ export function NovelPage() {
               <Route path="outline" element={<OutlinePage novelId={novelId} novel={book} workspace={workspace} />} />
               <Route path="outline/:view" element={<OutlinePage novelId={novelId} novel={book} workspace={workspace} />} />
               <Route path="bible" element={<BiblePage novelId={novelId} novel={book} />} />
-              {/* An entry or an event opens over the Story bible, a note over Notes (#233): the gallery stays as it was underneath. */}
+              {/* An entry or an event opens over the Story bible, a note over Notes (heffrey78/gh-writer#233): the gallery stays as it was underneath. */}
               <Route path="bible/:entityId" element={<BiblePage novelId={novelId} novel={book} over={<EntryOver novelId={novelId} novel={book} workspace={workspace} spell={spell} />} />} />
               <Route path="event/:eventId" element={<BiblePage novelId={novelId} novel={book} over={<EventOver novelId={novelId} novel={book} workspace={workspace} spell={spell} />} />} />
               <Route path="note/:noteId" element={<NotesPage novelId={novelId} novel={book} over={<NoteOver novelId={novelId} novel={book} workspace={workspace} spell={spell} />} />} />
@@ -333,7 +333,7 @@ export function NovelPage() {
   );
 }
 
-/** A view's address: an item in its modal is its gallery's view, which stays as it was underneath (#233). */
+/** A view's address: an item in its modal is its gallery's view, which stays as it was underneath (heffrey78/gh-writer#233). */
 const sameView = (pathname: string) => pathname.replace(/\/note\/[^/]+$/, "/notes").replace(/\/(bible|event)\/[^/]+$/, "/bible");
 
 type RouteProps = { novelId: string; novel: Novel; workspace: Workspace; spell: ReturnType<typeof useSpell>; entries?: QuickEntries | undefined };

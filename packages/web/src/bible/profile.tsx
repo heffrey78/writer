@@ -4,7 +4,7 @@ import { Button } from "../ui/button.tsx";
 import { cn } from "../ui/cn.ts";
 
 /*
- * The parts a story bible profile is made of (#148), in the Scene card's design: read first, each
+ * The parts a story bible profile is made of (heffrey78/gh-writer#148), in the Scene card's design: read first, each
  * part edited in place from its pencil, empty parts behind a quiet "+ Add". The full entry page,
  * and in time the Entry tab and the mention card, are built from them.
  */
@@ -85,7 +85,7 @@ export function AddButton({ place, part, children }: { place: InPlace; part: str
 
 /**
  * The parts open for editing under it, each with its save, so that a modal saves them before it closes
- * (#234). A save that fails resolves false, and says why in its part.
+ * (heffrey78/gh-writer#234). A save that fails resolves false, and says why in its part.
  */
 export const OpenParts = createContext<Set<() => Promise<boolean>> | undefined>(undefined);
 
@@ -101,7 +101,7 @@ export async function saveOpenParts(parts: Set<() => Promise<boolean>>): Promise
 
 /**
  * Where a part is edited: Escape (unless something in it took the key) returns to the part, as it was.
- * Leaving it saves it (#234): the focus going elsewhere on the page, or another part opened, or the
+ * Leaving it saves it (heffrey78/gh-writer#234): the focus going elsewhere on the page, or another part opened, or the
  * modal it's in closing. `save` keeps what's typed (by default the part, saved as it changed, closes).
  */
 export function EditorFrame({ place, children, className, save }: { place: InPlace; children: ReactNode; className?: string; save?: () => Promise<boolean> | boolean }) {

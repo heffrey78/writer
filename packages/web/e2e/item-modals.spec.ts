@@ -3,7 +3,7 @@ import { join } from "node:path";
 import type { Page } from "@playwright/test";
 import { axe, caretAtEnd, expect, openView, test, type App } from "./fixtures.ts";
 
-/** Notes, off-page events and entries open as a modal over their gallery (#233), their parts saved on leaving them (#234). */
+/** Notes, off-page events and entries open as a modal over their gallery (heffrey78/gh-writer#233), their parts saved on leaving them (heffrey78/gh-writer#234). */
 
 const ADA = "bible/characters/ada.md";
 
@@ -25,7 +25,7 @@ const views = (page: Page) => page.getByRole("navigation", { name: "Views" });
 /** Underneath a modal: there, but hidden from assistive technology while it's open. */
 const under = (page: Page, name: string | RegExp) => page.getByRole("heading", { level: 1, name, includeHidden: true });
 
-test("a note: made in its modal over Notes by a title, written, closed by clicking away; Back closes it (#235)", async ({ page, app }) => {
+test("a note: made in its modal over Notes by a title, written, closed by clicking away; Back closes it (heffrey78/gh-writer#235)", async ({ page, app }) => {
   const novel = await openNovel(page, app);
   await views(page).getByRole("link", { name: "Notes" }).click();
   await page.getByRole("button", { name: "New note" }).click();
@@ -49,7 +49,7 @@ test("a note: made in its modal over Notes by a title, written, closed by clicki
   await expect.poll(() => novel.read("notes/count-the-flags.md")).toMatch(/title: Count the flags\n[\s\S]*---\n\n?Nine flags, one missing\.\n$/);
   await axe(page);
 
-  // A tag, saved by clicking elsewhere in the modal (#234).
+  // A tag, saved by clicking elsewhere in the modal (heffrey78/gh-writer#234).
   await page.getByRole("dialog").getByRole("button", { name: "Add tags" }).click();
   await page.keyboard.type("flags");
   await page.getByRole("heading", { level: 1, name: "Count the flags" }).click();
@@ -90,7 +90,7 @@ test("a note: made in its modal over Notes by a title, written, closed by clicki
   await expect(under(page, /^Notes/)).toBeAttached();
 });
 
-test("a part saves when the focus leaves it, another opens or the modal closes; Escape cancels it, not the modal (#234)", async ({ page, app }) => {
+test("a part saves when the focus leaves it, another opens or the modal closes; Escape cancels it, not the modal (heffrey78/gh-writer#234)", async ({ page, app }) => {
   const novel = await openNovel(page, app);
   await palette(page, "character: ada");
   const modal = page.getByRole("dialog", { name: "Ada Varn" });
@@ -152,7 +152,7 @@ test("a part saves when the focus leaves it, another opens or the modal closes; 
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });
 
-test("an off-page event: made in its modal over the Story bible by a title; the Timeline and the palette open it there (#236)", async ({ page, app }) => {
+test("an off-page event: made in its modal over the Story bible by a title; the Timeline and the palette open it there (heffrey78/gh-writer#236)", async ({ page, app }) => {
   const novel = await openNovel(page, app);
   await views(page).getByRole("link", { name: "Story bible" }).click();
   await page.getByRole("button", { name: "New off-page event" }).click();
@@ -184,7 +184,7 @@ test("an off-page event: made in its modal over the Story bible by a title; the 
   await expect(page.getByRole("dialog", { name: "The plans are stolen" })).toBeVisible();
 });
 
-test("an entry: made in its modal by a type and a name, its profile in place; New on a type's group starts with that type (#237)", async ({ page, app }) => {
+test("an entry: made in its modal by a type and a name, its profile in place; New on a type's group starts with that type (heffrey78/gh-writer#237)", async ({ page, app }) => {
   const novel = await openNovel(page, app);
   await views(page).getByRole("link", { name: "Story bible" }).click();
   await page.getByRole("button", { name: "New entry" }).click();

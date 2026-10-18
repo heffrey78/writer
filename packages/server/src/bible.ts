@@ -68,7 +68,7 @@ export interface EventFields {
 export interface NoteFields {
   title?: string;
   tags?: string[] | null;
-  /** The scenes it belongs to (#222); taking a scene off takes its pin too. */
+  /** The scenes it belongs to (heffrey78/gh-writer#222); taking a scene off takes its pin too. */
   scenes?: string[] | null;
   note?: string | null;
 }
@@ -385,7 +385,7 @@ export class BibleOperations {
   }
 
   /**
-   * Write an off-page event as a scene (#165): a new scene at the end of `chapter` with the event's
+   * Write an off-page event as a scene (heffrey78/gh-writer#165): a new scene at the end of `chapter` with the event's
    * title, time, duration, characters, locations and plotlines, and its note as the synopsis. The event
    * is kept, its `scene` naming the new one, or removed: refused (REFERENCED) while prose mentions it.
    * One commit; migrates as createEvent does.
@@ -452,7 +452,7 @@ export class BibleOperations {
   }
 
   /**
-   * Pin a note to the top of a scene's notes, or unpin it (#222). A scene has one pinned note: pinning
+   * Pin a note to the top of a scene's notes, or unpin it (heffrey78/gh-writer#222). A scene has one pinned note: pinning
    * this one unpins the scene's other, in the same commit. Pinning in a scene the note isn't on puts it there.
    */
   pinNote(id: string, scene: string, pinned: boolean): Promise<OperationResult> {
@@ -486,7 +486,7 @@ export class BibleOperations {
   }
 
   /**
-   * Promote a note (#205): to an off-page event (its title, and its prose as the event's note), or to a
+   * Promote a note (heffrey78/gh-writer#205): to an off-page event (its title, and its prose as the event's note), or to a
    * scene at the end of `chapter` (its title, and its prose as the synopsis). The note is kept, `became`
    * naming what it became, or removed; one commit. To an event in a novel in format v1, migrates as createEvent does.
    */
@@ -600,7 +600,7 @@ export class BibleOperations {
   }
 
   /**
-   * Say when Day 1 is (#239): novel.yaml's calendar.start, so days of the story sit among dates (Day 0
+   * Say when Day 1 is (heffrey78/gh-writer#239): novel.yaml's calendar.start, so days of the story sit among dates (Day 0
    * the day before). null removes it, and the calendar with it. One commit.
    */
   updateCalendar(start: string | null): Promise<OperationResult> {

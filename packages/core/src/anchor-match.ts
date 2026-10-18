@@ -1,5 +1,5 @@
 /*
- * Finding an issue's passage again (#9): the scene is found by its ID wherever its file has moved; in
+ * Finding an issue's passage again (heffrey78/gh-writer#9): the scene is found by its ID wherever its file has moved; in
  * its text (as plain text, the way the editor reads it), the quoted words are looked for exactly,
  * then with spacing, quote marks, dashes and case evened out, then approximately, word by word, for a
  * passage edited a little since. Not found: the issue is orphaned (shown with its quote, never lost).

@@ -1,8 +1,19 @@
-# gh-writer
+# Writer
 
-**Plan and write a novel with GitHub.** gh-writer is a writing app that runs on your own computer and keeps your book as plain Markdown and YAML files in a git repository. You write in a calm, distraction-free editor; your story bible, outline and diagrams sit beside the text; and GitHub keeps every version, backs it up, and tracks the work around the book (plot holes, research, revision notes) as issues. You never have to type a git command.
+**Write books with GitHub: novels first, then journals, campaigns and non-fiction.** Writer is a writing app for your desktop, and later for Android. It keeps each book as plain Markdown and YAML files in a git repository. You write in a calm, distraction-free editor, with the book's outline and index beside the text, while GitHub keeps every version, backs it up, and tracks the work around the book as issues. You never have to type a git command.
 
-![Writing a chapter in gh-writer, the manuscript tree on the left](docs/screenshots/writing.png)
+Writer grows out of [gh-writer](https://github.com/heffrey78/gh-writer), a novel-writing app, and starts as an exact copy of it (decision [D13](https://github.com/heffrey78/writer/issues/9)). It is being made into a general base, where each kind of book gets its own words, structure and features:
+
+- **Novel:** parts, chapters and scenes, with a story bible, plotlines and story time. This is what gh-writer does today.
+- **Journal:** one book on the shelf, a chapter for each month and an entry for each day, with the people, places, events and values in it ([#5](https://github.com/heffrey78/writer/issues/5)).
+- **Campaign:** a tabletop campaign's arcs and sessions, NPCs, places, factions, items and quests ([#6](https://github.com/heffrey78/writer/issues/6)).
+- **Non-fiction:** parts, chapters and sections, with sources and concepts ([#7](https://github.com/heffrey78/writer/issues/7)).
+
+Writer doesn't try to be everything to everyone. A feature that only some kinds want is a module those kinds use, not a part of every book ([D14](https://github.com/heffrey78/writer/issues/10)). Books from gh-writer open in Writer unchanged ([#2](https://github.com/heffrey78/writer/issues/2)).
+
+Until the Novel is one kind among others, the features are gh-writer's:
+
+![Writing a chapter, the manuscript tree on the left](docs/screenshots/writing.png)
 
 ## Features
 
@@ -91,30 +102,29 @@ The app stays calm as it grows: a sidebar grouped by what you're doing (write, p
 You need [Node.js](https://nodejs.org) 22.18 or later and [git](https://git-scm.com).
 
 ```sh
-git clone https://github.com/heffrey78/gh-writer
-cd gh-writer
+git clone https://github.com/heffrey78/writer
+cd writer
 npm install
 npm run build
-npx gh-writer serve
+npx writer serve
 ```
 
-Your browser opens on your library, where you can start a new novel, open a folder or clone one from GitHub. To try the sample novel, *The Bridge at Varn*: `npx gh-writer serve examples/sample-novel`.
+Your browser opens on your library, where you can start a new novel, open a folder or clone one from GitHub. To try the sample novel, *The Bridge at Varn*: `npx writer serve examples/sample-novel`. For the desktop app, see [DEVELOPER.md](DEVELOPER.md).
 
 - **[USER.md](USER.md)**: the guide for writers: the library, writing, the story bible, diagrams, GitHub, compiling and the command line.
 - **[DEVELOPER.md](DEVELOPER.md)**: the guide for contributors: architecture, packages, tests and conventions.
 
 ## Roadmap
 
-Built so far: the repository format and template, local-first saving and sync, manuscript structure, the editor, the story bible, mentions, the app shell, GitHub sign-in, issues and passage notes, entity labels, quick entry, all four diagrams and their snapshots on github.com, compiling to DOCX, EPUB and PDF, versions with word-by-word comparison, and writing progress and goals.
+The plan is tracked in [this repository's issues](https://github.com/heffrey78/writer/issues) as requirements, decisions and tasks, in three milestones:
 
-Next, as tracked in [the project's issues](https://github.com/heffrey78/gh-writer/issues):
-
-| Feature | What it adds |
+| Milestone | What it adds |
 |---|---|
-| [Drafting pipeline on a GitHub Projects board](https://github.com/heffrey78/gh-writer/issues/11) | Each scene's status (outlined, drafted, revised, final), point of view and word count on a board, table and roadmap, kept in sync with the scene files. |
-| [Editorial review through pull requests](https://github.com/heffrey78/gh-writer/issues/18) | Open a revision pass for review; editors comment on lines on github.com, and the comments appear in the editor's margin beside the passage. |
+| [Extraction: the Base from gh-writer](https://github.com/heffrey78/writer/milestone/1) | gh-writer imported and renamed, every check green; gh-writer's novels opening unchanged; kinds and modules, with the novel as the first kind |
+| [Journal](https://github.com/heffrey78/writer/milestone/2) | The Journal kind, built only from the base's extension points |
+| [Roadmap](https://github.com/heffrey78/writer/milestone/3) | The Campaign and Non-fiction kinds, and Writer on Android |
 
-gh-writer isn't packaged yet: for now it runs from a clone of this repository, as above.
+gh-writer's own issues, [heffrey78/gh-writer](https://github.com/heffrey78/gh-writer/issues), are the record of how the app got to where Writer starts.
 
 ## License
 

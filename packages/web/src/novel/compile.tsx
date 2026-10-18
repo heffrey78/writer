@@ -163,7 +163,7 @@ export function CompileDialog({ novelId, novel, workspace, onClose }: { novelId:
 }
 
 /**
- * The book's cover (#168): the one in novel.yaml, its file and size, Change… and Remove; or Add a
+ * The book's cover (heffrey78/gh-writer#168): the one in novel.yaml, its file and size, Change… and Remove; or Add a
  * cover…. It goes on the EPUB and the PDF, not the Word manuscript.
  */
 function CoverRow({ novelId, novel }: { novelId: string; novel: Novel }) {

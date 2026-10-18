@@ -138,7 +138,7 @@ export interface SyncStatus {
   ahead?: number;
   behind?: number;
   lastSync?: string | null;
-  /** Files changed on both sides, for the resolver (#47). */
+  /** Files changed on both sides, for the resolver (heffrey78/gh-writer#47). */
   conflict?: { files: string[] };
   error?: { code: string; message: string; detail?: string };
   commit: CommitStatus;
@@ -271,7 +271,7 @@ export interface EventFields {
 export interface NoteFields {
   title?: string;
   tags?: string[] | null;
-  /** The scenes it belongs to (#222). */
+  /** The scenes it belongs to (heffrey78/gh-writer#222). */
   scenes?: string[] | null;
   note?: string | null;
 }
@@ -577,7 +577,7 @@ export function createApi({ baseUrl = "", headers = {}, fetch = globalThis.fetch
     /** The story bible's changes: each is one commit; refusals throw ApiError with the server's code (STALE, BAD_REQUEST, BLOCKED…). */
     bible: bibleApi((id) => `/api/novels/${encodeURIComponent(id)}/bible`, request, upload),
     issues: issuesApi((id) => `/api/novels/${encodeURIComponent(id)}/issues`, request),
-    /** The drafting board on GitHub (#11): failures to sync are in the status's `error`; setting up throws ApiError. */
+    /** The drafting board on GitHub (heffrey78/gh-writer#11): failures to sync are in the status's `error`; setting up throws ApiError. */
     board: boardApi((id) => `/api/novels/${encodeURIComponent(id)}/board`, request),
     /** Reshaping the manuscript: each is one commit; IDs never change. */
     manuscript: manuscriptApi((id) => `/api/novels/${encodeURIComponent(id)}/manuscript`, request),
@@ -713,7 +713,7 @@ function issuesApi(root: (novelId: string) => string, request: Request) {
     create: (novelId: string, input: IssueInput & { title: string }) => call<Issue>("POST", novelId, "", input),
     update: (novelId: string, number: number, input: IssueInput) => call<Issue>("PATCH", novelId, `/${number}`, input),
     comment: (novelId: string, number: number, body: string) => call<IssueComment>("POST", novelId, `/${number}/comments`, { body }),
-    /** Raise an issue about a passage: quoted, linked, labelled with its kind, and anchored (#9). */
+    /** Raise an issue about a passage: quoted, linked, labelled with its kind, and anchored (heffrey78/gh-writer#9). */
     raise: (novelId: string, passage: { path: string; scene: string; sceneTitle: string; quote: string; title: string; details?: string; kind?: IssueLabel; labels?: string[] }) =>
       call<Issue>("POST", novelId, "/passage", passage),
     /** Make a label on the repository (with its colour) if it isn't there yet. */
@@ -859,7 +859,7 @@ function manuscriptApi(root: (novelId: string) => string, request: Request) {
     move: (novelId: string, id: string, index: number, to?: string | null) => call<OperationResult>("POST", novelId, `${item(id)}/move`, { index, ...(to !== undefined ? { to } : {}) }),
     /**
      * Notes left on no scene by the delete are kept unattached or deleted as `notes` says; without it,
-     * a delete that would leave some is refused (409 NOTES_LEFT { notes }) for the app to ask (#222).
+     * a delete that would leave some is refused (409 NOTES_LEFT { notes }) for the app to ask (heffrey78/gh-writer#222).
      */
     delete: (novelId: string, id: string, notes?: "keep" | "delete") => call<OperationResult>("POST", novelId, `${item(id)}/delete`, notes ? { notes } : undefined),
     /** Before paragraph `paragraph` (0-based); the rest becomes a new scene titled `title`. */

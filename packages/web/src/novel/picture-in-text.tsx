@@ -13,7 +13,7 @@ import { Field } from "../ui/field.tsx";
 export type PictureRequest = { kind: "add"; at: number; file?: File } | { kind: "edit"; at: number; picture: PictureAttrs };
 
 /**
- * A picture between paragraphs (#203): the image (chosen, dropped or pasted), its description for
+ * A picture between paragraphs (heffrey78/gh-writer#203): the image (chosen, dropped or pasted), its description for
  * screen readers (required) and an optional caption, and what it's saved as. Resized here, in the
  * browser, and saved under images/ before it's put in the text; changing one changes only its
  * description and caption.

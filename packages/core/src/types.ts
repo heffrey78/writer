@@ -145,7 +145,7 @@ export interface Diagnostic {
   line?: number;
 }
 
-/** compile.yaml: how the manuscript is compiled (#19). */
+/** compile.yaml: how the manuscript is compiled (heffrey78/gh-writer#19). */
 export interface CompileFile {
   presets: Record<string, CompilePreset>;
 }

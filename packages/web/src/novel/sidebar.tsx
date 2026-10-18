@@ -11,8 +11,8 @@ import { ManuscriptSidebar } from "./manuscript-tree.tsx";
 import type { Workspace } from "./workspace.ts";
 
 /*
- * The novel's sidebar (#136): Write (the manuscript), then the views grouped by what the author is
- * doing: Plan (every view of the book and its world, #232) and Revise. It collapses to a strip of icons (Ctrl+\), remembered in this browser.
+ * The novel's sidebar (heffrey78/gh-writer#136): Write (the manuscript), then the views grouped by what the author is
+ * doing: Plan (every view of the book and its world, heffrey78/gh-writer#232) and Revise. It collapses to a strip of icons (Ctrl+\), remembered in this browser.
  */
 
 const KEY = "ghw.sidebar";

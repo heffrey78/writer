@@ -6,7 +6,7 @@ import { NodeSelection, TextSelection } from "@tiptap/pm/state";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { chapterContent, getMarkdown, insertPicture, loadChapter, loadMarkdown, pictureAt, PicturesExtension, proseContent, serializeChapter, setPicture, type PictureCallbacks } from "../src/index.ts";
 
-/** Pictures put in, changed and handed to the app (D10, #203). */
+/** Pictures put in, changed and handed to the app (D10, heffrey78/gh-writer#203). */
 
 const MAP = { url: "/images/map.jpg", alt: "A map of Varn", caption: "The valley" };
 let editor: Editor;

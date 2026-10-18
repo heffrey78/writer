@@ -10,7 +10,7 @@ function random(seed: number) {
 }
 
 /**
- * The graph benchmark (#68): `nodes` entities and `edges` relationships on the real canvas, with a
+ * The graph benchmark (heffrey78/gh-writer#68): `nodes` entities and `edges` relationships on the real canvas, with a
  * button that changes every edge at once, as moving the story-position slider can. The time from
  * the click to the next painted frame is written to data-update-ms.
  */

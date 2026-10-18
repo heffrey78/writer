@@ -14,7 +14,7 @@ export interface PictureSource {
 const STAGE = { width: 340, height: 400 };
 
 /**
- * Making a picture (#168): the image chosen (its name, pixel size and file size), a crop frame at
+ * Making a picture (heffrey78/gh-writer#168): the image chosen (its name, pixel size and file size), a crop frame at
  * the slot's shape, dragged or moved with the arrow keys (+ and − resize it, as does Size), a focal
  * point for thumbnails, and what will be saved: where, at what size, about how large. Another image
  * can be chosen, dropped or pasted in. Cancel saves nothing; the result is resized here, in the

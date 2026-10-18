@@ -10,7 +10,7 @@ import type { CompilePreset } from "./types.ts";
 import { countWords } from "./words.ts";
 
 /*
- * Compiling the manuscript (#19, D6): the scenes in reading order, as a book every output format
+ * Compiling the manuscript (heffrey78/gh-writer#19, D6): the scenes in reading order, as a book every output format
  * (DOCX, EPUB, PDF) renders the same way. Only the story's words come through: a mention is its words,
  * a link its text; front matter, hidden notes (HTML comments) and other markup stay behind.
  */

@@ -15,7 +15,7 @@ import { cn } from "./ui/cn.ts";
 export const MENU_ITEM = "flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm outline-none data-[highlighted]:bg-accent-soft";
 
 /**
- * The app's frame: a skip link, the top bar, and the page. The bar (#136) is home and the page's
+ * The app's frame: a skip link, the top bar, and the page. The bar (heffrey78/gh-writer#136) is home and the page's
  * `heading` on the left; its `actions` (a few, always wanted) and a ⋯ menu on the right, holding the
  * page's `menu` items, the theme, the GitHub account and the keyboard shortcuts. `wide` pages lay
  * themselves out across the window; `chrome={false}` hides the bar (focus mode).

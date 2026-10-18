@@ -8,7 +8,7 @@ import { fakeGitHub, type FakeGitHub } from "./fake-github.ts";
 import { gitIn, novelRepo, scratch } from "./fixtures.ts";
 import { send } from "./http.ts";
 
-/** Who git signs as (#186): GET and PUT /api/identity, from the GitHub account when there's one. */
+/** Who git signs as (heffrey78/gh-writer#186): GET and PUT /api/identity, from the GitHub account when there's one. */
 
 const TOKEN = "test-token-0123456789";
 const SIGNED_IN = "gho_signed_in";

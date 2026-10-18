@@ -23,7 +23,7 @@ import { Confirm } from "../ui/confirm.tsx";
 import { PromoteNoteDialog } from "./promote.tsx";
 
 /**
- * A writer's note (#205): its title, tags and prose, each edited in place, and what it became if it
+ * A writer's note (heffrey78/gh-writer#205): its title, tags and prose, each edited in place, and what it became if it
  * was promoted. Make it an event or Write it as a scene turns it into story; Delete takes it away.
  * The prose and tags save to its file as they're made; a new title moves the file.
  */
@@ -40,8 +40,8 @@ export function NotePage({
   note: Note;
   workspace: Workspace;
   spell?: { service: SpellService; onAddWord: (w: string) => void } | undefined;
-  /** Shown in a modal over the Notes gallery (#235): its title is a level-2 heading with this ID. */
-  embedded?: { headingId: string; /** In a modal (#233), the dialog's own top heading. */ modal?: boolean };
+  /** Shown in a modal over the Notes gallery (heffrey78/gh-writer#235): its title is a level-2 heading with this ID. */
+  embedded?: { headingId: string; /** In a modal (heffrey78/gh-writer#233), the dialog's own top heading. */ modal?: boolean };
 }) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -58,7 +58,7 @@ export function NotePage({
   useEffect(() => void workspace.open([note.file]), [workspace, note.file]);
   useCommands(() => [{ id: "note.promote", title: `Make “${note.title}” an event or a scene`, group: "Notes", keywords: ["promote", "event", "scene"], run: () => setPromoting(true) }], [note.title]);
 
-  // A note just made: the caret goes into its prose, ready to write (#222).
+  // A note just made: the caret goes into its prose, ready to write (heffrey78/gh-writer#222).
   const { state } = useLocation() as { state: { focusProse?: boolean } | null };
   const prose = useRef<HTMLDivElement>(null);
   const focused = useRef(false);

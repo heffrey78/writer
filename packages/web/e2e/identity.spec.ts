@@ -3,7 +3,7 @@ import { join } from "node:path";
 import type { Page } from "@playwright/test";
 import { axe, expect, launch, test, type App } from "./fixtures.ts";
 
-/** Your name and email for git (#186): offered from the GitHub account at first run, and changed from the ⋯ menu. */
+/** Your name and email for git (heffrey78/gh-writer#186): offered from the GitHub account at first run, and changed from the ⋯ menu. */
 
 async function signIn(page: Page, app: App) {
   const headers = { origin: app.url };

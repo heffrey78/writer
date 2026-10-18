@@ -4,7 +4,7 @@ import type { Page } from "@playwright/test";
 import { asFormatV1 } from "../../server/test/fixtures.ts";
 import { axe, caretAtEnd, expect, selectionSettled, test, type App } from "./fixtures.ts";
 
-/** Off-page events as pages of their own (#165, #210). */
+/** Off-page events as pages of their own (heffrey78/gh-writer#165, heffrey78/gh-writer#210). */
 
 const FLOOD = "bible/events/the-flood-of-09.md";
 
@@ -33,7 +33,7 @@ test("an event's page: read first, each part edited in place by keyboard, its no
   const file = () => readFileSync(join(dir, FLOOD), "utf8");
   await openEvent(page, "The flood of '09");
 
-  // In its modal over the Story bible (#236).
+  // In its modal over the Story bible (heffrey78/gh-writer#236).
   const modal = page.getByRole("dialog", { name: "The flood of '09" });
   await expect(modal.getByText("Story bible · Off the page")).toBeVisible();
   await expect(modal.getByText("2 Nov 2009 · 3 days")).toBeVisible();
@@ -260,7 +260,7 @@ test("events where the story's facts show: @ mentions and their cards, profiles'
   await axe(page);
   await card.getByRole("button", { name: "Open event" }).click();
   await expect(page.getByRole("heading", { level: 2, name: "The flood of '09" })).toBeVisible();
-  // The tab says what it's showing (#222).
+  // The tab says what it's showing (heffrey78/gh-writer#222).
   await expect(page.getByRole("tab", { name: "Event" })).toHaveAttribute("aria-selected", "true");
 
   // The scene card says where the scene stands against the events around it.

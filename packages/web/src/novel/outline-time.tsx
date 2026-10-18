@@ -10,7 +10,7 @@ import { STATUSES, StatusSelect, Synopsis, useSceneEdit } from "./outline.tsx";
 import type { Workspace } from "./workspace.ts";
 
 /*
- * The outline in story time (#165): the scenes in the order things happen, with the off-page events
+ * The outline in story time (heffrey78/gh-writer#165): the scenes in the order things happen, with the off-page events
  * placed among them, drawn so they're never taken for scenes (dashed cards, italic rows, "Off the
  * page"). Dated items first, then relative days; then the undated scenes in reading order, and the
  * undated events. Nothing moves here: it's reading order that's rearranged.

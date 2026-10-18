@@ -1,5 +1,5 @@
 /*
- * Issues about a passage of the prose (#9, D1): the issue's body reads well on github.com (the note,
+ * Issues about a passage of the prose (heffrey78/gh-writer#9, D1): the issue's body reads well on github.com (the note,
  * the passage quoted, where it is), and ends with a hidden footer that tells Writer which scene and
  * words it's about: <!-- gh-writer {"scene":"sc_…","quote":"…","commit":"…"} -->.
  */

@@ -3,7 +3,7 @@ import { join } from "node:path";
 import type { Page } from "@playwright/test";
 import { axe, caretAtEnd, expect, test, type App } from "./fixtures.ts";
 
-/** The writer's notes (#205). */
+/** The writer's notes (heffrey78/gh-writer#205). */
 
 const IDEA = "notes/what-if-ben-never-sold.md";
 
@@ -131,7 +131,7 @@ test("the note just written is found by its words in the gallery, and its mentio
   await page.keyboard.type("Who collects it? Maybe @mirela");
   await page.keyboard.press("Enter");
 
-  // Closed, the Notes gallery (#235); once saved, the note is found there by its words, the previous note by its own.
+  // Closed, the Notes gallery (heffrey78/gh-writer#235); once saved, the note is found there by its words, the previous note by its own.
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toHaveCount(0);
   const cards = page.getByRole("list", { name: "Notes" }).getByRole("listitem");

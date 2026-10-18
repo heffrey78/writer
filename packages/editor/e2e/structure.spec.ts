@@ -2,7 +2,7 @@ import { AxeBuilder } from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { caretAfter, move, open, savedContains, textbox } from "./helpers.ts";
 
-/** Headings, lists and tables written by keyboard alone (D10, #202). */
+/** Headings, lists and tables written by keyboard alone (D10, heffrey78/gh-writer#202). */
 
 const STATION = "manuscript/01-return/01-arrival/01-the-station.md";
 const openScene = (page: Page, scene: string) => open(page, `scene=${encodeURIComponent(scene)}`);

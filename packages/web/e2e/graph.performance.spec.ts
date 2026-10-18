@@ -1,7 +1,7 @@
 import { expect, test } from "./fixtures.ts";
 
 /**
- * #68 / D4: React Flow handles a 60-node, 200-edge relationship graph smoothly. Dragging a node keeps
+ * heffrey78/gh-writer#68 / D4: React Flow handles a 60-node, 200-edge relationship graph smoothly. Dragging a node keeps
  * frames under 50 ms at the 95th percentile, and changing every edge at once (as moving the story
  * slider can) paints in under 100 ms. Runs alone, after the other tests.
  */

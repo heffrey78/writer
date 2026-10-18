@@ -1,7 +1,7 @@
 import { slugify } from "@writer/core";
 
 /*
- * Pictures (#168): what shape each kind of picture is, and the geometry of cropping one. Kept apart
+ * Pictures (heffrey78/gh-writer#168): what shape each kind of picture is, and the geometry of cropping one. Kept apart
  * from the DOM, so it can be tested on its own; the canvas work is in resize.ts.
  */
 
@@ -121,7 +121,7 @@ export function objectPosition(focus: [number, number] | undefined): string {
   return `${Math.round(x * 100)}% ${Math.round(y * 100)}%`;
 }
 
-/** A picture in the prose (#203) is kept no larger than this on its longest edge: sharp on a page, quick to sync. */
+/** A picture in the prose (heffrey78/gh-writer#203) is kept no larger than this on its longest edge: sharp on a page, quick to sync. */
 export const LONGEST_EDGE = 1600;
 
 /** The size a picture in the prose is saved at: its own, or smaller to fit LONGEST_EDGE (nothing is enlarged). */

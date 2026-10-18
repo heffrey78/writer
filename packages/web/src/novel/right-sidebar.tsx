@@ -4,7 +4,7 @@ import { create } from "zustand";
 import { cn } from "../ui/cn.ts";
 
 /*
- * The right sidebar (#149): the scene the caret is in, and a story bible entry, as two tabs beside
+ * The right sidebar (heffrey78/gh-writer#149): the scene the caret is in, and a story bible entry, as two tabs beside
  * the text. Ctrl+Shift+\ (⌘⇧\ on a Mac) opens and closes it; closed, it's a strip of icons at the
  * right edge, as the left sidebar is. Open or closed, its tab and its width are remembered in this
  * browser. On a narrow window it's a sheet over the text, shown only when asked for.

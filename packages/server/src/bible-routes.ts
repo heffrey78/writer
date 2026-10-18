@@ -58,7 +58,7 @@ export function bibleRoutes(routes: Hono<Env>): void {
     const { base, changes } = await body(c);
     return operation(c, async () => {
       const result = await bible(c).updateEntity(c.req.param("entity"), String(base ?? ""), (changes ?? {}) as never);
-      // A new name: its GitHub label follows (#10).
+      // A new name: its GitHub label follows (heffrey78/gh-writer#10).
       if ((changes as { name?: unknown } | undefined)?.name !== undefined) void c.var.ws.issues?.refresh().catch(() => {});
       return result;
     });

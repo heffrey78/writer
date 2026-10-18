@@ -18,7 +18,7 @@ import { reload, stayIfThere, undoAdoption, useAdoption, useSwitchVersion, useVe
 import type { Workspace } from "./workspace.ts";
 
 /*
- * Drafts (#136): the book's history in one place. A version is a separate take on the book (the
+ * Drafts (heffrey78/gh-writer#136): the book's history in one place. A version is a separate take on the book (the
  * main version, a darker ending); a checkpoint is a named moment in a version to come back to. The
  * open version comes first, with its checkpoints; then the others with theirs; then those of versions
  * since discarded.

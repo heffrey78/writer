@@ -47,7 +47,7 @@ export interface AutosaveOptions {
   maxRetryDelay?: number;
   /** Keeps a copy of unsaved text until the server has it (survives a reload). Default: sessionStorage; null for none. */
   storage?: StorageLike | null;
-  /** Called when a save meets newer text on disk: offer the conflict resolver (#47) or a reload. */
+  /** Called when a save meets newer text on disk: offer the conflict resolver (heffrey78/gh-writer#47) or a reload. */
   onConflict?: (conflict: Conflict) => void;
   /** Called when a file's text is on disk: what was saved and its new hash. */
   onSaved?: (path: string, content: string, hash: string) => void;

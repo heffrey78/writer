@@ -10,7 +10,7 @@ import { diffParagraphs, diffSequences, type ParagraphDiff } from "./word-diff.t
 import { countWords } from "./words.ts";
 
 /*
- * Two states of a novel side by side (#17): two versions, a checkpoint and now. Everything is matched
+ * Two states of a novel side by side (heffrey78/gh-writer#17): two versions, a checkpoint and now. Everything is matched
  * by ID, so a renamed or moved scene is the same scene. The prose of one scene is compared word by
  * word on demand (compareProse); the rest says what changed in plain words.
  */

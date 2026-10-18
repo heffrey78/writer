@@ -3,7 +3,7 @@ import type { Page } from "@playwright/test";
 import { asDesktop, calls, caretAtEnd, expect, launch, test, type App } from "./fixtures.ts";
 
 /**
- * The desktop app's right-click menu (#243), with a stand-in for the shell that can't cut, copy or
+ * The desktop app's right-click menu (heffrey78/gh-writer#243), with a stand-in for the shell that can't cut, copy or
  * paste itself (as on macOS and Windows), so the page's own way is what's checked here; on Linux the
  * shell runs the webview's own commands instead, checked in the built app.
  */

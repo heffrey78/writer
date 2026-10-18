@@ -4,7 +4,7 @@ import { bookImages, type Book, type Novel } from "@writer/core";
 import { unzlibSync, zlibSync } from "fflate";
 
 /*
- * The book's cover (#168), from novel.yaml's `cover`: an image the e-book shows first and the PDF
+ * The book's cover (heffrey78/gh-writer#168), from novel.yaml's `cover`: an image the e-book shows first and the PDF
  * prints on its first page. The app saves covers as JPEG; a PNG (one put there by hand) works too.
  */
 

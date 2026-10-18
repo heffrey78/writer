@@ -21,7 +21,7 @@ import "./styles.css";
 
 apply();
 
-// The graph benchmark (#68), loaded only when visited.
+// The graph benchmark (heffrey78/gh-writer#68), loaded only when visited.
 const GraphBench = lazy(() => import("./graph/graph-bench.tsx").then((m) => ({ default: m.GraphBench })));
 
 createRoot(document.getElementById("root")!).render(

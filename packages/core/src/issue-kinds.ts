@@ -1,5 +1,5 @@
 /*
- * What a novel's issues are about (#8, #9): writing kinds rather than GitHub's software labels. A
+ * What a novel's issues are about (heffrey78/gh-writer#8, heffrey78/gh-writer#9): writing kinds rather than GitHub's software labels. A
  * kind is the label kind/<key> on GitHub, with its own colour.
  */
 

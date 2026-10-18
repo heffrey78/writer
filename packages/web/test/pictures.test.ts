@@ -73,7 +73,7 @@ describe("the focal point", () => {
   });
 });
 
-describe("a picture in the prose (#203)", () => {
+describe("a picture in the prose (heffrey78/gh-writer#203)", () => {
   it("is kept no larger than 1600 px on its longest edge, its shape kept, and never enlarged", () => {
     expect(savedSize(PHOTO)).toEqual({ width: 1600, height: 1067 });
     expect(savedSize({ width: 1000, height: 1400 })).toEqual({ width: 1000, height: 1400 });

@@ -1,7 +1,7 @@
 import { asDesktop, calls, expect, launch, test } from "./fixtures.ts";
 
 /**
- * The page's side of the desktop app (#191), with a stand-in for the shell: what the page asks it for
+ * The page's side of the desktop app (heffrey78/gh-writer#191), with a stand-in for the shell: what the page asks it for
  * (a folder, a novel's window, the library) and the commands it runs for it. The shell itself is
  * checked by its own tests and on the built app.
  */
@@ -62,7 +62,7 @@ test("the shell's About opens About Writer; in a browser there's no Choose…", 
   await expect(browser.getByRole("button", { name: "Choose…" })).toHaveCount(0);
 });
 
-test("in the desktop app, the mouse's back and forward buttons go back and forward (#224)", async ({ page, app }) => {
+test("in the desktop app, the mouse's back and forward buttons go back and forward (heffrey78/gh-writer#224)", async ({ page, app }) => {
   await app.restart(app.novelRepo("varn"));
   await asDesktop(page);
   await launch(page, app);

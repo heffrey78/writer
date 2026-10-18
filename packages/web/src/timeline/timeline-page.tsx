@@ -35,7 +35,7 @@ export function TimelinePage({ novelId, novel }: { novelId: string; novel: Novel
   const n = t.items.length;
   const readSlot = reading.length ? (n * SLOT) / reading.length : SLOT;
   const name = (id: string) => novel.entities.find((e) => e.id === id)?.name ?? id;
-  // An event is added by its title, then opens on its own page (#165): the novel's dialog.
+  // An event is added by its title, then opens on its own page (heffrey78/gh-writer#165): the novel's dialog.
   const add = useNewEvent((s) => s.set);
   const lanesText = (i: TimelineItem) => lanesOf(i, mode).map((l) => t.lanes.find((x) => x.id === l)?.name ?? l).join(", ");
 

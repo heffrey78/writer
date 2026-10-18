@@ -3,7 +3,7 @@ import { join } from "node:path";
 import type { Page } from "@playwright/test";
 import { axe, expect, test, type App } from "./fixtures.ts";
 
-/** A scene's notes on the right sidebar (#222). */
+/** A scene's notes on the right sidebar (heffrey78/gh-writer#222). */
 
 async function openNovel(page: Page, app: App) {
   const dir = app.novelRepo("varn");
@@ -70,7 +70,7 @@ test("a scene's notes: made beside the text, written at once, pinned on top, tak
   await expect.poll(() => read("notes/count-the-flags.md")).not.toContain("scenes");
 });
 
-test("a note already written is put on the scene from its Notes tab, keeping the scenes it's on (#238)", async ({ page, app }) => {
+test("a note already written is put on the scene from its Notes tab, keeping the scenes it's on (heffrey78/gh-writer#238)", async ({ page, app }) => {
   const dir = await openNovel(page, app);
   const read = () => readFileSync(join(dir, "notes/what-if-ben-never-sold.md"), "utf8");
   await sidebar(page).getByRole("tab", { name: "Notes" }).click();

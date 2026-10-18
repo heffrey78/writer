@@ -1,5 +1,5 @@
 /*
- * Differences in prose as an editor marks them (#17): which words were deleted and which inserted,
+ * Differences in prose as an editor marks them (heffrey78/gh-writer#17): which words were deleted and which inserted,
  * not which lines changed. Paragraphs are paired first; within a changed pair the words are diffed.
  */
 

@@ -6,7 +6,7 @@ import { body, operation, type Env } from "./bible-routes.ts";
 import { gitPlumbing } from "./git.ts";
 
 /*
- * The novel's writing history (#20, D8): for every commit reachable from HEAD that changed scenes,
+ * The novel's writing history (heffrey78/gh-writer#20, D8): for every commit reachable from HEAD that changed scenes,
  * the words it added and removed, word-diffed against its parent. Merges are skipped: the commits
  * they join are counted themselves. Results are kept per commit in the clone's .git, so only new
  * commits are diffed; a fresh clone works them all out again, the same.
@@ -172,7 +172,7 @@ export function statsRoutes(routes: Hono<Env>): void {
     return operation(c, () => c.var.ws.bible.updateTarget({ words: pick("words"), date: pick("date"), daily: pick("daily") }));
   });
 
-  /** PUT /:id/calendar  { start } (a date, or null to remove it) → { commit, files }: when Day 1 is, in novel.yaml (#239). */
+  /** PUT /:id/calendar  { start } (a date, or null to remove it) → { commit, files }: when Day 1 is, in novel.yaml (heffrey78/gh-writer#239). */
   routes.put("/:id/calendar", async (c) => {
     const { start } = await body(c);
     return operation(c, () => c.var.ws.bible.updateCalendar(start as string | null));

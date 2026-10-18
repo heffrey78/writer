@@ -5,7 +5,7 @@ import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import { SCENE_STRUCTURE } from "./chapter.ts";
 
 /*
- * Pinned details (#149): in the chapter view, a quiet line under each scene's title holding the
+ * Pinned details (heffrey78/gh-writer#149): in the chapter view, a quiet line under each scene's title holding the
  * details the author pinned (point of view, when, where…), given by the app per scene. The line is
  * a widget, not part of the document: it never reaches the Markdown, the word count or find.
  */

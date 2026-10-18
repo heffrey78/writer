@@ -26,7 +26,7 @@ export interface EntryPresence {
 }
 
 /**
- * Where an entry is across the book (#159), from the same marks as the Presence view: the strip of
+ * Where an entry is across the book (heffrey78/gh-writer#159), from the same marks as the Presence view: the strip of
  * scenes on its profile, and the facts beneath it. Undefined for an ID the novel doesn't have.
  */
 export function entryPresence(novel: Novel, id: string): EntryPresence | undefined {

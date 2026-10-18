@@ -745,7 +745,7 @@
   resize: vertical;
 }
 
-/* Open issues beside their passages (#9): a marker in the margin, the passage lit while it's pointed at. */
+/* Open issues beside their passages (heffrey78/gh-writer#9): a marker in the margin, the passage lit while it's pointed at. */
 .ghw-prose p {
   position: relative;
 }

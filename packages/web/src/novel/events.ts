@@ -27,7 +27,7 @@ async function answers(): Promise<boolean> {
 /**
  * The novel's live events (server: GET /events): files changed outside the app, and the sync status.
  * Returns whether Writer is answering; EventSource reconnects by itself. An error on the stream
- * alone doesn't say it isn't (WebKit can report one while the stream holds, #197), so it's asked:
+ * alone doesn't say it isn't (WebKit can report one while the stream holds, heffrey78/gh-writer#197), so it's asked:
  * not answering, it's asked again until it does, or until the stream is back.
  */
 export function useNovelEvents(novelId: string, handlers: NovelEventHandlers): boolean {

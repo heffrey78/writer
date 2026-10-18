@@ -5,8 +5,8 @@ import { cn } from "../ui/cn.ts";
 import { ProfileSection } from "./profile.tsx";
 
 /*
- * In the story (#159): every scene in reading order, under its part and chapter names, marking where
- * an entry carries the scene, is in it, or is only mentioned. The relationships' arcs (#160) draw
+ * In the story (heffrey78/gh-writer#159): every scene in reading order, under its part and chapter names, marking where
+ * an entry carries the scene, is in it, or is only mentioned. The relationships' arcs (heffrey78/gh-writer#160) draw
  * over the same columns, so both are laid out by StripRow.
  */
 

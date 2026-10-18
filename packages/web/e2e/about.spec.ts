@@ -3,7 +3,7 @@ import { join } from "node:path";
 import type { Page } from "@playwright/test";
 import { axe, expect, launch, test } from "./fixtures.ts";
 
-/** About Writer, and the desktop app's word of a newer release (#169, #192). */
+/** About Writer, and the desktop app's word of a newer release (heffrey78/gh-writer#169, heffrey78/gh-writer#192). */
 
 async function audit(page: Page) {
   for (const colorScheme of ["light", "dark"] as const) {

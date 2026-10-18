@@ -4,7 +4,7 @@ import type { Page } from "@playwright/test";
 import { coverImage } from "../../export/src/cover.ts";
 
 /*
- * Pictures for the tests (#168), made in the page itself: a photo-like image of any size (a gradient
+ * Pictures for the tests (heffrey78/gh-writer#168), made in the page itself: a photo-like image of any size (a gradient
  * with some noise, so it compresses like a photo), as a file to choose, drop or paste.
  */
 

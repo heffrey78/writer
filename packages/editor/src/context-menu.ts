@@ -1,5 +1,5 @@
 /*
- * The app's own right-click menu (the desktop app's, #243): when the app draws one menu for every
+ * The app's own right-click menu (the desktop app's, heffrey78/gh-writer#243): when the app draws one menu for every
  * right-click, what was clicked adds its items to the click's event rather than opening a menu of its
  * own (the spelling suggestions, say), and the app's menu shows them above its own.
  */

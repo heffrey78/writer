@@ -18,7 +18,7 @@ import { AddRelationshipDialog, RelationshipAtSceneDialog } from "./relationship
 import { StripHeader } from "./strip.tsx";
 
 /*
- * Relationships as arcs (#160): each of an entry's relationships a bar over the same scenes as its
+ * Relationships as arcs (heffrey78/gh-writer#160): each of an entry's relationships a bar over the same scenes as its
  * strip, from the scene it starts to the scene it ends, in its type's colour and line, named on the
  * bar. Bars are grouped by who the relationship is with, stacked where they overlap. A marker under
  * them (arrow keys, or a click) reads what holds at one scene. A bar opens its changes.

@@ -9,7 +9,7 @@ import type { Workspace } from "./workspace.ts";
 import { PAGE_WIDTH } from "../ui/page.ts";
 
 /*
- * The story map (#136): the views that set the story's elements against its scenes, as tabs of one
+ * The story map (heffrey78/gh-writer#136): the views that set the story's elements against its scenes, as tabs of one
  * page. Each tab has its own address (/story-map/plotlines…); each view keeps its controls and export.
  */
 

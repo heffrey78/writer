@@ -2,7 +2,7 @@ import type { Novel } from "./model.ts";
 import type { RelationshipStyle } from "./types.ts";
 
 /*
- * Relationship colours (#148): the eight slots of the validated chart palette, each with a light and
+ * Relationship colours (heffrey78/gh-writer#148): the eight slots of the validated chart palette, each with a light and
  * a dark step (checked for colour-vision separation and contrast on the app's surfaces with the
  * dataviz validator). Relationships are always drawn with their type's name beside them, which is
  * the relief three light steps' sub-3:1 contrast needs. The status colours (danger, warn, ok) are not

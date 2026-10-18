@@ -7,7 +7,7 @@ import { canInspect, clipboardText, desktop, inspect, shellEdit, type EditAction
 import { useCanGo } from "./history.tsx";
 
 /*
- * The desktop app's right-click menu (#243): one menu, in the app's theme, wherever the click lands,
+ * The desktop app's right-click menu (heffrey78/gh-writer#243): one menu, in the app's theme, wherever the click lands,
  * instead of the webview's. In text: Cut, Copy, Paste and Select all, then Back and Forward;
  * elsewhere, Back and Forward (and Copy, with text selected). What was clicked can add its own items above them (the spelling
  * suggestions, Raise an issue… on a passage); places with a menu of their own (the manuscript tree)

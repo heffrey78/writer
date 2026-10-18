@@ -35,7 +35,7 @@ Decisions D13–D16 are **Proposed** until the owner accepts them. Don't build o
 
 ## Architecture
 
-Inherited from gh-writer (see its DEVELOPER.md until this repository has its own):
+Inherited from gh-writer; [DEVELOPER.md](DEVELOPER.md) has the details, the desktop shell and the release steps:
 
 ```
 web (React) ── client (API, autosave) ──HTTP──► server (Hono, 127.0.0.1, per-launch secret) ── core (format, model)
@@ -62,16 +62,18 @@ New server code keeps `node:` APIs at its edges, so splitting it into an engine 
 
 TypeScript throughout, on Node ≥ 22.18, which runs `.ts` directly (no build for the server or CLI). The code uses erasable syntax only: no enums, no namespaces, no parameter properties. Strict tsconfig with `noUncheckedIndexedAccess` and `verbatimModuleSyntax`. npm workspaces under `packages/*`. React 19, TipTap/ProseMirror, React Flow, react-query, zustand, Radix, cmdk and Tailwind 4 on Vite. Hono on the server. Tauri 2 (Rust) for the desktop shell.
 
-These commands exist once gh-writer is imported (#13); the names change with the rename (#14):
-
 | Command | Runs |
 |---|---|
 | `npm run check` | typecheck and the unit tests: run before every commit |
 | `npm test` | Vitest (`packages/*/test`) |
 | `npm run test:e2e` | Playwright: the editor playground, then the **built** web app against real servers |
-| `npm run dev` | the web app with hot reload and a real server (set the config dir env var to a scratch folder) |
+| `npm run dev` | the web app with hot reload and a real server. Set `WRITER_CONFIG_DIR` to a scratch folder so it doesn't use your own library |
+| `npx writer serve examples/sample-novel` | the app on the sample novel, after `npm run build` |
 | `npm run build:template` | rebuild the vendored tools and diagram snapshots |
 | `npm run desktop` | the desktop app in development |
+| `npm run desktop:arch` | the Arch package, `packages/desktop/arch/writer-*.pkg.tar.zst` |
+
+Names that stay gh-writer's on purpose (the `.github/gh-writer/` tools folder, the issue anchor footer, the board markers, `.git/gh-writer/` caches, the EPUB `urn:gh-writer:`) are listed in DEVELOPER.md under *Names kept from gh-writer*. Don't rename them: gh-writer's novels depend on them.
 
 ## Testing
 

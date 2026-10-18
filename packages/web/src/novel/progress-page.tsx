@@ -9,7 +9,7 @@ import { ProgressCharts } from "./progress-charts.tsx";
 import { PAGE } from "../ui/page.ts";
 
 /*
- * Progress (#20): how long the book is against its target, where it's heading at the recent pace,
+ * Progress (heffrey78/gh-writer#20): how long the book is against its target, where it's heading at the recent pace,
  * today's words against the daily goal and the streak, all from the novel's history (D8).
  */
 

@@ -10,7 +10,7 @@ import type { Workspace } from "./workspace.ts";
 const format = new Intl.NumberFormat();
 
 /**
- * Words added today beside the editor's counts (#20), against the daily goal: from the history and
+ * Words added today beside the editor's counts (heffrey78/gh-writer#20), against the daily goal: from the history and
  * saved work not committed yet, read again after each save. Opens Progress.
  */
 export function TodayCount({ novelId, workspace }: { novelId: string; workspace: Workspace }) {

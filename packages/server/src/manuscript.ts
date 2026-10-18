@@ -259,7 +259,7 @@ export class ManuscriptOperations {
 
   /** Delete a scene, chapter or part (with what's in it). It stays in history: see recentlyDeleted. */
   /**
-   * Delete a scene, chapter or part. Its scenes are taken off the notes on them (#222); a note left on no
+   * Delete a scene, chapter or part. Its scenes are taken off the notes on them (heffrey78/gh-writer#222); a note left on no
    * scene is kept unattached or deleted as `notes` says, and without it the delete is refused
    * (NOTES_LEFT { notes }) for the app to ask.
    */
@@ -488,7 +488,7 @@ export class ManuscriptOperations {
 
   /** Relationships that start or end at `from` now do at `to`, and notes on it are on `to` (merged scenes). */
   async #retarget(o: Overlay, novel: Novel, from: string, to: string): Promise<void> {
-    // Notes on it are on the merged scene now (#222); a pin goes too, unless that scene has one already.
+    // Notes on it are on the merged scene now (heffrey78/gh-writer#222); a pin goes too, unless that scene has one already.
     const pinnedThere = novel.notes.some((n) => n.pinned.includes(to));
     for (const n of novel.notes.filter((x) => x.scenes.includes(from) || x.pinned.includes(from))) {
       const scenes = [...new Set(n.scenes.map((s) => (s === from ? to : s)))];

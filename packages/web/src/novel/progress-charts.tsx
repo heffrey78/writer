@@ -4,7 +4,7 @@ import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type R
 import { cn } from "../ui/cn.ts";
 
 /*
- * Progress charts (#20): words added and cut per day, the book's length over time, and the length
+ * Progress charts (heffrey78/gh-writer#20): words added and cut per day, the book's length over time, and the length
  * of each chapter and its scenes. Inline SVG in the theme's tokens (--ghw-series-1/2, validated for
  * colour vision and contrast in both themes); each with a tooltip on hover and on the arrow keys,
  * and a table that says everything the chart does.

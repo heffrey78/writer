@@ -4,7 +4,7 @@ import type { Page } from "@playwright/test";
 import { axe, caretAtEnd, expect, test, type App } from "./fixtures.ts";
 import { makePicture, pastePicture, pictureIn } from "./pictures.ts";
 
-/** Pictures between paragraphs (D10, #203): added, changed and removed, checked in the scene's Markdown and images/ on disk. */
+/** Pictures between paragraphs (D10, heffrey78/gh-writer#203): added, changed and removed, checked in the scene's Markdown and images/ on disk. */
 
 const STATION = "manuscript/01-return/01-arrival/01-the-station.md";
 const BRIDGE = "manuscript/01-return/01-arrival/02-the-bridge.md";

@@ -25,7 +25,7 @@ describe("story time", () => {
     expect(storyInstant(undefined, "PT1H", undefined)).toBeUndefined();
   });
 
-  it("finds Day 1 from a day and its date, and the days that can't be placed among dates without it (#239)", async () => {
+  it("finds Day 1 from a day and its date, and the days that can't be placed among dates without it (heffrey78/gh-writer#239)", async () => {
     expect(dayOneFor("2026-10-12", 3)).toBe("2026-10-10");
     expect(dayOneFor("2026-10-10", 1)).toBe("2026-10-10");
     expect(dayOneFor("2026-07-01", -100)).toBe("2026-10-10");

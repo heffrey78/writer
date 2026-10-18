@@ -139,7 +139,7 @@ describe("PUT /target and GET /stats", { timeout: 30_000 }, () => {
     }
   });
 
-  it("says when Day 1 is in novel.yaml, or that it has no date, one commit each (#239)", async () => {
+  it("says when Day 1 is in novel.yaml, or that it has no date, one commit each (heffrey78/gh-writer#239)", async () => {
     const { createServer, Library, sessionCookie } = await import("../src/index.ts");
     const dir = novelRepo(fresh("calendar"));
     const library = await Library.open({ configDir: fresh("config") });

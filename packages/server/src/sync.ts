@@ -17,7 +17,7 @@ export interface SyncerOptions {
  * local: no remote to sync with. syncing: a sync is under way. synced: up to date with the remote.
  * ahead / behind: commits not yet pushed / not yet brought in. offline: the remote couldn't be reached
  * (retried by itself). needs-sign-in: the remote refused the credentials. conflict: the remote has
- * changes that clash with local ones (for the resolver, #47). error: anything else.
+ * changes that clash with local ones (for the resolver, heffrey78/gh-writer#47). error: anything else.
  */
 export type SyncState = "local" | "syncing" | "synced" | "ahead" | "behind" | "offline" | "needs-sign-in" | "conflict" | "error";
 

@@ -3,7 +3,7 @@ import type { Novel, Scene } from "./model.ts";
 import { storyInstant, type TimelineItem } from "./time.ts";
 
 /*
- * What a profile says that depends on the entry's type (#161): a location's visitors and the story
+ * What a profile says that depends on the entry's type (heffrey78/gh-writer#161): a location's visitors and the story
  * time its scenes span; a plotline's beats in reading order, the scenes it skips, who's in it and
  * where, and where it goes quiet; a theme's strength scene by scene.
  */

@@ -6,11 +6,11 @@ import { git } from "./git.ts";
 import { GitHubError, unreachable, type GitHub, type GitHubRepo } from "./github.ts";
 
 /*
- * A novel's GitHub issues (#8), as Writer keeps them: fetched from the novel's repository and
+ * A novel's GitHub issues (heffrey78/gh-writer#8), as Writer keeps them: fetched from the novel's repository and
  * cached per clone in .git/gh-writer/issues.json (never committed: issues are work, not story facts,
  * D1), so they're there offline and cost few API calls. Changes go to GitHub, and its answer goes
  * into the cache. Changes made while GitHub can't be reached are made in the cache at once, queued
- * there, and sent in order once it can (#112).
+ * there, and sent in order once it can (heffrey78/gh-writer#112).
  */
 
 export interface IssueComment {
@@ -111,7 +111,7 @@ export interface IssueFilter {
   text?: string;
 }
 
-/** An issue about a passage of a scene (#9). */
+/** An issue about a passage of a scene (heffrey78/gh-writer#9). */
 export interface Passage {
   /** The scene file, relative to the novel. */
   path: string;

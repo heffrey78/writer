@@ -89,7 +89,7 @@ export async function loadNovel(source: FileSource): Promise<Novel> {
   const layouts = await yamlFile("diagrams/layouts.yaml", "layouts");
   if (layouts && isObject(layouts["layouts"])) novel.layouts = layouts["layouts"] as Novel["layouts"];
 
-  // How it's compiled (#19): the front and back matter a preset names must be there.
+  // How it's compiled (heffrey78/gh-writer#19): the front and back matter a preset names must be there.
   const compile = await yamlFile("compile.yaml", "compile");
   if (compile && isObject(compile["presets"])) {
     novel.compile = compile as unknown as CompileFile;

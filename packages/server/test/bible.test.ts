@@ -459,7 +459,7 @@ describe("notes (D12)", () => {
   });
 });
 
-describe("scene notes (#222)", () => {
+describe("scene notes (heffrey78/gh-writer#222)", () => {
   const STATION = "sc_5tat1n";
   const SPAN = "sc_br1dg3";
   const manuscript = () => new ManuscriptOperations(dir, (fn) => fn());

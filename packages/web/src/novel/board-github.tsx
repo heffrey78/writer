@@ -10,7 +10,7 @@ import { ErrorAlert } from "../ui/alert.tsx";
 import { Button } from "../ui/button.tsx";
 
 /*
- * The drafting board on GitHub (#11, D8), above the board in the app: putting it there, how it
+ * The drafting board on GitHub (heffrey78/gh-writer#11, D8), above the board in the app: putting it there, how it
  * stands (when it last synced, what that did), and the scenes whose status differs between the
  * file and GitHub, each settled by the author. Shown only for a novel on GitHub.
  */

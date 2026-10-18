@@ -74,14 +74,14 @@ export function relationshipHistory(novel: Novel, id: string, other?: string): R
   });
 }
 
-/** The writer's notes that mention an entry or an event (#205), newest first. */
+/** The writer's notes that mention an entry or an event (heffrey78/gh-writer#205), newest first. */
 export function notesMentioning(novel: Novel, id: string): Note[] {
   return novel.notes
     .filter((n) => mentions(n.body).some((m) => m.id === id))
     .sort((a, b) => (b.created ?? "").localeCompare(a.created ?? "") || a.title.localeCompare(b.title));
 }
 
-/** A scene's notes (#222): the one pinned there first, then newest first. */
+/** A scene's notes (heffrey78/gh-writer#222): the one pinned there first, then newest first. */
 export function notesOfScene(novel: Novel, sceneId: string): Note[] {
   const pinned = (n: Note) => (n.pinned.includes(sceneId) ? 1 : 0);
   return novel.notes

@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { open } from "./helpers.ts";
 
 /**
- * Keystroke-to-render latency on a 10,000-word chapter (#4: under 50 ms). Each keydown is timed
+ * Keystroke-to-render latency on a 10,000-word chapter (heffrey78/gh-writer#4: under 50 ms). Each keydown is timed
  * from the event's timestamp to just after the next animation frame, when the browser has
  * applied the edit and is about to paint.
  */

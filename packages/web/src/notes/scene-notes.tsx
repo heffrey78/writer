@@ -22,10 +22,10 @@ export const useSceneNotes = create<{ pending: boolean; request: () => void }>((
 type Spell = { service: SpellService; onAddWord: (w: string) => void } | undefined;
 
 /**
- * The right sidebar's Notes tab (#222): the notes on the scene the caret is in, as sticky-note cards,
+ * The right sidebar's Notes tab (heffrey78/gh-writer#222): the notes on the scene the caret is in, as sticky-note cards,
  * the one pinned there first, then newest. A card is truncated until opened, when it expands in place
  * to edit its title, tags and prose, pin it here, take it off this scene, or open its page. + Note makes
- * one on the scene, opened, with the caret in its prose; Add a note puts one already written on it too (#238).
+ * one on the scene, opened, with the caret in its prose; Add a note puts one already written on it too (heffrey78/gh-writer#238).
  */
 export function SceneNotes({ novelId, novel, workspace, scene, spell }: { novelId: string; novel: Novel; workspace: Workspace; scene: Scene; spell: Spell }) {
   const queryClient = useQueryClient();

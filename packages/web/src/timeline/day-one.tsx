@@ -22,7 +22,7 @@ export function useSetDayOne(novelId: string) {
 }
 
 /**
- * When Day 1 is (#239): a date, so days of the story sit among dates (Day 0 the day before), edited in
+ * When Day 1 is (heffrey78/gh-writer#239): a date, so days of the story sit among dates (Day 0 the day before), edited in
  * place from a date or the day of a dated scene (its date copied, once). While it has none and the
  * book has both, the days that can't be placed among the dates are counted here.
  */

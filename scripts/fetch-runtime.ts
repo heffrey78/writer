@@ -57,7 +57,7 @@ const UNUSED = {
     /^share\/(gitweb|perl5|locale|bash-completion)\//,
     /^bin\/scalar$/,
   ],
-  // MinGit: Git Credential Manager and its UI libraries, Git LFS, Scalar. Checked on Windows in #196.
+  // MinGit: Git Credential Manager and its UI libraries, Git LFS, Scalar. Checked on Windows in heffrey78/gh-writer#196.
   win32: [
     /^mingw64\/bin\/(git-credential-manager.*|scalar\.exe|gcmcore\.dll|msalruntime\.dll|av_libglesv2\.dll|(lib)?(SkiaSharp|HarfBuzzSharp)\.dll|(Atlassian|Avalonia|GitHub|GitLab|MicroCom|Microsoft|System)\..*\.dll|Avalonia\.dll)$/,
     /^mingw64\/libexec\/git-core\/git-lfs\.exe$/,

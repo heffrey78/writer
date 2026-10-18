@@ -155,7 +155,7 @@ test("says when Writer stops answering", async ({ page, app }) => {
   await expect(page.getByRole("alert")).toContainText("Writer isn't answering", { timeout: 10_000 });
 });
 
-test("an error on the event stream alone says nothing while Writer answers; offline it does, until it's back (#197)", async ({ page, app }) => {
+test("an error on the event stream alone says nothing while Writer answers; offline it does, until it's back (heffrey78/gh-writer#197)", async ({ page, app }) => {
   const m = machines(app);
   // The page's event streams, to report an error on as WebKit can while the stream holds.
   await page.addInitScript(() => {

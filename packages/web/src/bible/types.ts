@@ -23,7 +23,7 @@ export const matches = (entity: Entity, query: string) => {
 /** What @ suggestions call off-page events, grouped after the bible's entries. */
 export const OFF_THE_PAGE = "Off the page";
 
-/** Every entry, for @ suggestions: by type in the bible's order, then by name; then the off-page events (#165). */
+/** Every entry, for @ suggestions: by type in the bible's order, then by name; then the off-page events (heffrey78/gh-writer#165). */
 export function mentionEntities(novel: Novel): MentionEntity[] {
   return [
     ...novel.entityTypes.flatMap((t) =>

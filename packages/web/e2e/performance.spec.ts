@@ -3,7 +3,7 @@ import { expect, test, type App } from "./fixtures.ts";
 import { writeBigNovel } from "./big-novel.ts";
 
 /**
- * #54 / #7: a 150,000-word novel opens to an editable state in under 2 seconds, and typing in it
+ * heffrey78/gh-writer#54 / heffrey78/gh-writer#7: a 150,000-word novel opens to an editable state in under 2 seconds, and typing in it
  * stays within the editor's budget (50 ms at the 95th percentile). Runs alone, after the other tests.
  */
 
@@ -63,7 +63,7 @@ test("a 150,000-word novel opens on a first launch, nothing cached, in under 2 s
 
 test("typing in a chapter of the 150,000-word novel stays under 50 ms at the 95th percentile", async ({ page, app }) => {
   await app.restart(bigNovel(app, { plotlines: 12 }));
-  // With details pinned under each scene's title (#153), and the right sidebar open.
+  // With details pinned under each scene's title (heffrey78/gh-writer#153), and the right sidebar open.
   await page.addInitScript(() => localStorage.setItem("ghw.pinnedDetails", JSON.stringify(["pov", "when", "plotlines"])));
   await page.goto(app.launchUrl);
   const text = page.getByRole("textbox", { name: "Chapter text" });

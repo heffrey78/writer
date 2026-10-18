@@ -244,7 +244,7 @@ export class NovelWorkspace {
   }
 
   /**
-   * Save a picture for the prose (#203): `bytes` (JPEG or PNG, resized by the app) at images/<slug>.jpg
+   * Save a picture for the prose (heffrey78/gh-writer#203): `bytes` (JPEG or PNG, resized by the app) at images/<slug>.jpg
    * or .png, the slug from `name` (with -2, -3… if taken). It isn't committed on its own: the scene that
    * names it is saved next, and the two go in one commit.
    */

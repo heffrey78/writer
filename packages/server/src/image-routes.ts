@@ -6,14 +6,14 @@ import { FileError, IMAGES_DIR, MAX_IMAGE_BYTES, servableImage } from "./files.t
 import type { Library } from "./library.ts";
 
 /*
- * Pictures (#168, #203): the bible's portraits, the book's cover and the prose's pictures, in images/.
+ * Pictures (heffrey78/gh-writer#168, heffrey78/gh-writer#203): the bible's portraits, the book's cover and the prose's pictures, in images/.
  *
  * GET  /:id/images/<path>                         the image at images/<path>, with its media type; ETag, revalidated each time
  * PUT  /:id/bible/entities/:entity/picture?base=&focus=x,y   the image's bytes (JPEG or PNG) → { file, image, commit }
  * POST /:id/bible/entities/:entity/picture/delete  { base } → { file, commit }
  * PUT  /:id/cover                                 the image's bytes → { cover, commit }
  * POST /:id/cover/delete                          → { commit }
- * PUT  /:id/images?name=                          a picture for the prose (#203): the bytes → { path }, images/<name>.jpg or .png
+ * PUT  /:id/images?name=                          a picture for the prose (heffrey78/gh-writer#203): the bytes → { path }, images/<name>.jpg or .png
  *
  * Uploads are refused over GitHub's 100 MB limit before they're read (413 TOO_LARGE), and anything but
  * JPEG or PNG bytes is 400 BAD_REQUEST. The app resizes pictures before sending them.

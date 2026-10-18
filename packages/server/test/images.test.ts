@@ -175,7 +175,7 @@ describe("the book's cover", () => {
   });
 });
 
-describe("a picture in the prose (#203)", () => {
+describe("a picture in the prose (heffrey78/gh-writer#203)", () => {
   const STATION = "manuscript/01-return/01-arrival/01-the-station.md";
   const BRIDGE = "manuscript/01-return/01-arrival/02-the-bridge.md";
   let ws: NovelWorkspace;

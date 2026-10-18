@@ -3,7 +3,7 @@ import { body, type Env } from "./bible-routes.ts";
 import { IssuesError, type IssueFilter, type IssueInput } from "./issues.ts";
 
 /*
- * The open novel's GitHub issues (#8), from its cache and changed on GitHub:
+ * The open novel's GitHub issues (heffrey78/gh-writer#8), from its cache and changed on GitHub:
  *
  * GET   /:id/issues?state=open|closed|all&labels=a,b&milestone=3|none&q=words → { issues, labels, milestones, status }
  * GET   /:id/issues/:number                    → the issue with its comments

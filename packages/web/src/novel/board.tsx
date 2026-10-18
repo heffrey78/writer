@@ -12,7 +12,7 @@ import { useSceneEdit } from "./scene-edit.ts";
 import type { Workspace } from "./workspace.ts";
 
 /*
- * The drafting board (#11): every scene in a column for its status, in reading order, as GitHub's
+ * The drafting board (heffrey78/gh-writer#11): every scene in a column for its status, in reading order, as GitHub's
  * board shows them. Dragging a card to another column, or Alt+Left and Alt+Right on its handle,
  * changes the scene's status in its file, autosaved like any edit. Works with or without GitHub;
  * on GitHub, it can be mirrored to a project there (board-github.tsx).

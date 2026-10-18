@@ -6,7 +6,7 @@ import type { Page } from "@playwright/test";
 import { caretAtEnd, expect, test, type App } from "./fixtures.ts";
 
 /**
- * #2's promises, met the way an author would meet them: the real app on real servers, git only read
+ * heffrey78/gh-writer#2's promises, met the way an author would meet them: the real app on real servers, git only read
  * by the tests (never run on the author's behalf), and every check made on disk and in git history.
  */
 

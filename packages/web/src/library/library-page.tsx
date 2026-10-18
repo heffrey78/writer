@@ -137,7 +137,7 @@ function Book({ novel, menus }: { novel: LibraryEntry; menus: HTMLElement | null
     mutationFn: () => api.removeNovel(novel.id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: keys.library }),
   });
-  // The book's own cover (#168), set or changed from its menu, as from Compile.
+  // The book's own cover (heffrey78/gh-writer#168), set or changed from its menu, as from Compile.
   const shown = () => Promise.all([queryClient.invalidateQueries({ queryKey: keys.library }), queryClient.invalidateQueries({ queryKey: keys.novel(novel.id) })]);
   const cover = usePictureFlow({
     name: novel.title,

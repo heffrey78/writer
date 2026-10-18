@@ -32,7 +32,7 @@ const LISTS = [
 ] as const;
 
 /**
- * An off-page event as a profile (#165), in the design of an entry's (#148): its title, when and how
+ * An off-page event as a profile (heffrey78/gh-writer#165), in the design of an entry's (heffrey78/gh-writer#148): its title, when and how
  * long as the lead, who, where and its plotlines as rows, its note as prose, and where it falls among
  * the scenes in story time. Each part edits in place, saved to the event's file as it's made, like a
  * scene card's details. In a novel in format v1, the first change asks to move it to v2 (D11).
@@ -51,8 +51,8 @@ export function EventPage({
   event: StoryEvent;
   workspace: Workspace;
   spell?: { service: SpellService; onAddWord: (w: string) => void } | undefined;
-  /** Shown in a side panel beside the text, or in a modal over the Story bible (#236): its title is a level-2 heading with this ID. */
-  embedded?: { headingId: string; /** In a modal (#233), the dialog's own top heading. */ modal?: boolean };
+  /** Shown in a side panel beside the text, or in a modal over the Story bible (heffrey78/gh-writer#236): its title is a level-2 heading with this ID. */
+  embedded?: { headingId: string; /** In a modal (heffrey78/gh-writer#233), the dialog's own top heading. */ modal?: boolean };
   /** The whole page, or the right sidebar's Entry tab, which leaves out delete and links to the page. */
   size?: "page" | "tab";
 }) {

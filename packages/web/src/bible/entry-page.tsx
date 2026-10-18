@@ -31,7 +31,7 @@ const VIA: Record<SceneLink, string> = { pov: "point of view", characters: "pres
 type FieldValue = string | number | boolean;
 
 /**
- * A bible entry as a profile (#158), read first: its type, tags, name and other names, a portrait,
+ * A bible entry as a profile (heffrey78/gh-writer#158), read first: its type, tags, name and other names, a portrait,
  * the summary as a lead, its fields as rows, then its notes, issues, scenes and relationships. Each
  * part edits in place from its pencil (or "+ Add…" while empty), saved to the entry's file at once.
  */
@@ -50,13 +50,13 @@ export function EntryPage({
   entity: Entity;
   workspace: Workspace;
   spell?: { service: SpellService; onAddWord: (w: string) => void } | undefined;
-  /** Shown in a side panel beside the text or a modal over the gallery (#237): its name is a level-2 heading with this ID, and it takes the panel's or modal's width. */
-  embedded?: { headingId: string; /** In a modal (#233), the dialog's own top heading. */ modal?: boolean };
+  /** Shown in a side panel beside the text or a modal over the gallery (heffrey78/gh-writer#237): its name is a level-2 heading with this ID, and it takes the panel's or modal's width. */
+  embedded?: { headingId: string; /** In a modal (heffrey78/gh-writer#233), the dialog's own top heading. */ modal?: boolean };
   /** A part to open for editing at once ("name" after a quick entry's Add details). */
   startEditing?: "name";
   /**
-   * How much it shows: the whole page, or the right sidebar's Entry tab (#163), which shows the
-   * picture (#168) without its slot, leaves out delete, issues and the type's own sections, and links to the page instead.
+   * How much it shows: the whole page, or the right sidebar's Entry tab (heffrey78/gh-writer#163), which shows the
+   * picture (heffrey78/gh-writer#168) without its slot, leaves out delete, issues and the type's own sections, and links to the page instead.
    */
   size?: "page" | "tab";
 }) {

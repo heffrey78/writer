@@ -35,7 +35,7 @@ export function createApp({ token, port, library, workspaces, github, web }: App
   app.get("/api/app", async (c) => c.json(await appInfo(updates)));
   app.get("/api/app/licenses", async (c) => c.json({ licenses: await licenses() }));
 
-  // Who git signs as (#186): the name and email set on this computer, and one from the GitHub account.
+  // Who git signs as (heffrey78/gh-writer#186): the name and email set on this computer, and one from the GitHub account.
   app.get("/api/identity", async (c) =>
     c.json({ identity: await globalIdentity(), suggestion: (await github.suggestedIdentity().catch(() => undefined)) ?? null }),
   );

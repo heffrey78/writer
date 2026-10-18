@@ -2,7 +2,7 @@ import { diffSequences } from "./word-diff.ts";
 import { markdownWords } from "./words.ts";
 
 /*
- * Writing statistics (#20, D8), from the novel's history: words added and removed by each commit,
+ * Writing statistics (heffrey78/gh-writer#20, D8), from the novel's history: words added and removed by each commit,
  * gathered by day, with the book's length, the daily goal's streak and a projected finish.
  */
 

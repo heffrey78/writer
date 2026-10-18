@@ -136,7 +136,7 @@ describe("loader structure checks", () => {
   });
 });
 
-describe("notes mentioning a record (#205)", () => {
+describe("notes mentioning a record (heffrey78/gh-writer#205)", () => {
   it("finds the sample's note by the entries and events it mentions", async () => {
     const novel = await loadNovel(nodeSource(SAMPLE));
     expect(notesMentioning(novel, "char_7f3k2q").map((n) => n.id)).toEqual(["note_w1fben"]);
@@ -145,7 +145,7 @@ describe("notes mentioning a record (#205)", () => {
   });
 });
 
-describe("a scene's notes (#222)", () => {
+describe("a scene's notes (heffrey78/gh-writer#222)", () => {
   it("lists the notes on a scene, the one pinned there first, then newest", async () => {
     const note = (id: string, title: string, front: string) => `---\nid: ${id}\ntitle: ${title}\n${front}---\n`;
     const files: Record<string, string> = {

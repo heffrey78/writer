@@ -8,7 +8,7 @@ import { getDocument, OPS } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { describe, expect, it } from "vitest";
 import { coverImage, toDocx, toEpub, toPdf, type CoverImage } from "../src/index.ts";
 
-/** A scene's own headings, lists, tables and pictures in every format (D10, #204). */
+/** A scene's own headings, lists, tables and pictures in every format (D10, heffrey78/gh-writer#204). */
 
 const JPEG = new Uint8Array(readFileSync(new URL("fixtures/cover.jpg", import.meta.url)));
 const ALPHA_PNG = new Uint8Array(readFileSync(new URL("fixtures/cover-alpha.png", import.meta.url)));

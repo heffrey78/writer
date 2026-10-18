@@ -12,7 +12,7 @@ import type { useSpell } from "./spell.ts";
 import type { Workspace } from "./workspace.ts";
 
 /*
- * The modals over the galleries (#233): /note/<id> over Notes, /event/<id> and /bible/<id> over the
+ * The modals over the galleries (heffrey78/gh-writer#233): /note/<id> over Notes, /event/<id> and /bible/<id> over the
  * Story bible; /note/new, /event/new and /bible/new (?type=) make one, starting from its title.
  */
 
@@ -38,7 +38,7 @@ function Gone({ what }: { what: string }) {
   );
 }
 
-/** A note over the Notes gallery (#235). */
+/** A note over the Notes gallery (heffrey78/gh-writer#235). */
 export function NoteOver({ novelId, novel, workspace, spell }: Props) {
   const { noteId } = useParams();
   const close = useCloseTo(`/novels/${novelId}/notes`);
@@ -58,7 +58,7 @@ export function NoteOver({ novelId, novel, workspace, spell }: Props) {
   );
 }
 
-/** An off-page event over the Story bible (#236). Made in a novel in format v1, it moves the novel to v2 (D11). */
+/** An off-page event over the Story bible (heffrey78/gh-writer#236). Made in a novel in format v1, it moves the novel to v2 (D11). */
 export function EventOver({ novelId, novel, workspace, spell }: Props) {
   const { eventId } = useParams();
   const close = useCloseTo(`/novels/${novelId}/bible#off-the-page`);
@@ -81,7 +81,7 @@ export function EventOver({ novelId, novel, workspace, spell }: Props) {
   );
 }
 
-/** A story bible entry over the gallery (#237); a new one by its type (unless the address names it) and name. */
+/** A story bible entry over the gallery (heffrey78/gh-writer#237); a new one by its type (unless the address names it) and name. */
 export function EntryOver({ novelId, novel, workspace, spell }: Props) {
   const { entityId } = useParams();
   const [params] = useSearchParams();

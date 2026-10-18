@@ -10,7 +10,7 @@ import { ErrorAlert } from "../ui/alert.tsx";
 import { Button } from "../ui/button.tsx";
 
 /**
- * Turn a note into story (#205): an off-page event (its prose the event's note) or a scene at the end of
+ * Turn a note into story (heffrey78/gh-writer#205): an off-page event (its prose the event's note) or a scene at the end of
  * a chapter (its prose the synopsis), keeping the note (naming what it became) or removing it. What it
  * became opens.
  */

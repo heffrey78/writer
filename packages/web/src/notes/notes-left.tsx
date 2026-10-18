@@ -11,7 +11,7 @@ interface Question {
   answer: (choice: Choice | null) => void;
 }
 
-/** Asking, before a delete, what becomes of notes that would be left on no scene (#222). */
+/** Asking, before a delete, what becomes of notes that would be left on no scene (heffrey78/gh-writer#222). */
 export const useNotesLeft = create<{ question: Question | null; ask: (what: string, notes: Note[]) => Promise<Choice | null> }>((set) => ({
   question: null,
   ask: (what, notes) =>

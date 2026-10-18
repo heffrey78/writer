@@ -4,7 +4,7 @@ import type { Page } from "@playwright/test";
 import { axe, caretAtEnd, expect, launch, test, type App } from "./fixtures.ts";
 
 /**
- * #7's promises, walked the way a keyboard user would meet them: every flow mouse-free, focus always
+ * heffrey78/gh-writer#7's promises, walked the way a keyboard user would meet them: every flow mouse-free, focus always
  * visible, no axe violations in either theme, and a layout that works from a 13-inch laptop to a
  * large monitor.
  */

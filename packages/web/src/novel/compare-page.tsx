@@ -21,7 +21,7 @@ interface Bring {
 }
 
 /*
- * Two states of the book side by side (#17): now, any version, any checkpoint. A summary, then every
+ * Two states of the book side by side (heffrey78/gh-writer#17): now, any version, any checkpoint. A summary, then every
  * chapter and scene with what changed, a scene's text word by word when opened, and the story bible.
  */
 

@@ -7,7 +7,7 @@ import { MAX_FILE_BYTES } from "./files.ts";
 import { VersionError } from "./versions.ts";
 
 /*
- * Alternate versions (#17, D7):
+ * Alternate versions (heffrey78/gh-writer#17, D7):
  * GET    /:id/versions                    { versions }: the main version first
  * POST   /:id/versions                    { name, from? } → 201 { version }: started from the open one (or checkpoint
  *                                          `from`, to bring a discarded version back), and opened

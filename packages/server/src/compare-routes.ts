@@ -7,7 +7,7 @@ import { commitSource } from "./git-source.ts";
 import type { NovelWorkspace } from "./workspace.ts";
 
 /*
- * Comparing two states of the novel (#17):
+ * Comparing two states of the novel (heffrey78/gh-writer#17):
  * GET /:id/compare?from=&to=                    { comparison }: chapters and scenes, bible, relationships, events
  * GET /:id/compare/scene/:sceneId?from=&to=     { paragraphs }: the scene's text, word by word where reworded
  * Each side is "now" (what's saved), "version:<id>" (a version as last committed) or "checkpoint:<id>".

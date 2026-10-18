@@ -2,7 +2,7 @@ import { buildSchema, graphql, GraphQLError } from "graphql";
 
 /*
  * GitHub Projects (v2) for the fake GitHub: the part of GitHub's GraphQL schema the drafting board
- * uses (#11), with the same type, field and argument names, run by graphql-js. A query that GitHub's
+ * uses (heffrey78/gh-writer#11), with the same type, field and argument names, run by graphql-js. A query that GitHub's
  * schema wouldn't accept fails here too. Where GitHub's behaviour is unsure, the fake does the less
  * convenient thing: changing a single-select field's options gives them new IDs and clears the
  * values that used them.

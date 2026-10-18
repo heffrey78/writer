@@ -1,4 +1,4 @@
-// The desktop app's smoke test (#193), run against an installed package on a machine without git:
+// The desktop app's smoke test (heffrey78/gh-writer#193), run against an installed package on a machine without git:
 // the packaged Node runs this, and the packaged server and git do the work, against a fake GitHub.
 //
 //   1. Sign in to GitHub; clone a novel; take the name and email the account offers.

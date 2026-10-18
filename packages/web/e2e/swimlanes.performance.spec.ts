@@ -3,7 +3,7 @@ import { writeBigNovel } from "./big-novel.ts";
 import { expect, test } from "./fixtures.ts";
 
 /**
- * #78 / #12: a 120-scene book with 12 plotlines (10 generated, the sample's 2) renders its swimlanes
+ * heffrey78/gh-writer#78 / heffrey78/gh-writer#12: a 120-scene book with 12 plotlines (10 generated, the sample's 2) renders its swimlanes
  * in under 500 ms; re-shading every cell for a new gap threshold takes under 100 ms; scrolling and
  * hovering keep frames under 50 ms at the 95th percentile. A cell edit end to end (save, model
  * reload, render) is measured and reported, within a second. Runs alone, after the other tests.

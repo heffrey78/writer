@@ -126,7 +126,7 @@ export function useStructure(novelId: string, novel: Novel, workspace: Workspace
       }),
     remove: async (id: string) => {
       const item = itemOf(novel, id);
-      // Notes on only what's going (#222): kept unattached or deleted too, as the author says.
+      // Notes on only what's going (heffrey78/gh-writer#222): kept unattached or deleted too, as the author says.
       const gone = new Set(
         novel.allScenes
           .filter((s) => s.id === id || s.chapterId === id || novel.allChapters.some((c) => c.id === s.chapterId && c.partId === id))

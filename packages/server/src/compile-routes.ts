@@ -6,7 +6,7 @@ import { body, type Env } from "./bible-routes.ts";
 import { gitPlumbing } from "./git.ts";
 
 /*
- * POST /:id/compile  { format: docx|epub|pdf, preset?, from?, to? } → the file (#19)
+ * POST /:id/compile  { format: docx|epub|pdf, preset?, from?, to? } → the file (heffrey78/gh-writer#19)
  *
  * Compiles what's saved on disk. Its dates are the latest commit's when everything saved is
  * committed (so the same commit compiles to the same file here and in the novel's GitHub Action),

@@ -2,7 +2,7 @@ import { expect, test } from "./fixtures.ts";
 import { dropPicture, makePicture, pictureIn } from "./pictures.ts";
 
 /**
- * #168: a 20-megapixel photo is read, resized and saved in under 2 seconds: from the drop until the
+ * heffrey78/gh-writer#168: a 20-megapixel photo is read, resized and saved in under 2 seconds: from the drop until the
  * frame is ready, and from "Use this portrait" until the portrait is on the profile. The time spent
  * framing it is the author's, not counted. Runs alone, after the other tests.
  */

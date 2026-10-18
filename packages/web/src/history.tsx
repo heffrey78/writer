@@ -6,7 +6,7 @@ import { useCommands } from "./commands.ts";
 import { desktop } from "./desktop.ts";
 
 /*
- * Back and Forward through the app's own pages (#224), for the desktop app's window, which has no
+ * Back and Forward through the app's own pages (heffrey78/gh-writer#224), for the desktop app's window, which has no
  * browser buttons, and the same in a browser. Where we are comes from the router's history index; how
  * far Forward reaches is the furthest index a new page was opened at, kept for this tab.
  */

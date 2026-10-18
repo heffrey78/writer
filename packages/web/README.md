@@ -123,7 +123,7 @@ A new mention of a character or location that the scene doesn't list yet adds it
 An entry's page (`/novels/:id/bible/:entityId`) has:
 
 - **Details:** name, other names, summary, fields, tags and image, saved together as one change ("Bible: edit Ada Varn"). A new name moves the file to match and changes nothing else ("Bible: rename Ada Varn to Ada Kost").
-- **Picture** (`bible/picture.tsx`, #168): a slot for a 4:5 portrait (a wide 16:9 picture for a location), taking a file dropped on it, pasted while it has the focus, or chosen. `PictureDialog` (`bible/picture-dialog.tsx`) frames it: the crop frame and the focal point are buttons moved with the arrow keys or dragged, and *Size* resizes the frame. The crop is resized in the browser (`bible/resize.ts`: `createImageBitmap`'s high-quality resampling, then JPEG at 0.85, or PNG when transparency is kept) and only the result is sent (`api.bible.setPicture`), so the server needs no image library. The geometry (`bible/pictures.ts`) is plain functions, tested on their own. Pictures are shown from `/images/` with the model's version of each in the URL (`usePictureUrl`), so a replaced one is never shown from the cache.
+- **Picture** (`bible/picture.tsx`, heffrey78/gh-writer#168): a slot for a 4:5 portrait (a wide 16:9 picture for a location), taking a file dropped on it, pasted while it has the focus, or chosen. `PictureDialog` (`bible/picture-dialog.tsx`) frames it: the crop frame and the focal point are buttons moved with the arrow keys or dragged, and *Size* resizes the frame. The crop is resized in the browser (`bible/resize.ts`: `createImageBitmap`'s high-quality resampling, then JPEG at 0.85, or PNG when transparency is kept) and only the result is sent (`api.bible.setPicture`), so the server needs no image library. The geometry (`bible/pictures.ts`) is plain functions, tested on their own. Pictures are shown from `/images/` with the model's version of each in the URL (`usePictureUrl`), so a replaced one is never shown from the cache.
 - **Notes:** the free-form text below the front matter, in the prose editor, autosaved like a scene.
 - **In the story:** every scene that refers to the entry, and how (point of view, present, set here, plotline, theme, mentioned), each linking to the scene; and its relationships, read from its side ("Rivals with Ben Varn, from “The Betrayal”").
 - **Delete:** if the story still refers to the entry, it lists every reference and asks first. Otherwise it simply goes ("Bible: remove …").
@@ -157,7 +157,7 @@ A command has an `id`, `title` and `group`, and optionally `keys` (TipTap style,
 - **The workspace:** Sync now, resolve conflicts (during one), checkpoints, and go to every chapter and scene by title.
 - **The writing view:** the editor's commands (writing modes, session, find, spelling) run on the open editor.
 
-The outline, bible and mention views (#3, #5, #6) add theirs the same way.
+The outline, bible and mention views (heffrey78/gh-writer#3, heffrey78/gh-writer#5, heffrey78/gh-writer#6) add theirs the same way.
 
 ## Theming
 
@@ -171,7 +171,7 @@ The theme follows the OS. Choosing Light or Dark in the top bar sets `data-theme
 
 ## Resilience
 
-`e2e/resilience.spec.ts` checks #2's promises the way an author would meet them: the real app on real servers, git run by the tests only to look, and every check made on disk and in git history.
+`e2e/resilience.spec.ts` checks heffrey78/gh-writer#2's promises the way an author would meet them: the real app on real servers, git run by the tests only to look, and every check made on disk and in git history.
 
 | Promise | Test |
 |---|---|
@@ -203,7 +203,7 @@ Actions that live in a passing notice (Undo after a restore) are also palette co
 
 ## Performance
 
-The target (#7) is a 150,000-word novel editable within 2 seconds of opening, and typing within the editor's budget, 50 ms from keystroke to paint at the 95th percentile. `e2e/big-novel.ts` writes a full-length test novel: 3 parts, 60 chapters, 240 scenes and 153,080 words of prose cycled from the sample novel, plus a 49-entry bible. It validates cleanly. `e2e/performance.spec.ts` runs as its own Playwright project, after the other tests, so nothing competes for the CPU:
+The target (heffrey78/gh-writer#7) is a 150,000-word novel editable within 2 seconds of opening, and typing within the editor's budget, 50 ms from keystroke to paint at the 95th percentile. `e2e/big-novel.ts` writes a full-length test novel: 3 parts, 60 chapters, 240 scenes and 153,080 words of prose cycled from the sample novel, plus a 49-entry bible. It validates cleanly. `e2e/performance.spec.ts` runs as its own Playwright project, after the other tests, so nothing competes for the CPU:
 
 | Measured (dev machine, Chromium) | Result |
 |---|---|

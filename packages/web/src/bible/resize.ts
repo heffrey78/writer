@@ -1,7 +1,7 @@
 import type { Crop } from "./pictures.ts";
 
 /*
- * Cropping and resizing a picture in the browser, before it's sent (#168): the server keeps only
+ * Cropping and resizing a picture in the browser, before it's sent (heffrey78/gh-writer#168): the server keeps only
  * the result, and needs no image library of its own.
  */
 

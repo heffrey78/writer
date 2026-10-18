@@ -133,7 +133,7 @@ export interface Note {
   id: string;
   title: string;
   tags: string[];
-  /** The scenes it belongs to (#222). */
+  /** The scenes it belongs to (heffrey78/gh-writer#222). */
   scenes: string[];
   /** The scenes, of those, where it's pinned to the top of their notes. */
   pinned: string[];
