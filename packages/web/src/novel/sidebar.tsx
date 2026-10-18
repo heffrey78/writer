@@ -1,4 +1,4 @@
-import type { Novel } from "@gh-writer/core";
+import type { Novel } from "@writer/core";
 import { BookOpen, CircleDot, Columns2, Goal, ListTree, Map as MapIcon, Network, PanelLeftClose, PanelLeftOpen, PenLine, StickyNote, type LucideIcon } from "lucide-react";
 import { Dialog } from "radix-ui";
 import { useEffect, useId, useState, type ReactNode } from "react";

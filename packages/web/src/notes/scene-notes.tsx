@@ -1,7 +1,7 @@
-import { imageUrl } from "@gh-writer/client";
-import { notesOfScene, proseText, readFrontMatter, type Note, type Novel, type Scene } from "@gh-writer/core";
-import { joinSceneFile } from "@gh-writer/editor";
-import { SceneEditor, type SpellService } from "@gh-writer/editor/react";
+import { imageUrl } from "@writer/client";
+import { notesOfScene, proseText, readFrontMatter, type Note, type Novel, type Scene } from "@writer/core";
+import { joinSceneFile } from "@writer/editor";
+import { SceneEditor, type SpellService } from "@writer/editor/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ExternalLink, Pin, Plus, Unlink } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";

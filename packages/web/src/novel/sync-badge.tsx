@@ -1,4 +1,4 @@
-import type { SyncStatus } from "@gh-writer/client";
+import type { SyncStatus } from "@writer/client";
 import { AlertTriangle, Check, CloudOff, GitMerge, KeyRound, Laptop, RefreshCw, type LucideIcon } from "lucide-react";
 import { Popover } from "radix-ui";
 import { useId } from "react";

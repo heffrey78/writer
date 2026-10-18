@@ -2,7 +2,7 @@ import type { Novel } from "./model.ts";
 import type { FileSource } from "./source.ts";
 
 /*
- * Imported as "@gh-writer/core/dictionary", not from the package index, so the vendored
+ * Imported as "@writer/core/dictionary", not from the package index, so the vendored
  * validator's bundle doesn't change with it.
  *
  * The novel's own dictionary: dictionary.txt at the repository root, words the spell checker

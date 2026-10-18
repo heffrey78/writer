@@ -90,7 +90,7 @@ for (const [name, viewport] of [
     await expect(text).toBeFocused({ timeout: 15_000 });
     await noSideways(page);
     await audit(page);
-    const here = join(app.home, "gh-writer", "varn");
+    const here = join(app.home, "writer", "varn");
 
     // Write, and meet the other machine's change to the same paragraph.
     await page.keyboard.press("Control+End");

@@ -1,4 +1,4 @@
-import type { Note } from "@gh-writer/core";
+import type { Note } from "@writer/core";
 import { AlertDialog } from "radix-ui";
 import { create } from "zustand";
 import { Button } from "../ui/button.tsx";

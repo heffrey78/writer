@@ -29,9 +29,9 @@ export async function migration(source: FileSource): Promise<Migration> {
   const novelText = await source.read("novel.yaml");
   if (novelText === undefined) return { status: "refused", reason: "There's no novel.yaml here." };
   const novel = parseYaml(novelText, "novel.yaml");
-  if (novel.diagnostics.length || !isObject(novel.data)) return { status: "refused", reason: "novel.yaml can't be read: fix it first (gh-writer validate)." };
+  if (novel.diagnostics.length || !isObject(novel.data)) return { status: "refused", reason: "novel.yaml can't be read: fix it first (writer validate)." };
   const from = typeof novel.data["schema_version"] === "number" ? novel.data["schema_version"] : 1;
-  if (from > SCHEMA_VERSION) return { status: "refused", reason: `This novel is in format v${from}, newer than this gh-writer (v${SCHEMA_VERSION}).` };
+  if (from > SCHEMA_VERSION) return { status: "refused", reason: `This novel is in format v${from}, newer than this Writer (v${SCHEMA_VERSION}).` };
   if (from === SCHEMA_VERSION) return { status: "current" };
 
   const types = Array.isArray(novel.data["entity_types"]) ? novel.data["entity_types"].filter(isObject) : [];
@@ -47,12 +47,12 @@ export async function migration(source: FileSource): Promise<Migration> {
   const eventsText = await source.read(EVENTS_YAML);
   if (eventsText !== undefined) {
     const parsed = parseYaml(eventsText, EVENTS_YAML);
-    if (parsed.diagnostics.length) return { status: "refused", reason: `${EVENTS_YAML} can't be read: fix it first (gh-writer validate).` };
+    if (parsed.diagnostics.length) return { status: "refused", reason: `${EVENTS_YAML} can't be read: fix it first (writer validate).` };
     const list = isObject(parsed.data) && Array.isArray(parsed.data["events"]) ? parsed.data["events"] : [];
     const folder = `bible/${EVENTS_FOLDER}`;
     const taken = new Set((await source.list(folder)).map((e) => e.name));
     for (const item of list) {
-      if (!isObject(item) || typeof item["id"] !== "string") return { status: "refused", reason: `${EVENTS_YAML} has an event without an ID: fix it first (gh-writer validate).` };
+      if (!isObject(item) || typeof item["id"] !== "string") return { status: "refused", reason: `${EVENTS_YAML} has an event without an ID: fix it first (writer validate).` };
       const title = typeof item["title"] === "string" ? item["title"] : item["id"];
       const name = uniqueFileName(slugify(title), ".md", taken);
       taken.add(name);

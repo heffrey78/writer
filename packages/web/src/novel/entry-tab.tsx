@@ -1,5 +1,5 @@
-import type { Novel } from "@gh-writer/core";
-import type { SpellService } from "@gh-writer/editor/react";
+import type { Novel } from "@writer/core";
+import type { SpellService } from "@writer/editor/react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useId, useRef } from "react";
 import { create } from "zustand";

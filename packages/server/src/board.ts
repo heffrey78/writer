@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { countWords, editFrontMatter, type Novel, type SceneStatus } from "@gh-writer/core";
+import { countWords, editFrontMatter, type Novel, type SceneStatus } from "@writer/core";
 import { git } from "./git.ts";
 import { GitHubError, type GitHub, type GitHubRepo } from "./github.ts";
 import type { TextFile } from "./files.ts";
@@ -29,10 +29,10 @@ const STATUS_DESCRIPTIONS: Record<SceneStatus, string> = {
 };
 /** The options GitHub gives a new project's Status field: replaced by the scene statuses. */
 const STOCK_STATUS = ["todo", "in progress", "done"];
-/** The field of gh-writer's own that holds the status where the project's Status field can't be changed. */
+/** The field of Writer's own that holds the status where the project's Status field can't be changed. */
 const OWN_STATUS = "Scene status";
 
-/** The fields gh-writer keeps, by the names they have on the board. */
+/** The fields Writer keeps, by the names they have on the board. */
 const FIELD = { pov: "POV", part: "Part", chapter: "Chapter", words: "Words", order: "Order", scene: "Scene ID" } as const;
 type Mirrored = "title" | "pov" | "part" | "chapter" | "words" | "order";
 const MIRRORED: Mirrored[] = ["title", "pov", "part", "chapter", "words", "order"];
@@ -97,7 +97,7 @@ export interface BoardStatus {
   gone?: boolean;
 }
 
-/** What gh-writer last put on the board for a scene, or read back from it. */
+/** What Writer last put on the board for a scene, or read back from it. */
 interface Synced {
   /** Null when unknown (a board found by a fresh clone): then any difference is a conflict. */
   status: SceneStatus | null;
@@ -401,11 +401,11 @@ export class BoardStore {
     const mutations: string[] = [];
     const projectId = board.id;
 
-    // Items by the scene they're for; gh-writer's items for scenes that are gone, and duplicates, go.
+    // Items by the scene they're for; Writer's items for scenes that are gone, and duplicates, go.
     const byScene = new Map<string, Item>();
     for (const item of board.items) {
       const scene = item.values.get(fields.scene.id);
-      if (typeof scene !== "string" || !scene) continue; // not gh-writer's: left alone
+      if (typeof scene !== "string" || !scene) continue; // not Writer's: left alone
       if (!wanted.has(scene) || byScene.has(scene)) {
         mutations.push(`deleteProjectV2Item(input: ${literal({ projectId, itemId: item.id })}) { deletedItemId }`);
         summary.removed++;
@@ -478,7 +478,7 @@ export class BoardStore {
       for (const key of MIRRORED) {
         const want = w.synced[key];
         const have = onBoard[key];
-        // An issue's title is the issue's (an item converted on GitHub): gh-writer leaves it.
+        // An issue's title is the issue's (an item converted on GitHub): Writer leaves it.
         if (key === "title" && item.type !== "DRAFT_ISSUE") continue;
         if (!isNew && base && have !== null && have !== want && have !== base[key]) edited.push(FIELD_NAMES[key]);
         if (key === "title") {
@@ -517,7 +517,7 @@ export class BoardStore {
   }
 
   /**
-   * Make sure the board has the fields gh-writer keeps, and the options its single-select fields
+   * Make sure the board has the fields Writer keeps, and the options its single-select fields
    * need. Changing a field's options may clear the values that used them (GitHub gives options new
    * IDs): those items' values are forgotten here, so they're set again.
    */
@@ -526,7 +526,7 @@ export class BoardStore {
     const forget = (field: Field) => board.items.forEach((i) => i.values.delete(field.id));
     const statusOptions = STATUSES.map((s) => ({ name: STATUS_NAMES[s], color: new Enum(STATUS_COLOURS[s]), description: STATUS_DESCRIPTIONS[s] }));
 
-    // Status: the project's own field, with the scene statuses as its options; else one of gh-writer's.
+    // Status: the project's own field, with the scene statuses as its options; else one of Writer's.
     let status = byName(OWN_STATUS) ?? byName("Status");
     if (status?.dataType !== "SINGLE_SELECT") status = undefined;
     const has = (f: Field, names: string[]) => names.every((n) => f.options?.some((o) => o.name.toLowerCase() === n.toLowerCase()));
@@ -646,9 +646,9 @@ export class BoardStore {
     const [made] = await this.#mutate([`createProjectV2(input: ${literal({ ownerId, repositoryId, title: `${title}: drafting board` })}) { projectV2 { id number title url } }`]);
     const project = (made as { projectV2: { id: string; number: number; title: string; url: string } }).projectV2;
     const readme = [
-      `The drafting board of *${title}*, kept by [gh-writer](https://github.com/heffrey78/gh-writer) from the novel's files: one card per scene.`,
+      `The drafting board of *${title}*, kept by [Writer](https://github.com/heffrey78/writer) from the novel's files: one card per scene.`,
       "",
-      "Move a card to another status here and the scene's file follows at gh-writer's next sync. POV, part, chapter, words and order come from the files: change them in the novel, not here.",
+      "Move a card to another status here and the scene's file follows at Writer's next sync. POV, part, chapter, words and order come from the files: change them in the novel, not here.",
       "",
       `<!-- gh-writer-board: ${novel.config?.id ?? ""} -->`,
     ].join("\n");
@@ -741,7 +741,7 @@ function uniqueNames(pairs: [string, string][]): Map<string, string> {
   return out;
 }
 
-/** An item's values as gh-writer reads them. */
+/** An item's values as Writer reads them. */
 function readItem(item: Item, fields: Fields): { status: SceneStatus | undefined; statusName: string | null } & Record<Mirrored, string | number | null> {
   const option = (field: Field | undefined) => {
     if (!field) return null;
@@ -769,7 +769,7 @@ function asBoardError(e: unknown): BoardError {
       case "NO_SIGN_IN":
         return new BoardError("NO_SIGN_IN", e.message);
       case "NEEDS_SCOPE":
-        return new BoardError("NEEDS_SCOPE", "This GitHub sign-in doesn't allow gh-writer to use Projects. Reconnect GitHub to grant it.");
+        return new BoardError("NEEDS_SCOPE", "This GitHub sign-in doesn't allow Writer to use Projects. Reconnect GitHub to grant it.");
       case "OFFLINE":
         return new BoardError("OFFLINE", "GitHub can't be reached right now. The board will catch up at the next sync.");
       case "RATE_LIMITED":

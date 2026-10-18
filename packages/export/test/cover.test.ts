@@ -2,8 +2,8 @@ import { mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import { compileBook, loadNovel, memorySource, type Book } from "@gh-writer/core";
-import { nodeSource } from "@gh-writer/core/node";
+import { compileBook, loadNovel, memorySource, type Book } from "@writer/core";
+import { nodeSource } from "@writer/core/node";
 import { strFromU8, unzipSync, unzlibSync } from "fflate";
 import { JSDOM } from "jsdom";
 import { getDocument, OPS } from "pdfjs-dist/legacy/build/pdf.mjs";
@@ -49,7 +49,7 @@ describe("a cover image", () => {
   });
 
   it("is read from novel.yaml's cover, or says why it can't be", async () => {
-    const root = mkdtempSync(join(tmpdir(), "gh-writer-cover-"));
+    const root = mkdtempSync(join(tmpdir(), "writer-cover-"));
     mkdirSync(join(root, "images"));
     writeFileSync(join(root, "images/cover.jpg"), JPEG);
     writeFileSync(join(root, "images/notes.jpg"), "not an image");

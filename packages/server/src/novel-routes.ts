@@ -1,4 +1,4 @@
-import { SCHEMA_VERSION } from "@gh-writer/core";
+import { SCHEMA_VERSION } from "@writer/core";
 import { Hono, type Context } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { streamSSE } from "hono/streaming";
@@ -55,7 +55,7 @@ export function novelRoutes(library: Library, workspaces: Workspaces, github?: G
     if (c.req.method !== "GET" && c.req.method !== "HEAD" && !c.req.path.endsWith("/sync")) {
       const version = await ws.tooNew();
       if (version !== undefined) {
-        return c.json({ code: "TOO_NEW", error: `This novel is in format v${version}, newer than this copy of gh-writer reads (v${SCHEMA_VERSION}). Update gh-writer to change it.` }, 409);
+        return c.json({ code: "TOO_NEW", error: `This novel is in format v${version}, newer than this copy of Writer reads (v${SCHEMA_VERSION}). Update Writer to change it.` }, 409);
       }
     }
     await next();

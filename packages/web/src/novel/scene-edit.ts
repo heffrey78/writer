@@ -1,5 +1,5 @@
-import { readFrontMatter, type Scene, type YamlEdit } from "@gh-writer/core";
-import { joinSceneFile } from "@gh-writer/editor";
+import { readFrontMatter, type Scene, type YamlEdit } from "@writer/core";
+import { joinSceneFile } from "@writer/editor";
 import { useQueryClient } from "@tanstack/react-query";
 import { api, keys } from "../api.ts";
 import { useNotice } from "./notice.tsx";

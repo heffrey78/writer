@@ -3,8 +3,8 @@ import { cpSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createApi } from "@gh-writer/client";
-import { createServer, hashText, Library, sessionCookie, type RunningServer } from "@gh-writer/server";
+import { createApi } from "@writer/client";
+import { createServer, hashText, Library, sessionCookie, type RunningServer } from "@writer/server";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createWorkspace, type Workspace } from "../src/novel/workspace.ts";
 
@@ -34,7 +34,7 @@ const paragraphs = (text: string) => text.slice(text.indexOf("\n---\n") + 5).spl
 const replaceParagraph = (text: string, i: number, by: string) => text.replace(paragraphs(text)[i]!.trim(), by);
 
 beforeAll(() => {
-  tmp = mkdtempSync(join(tmpdir(), "gh-writer-ws-"));
+  tmp = mkdtempSync(join(tmpdir(), "writer-ws-"));
 });
 afterAll(() => rmSync(tmp, { recursive: true, force: true }));
 

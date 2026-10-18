@@ -1,6 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 
-// The README's screenshots (docs/screenshots), taken of the sample novel: `npm run screenshots -w @gh-writer/web`.
+// The README's screenshots (docs/screenshots), taken of the sample novel: `npm run screenshots -w @writer/web`.
 export default defineConfig({
   testDir: "e2e",
   testMatch: /screenshots\.ts$/,

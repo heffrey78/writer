@@ -48,18 +48,18 @@ test("opens a folder by keyboard alone, then shelves it", async ({ page, app }) 
   await page.keyboard.type(dir);
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/\/novels\/lib_\w+$/);
-  await expect(page).toHaveTitle("The Bridge at Varn · gh-writer");
+  await expect(page).toHaveTitle("The Bridge at Varn · Writer");
 
-  await page.getByRole("link", { name: "gh-writer" }).click();
+  await page.getByRole("link", { name: "writer" }).click();
   await expect(novels(page)).toHaveCount(1);
-  await expect(novels(page).getByRole("link", { name: "The Bridge at Varn, by gh-writer sample" })).toBeVisible();
+  await expect(novels(page).getByRole("link", { name: "The Bridge at Varn, by Writer sample" })).toBeVisible();
   await expect(novels(page)).toContainText("Not on GitHub yet");
   await expect(await bookMenu(page, "The Bridge at Varn")).toContainText(dir);
   await page.keyboard.press("Escape");
 
   // The cover opens the novel.
   await novels(page).getByRole("link").click();
-  await expect(page).toHaveTitle("The Bridge at Varn · gh-writer");
+  await expect(page).toHaveTitle("The Bridge at Varn · Writer");
 });
 
 test("the shelf catches up when its window comes forward: a novel opened elsewhere and put on GitHub since", async ({ page, app }) => {
@@ -109,10 +109,10 @@ test("clones from a repository and opens the novel", async ({ page, app }) => {
   const bare = app.bareRepo("varn.git");
   await launch(page, app);
   await cloneFrom(page, `file://${bare}`);
-  await expect(page).toHaveTitle("The Bridge at Varn · gh-writer");
+  await expect(page).toHaveTitle("The Bridge at Varn · Writer");
   await page.goto(app.url);
   await expect(novels(page)).toContainText(bare);
-  await expect(await bookMenu(page, "The Bridge at Varn")).toContainText(join(app.home, "gh-writer", "varn"));
+  await expect(await bookMenu(page, "The Bridge at Varn")).toContainText(join(app.home, "writer", "varn"));
 });
 
 test("says what to do when GitHub refuses the credentials", async ({ page, app }) => {

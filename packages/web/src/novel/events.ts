@@ -1,4 +1,4 @@
-import type { SyncStatus } from "@gh-writer/client";
+import type { SyncStatus } from "@writer/client";
 import { useEffect, useRef, useState } from "react";
 import type { FileEvent } from "./workspace.ts";
 
@@ -11,11 +11,11 @@ export interface NovelEventHandlers {
   board?: () => void;
 }
 
-/** How often, while gh-writer isn't answering, it's asked again; and how long each ask may take. */
+/** How often, while Writer isn't answering, it's asked again; and how long each ask may take. */
 export const RECHECK_MS = 3_000;
 const ASK_TIMEOUT_MS = 5_000;
 
-/** Whether gh-writer answers this tab (with its session): the health check, cheap and never cached. */
+/** Whether Writer answers this tab (with its session): the health check, cheap and never cached. */
 async function answers(): Promise<boolean> {
   try {
     return (await fetch("/api/health", { cache: "no-store", signal: AbortSignal.timeout(ASK_TIMEOUT_MS) })).ok;
@@ -26,7 +26,7 @@ async function answers(): Promise<boolean> {
 
 /**
  * The novel's live events (server: GET /events): files changed outside the app, and the sync status.
- * Returns whether gh-writer is answering; EventSource reconnects by itself. An error on the stream
+ * Returns whether Writer is answering; EventSource reconnects by itself. An error on the stream
  * alone doesn't say it isn't (WebKit can report one while the stream holds, #197), so it's asked:
  * not answering, it's asked again until it does, or until the stream is back.
  */

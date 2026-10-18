@@ -1,4 +1,4 @@
-import type { Novel } from "@gh-writer/core";
+import type { Novel } from "@writer/core";
 import { useEffect, useRef, type KeyboardEvent, type ReactNode } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router";
 import { PresencePage } from "../presence/presence-page.tsx";

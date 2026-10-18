@@ -4,7 +4,7 @@ import { defineConfig, devices } from "@playwright/test";
 // asked, since Playwright's WebKit needs Ubuntu's libraries (or its Docker image).
 const browsers = (process.env.E2E_BROWSERS ?? (process.env.CI ? "chromium,webkit" : "chromium")).split(",");
 
-// Each test starts its own gh-writer server (e2e/fixtures.ts) on the built app: `npm run test:e2e` builds first.
+// Each test starts its own writer server (e2e/fixtures.ts) on the built app: `npm run test:e2e` builds first.
 export default defineConfig({
   testDir: "e2e",
   fullyParallel: true,

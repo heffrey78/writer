@@ -1,5 +1,5 @@
-import { ApiError, type CloneProgress, type LibraryEntry } from "@gh-writer/client";
-import { slugify } from "@gh-writer/core";
+import { ApiError, type CloneProgress, type LibraryEntry } from "@writer/client";
+import { slugify } from "@writer/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Lock } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
@@ -161,7 +161,7 @@ export function CloneDialog({ folder, onClose }: { folder: string | undefined; o
       <form onSubmit={submit} className="grid gap-3">
         <YourRepositories chosen={repo} onChoose={setRepo} />
         <Field label="Repository" placeholder="owner/name or a URL" value={repo} onChange={(e) => setRepo(e.target.value)} required autoFocus />
-        <Field label="Into folder (optional)" placeholder={`${folder ?? "~/gh-writer"}/<name>`} value={into} onChange={(e) => setInto(e.target.value)} />
+        <Field label="Into folder (optional)" placeholder={`${folder ?? "~/writer"}/<name>`} value={into} onChange={(e) => setInto(e.target.value)} />
         <ChooseFolder title="Where the clone goes (a new or empty folder)" onChosen={setInto} />
         {clone.isPending && (
           <div className="grid gap-1">

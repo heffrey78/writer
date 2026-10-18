@@ -5,21 +5,21 @@ import react from "@vitejs/plugin-react";
 import { defineConfig, type Plugin } from "vite";
 
 /**
- * `npm run dev`: a real gh-writer server (the author's library, or GH_WRITER_CONFIG_DIR's) runs inside
+ * `npm run dev`: a real writer server (the author's library, or WRITER_CONFIG_DIR's) runs inside
  * Vite, and /api is proxied to it with the session attached. The proxy speaks for the page: it sets
  * Host and Origin to the server's own, so the server's checks pass as they would in production.
  */
-function ghWriterServer(): Plugin {
+function writerServer(): Plugin {
   return {
-    name: "gh-writer-server",
+    name: "writer-server",
     apply: "serve",
     async configureServer(vite) {
-      const { createServer, Library, sessionCookie } = await import("@gh-writer/server");
+      const { createServer, Library, sessionCookie } = await import("@writer/server");
       const token = randomBytes(32).toString("base64url");
       const server = await createServer({ library: await Library.open(), token });
       const cookie = `${sessionCookie(server.port)}=${token}`;
       vite.httpServer?.once("close", () => void server.close());
-      vite.config.logger.info(`  gh-writer server: ${server.url} (library: ${server.library.file})`);
+      vite.config.logger.info(`  writer server: ${server.url} (library: ${server.library.file})`);
       vite.middlewares.use("/api", (req, res) => {
         const headers = { ...req.headers, host: `127.0.0.1:${server.port}`, cookie };
         if (headers.origin) headers.origin = server.url;
@@ -37,7 +37,7 @@ function ghWriterServer(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [react(), tailwindcss(), ghWriterServer()],
+  plugins: [react(), tailwindcss(), writerServer()],
   server: { port: 5180, strictPort: true },
   build: {
     outDir: "dist",

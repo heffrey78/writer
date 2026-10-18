@@ -1,5 +1,5 @@
-import { slugify } from "@gh-writer/core";
-import type { PictureAttrs } from "@gh-writer/editor";
+import { slugify } from "@writer/core";
+import type { PictureAttrs } from "@writer/editor";
 import { useEffect, useRef, useState, type ClipboardEvent, type DragEvent, type FormEvent } from "react";
 import { api } from "../api.ts";
 import { megabytes, refusal, savedSize } from "../bible/pictures.ts";

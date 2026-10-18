@@ -1,7 +1,7 @@
 import { mkdir, readdir, readFile, realpath, rename, rm, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
-import { newId, parseYaml, slugify } from "@gh-writer/core";
+import { newId, parseYaml, slugify } from "@writer/core";
 import type { SimpleGitProgressEvent } from "simple-git";
 import { classifyGitError, cloneUrl, git, repoName, type GitAuthSource } from "./git.ts";
 import { DEFAULT_TEMPLATE, NeedsIdentity, writeNewNovel, type NewNovel } from "./new-novel.ts";
@@ -45,7 +45,7 @@ export interface CloneOptions {
   into?: string;
   onProgress?: (e: SimpleGitProgressEvent) => void;
   signal?: AbortSignal;
-  /** gh-writer's GitHub credentials for the clone URL, if any. */
+  /** Writer's GitHub credentials for the clone URL, if any. */
   auth?: GitAuthSource;
 }
 
@@ -54,13 +54,13 @@ interface LibraryFile {
   novels: LibraryEntry[];
 }
 
-/** The per-user platform config directory for gh-writer, or $GH_WRITER_CONFIG_DIR. */
+/** The per-user platform config directory for Writer, or $WRITER_CONFIG_DIR. */
 export function defaultConfigDir(): string {
   const env = process.env;
-  if (env.GH_WRITER_CONFIG_DIR) return resolve(env.GH_WRITER_CONFIG_DIR);
-  if (process.platform === "win32") return join(env.APPDATA ?? join(homedir(), "AppData", "Roaming"), "gh-writer");
-  if (process.platform === "darwin") return join(homedir(), "Library", "Application Support", "gh-writer");
-  return join(env.XDG_CONFIG_HOME || join(homedir(), ".config"), "gh-writer");
+  if (env.WRITER_CONFIG_DIR) return resolve(env.WRITER_CONFIG_DIR);
+  if (process.platform === "win32") return join(env.APPDATA ?? join(homedir(), "AppData", "Roaming"), "writer");
+  if (process.platform === "darwin") return join(homedir(), "Library", "Application Support", "writer");
+  return join(env.XDG_CONFIG_HOME || join(homedir(), ".config"), "writer");
 }
 
 /**
@@ -86,7 +86,7 @@ export class Library {
 
   static async open({
     configDir = defaultConfigDir(),
-    cloneDir = join(homedir(), "gh-writer"),
+    cloneDir = join(homedir(), "writer"),
     templateDir = DEFAULT_TEMPLATE,
   }: { configDir?: string; cloneDir?: string; templateDir?: string } = {}): Promise<Library> {
     const library = new Library(join(configDir, "library.json"), cloneDir, templateDir);
@@ -129,7 +129,7 @@ export class Library {
     if (!isRepo) throw new LibraryError("NOT_A_REPO", `${path} isn't a git repository. A novel needs one to keep its history and sync with GitHub.`);
 
     const cover = await coverOf(path);
-    if (!cover) throw new LibraryError("NOT_A_NOVEL", `${path} has no novel.yaml, so it isn't a gh-writer novel.`);
+    if (!cover) throw new LibraryError("NOT_A_NOVEL", `${path} has no novel.yaml, so it isn't a Writer novel.`);
     const remote = await remoteOf(path);
 
     const lastOpened = new Date().toISOString();
@@ -198,7 +198,7 @@ export class Library {
     } catch (e) {
       await cleanUp();
       if (e instanceof LibraryError && e.code === "NOT_A_NOVEL") {
-        throw new LibraryError("NOT_A_NOVEL", `${url} has no novel.yaml, so it isn't a gh-writer novel. Nothing was kept.`);
+        throw new LibraryError("NOT_A_NOVEL", `${url} has no novel.yaml, so it isn't a Writer novel. Nothing was kept.`);
       }
       throw e;
     }
@@ -297,7 +297,7 @@ function isEntry(n: unknown): n is LibraryEntry {
 
 /**
  * A path as a person types it: a leading ~ is their home folder, as in a shell. Without this,
- * "~/gh-writer/novel" would be a folder named "~" wherever gh-writer happened to start.
+ * "~/writer/novel" would be a folder named "~" wherever Writer happened to start.
  */
 export function expandHome(path: string): string {
   const p = path.trim();

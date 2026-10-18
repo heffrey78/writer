@@ -22,8 +22,8 @@ import {
   type Relationship,
   type SeriesSlot,
   type YamlEdit,
-} from "@gh-writer/core";
-import { nodeSource } from "@gh-writer/core/node";
+} from "@writer/core";
+import { nodeSource } from "@writer/core/node";
 import { parse, stringify } from "yaml";
 import { hashText, IMAGES_DIR, MAX_IMAGE_BYTES, sniffImage } from "./files.ts";
 import type { ManuscriptOperations } from "./manuscript.ts";

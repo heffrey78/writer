@@ -1,6 +1,6 @@
-import { ApiError, type Conflicts, type FileResolution, type Version } from "@gh-writer/client";
-import type { Novel } from "@gh-writer/core";
-import { ConflictResolver, type ResolvedFile } from "@gh-writer/editor/react";
+import { ApiError, type Conflicts, type FileResolution, type Version } from "@writer/client";
+import type { Novel } from "@writer/core";
+import { ConflictResolver, type ResolvedFile } from "@writer/editor/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Split } from "lucide-react";
 import { Dialog } from "radix-ui";

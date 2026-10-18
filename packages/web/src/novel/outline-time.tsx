@@ -1,5 +1,5 @@
-import { countWords, proseText, storyTimeline, type Novel, type Scene, type StoryEvent } from "@gh-writer/core";
-import { when } from "@gh-writer/core/diagrams";
+import { countWords, proseText, storyTimeline, type Novel, type Scene, type StoryEvent } from "@writer/core";
+import { when } from "@writer/core/diagrams";
 import { useMemo } from "react";
 import { Link, useSearchParams } from "react-router";
 import { Button } from "../ui/button.tsx";

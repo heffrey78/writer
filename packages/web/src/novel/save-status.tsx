@@ -1,4 +1,4 @@
-import type { Autosave } from "@gh-writer/client";
+import type { Autosave } from "@writer/client";
 import type { StoreApi } from "zustand";
 import { useStore } from "zustand";
 import type { QuickEntriesState } from "../bible/quick-entries.ts";

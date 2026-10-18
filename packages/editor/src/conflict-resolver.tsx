@@ -1,4 +1,4 @@
-import { resolveMerge, type MergeChunk, type Resolution } from "@gh-writer/core";
+import { resolveMerge, type MergeChunk, type Resolution } from "@writer/core";
 import { DOMSerializer } from "@tiptap/pm/model";
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { parseProse } from "./markdown.ts";

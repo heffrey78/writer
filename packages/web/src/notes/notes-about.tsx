@@ -1,4 +1,4 @@
-import { notesMentioning, type Novel } from "@gh-writer/core";
+import { notesMentioning, type Novel } from "@writer/core";
 import { useMemo } from "react";
 import { Link } from "react-router";
 import { ProfileSection } from "../bible/profile.tsx";

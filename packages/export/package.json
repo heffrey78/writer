@@ -1,5 +1,5 @@
 {
-  "name": "@gh-writer/export",
+  "name": "@writer/export",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -8,7 +8,7 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@gh-writer/core": "0.1.0",
+    "@writer/core": "0.1.0",
     "fflate": "^0.8.3",
     "fontkit": "^2.0.4",
     "pdfkit": "^0.20.2"

@@ -1,6 +1,6 @@
-import { createAutosave, type Api, type Autosave, type Conflict, type StorageLike } from "@gh-writer/client";
-import { editFrontMatter, merge2, merge3, type MergeChunk, type YamlEdit } from "@gh-writer/core";
-import { joinSceneFile, splitSceneFile } from "@gh-writer/editor";
+import { createAutosave, type Api, type Autosave, type Conflict, type StorageLike } from "@writer/client";
+import { editFrontMatter, merge2, merge3, type MergeChunk, type YamlEdit } from "@writer/core";
+import { joinSceneFile, splitSceneFile } from "@writer/editor";
 import { createStore, type StoreApi } from "zustand/vanilla";
 
 /** A scene file open for writing. */

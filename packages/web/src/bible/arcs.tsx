@@ -1,4 +1,4 @@
-import { entryPresence, relationshipsAt, relationshipStyle, type Entity, type Novel, type Relationship } from "@gh-writer/core";
+import { entryPresence, relationshipsAt, relationshipStyle, type Entity, type Novel, type Relationship } from "@writer/core";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
 import { DropdownMenu } from "radix-ui";
@@ -11,7 +11,7 @@ import { ErrorAlert } from "../ui/alert.tsx";
 import { Button } from "../ui/button.tsx";
 import { cn } from "../ui/cn.ts";
 import { Confirm } from "../ui/confirm.tsx";
-import { describeRelationship as describe } from "@gh-writer/core/diagrams";
+import { describeRelationship as describe } from "@writer/core/diagrams";
 import { ProfileSection } from "./profile.tsx";
 import { RelationshipLines } from "./relationship-types.tsx";
 import { AddRelationshipDialog, RelationshipAtSceneDialog } from "./relationships.tsx";

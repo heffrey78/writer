@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 import { parseArgs } from "node:util";
-import { newId, SCHEMA_VERSION } from "@gh-writer/core";
+import { newId, SCHEMA_VERSION } from "@writer/core";
 import { runCompile } from "./compile-command.ts";
 import { runMigrate } from "./migrate-command.ts";
 import { runServe } from "./serve-command.ts";
 import { runSnapshots } from "./snapshots-command.ts";
 import { runValidate } from "./validate-command.ts";
 
-const USAGE = `Usage: gh-writer <command> [options]
+const USAGE = `Usage: writer <command> [options]
 
 Commands:
   serve [dir]               Start the app on this machine and open the novel in dir
@@ -28,7 +28,7 @@ Commands:
       --out <dir>           Where the files go (default: compiled/ in the novel)
   migrate [dir]             Move a novel to the newest format, as one commit (and update its
                             tools in .github/gh-writer/)
-  new-id <prefix>           Print a new random ID, e.g. "gh-writer new-id char"
+  new-id <prefix>           Print a new random ID, e.g. "writer new-id char"
 
 Options:
   -h, --help                Show this help
@@ -59,7 +59,7 @@ async function main(argv: string[]): Promise<number> {
   const [command, ...rest] = positionals;
 
   if (values.version) {
-    console.log(`gh-writer 0.1.0 (format v${SCHEMA_VERSION})`);
+    console.log(`writer 0.1.0 (format v${SCHEMA_VERSION})`);
     return 0;
   }
   if (values.help || !command) {

@@ -1,5 +1,5 @@
-import { mentions, type Novel, type StoryEvent } from "@gh-writer/core";
-import { chapterTitle } from "@gh-writer/core/diagrams";
+import { mentions, type Novel, type StoryEvent } from "@writer/core";
+import { chapterTitle } from "@writer/core/diagrams";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog } from "radix-ui";
 import { useId, useState, type FormEvent } from "react";

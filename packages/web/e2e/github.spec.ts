@@ -96,11 +96,11 @@ test("a clone GitHub refuses offers to connect, then clones and syncs with the c
   const clone = page.getByRole("dialog", { name: "Clone from GitHub" });
   await clone.getByRole("textbox", { name: "Repository" }).fill(url);
   await clone.getByRole("button", { name: "Clone", exact: true }).click();
-  await expect(clone.getByRole("alert")).toContainText("Connect gh-writer to GitHub");
+  await expect(clone.getByRole("alert")).toContainText("Connect Writer to GitHub");
 
   await clone.getByRole("button", { name: "Connect GitHub and try again" }).click();
   await signInWithCode(page, app);
-  await expect(page).toHaveTitle("The Bridge at Varn · gh-writer");
+  await expect(page).toHaveTitle("The Bridge at Varn · Writer");
   await expect(badge(page)).toHaveAccessibleName("Sync: Synced");
 
   // Written here, pushed with the connection.
@@ -114,7 +114,7 @@ test("a clone GitHub refuses offers to connect, then clones and syncs with the c
   await expect.poll(() => app.git(app.github.repoPath("ada", "varn"), "log", "-1", "--format=%s")).not.toContain("Start");
 
   // No token anywhere on disk: not in the novel's git config, not in the library.
-  const here = join(app.home, "gh-writer", "varn");
+  const here = join(app.home, "writer", "varn");
   for (const file of [...contents(join(here, ".git")), ...contents(join(app.home, "config"))]) expect(file.includes(app.github.deviceToken)).toBe(false);
 });
 
@@ -168,7 +168,7 @@ test("signed out, puts a new novel on GitHub from the shelf: connects, creates a
   await page.getByRole("button", { name: "More for “The Salt Road”" }).click();
   await page.getByRole("menuitem", { name: "Put on GitHub…" }).click();
   const publish = page.getByRole("dialog", { name: "Put on GitHub" });
-  await expect(publish).toContainText("Connect gh-writer to GitHub first");
+  await expect(publish).toContainText("Connect Writer to GitHub first");
   await publish.getByRole("button", { name: "Connect GitHub" }).click();
   await signInWithCode(page, app);
 
@@ -233,7 +233,7 @@ test("clones by picking from the author's repositories", async ({ page, app }) =
   await list.getByRole("button", { name: /ada\/varn/ }).click();
   await expect(clone.getByRole("textbox", { name: "Repository" })).toHaveValue(`${app.github.url}/ada/varn.git`);
   await clone.getByRole("button", { name: "Clone", exact: true }).click();
-  await expect(page).toHaveTitle("The Bridge at Varn · gh-writer");
+  await expect(page).toHaveTitle("The Bridge at Varn · Writer");
 });
 
 test("a sign-in without the workflow permission: publishing says so, and reconnecting pushes to the same repository", async ({ page, app }) => {

@@ -1,4 +1,4 @@
-import { editFrontMatter, readFrontMatter } from "@gh-writer/core";
+import { editFrontMatter, readFrontMatter } from "@writer/core";
 import { describe, expect, it } from "vitest";
 import { entryEdits, plotlineEdits, type EntryChange, type PlotlineChange, type SceneList } from "../src/novel/plotline-edits.ts";
 

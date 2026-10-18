@@ -1,8 +1,8 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { loadNovel, readAnchor } from "@gh-writer/core";
-import { nodeSource } from "@gh-writer/core/node";
+import { loadNovel, readAnchor } from "@writer/core";
+import { nodeSource } from "@writer/core/node";
 import { createServer, GitHub, Library, memoryStore, sessionCookie, type TokenStore } from "../src/index.ts";
 import { IssueStore, type IssuesError } from "../src/issues.ts";
 import { fakeGitHub, type FakeGitHub } from "./fake-github.ts";
@@ -138,7 +138,7 @@ describe("issues", () => {
 
     const made = await issues.create({ title: "  The ferry's name changes in chapter four  ", body: "It's *Marta* in chapter one.", labels: ["kind/continuity"], milestone: 1 });
     expect(made).toMatchObject({ number: 5, title: "The ferry's name changes in chapter four", labels: ["kind/continuity"], milestone: 1, state: "open" });
-    // On GitHub with gh-writer's marker hidden after it; in gh-writer without.
+    // On GitHub with Writer's marker hidden after it; in Writer without.
     expect(issuesOf().issues.find((i) => i.number === 5)).toMatchObject({ body: expect.stringMatching(/^It's \*Marta\* in chapter one\.\n\n<!-- gh-writer-create: [\w-]+ -->$/), user: "ada" });
     expect(made.body).toBe("It's *Marta* in chapter one.");
 
@@ -220,7 +220,7 @@ describe("labels for bible entries", () => {
     const issues = withNovel();
     await issues.refresh();
     const made = await issues.create({ title: "What does Ada know?", labels: ["char/ada-varn"] });
-    // Labelled on github.com by name, before gh-writer made the label: GitHub made it, uncoloured.
+    // Labelled on github.com by name, before Writer made the label: GitHub made it, uncoloured.
     fake.addIssue("ada", repoName(), { title: "Ben's debts", labels: ["char/ben-varn"] });
     const ada = join(dir, "bible/characters/ada.md");
     writeFileSync(ada, readFileSync(ada, "utf8").replace("name: Ada Varn", "name: Ada Kost"));
@@ -296,7 +296,7 @@ describe("offline", () => {
     expect(await issues.get(1)).toMatchObject({ state: "closed", pending: true, comments: [{ body: "The clock in chapter two says otherwise." }, { body: "Fixed offline.", pending: true }] });
     expect(issuesOf().issues).toHaveLength(4);
 
-    // gh-writer restarts: the queue is still there.
+    // Writer restarts: the queue is still there.
     const again = open();
     expect((await again.status()).queued).toBe(5);
     offline = false;

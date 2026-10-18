@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "gh-writer",
+  "productName": "writer",
   "version": "0.1.0",
-  "identifier": "io.github.heffrey78.ghwriter",
+  "identifier": "io.github.heffrey78.writer",
   "build": {
     "frontendDist": "../loading"
   },
@@ -26,7 +26,7 @@
     ],
     "resources": {
       "../../../dist/server/": "server/",
-      "../../../LICENSE.md": "licenses/gh-writer-LICENSE.md"
+      "../../../LICENSE.md": "licenses/writer-LICENSE.md"
     },
     "publisher": "Jeff Wikstrom",
     "copyright": "Copyright (c) 2026 Jeff Wikstrom"

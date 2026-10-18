@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createServer, GitFailure, Library, LibraryError, type LibraryEntry, type RunningServer } from "@gh-writer/server";
+import { createServer, GitFailure, Library, LibraryError, type LibraryEntry, type RunningServer } from "@writer/server";
 
 export interface ServeOptions {
   /** 0 picks a free port. */
@@ -52,7 +52,7 @@ export async function runServe(dir: string | undefined, { port = 0, open = true,
     if (!web) say("The web app isn't built yet: run `npm run build` first. Serving the API only.");
     server = await createServer({ library, port, ...(web ? { web } : {}), ...(syncEvery !== undefined ? { sync: { intervalMs: syncEvery * 60_000 } } : {}) });
     launchUrl = novel ? server.launchUrlFor(`/novels/${novel.id}`) : server.launchUrl;
-    say(novel ? `gh-writer is serving ${novel.title} (${novel.path})` : `gh-writer is serving your library (${library.file})`);
+    say(novel ? `Writer is serving ${novel.title} (${novel.path})` : `Writer is serving your library (${library.file})`);
   } catch (e) {
     // The desktop app reads failures from the JSON line; on the command line they surface as before.
     if (!sidecar) throw e;
@@ -86,9 +86,9 @@ export async function runServe(dir: string | undefined, { port = 0, open = true,
   return 0;
 }
 
-/** The built web app (packages/web/dist, or beside the server bundle: GH_WRITER_WEB), if it has been built. */
+/** The built web app (packages/web/dist, or beside the server bundle: WRITER_WEB), if it has been built. */
 function webApp(): string | undefined {
-  const dir = process.env.GH_WRITER_WEB || fileURLToPath(new URL("../../web/dist", import.meta.url));
+  const dir = process.env.WRITER_WEB || fileURLToPath(new URL("../../web/dist", import.meta.url));
   return existsSync(join(dir, "index.html")) ? dir : undefined;
 }
 

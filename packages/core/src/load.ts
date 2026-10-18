@@ -74,7 +74,7 @@ export async function loadNovel(source: FileSource): Promise<Novel> {
     if (typeof version === "number" && version > SCHEMA_VERSION) {
       // Don't guess at a newer format: report only this.
       novel.diagnostics = [error("E_SCHEMA_VERSION", "novel.yaml",
-        `schema_version ${version} is newer than this validator supports (${SCHEMA_VERSION}); update gh-writer`)];
+        `schema_version ${version} is newer than this validator supports (${SCHEMA_VERSION}); update Writer`)];
       return novel;
     }
     novel.config = config as unknown as NovelFile;

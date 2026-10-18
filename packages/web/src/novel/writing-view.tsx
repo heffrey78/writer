@@ -1,5 +1,5 @@
-import { readAnchor, readFrontMatter, type Chapter, type Novel, type Scene } from "@gh-writer/core";
-import { countWords } from "@gh-writer/core";
+import { readAnchor, readFrontMatter, type Chapter, type Novel, type Scene } from "@writer/core";
+import { countWords } from "@writer/core";
 import {
   appContextMenu,
   caretBlock,
@@ -23,16 +23,16 @@ import {
   type Manuscript,
   type MentionTarget,
   type PictureCallbacks,
-} from "@gh-writer/editor";
-import { ChapterEditor, FindReplace, SceneEditor, useWritingModes, WordCount, type SpellService } from "@gh-writer/editor/react";
+} from "@writer/editor";
+import { ChapterEditor, FindReplace, SceneEditor, useWritingModes, WordCount, type SpellService } from "@writer/editor/react";
 import type { Editor } from "@tiptap/core";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { Plus } from "lucide-react";
 import { Button } from "../ui/button.tsx";
 import { create, useStore } from "zustand";
-import { joinSceneFile, splitSceneFile } from "@gh-writer/editor";
-import { imageUrl } from "@gh-writer/client";
+import { joinSceneFile, splitSceneFile } from "@writer/editor";
+import { imageUrl } from "@writer/client";
 import { api } from "../api.ts";
 import { useCommands } from "../commands.ts";
 import type { QuickEntries } from "../bible/quick-entries.ts";

@@ -5,8 +5,8 @@ import { git, gitInstall } from "./git.ts";
 /**
  * What the running app is (D9): its version, the Node and git it runs on, the licences it ships, and
  * whether a newer release is out. The desktop app says what it is through the environment:
- * GH_WRITER_APP_VERSION and GH_WRITER_LICENSES (a folder of licence texts). From a terminal
- * (`gh-writer serve`) there's no app version and no update check: updating is the checkout's.
+ * WRITER_APP_VERSION and WRITER_LICENSES (a folder of licence texts). From a terminal
+ * (`writer serve`) there's no app version and no update check: updating is the checkout's.
  */
 export interface AppInfo {
   desktop: boolean;
@@ -32,7 +32,7 @@ export interface License {
 }
 
 /** Where releases come from. */
-export const RELEASES_REPO = "heffrey78/gh-writer";
+export const RELEASES_REPO = "heffrey78/writer";
 const DAY = 24 * 60 * 60 * 1000;
 const HOUR = 60 * 60 * 1000;
 
@@ -91,7 +91,7 @@ export class UpdateCheck {
 }
 
 export async function appInfo(updates: UpdateCheck): Promise<AppInfo> {
-  const version = process.env.GH_WRITER_APP_VERSION || null;
+  const version = process.env.WRITER_APP_VERSION || null;
   let gitVersion: string | null = null;
   try {
     const { major, minor, patch } = await git().version();
@@ -108,9 +108,9 @@ export async function appInfo(updates: UpdateCheck): Promise<AppInfo> {
   };
 }
 
-/** The licence texts the desktop app ships (GH_WRITER_LICENSES), by name; none from a terminal. */
+/** The licence texts the desktop app ships (WRITER_LICENSES), by name; none from a terminal. */
 export async function licenses(): Promise<License[]> {
-  const dir = process.env.GH_WRITER_LICENSES;
+  const dir = process.env.WRITER_LICENSES;
   if (!dir) return [];
   const names = (await readdir(dir).catch(() => [])).filter((n) => /\.(txt|md)$/.test(n)).sort();
   return Promise.all(names.map(async (name) => ({ name, text: await readFile(join(dir, name), "utf8") })));

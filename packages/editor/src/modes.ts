@@ -71,7 +71,7 @@ export const writingModes = createStore<WritingModesStore>()(
       set: (modes) => set(modes),
     }),
     {
-      name: "gh-writer:writing-modes",
+      name: "writer:writing-modes",
       storage: createJSONStorage(() => storage),
       partialize: ({ focus, dim, typewriter, pinCount, spellcheck, linkSuggestions }) => ({ focus, dim, typewriter, pinCount, spellcheck, linkSuggestions }),
     },

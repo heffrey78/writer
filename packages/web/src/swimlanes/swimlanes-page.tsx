@@ -1,4 +1,4 @@
-import { editYaml, type Entity, type Novel, type Scene } from "@gh-writer/core";
+import { editYaml, type Entity, type Novel, type Scene } from "@writer/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { Popover } from "radix-ui";
 import { useId, useMemo, useState } from "react";
@@ -7,14 +7,14 @@ import { GapControls } from "../diagrams/gap-controls.tsx";
 import { amount, readGap, writeGap } from "../diagrams/gap-param.ts";
 import { readSize, SceneGrid, SizeSelect, type GridMark } from "../diagrams/scene-grid.tsx";
 import { ExportMenu } from "../diagrams/export-menu.tsx";
-import { plotlinesSvg } from "@gh-writer/core/snapshots";
+import { plotlinesSvg } from "@writer/core/snapshots";
 import { useNotice } from "../novel/notice.tsx";
 import { plotlineEdits, type PlotlineChange } from "../novel/plotline-edits.ts";
 import { useSceneEdit } from "../novel/scene-edit.ts";
 import type { Workspace } from "../novel/workspace.ts";
 import { Button } from "../ui/button.tsx";
 import { useViewParams } from "../ui/view-params.ts";
-import { cellKey, DEFAULT_GAP, gaps, swimlanes, zoomed, type Gap, type GapThreshold, type Mark } from "@gh-writer/core/diagrams";
+import { cellKey, DEFAULT_GAP, gaps, swimlanes, zoomed, type Gap, type GapThreshold, type Mark } from "@writer/core/diagrams";
 
 const number = new Intl.NumberFormat();
 

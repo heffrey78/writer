@@ -1,6 +1,6 @@
-// Bundle the gh-writer command (serve and the rest) into one ES module for Node's official binary,
+// Bundle the Writer command (serve and the rest) into one ES module for Node's official binary,
 // with what it reads at run time beside it (D9):
-//   gh-writer.mjs   the CLI and server, every dependency inlined but the keychain's native module
+//   writer.mjs   the CLI and server, every dependency inlined but the keychain's native module
 //   node_modules/   @napi-rs/keyring and its prebuilt module for this platform
 //   web/            the built web app
 //   template/       the novel template
@@ -25,7 +25,7 @@ const { version } = JSON.parse(readFileSync(join(repo, "packages/cli/package.jso
 rmSync(out, { recursive: true, force: true });
 await build({
   entryPoints: [join(repo, "packages/cli/src/bundle.ts")],
-  outfile: join(out, "gh-writer.mjs"),
+  outfile: join(out, "writer.mjs"),
   bundle: true,
   platform: "node",
   format: "esm",
@@ -35,7 +35,7 @@ await build({
   legalComments: "linked",
   banner: {
     js: [
-      `// gh-writer ${version}. Generated file, do not edit. Source: https://github.com/heffrey78/gh-writer`,
+      `// Writer ${version}. Generated file, do not edit. Source: https://github.com/heffrey78/writer`,
       'import { createRequire as __cr } from "node:module"; const require = __cr(import.meta.url);',
     ].join("\n"),
   },
@@ -50,4 +50,4 @@ for (const pkg of readdirSync(napi).filter((name) => name === "keyring" || name.
 cpSync(web, join(out, "web"), { recursive: true });
 cpSync(join(repo, "templates/novel"), join(out, "template"), { recursive: true });
 cpSync(join(repo, "packages/export/fonts"), join(out, "fonts"), { recursive: true });
-console.log(`Built ${join(out, "gh-writer.mjs")}`);
+console.log(`Built ${join(out, "writer.mjs")}`);

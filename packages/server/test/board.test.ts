@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
-import { countWords } from "@gh-writer/core";
+import { countWords } from "@writer/core";
 import { join } from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createServer, GitHub, Library, memoryStore, sessionCookie } from "../src/index.ts";

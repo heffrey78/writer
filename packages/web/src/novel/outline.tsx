@@ -1,4 +1,4 @@
-import { countWords, type Novel, type Scene, type SceneStatus } from "@gh-writer/core";
+import { countWords, type Novel, type Scene, type SceneStatus } from "@writer/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { GripVertical } from "lucide-react";
 import { Fragment, useEffect, useRef, useState, type DragEvent, type KeyboardEvent } from "react";

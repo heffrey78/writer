@@ -1,5 +1,5 @@
 {
-  "name": "@gh-writer/editor",
+  "name": "@writer/editor",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,7 +10,7 @@
     "./styles.css": "./src/styles.css"
   },
   "dependencies": {
-    "@gh-writer/core": "0.1.0",
+    "@writer/core": "0.1.0",
     "@tiptap/core": "^3.31.4",
     "@tiptap/extensions": "^3.31.4",
     "@tiptap/pm": "^3.31.4",

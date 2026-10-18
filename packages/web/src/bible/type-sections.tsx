@@ -1,5 +1,5 @@
-import { entryPresence, locationProfile, plotlineProfile, readFrontMatter, themeProfile, type Entity, type Novel, type Scene, type Tally } from "@gh-writer/core";
-import { joinSceneFile } from "@gh-writer/editor";
+import { entryPresence, locationProfile, plotlineProfile, readFrontMatter, themeProfile, type Entity, type Novel, type Scene, type Tally } from "@writer/core";
+import { joinSceneFile } from "@writer/editor";
 import { useMemo } from "react";
 import { Link } from "react-router";
 import type { Workspace } from "../novel/workspace.ts";

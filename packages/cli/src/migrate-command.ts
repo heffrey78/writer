@@ -1,5 +1,5 @@
 import { resolve } from "node:path";
-import { migrateNovel } from "@gh-writer/server";
+import { migrateNovel } from "@writer/server";
 
 /** Move the novel in `dir` to the newest format, as one commit, and return the process exit code. */
 export async function runMigrate(dir: string, out: (s: string) => void = console.log, err: (s: string) => void = console.error): Promise<number> {

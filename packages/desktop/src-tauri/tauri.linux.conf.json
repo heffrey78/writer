@@ -6,7 +6,7 @@
     ],
     "resources": {
       "../../../dist/server/": "server/",
-      "../../../LICENSE.md": "licenses/gh-writer-LICENSE.md",
+      "../../../LICENSE.md": "licenses/writer-LICENSE.md",
       "../../../dist/runtime/linux-x64/": "runtime/",
       "../../../dist/runtime/linux-x64/licenses/": "licenses/"
     },

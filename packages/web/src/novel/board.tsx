@@ -1,4 +1,4 @@
-import { countWords, type Novel, type Scene, type SceneStatus } from "@gh-writer/core";
+import { countWords, type Novel, type Scene, type SceneStatus } from "@writer/core";
 import { GripVertical } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
 import { Link, useSearchParams } from "react-router";

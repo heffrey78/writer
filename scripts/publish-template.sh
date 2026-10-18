@@ -3,18 +3,18 @@
 # on first run. Safe to re-run: it commits only when the template changed.
 #
 # Usage: scripts/publish-template.sh [owner/repo]
-#   default repo: heffrey78/gh-writer-novel-template
+#   default repo: heffrey78/writer-novel-template
 #   COMMIT_MESSAGE_SUFFIX: optional extra lines appended to the commit message
 set -euo pipefail
 
-REPO="${1:-heffrey78/gh-writer-novel-template}"
+REPO="${1:-heffrey78/writer-novel-template}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SRC="$ROOT/templates/novel"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
 if ! gh repo view "$REPO" >/dev/null 2>&1; then
-  gh repo create "$REPO" --private --description "Starter repository for a novel written with gh-writer"
+  gh repo create "$REPO" --private --description "Starter repository for a novel written with Writer"
 fi
 # Mark it as a template before any content lands, so the template's own
 # "Set up novel" workflow skips it.
@@ -33,7 +33,7 @@ if git diff --cached --quiet; then
 fi
 
 SOURCE_REV="$(git -C "$ROOT" rev-parse --short HEAD)"
-MESSAGE="Update template from gh-writer $SOURCE_REV"
+MESSAGE="Update template from Writer $SOURCE_REV"
 if [ -n "${COMMIT_MESSAGE_SUFFIX:-}" ]; then
   MESSAGE="$MESSAGE"$'\n\n'"$COMMIT_MESSAGE_SUFFIX"
 fi

@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { createServer, Library, sessionCookie, type RunningServer } from "@gh-writer/server";
+import { createServer, Library, sessionCookie, type RunningServer } from "@writer/server";
 import { createApi, createAutosave, type Api, type Autosave, type AutosaveState, type StorageLike } from "../src/index.ts";
 
 const SCENE = "manuscript/01-return/01-arrival/01-the-station.md";
@@ -62,7 +62,7 @@ const until = (a: Autosave, match: (s: AutosaveState) => boolean, ms = 3000) =>
   });
 
 beforeAll(() => {
-  tmp = mkdtempSync(join(tmpdir(), "gh-writer-client-"));
+  tmp = mkdtempSync(join(tmpdir(), "writer-client-"));
   const config = join(tmp, "gitconfig");
   writeFileSync(config, "[user]\n\tname = Test\n\temail = test@example.com\n");
   process.env.GIT_CONFIG_GLOBAL = config;
@@ -156,7 +156,7 @@ describe("autosave", () => {
     await server.close();
     a.change(SCENE, "Written while the server was down.\n");
     const failing = await until(a, (s) => s.status === "error");
-    expect(failing.error).toContain("Couldn't reach gh-writer");
+    expect(failing.error).toContain("Couldn't reach Writer");
     expect(failing.unsaved).toBe(1);
     await sleep(300); // several retries
     await start(lostPort);

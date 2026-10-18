@@ -114,7 +114,7 @@ describe("persistence", () => {
   it("refreshes the title and author when a novel is opened", async () => {
     const library = await openLibrary();
     const novel = await library.add(novelRepo());
-    expect(novel.author).toBe("gh-writer sample");
+    expect(novel.author).toBe("Writer sample");
     const yaml = join(novel.path, "novel.yaml");
     writeFileSync(yaml, readFileSync(yaml, "utf8").replace(/^title: .*$/m, "title: Varn").replace(/^author: .*$/m, "") + "author: Ada Writer\n");
     await library.touch(novel.id);
@@ -221,7 +221,7 @@ describe("Library.clone", () => {
 describe("expandHome", () => {
   it("reads a leading ~ as the home folder, as a shell does, and leaves other paths alone", () => {
     expect(expandHome("~")).toBe(homedir());
-    expect(expandHome("~/gh-writer/varn")).toBe(join(homedir(), "gh-writer/varn"));
+    expect(expandHome("~/writer/varn")).toBe(join(homedir(), "writer/varn"));
     expect(expandHome("  ~/novels ")).toBe(join(homedir(), "novels"));
     expect(expandHome("/srv/novels/~draft")).toBe("/srv/novels/~draft");
     expect(expandHome("relative/~/x")).toBe("relative/~/x");

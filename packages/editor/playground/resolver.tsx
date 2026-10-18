@@ -1,4 +1,4 @@
-import { merge3 } from "@gh-writer/core";
+import { merge3 } from "@writer/core";
 import { useMemo, useState } from "react";
 import { ConflictResolver, type ConflictFileView, type ResolvedFile } from "../src/react.tsx";
 import station from "../../../examples/sample-novel/manuscript/01-return/01-arrival/01-the-station.md?raw";

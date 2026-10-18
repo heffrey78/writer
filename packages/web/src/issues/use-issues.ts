@@ -1,15 +1,15 @@
-import { ApiError, type Issue, type IssueFilter, type IssueInput, type IssueList } from "@gh-writer/client";
+import { ApiError, type Issue, type IssueFilter, type IssueInput, type IssueList } from "@writer/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, keys } from "../api.ts";
 import { githubKey, useConnect } from "../github/connect.tsx";
 import { useNotice } from "../novel/notice.tsx";
 
-/** The novel's issues matching `filter`, from gh-writer's cache (refetched when they change). */
+/** The novel's issues matching `filter`, from Writer's cache (refetched when they change). */
 export function useIssueList(novelId: string, filter: IssueFilter, { enabled = true } = {}) {
   return useQuery({ queryKey: [...keys.issues(novelId), "list", filter], queryFn: () => api.issues.list(novelId, filter), enabled });
 }
 
-/** One issue with its comments. One gh-writer hasn't fetched yet (a link to it) is looked for on GitHub first. */
+/** One issue with its comments. One Writer hasn't fetched yet (a link to it) is looked for on GitHub first. */
 export function useIssue(novelId: string, number: number) {
   return useQuery({
     queryKey: [...keys.issues(novelId), "issue", number],

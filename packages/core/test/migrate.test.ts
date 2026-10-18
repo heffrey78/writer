@@ -80,7 +80,7 @@ describe("migration to format v2 (D11)", () => {
       const m = await migration(memorySource(files));
       return m.status === "refused" ? m.reason : m.status;
     };
-    expect(await reason({ "novel.yaml": V1.replace("1", "3") })).toMatch(/format v3, newer than this gh-writer/);
+    expect(await reason({ "novel.yaml": V1.replace("1", "3") })).toMatch(/format v3, newer than this Writer/);
     expect(await reason({ "novel.yaml": `${V1}entity_types:\n  - {key: happening, prefix: hap, folder: events, label: Happening}\n` })).toMatch(/“Happening” keeps its entries in bible\/events\//);
     expect(await reason({ "novel.yaml": V1, "bible/events.yaml": "events: [\n" })).toMatch(/bible\/events.yaml can't be read/);
     expect(await reason({})).toMatch(/no novel.yaml/);

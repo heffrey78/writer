@@ -1,7 +1,7 @@
-import type { Api } from "@gh-writer/client";
-import type { Novel } from "@gh-writer/core";
-import { addToDictionary, knownWords, parseDictionary } from "@gh-writer/core/dictionary";
-import { createWorkerSpellService, type SpellService } from "@gh-writer/editor";
+import type { Api } from "@writer/client";
+import type { Novel } from "@writer/core";
+import { addToDictionary, knownWords, parseDictionary } from "@writer/core/dictionary";
+import { createWorkerSpellService, type SpellService } from "@writer/editor";
 import { useEffect, useRef, useState } from "react";
 import affUrl from "../../../../node_modules/dictionary-en/index.aff?url";
 import dicUrl from "../../../../node_modules/dictionary-en/index.dic?url";

@@ -1,5 +1,5 @@
-import type { IssueLabel, IssueList, IssuesStatus, Milestone } from "@gh-writer/client";
-import { entityLabel, entityOfLabel, ISSUE_KINDS, kindLabel, kindOf, STOCK_LABELS, type Novel } from "@gh-writer/core";
+import type { IssueLabel, IssueList, IssuesStatus, Milestone } from "@writer/client";
+import { entityLabel, entityOfLabel, ISSUE_KINDS, kindLabel, kindOf, STOCK_LABELS, type Novel } from "@writer/core";
 import { plural } from "../bible/types.ts";
 import { useQueryClient } from "@tanstack/react-query";
 import { X } from "lucide-react";
@@ -296,7 +296,7 @@ export function MilestoneSelect({ id, value, milestones, onChange, any, canCreat
 }
 
 /**
- * How gh-writer's copy of the issues stands: signed out (it's what was kept), offline or rate limited
+ * How Writer's copy of the issues stands: signed out (it's what was kept), offline or rate limited
  * (changes wait), changes waiting, changes GitHub refused (with a way to drop each).
  */
 export function IssuesState({ status, onRefresh, onDiscard }: { status: IssuesStatus | undefined; onRefresh: () => void; onDiscard: (id: string) => void }) {
@@ -307,7 +307,7 @@ export function IssuesState({ status, onRefresh, onDiscard }: { status: IssuesSt
     <div className="grid gap-2 text-sm">
       {lapsed && (
         <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-warn/40 bg-warn-soft px-3 py-2">
-          <span>{github.signedIn ? "gh-writer's GitHub sign-in is missing a permission." : "gh-writer isn't signed in to GitHub."} These are the issues as last seen; changes need GitHub.</span>
+          <span>{github.signedIn ? "Writer's GitHub sign-in is missing a permission." : "Writer isn't signed in to GitHub."} These are the issues as last seen; changes need GitHub.</span>
           <Button size="sm" variant="primary" onClick={() => useConnect.getState().show(onRefresh)}>
             Reconnect GitHub
           </Button>

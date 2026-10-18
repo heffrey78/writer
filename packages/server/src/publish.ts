@@ -1,4 +1,4 @@
-import { ISSUE_KINDS, kindLabel, STOCK_LABELS } from "@gh-writer/core";
+import { ISSUE_KINDS, kindLabel, STOCK_LABELS } from "@writer/core";
 import { classifyGitError, git } from "./git.ts";
 import { GitHubError, type GitHub } from "./github.ts";
 import type { NovelWorkspace } from "./workspace.ts";
@@ -39,7 +39,7 @@ export async function publish(ws: NovelWorkspace, github: GitHub, { name, descri
   }
   const status = await github.status();
   const login = status.account?.login;
-  if (!status.signedIn || !login) throw new GitHubError("NO_SIGN_IN", "Connect gh-writer to GitHub first.");
+  if (!status.signedIn || !login) throw new GitHubError("NO_SIGN_IN", "Connect Writer to GitHub first.");
 
   const g = git(ws.root);
   let remote = (await g.raw(["remote", "get-url", "origin"]).catch(() => "")).trim();
@@ -82,7 +82,7 @@ export async function publish(ws: NovelWorkspace, github: GitHub, { name, descri
 
 /**
  * A new repository's labels for a novel: GitHub's stock ones (bug, enhancement, …) taken out, the
- * writing kinds put in. Best effort: a label left over is only hidden in gh-writer.
+ * writing kinds put in. Best effort: a label left over is only hidden in Writer.
  */
 async function writingLabels(github: GitHub, owner: string, name: string): Promise<void> {
   const repo = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}`;

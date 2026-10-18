@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { editFrontMatter, loadNovel, readFrontMatter } from "@gh-writer/core";
-import { nodeSource } from "@gh-writer/core/node";
+import { editFrontMatter, loadNovel, readFrontMatter } from "@writer/core";
+import { nodeSource } from "@writer/core/node";
 import { describe, expect, it } from "vitest";
 import { mentionEdits } from "../src/novel/mention-sync.ts";
 

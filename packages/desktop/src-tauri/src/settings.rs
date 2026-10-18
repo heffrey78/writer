@@ -36,7 +36,7 @@ mod tests {
 
     #[test]
     fn keeps_what_it_saved_and_defaults_otherwise() {
-        let dir = std::env::temp_dir().join(format!("gh-writer-settings-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("writer-settings-{}", std::process::id()));
         assert!(!Settings::load(&dir).system_git);
         Settings { system_git: true }.save(&dir).unwrap();
         assert!(Settings::load(&dir).system_git);

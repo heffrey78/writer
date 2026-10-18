@@ -1,8 +1,8 @@
 import { existsSync } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
 import { join, posix } from "node:path";
-import { editFrontMatter, editYaml, indexById, loadNovel, numberedName, slugify, uniqueId, type Chapter, type Novel, type Part, type Scene } from "@gh-writer/core";
-import { nodeSource } from "@gh-writer/core/node";
+import { editFrontMatter, editYaml, indexById, loadNovel, numberedName, slugify, uniqueId, type Chapter, type Novel, type Part, type Scene } from "@writer/core";
+import { nodeSource } from "@writer/core/node";
 import { parse, stringify } from "yaml";
 import { git } from "./git.ts";
 import { OperationError, transaction, type FileWrite, type OperationResult } from "./operations.ts";

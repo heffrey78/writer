@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
 import { styleText } from "node:util";
-import { validate, type Diagnostic } from "@gh-writer/core";
-import { nodeSource } from "@gh-writer/core/node";
+import { validate, type Diagnostic } from "@writer/core";
+import { nodeSource } from "@writer/core/node";
 
 export interface ValidateOptions {
   json?: boolean;

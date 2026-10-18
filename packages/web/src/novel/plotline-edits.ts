@@ -1,4 +1,4 @@
-import type { YamlEdit } from "@gh-writer/core";
+import type { YamlEdit } from "@writer/core";
 
 /** A scene's lists of entries. */
 export type SceneList = "characters" | "locations" | "themes" | "plotlines" | "entities";

@@ -2,7 +2,7 @@
 // .github/gh-writer/compile.mjs, with its type in .github/gh-writer/fonts/.
 // Usage: node compile.mjs [dir] [--format docx,epub,pdf] [--preset <name>] [--from <chapter>] [--to <chapter>] [--out <dir>]
 import { parseArgs } from "node:util";
-import { readFonts } from "@gh-writer/export";
+import { readFonts } from "@writer/export";
 import { runCompile } from "./compile-command.ts";
 
 const { values, positionals } = parseArgs({

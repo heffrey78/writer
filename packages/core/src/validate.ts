@@ -153,7 +153,7 @@ export function validateNovel(novel: Novel): Diagnostic[] {
   }
   if ((novel.config?.schema_version ?? 1) >= 2) {
     const leftover = novel.events.find((e) => e.index !== undefined);
-    if (leftover) push("warning", "W_EVENTS_YAML", leftover.file, "Events in bible/events.yaml are format v1's: run gh-writer migrate to give each its own file in bible/events/");
+    if (leftover) push("warning", "W_EVENTS_YAML", leftover.file, "Events in bible/events.yaml are format v1's: run writer migrate to give each its own file in bible/events/");
   }
 
   // Relationship types.

@@ -1292,7 +1292,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "gh-writer"
+name = "writer"
 version = "0.1.0"
 dependencies = [
  "serde",

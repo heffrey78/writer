@@ -9,7 +9,7 @@ import { runCompile } from "../src/compile-command.ts";
 
 const repo = fileURLToPath(new URL("../../../", import.meta.url));
 const template = join(repo, "templates/novel");
-const tmp = mkdtempSync(join(tmpdir(), "gh-writer-template-"));
+const tmp = mkdtempSync(join(tmpdir(), "writer-template-"));
 afterAll(() => rmSync(tmp, { recursive: true, force: true }));
 
 const node = (args: string[], cwd = repo, env: Record<string, string> = {}) => spawnSync("node", args, { cwd, encoding: "utf8", env: { ...process.env, NO_COLOR: "1", ...env } });
@@ -39,7 +39,7 @@ describe("novel template", () => {
     }
   }, 30_000);
 
-  it("vendors a compiler that matches the current source, with gh-writer's type alongside", () => {
+  it("vendors a compiler that matches the current source, with Writer's type alongside", () => {
     const fresh = join(tmp, "compile", "compile.mjs");
     expect(node([join(repo, "scripts/build-validator.ts"), "--compile", fresh]).status).toBe(0);
     const vendored = join(template, ".github/gh-writer");
@@ -85,7 +85,7 @@ describe("novel template", () => {
     expect(wf.jobs.compile.if).toContain("is_template");
     const steps = wf.jobs.compile.steps;
     const runs = steps.map((s) => s.run ?? "").join("\n");
-    // Checkpoints gh-writer takes by itself carry this trailer (packages/server/src/checkpoints.ts).
+    // Checkpoints Writer takes by itself carry this trailer (packages/server/src/checkpoints.ts).
     expect(runs).toContain("grep -q '^Checkpoint: *auto$'");
     expect(runs).toContain("node .github/gh-writer/compile.mjs . --out compiled");
     expect(runs).toContain('gh release create "$TAG" compiled/* --verify-tag --title "$NAME"');

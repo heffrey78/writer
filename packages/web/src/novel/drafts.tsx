@@ -1,4 +1,4 @@
-import { ApiError, type Checkpoint, type Version } from "@gh-writer/client";
+import { ApiError, type Checkpoint, type Version } from "@writer/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronRight, Split } from "lucide-react";
 import { Dialog } from "radix-ui";
@@ -248,7 +248,7 @@ function Panel({ novelId, workspace, close }: { novelId: string; workspace: Work
       {autoCount > 0 && (
         <label htmlFor={autoId} className="flex items-center gap-1.5 text-sm text-muted">
           <input id={autoId} type="checkbox" checked={showAuto} onChange={(e) => setShowAuto(e.target.checked)} />
-          Show the checkpoints gh-writer made by itself ({autoCount})
+          Show the checkpoints Writer made by itself ({autoCount})
         </label>
       )}
 

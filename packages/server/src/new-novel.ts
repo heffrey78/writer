@@ -1,17 +1,17 @@
 import { copyFile, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import { editYaml, loadNovel, newId } from "@gh-writer/core";
-import { nodeSource } from "@gh-writer/core/node";
-import { snapshots } from "@gh-writer/core/snapshots";
+import { editYaml, loadNovel, newId } from "@writer/core";
+import { nodeSource } from "@writer/core/node";
+import { snapshots } from "@writer/core/snapshots";
 import { hasGitIdentity } from "./committer.ts";
 import { git } from "./git.ts";
 
 /**
- * The novel template in this checkout of gh-writer (or beside the server bundle: GH_WRITER_TEMPLATE):
+ * The novel template in this checkout of Writer (or beside the server bundle: WRITER_TEMPLATE):
  * the same files a "Use this template" repository gets.
  */
-export const DEFAULT_TEMPLATE = process.env.GH_WRITER_TEMPLATE || fileURLToPath(new URL("../../../templates/novel", import.meta.url));
+export const DEFAULT_TEMPLATE = process.env.WRITER_TEMPLATE || fileURLToPath(new URL("../../../templates/novel", import.meta.url));
 
 /** The template's placeholder IDs, replaced with fresh ones in every new novel (as its init.mjs does on GitHub). */
 const TEMPLATE_IDS = ["nv_temp1a", "ch_temp1a", "sc_temp1a"];

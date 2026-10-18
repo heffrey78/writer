@@ -1,5 +1,5 @@
-import { ApiError } from "@gh-writer/client";
-import { slugify } from "@gh-writer/core";
+import { ApiError } from "@writer/client";
+import { slugify } from "@writer/core";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { create } from "zustand";
@@ -64,7 +64,7 @@ function Publish({ novel, onClose }: { novel: { id: string; folder: string }; on
     <Modal title="Put on GitHub" onClose={onClose}>
       {github.data && !signedIn ? (
         <div className="grid gap-3 text-sm">
-          <p>Connect gh-writer to GitHub first. The novel will go in a new repository on your account.</p>
+          <p>Connect Writer to GitHub first. The novel will go in a new repository on your account.</p>
           <div className="flex justify-end gap-2">
             <Button onClick={onClose}>Cancel</Button>
             <Button variant="primary" onClick={connect}>

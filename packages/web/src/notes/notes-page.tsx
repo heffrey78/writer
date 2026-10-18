@@ -1,4 +1,4 @@
-import { proseText, type Novel } from "@gh-writer/core";
+import { proseText, type Novel } from "@writer/core";
 import { Pin, Plus, Search } from "lucide-react";
 import { useId, useMemo, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router";

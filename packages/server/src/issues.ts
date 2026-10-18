@@ -1,12 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { entityLabel, entityOfLabel, ISSUE_KINDS, kindLabel, kindOf, passageIssueBody, type Novel } from "@gh-writer/core";
+import { entityLabel, entityOfLabel, ISSUE_KINDS, kindLabel, kindOf, passageIssueBody, type Novel } from "@writer/core";
 import { git } from "./git.ts";
 import { GitHubError, unreachable, type GitHub, type GitHubRepo } from "./github.ts";
 
 /*
- * A novel's GitHub issues (#8), as gh-writer keeps them: fetched from the novel's repository and
+ * A novel's GitHub issues (#8), as Writer keeps them: fetched from the novel's repository and
  * cached per clone in .git/gh-writer/issues.json (never committed: issues are work, not story facts,
  * D1), so they're there offline and cost few API calls. Changes go to GitHub, and its answer goes
  * into the cache. Changes made while GitHub can't be reached are made in the cache at once, queued
@@ -284,7 +284,7 @@ export class IssueStore {
   /**
    * Raise an issue about a passage: its body has the note, the passage quoted and a link to the scene
    * on GitHub at the latest commit holding it (at the passage's line when found there), and the
-   * hidden anchor gh-writer finds the passage by (D1). Queued like any other while offline.
+   * hidden anchor Writer finds the passage by (D1). Queued like any other while offline.
    */
   async raise(passage: Passage): Promise<Issue> {
     if (!passage.quote.trim()) throw new IssuesError("BAD_REQUEST", "Select the passage the issue is about.");
@@ -314,7 +314,7 @@ export class IssueStore {
     this.#changed();
   }
 
-  /** What a label of gh-writer's should be: a kind's, or a bible entry's (by its current name). */
+  /** What a label of Writer's should be: a kind's, or a bible entry's (by its current name). */
   async #known(name: string): Promise<Label | undefined> {
     const kind = kindOf(name);
     if (kind) return { name, color: kind.color, description: kind.description };
@@ -655,7 +655,7 @@ export class IssueStore {
 
   /**
    * Every page of a list, or undefined when GitHub says the first page hasn't changed (304 to its
-   * ETag): then nothing in it has, as far as gh-writer needs to know.
+   * ETag): then nothing in it has, as far as Writer needs to know.
    */
   async #pages<T>(repo: GitHubRepo, path: string): Promise<T[] | undefined> {
     const cache = this.#cache!;
@@ -769,7 +769,7 @@ function queueable(e: unknown): boolean {
   return error.code === "OFFLINE" || error.code === "RATE_LIMITED";
 }
 
-/** A new issue's body with gh-writer's marker after it (an HTML comment: invisible on github.com). */
+/** A new issue's body with Writer's marker after it (an HTML comment: invisible on github.com). */
 const withMarker = (body: string | undefined, marker: string) => `${body ?? ""}\n\n<!-- gh-writer-create: ${marker} -->`;
 
 const label = (n: number) => (n > 0 ? `#${n}` : "a new issue");
@@ -786,11 +786,11 @@ async function check(res: Response): Promise<void> {
   if ((res.status === 403 || res.status === 429) && (res.headers.get("x-ratelimit-remaining") === "0" || res.status === 429)) {
     const reset = Number(res.headers.get("x-ratelimit-reset"));
     const resetAt = Number.isFinite(reset) && reset > 0 ? new Date(reset * 1000).toISOString() : undefined;
-    throw new IssuesError("RATE_LIMITED", "GitHub has had enough requests from gh-writer for now.", resetAt);
+    throw new IssuesError("RATE_LIMITED", "GitHub has had enough requests from Writer for now.", resetAt);
   }
   if (res.status === 404) throw new IssuesError("NOT_FOUND", "GitHub doesn't have that (or doesn't let this sign-in see it).");
   if (res.status === 422) throw new IssuesError("BAD_REQUEST", `GitHub refused it: ${body.message ?? "invalid"}.`);
-  if (res.status === 403) throw new IssuesError("NO_SIGN_IN", `GitHub refused: ${body.message ?? "not allowed"}. Reconnect GitHub with the permissions gh-writer asks for.`);
+  if (res.status === 403) throw new IssuesError("NO_SIGN_IN", `GitHub refused: ${body.message ?? "not allowed"}. Reconnect GitHub with the permissions Writer asks for.`);
   throw new IssuesError("GITHUB", `GitHub answered ${res.status}${body.message ? `: ${body.message}` : ""}.`);
 }
 
@@ -833,7 +833,7 @@ function fromIssue(j: GhIssue): Issue {
   return {
     number: j.number,
     title: j.title,
-    // The marker of an issue gh-writer queued offline is for gh-writer only.
+    // The marker of an issue Writer queued offline is for Writer only.
     body: marker ? raw.replace(MARKER, "") : raw,
     state: j.state,
     labels: j.labels.map((l) => (typeof l === "string" ? l : l.name)),

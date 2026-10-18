@@ -3,8 +3,8 @@
  * cookie and the page's own Origin; elsewhere (tests, tools) pass them as `headers`.
  */
 
-import type { Comparison, ParagraphDiff } from "@gh-writer/core/compare";
-import type { SeriesSlot, WritingDay } from "@gh-writer/core";
+import type { Comparison, ParagraphDiff } from "@writer/core/compare";
+import type { SeriesSlot, WritingDay } from "@writer/core";
 
 /** GET /stats: the open version's writing days, the manuscript's words now, and novel.yaml's target. */
 /** How a relationship type is drawn: a palette slot and a line. */
@@ -21,7 +21,7 @@ export interface WritingStats {
   pending: { added: number; removed: number };
 }
 
-export type { ChapterComparison, ChangeStatus, Comparison, DiffPart, EntryComparison, EventComparison, FieldChange, ParagraphDiff, RelationshipComparison, SceneComparison } from "@gh-writer/core/compare";
+export type { ChapterComparison, ChangeStatus, Comparison, DiffPart, EntryComparison, EventComparison, FieldChange, ParagraphDiff, RelationshipComparison, SceneComparison } from "@writer/core/compare";
 
 /** The GitHub connection, as the server describes it (never with the token). */
 /** A name and email git signs commits with. */
@@ -65,7 +65,7 @@ export interface GitHubStatus {
   expired?: boolean;
   /** Signed in, but GitHub can't be reached. */
   offline?: boolean;
-  /** Signed in, but without permissions gh-writer needs: reconnect to grant them. */
+  /** Signed in, but without permissions Writer needs: reconnect to grant them. */
   missingScopes?: string[];
   /** Signed in, but without what the drafting board needs (`project`): only the board asks for a reconnect. */
   missingBoardScopes?: string[];
@@ -230,7 +230,7 @@ export interface CloneProgress {
 }
 
 export interface CloneOptions {
-  /** Where to clone to. Default: a folder named after the repository in ~/gh-writer. */
+  /** Where to clone to. Default: a folder named after the repository in ~/writer. */
   path?: string;
   onProgress?: (p: CloneProgress) => void;
   /** Aborting closes the request, which stops the clone. */
@@ -391,7 +391,7 @@ export function createApi({ baseUrl = "", headers = {}, fetch = globalThis.fetch
         keepalive: keepalive && (text?.length ?? 0) < KEEPALIVE_LIMIT,
       });
     } catch (e) {
-      throw new ApiError(0, "UNREACHABLE", `Couldn't reach gh-writer: ${e instanceof Error ? e.message : String(e)}`);
+      throw new ApiError(0, "UNREACHABLE", `Couldn't reach Writer: ${e instanceof Error ? e.message : String(e)}`);
     }
     const data = (res.status === 204 ? undefined : await res.json().catch(() => undefined)) as T & { code?: string; error?: string; detail?: string };
     if (!res.ok && !(res.status === 409 && passing !== undefined && data?.code === passing)) {
@@ -408,7 +408,7 @@ export function createApi({ baseUrl = "", headers = {}, fetch = globalThis.fetch
     try {
       res = await fetch(`${baseUrl}${path}`, { method, headers: { "content-type": image.type || "application/octet-stream", ...headers }, body: image, credentials: "same-origin" });
     } catch (e) {
-      throw new ApiError(0, "UNREACHABLE", `Couldn't reach gh-writer: ${e instanceof Error ? e.message : String(e)}`);
+      throw new ApiError(0, "UNREACHABLE", `Couldn't reach Writer: ${e instanceof Error ? e.message : String(e)}`);
     }
     const data = (await res.json().catch(() => undefined)) as T & { code?: string; error?: string };
     if (!res.ok) throw new ApiError(res.status, data?.code ?? "HTTP", data?.error ?? `${method} ${path}: HTTP ${res.status}`);
@@ -443,7 +443,7 @@ export function createApi({ baseUrl = "", headers = {}, fetch = globalThis.fetch
         });
       } catch (e) {
         if (signal?.aborted) throw e;
-        throw new ApiError(0, "UNREACHABLE", `Couldn't reach gh-writer: ${e instanceof Error ? e.message : String(e)}`);
+        throw new ApiError(0, "UNREACHABLE", `Couldn't reach Writer: ${e instanceof Error ? e.message : String(e)}`);
       }
       if (!res.ok || !res.body) {
         const data = (await res.json().catch(() => undefined)) as { code?: string; error?: string } | undefined;
@@ -497,7 +497,7 @@ export function createApi({ baseUrl = "", headers = {}, fetch = globalThis.fetch
         body: JSON.stringify(options),
         credentials: "same-origin",
       }).catch((e: unknown) => {
-        throw new ApiError(0, "UNREACHABLE", `Couldn't reach gh-writer: ${e instanceof Error ? e.message : String(e)}`);
+        throw new ApiError(0, "UNREACHABLE", `Couldn't reach Writer: ${e instanceof Error ? e.message : String(e)}`);
       });
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { code?: string; error?: string };
@@ -636,7 +636,7 @@ export interface IssueComment {
   pending?: boolean;
 }
 
-/** A GitHub issue of the novel's repository, as gh-writer has it (number negative while made offline). */
+/** A GitHub issue of the novel's repository, as Writer has it (number negative while made offline). */
 export interface Issue {
   number: number;
   title: string;

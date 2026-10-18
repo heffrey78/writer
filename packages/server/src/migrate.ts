@@ -1,7 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { migration, type FileSource, type Migration } from "@gh-writer/core";
-import { nodeSource } from "@gh-writer/core/node";
+import { migration, type FileSource, type Migration } from "@writer/core";
+import { nodeSource } from "@writer/core/node";
 import { readToolBytes, TOOLS_DIR } from "./files.ts";
 import { DEFAULT_TEMPLATE } from "./new-novel.ts";
 import { transaction, type FileWrite, type OperationResult } from "./operations.ts";

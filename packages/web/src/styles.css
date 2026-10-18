@@ -1,5 +1,5 @@
 @import "tailwindcss";
-@import "@gh-writer/editor/styles.css";
+@import "@writer/editor/styles.css";
 
 /*
  * One palette for the app and the editor: the editor's --ghw-* properties (light, dark, and

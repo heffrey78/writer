@@ -1,6 +1,6 @@
-import { ApiError } from "@gh-writer/client";
-import { entityLabel, ISSUE_KINDS, type Novel } from "@gh-writer/core";
-import { caretScene } from "@gh-writer/editor";
+import { ApiError } from "@writer/client";
+import { entityLabel, ISSUE_KINDS, type Novel } from "@writer/core";
+import { caretScene } from "@writer/editor";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Editor } from "@tiptap/core";
 import { X } from "lucide-react";

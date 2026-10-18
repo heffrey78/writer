@@ -1,4 +1,4 @@
-import type { Novel } from "@gh-writer/core";
+import type { Novel } from "@writer/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { useId, useState } from "react";
 import { api, keys } from "../api.ts";

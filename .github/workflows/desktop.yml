@@ -51,7 +51,7 @@ jobs:
       - run: npm ci
       - uses: actions/cache@v4
         with:
-          path: node_modules/.cache/gh-writer-runtime
+          path: node_modules/.cache/writer-runtime
           key: runtime-${{ hashFiles('scripts/fetch-runtime.ts') }}
       - name: The server bundle and the runtime (Node, git)
         run: |
@@ -90,7 +90,7 @@ jobs:
           useradd -m builder
           chown -R builder .
           deb=$(ls "$PWD"/dist/deb/*.deb)
-          su builder -c "GH_WRITER_DEB='$deb' packages/desktop/arch/build.sh"
+          su builder -c "WRITER_DEB='$deb' packages/desktop/arch/build.sh"
       - uses: actions/upload-artifact@v4
         with:
           name: arch
@@ -120,7 +120,7 @@ jobs:
         # Containers can't give WebKit's web process its own sandbox (no user namespaces).
         env:
           WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS: "1"
-        run: xvfb-run -a dbus-run-session -- /usr/lib/gh-writer/runtime/node/node smoke/smoke-desktop.mjs --sample smoke/sample-novel --gui
+        run: xvfb-run -a dbus-run-session -- /usr/lib/writer/runtime/node/node smoke/smoke-desktop.mjs --sample smoke/sample-novel --gui
 
   smoke-arch:
     name: Smoke test on a clean Arch
@@ -145,7 +145,7 @@ jobs:
       - name: Sign in, clone, write, sync, quit; and start and quit the app
         env:
           WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS: "1"
-        run: xvfb-run -a dbus-run-session -- /usr/lib/gh-writer/runtime/node/node smoke/smoke-desktop.mjs --sample smoke/sample-novel --gui
+        run: xvfb-run -a dbus-run-session -- /usr/lib/writer/runtime/node/node smoke/smoke-desktop.mjs --sample smoke/sample-novel --gui
 
   release:
     name: Draft the release
@@ -172,5 +172,5 @@ jobs:
           version=${GITHUB_REF_NAME#v}
           prerelease=$([[ "$version" == *-* ]] && echo --prerelease || true)
           gh release create "$GITHUB_REF_NAME" --draft $prerelease --verify-tag \
-            --title "gh-writer $version" --generate-notes \
+            --title "Writer $version" --generate-notes \
             artifacts/deb/*.deb artifacts/arch/*.pkg.tar.zst git-*.tar.xz dugite-native-*.tar.gz

@@ -6,7 +6,7 @@
 //               translations (the app answers git's credential prompts itself, and reads git's
 //               messages in English)
 //   licenses/   Node's and git's licences, and where git's source is
-// Downloads are cached in node_modules/.cache/gh-writer-runtime. For this machine's own target, it
+// Downloads are cached in node_modules/.cache/writer-runtime. For this machine's own target, it
 // checks that node and the git run with nothing else on PATH.
 // Usage: node scripts/fetch-runtime.ts [target] [--out <dir>]   (targets below; default: this machine's)
 //        node scripts/fetch-runtime.ts --versions                 (the pinned versions, as JSON)
@@ -80,7 +80,7 @@ if (!TARGETS.includes(target)) {
   process.exit(1);
 }
 const out = values.out ?? join(repo, "dist/runtime", target);
-const cache = join(repo, "node_modules/.cache/gh-writer-runtime");
+const cache = join(repo, "node_modules/.cache/writer-runtime");
 const windows = target.startsWith("win32");
 
 /** A file from the cache, or downloaded into it; either way, checked against its checksum. */
@@ -107,7 +107,7 @@ function hash(file: string): string {
 
 /** Unpack a .tar.gz, .tar.xz or .zip into a new temporary folder. */
 function unpack(archive: string): string {
-  const dir = mkdtempSync(join(tmpdir(), "gh-writer-runtime-"));
+  const dir = mkdtempSync(join(tmpdir(), "writer-runtime-"));
   if (archive.endsWith(".zip")) {
     for (const [path, bytes] of Object.entries(unzipSync(readFileSync(archive)))) {
       if (path.endsWith("/")) continue;
@@ -187,11 +187,11 @@ mkdirSync(join(out, "licenses"), { recursive: true });
   writeFileSync(
     join(out, "licenses/git-SOURCE.txt"),
     [
-      `gh-writer includes git ${GIT.version}, built by GitHub's dugite-native (${GIT.tag}) and distributed`,
+      `Writer includes git ${GIT.version}, built by GitHub's dugite-native (${GIT.tag}) and distributed`,
       "under the GNU General Public License, version 2 (git-COPYING.txt).",
       "",
-      "Its complete corresponding source is attached to every gh-writer release on GitHub, next to",
-      "the installers (https://github.com/heffrey78/gh-writer/releases), and is also available from:",
+      "Its complete corresponding source is attached to every Writer release on GitHub, next to",
+      "the installers (https://github.com/heffrey78/writer/releases), and is also available from:",
       `  git: https://github.com/git/git/tree/v${GIT.version}`,
       `  the build that packaged it: https://github.com/desktop/dugite-native/tree/${GIT.tag}`,
       "",
@@ -204,7 +204,7 @@ if (target === host) {
   const git = join(out, "git");
   const env = {
     PATH: "",
-    HOME: mkdtempSync(join(tmpdir(), "gh-writer-runtime-home-")),
+    HOME: mkdtempSync(join(tmpdir(), "writer-runtime-home-")),
     GIT_EXEC_PATH: windows ? join(git, "mingw64/libexec/git-core") : join(git, "libexec/git-core"),
     GIT_TEMPLATE_DIR: windows ? join(git, "mingw64/share/git-core/templates") : join(git, "share/git-core/templates"),
   };
@@ -213,7 +213,7 @@ if (target === host) {
     if (r.status !== 0) throw new Error(`${relative(out, file)} ${args.join(" ")} failed: ${r.error?.message ?? r.stderr}`);
     return r.stdout.trim();
   };
-  const scratch = mkdtempSync(join(tmpdir(), "gh-writer-runtime-check-"));
+  const scratch = mkdtempSync(join(tmpdir(), "writer-runtime-check-"));
   const gitBinary = windows ? join(git, "cmd/git.exe") : join(git, "bin/git");
   console.log(`  ${run(join(out, "node", windows ? "node.exe" : "node"), ["--version"])}, ${run(gitBinary, ["--version"])}`);
   run(gitBinary, ["init", "-q", join(scratch, "a")]);

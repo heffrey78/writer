@@ -1,5 +1,5 @@
-import { countWords, loadNovel, parseMarkdown, type Novel } from "@gh-writer/core";
-import { nodeSource } from "@gh-writer/core/node";
+import { countWords, loadNovel, parseMarkdown, type Novel } from "@writer/core";
+import { nodeSource } from "@writer/core/node";
 import type { Committer } from "./committer.ts";
 import { atomicWrite, writablePath } from "./files.ts";
 import { commitSource } from "./git-source.ts";
@@ -24,7 +24,7 @@ export interface Checkpoint {
   date: string;
   /** Manuscript words at the checkpoint. */
   words: number;
-  /** Taken by gh-writer itself (before a restore), not named by the author. */
+  /** Taken by Writer itself (before a restore), not named by the author. */
   auto: boolean;
   /** The branch it was made in, when it says (checkpoints made before versions don't). */
   branch?: string;

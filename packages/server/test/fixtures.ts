@@ -14,7 +14,7 @@ export const gitIn = (dir: string, ...args: string[]) => execFileSync("git", ["-
  * (credential helpers, signing…). Returns it and a function for fresh paths inside it.
  */
 export function scratch(prefix: string): { tmp: string; fresh: (name: string) => string; cleanUp: () => void } {
-  const tmp = mkdtempSync(join(tmpdir(), `gh-writer-${prefix}-`));
+  const tmp = mkdtempSync(join(tmpdir(), `writer-${prefix}-`));
   const config = join(tmp, "gitconfig");
   writeFileSync(config, "[user]\n\tname = Test\n\temail = test@example.com\n[init]\n\tdefaultBranch = main\n");
   process.env.GIT_CONFIG_GLOBAL = config;

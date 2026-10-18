@@ -15,7 +15,7 @@ const sample = join(repo, "examples/sample-novel");
 // The library goes to a temporary config directory, not the author's.
 const env = () => {
   const { FORCE_COLOR: _, ...rest } = process.env;
-  return { ...rest, NO_COLOR: "1", GH_WRITER_CONFIG_DIR: join(tmp, "config") };
+  return { ...rest, NO_COLOR: "1", WRITER_CONFIG_DIR: join(tmp, "config") };
 };
 
 const run = (file: string, ...args: string[]) => {
@@ -27,7 +27,7 @@ let tmp: string;
 let broken: string;
 
 beforeAll(() => {
-  tmp = mkdtempSync(join(tmpdir(), "gh-writer-cli-"));
+  tmp = mkdtempSync(join(tmpdir(), "writer-cli-"));
   broken = join(tmp, "broken");
   cpSync(sample, broken, { recursive: true });
   const scene = join(broken, "manuscript/02-the-sale/01-night-crossing/01-the-betrayal.md");
@@ -42,7 +42,7 @@ afterAll(() => {
   rmSync(tmp, { recursive: true, force: true });
 });
 
-describe("gh-writer validate", () => {
+describe("writer validate", () => {
   it("exits 0 and summarises a valid novel", () => {
     const r = run(main, "validate", sample);
     expect(r.code).toBe(0);
@@ -64,7 +64,7 @@ describe("gh-writer validate", () => {
   });
 });
 
-describe("gh-writer snapshots", () => {
+describe("writer snapshots", () => {
   it("writes the diagrams, then has nothing to do; a relationship change rewrites its snapshots and nothing else", () => {
     const novel = join(tmp, "snapshots");
     cpSync(sample, novel, { recursive: true });
@@ -126,10 +126,10 @@ async function serve(file: string, ...args: string[]) {
   return { child, exited, launch, exchange, cookie, out: () => out };
 }
 
-describe("gh-writer serve", () => {
+describe("writer serve", () => {
   it("opens the novel, prints a launch URL with a token, serves it, and exits cleanly on SIGTERM", async () => {
     const { child, exited, launch, exchange, cookie, out } = await serve(main, sample);
-    expect(out()).toContain(`gh-writer is serving The Bridge at Varn (${realpathSync(sample)})`);
+    expect(out()).toContain(`Writer is serving The Bridge at Varn (${realpathSync(sample)})`);
 
     expect(exchange.status).toBe(303);
     const library = (await (await fetch(new URL("/api/library", launch), { headers: { cookie } })).json()) as { novels: { path: string }[] };
@@ -149,7 +149,7 @@ describe("gh-writer serve", () => {
   }, 15_000); // Runs the CLI four times: past 5 s on a busy machine.
 });
 
-describe("gh-writer serve --sidecar", () => {
+describe("writer serve --sidecar", () => {
   /** The first line on stdout, as JSON; with the rest of stdout, which should stay empty. */
   function sidecar(...args: string[]) {
     const child = spawn("node", [main, "serve", ...args, "--sidecar"], { env: env() });
@@ -217,7 +217,7 @@ describe("gh-writer serve --sidecar", () => {
   }, 20_000);
 });
 
-describe("gh-writer commands", () => {
+describe("Writer commands", () => {
   it("new-id prints a valid ID", () => {
     expect(run(main, "new-id", "char").out.trim()).toMatch(/^char_[0-9a-hjkmnp-tv-z]{6}$/);
     expect(run(main, "new-id", "X").code).toBe(1);
@@ -250,7 +250,7 @@ describe("server bundle", () => {
     const out = join(tmp, "server");
     const build = spawnSync("node", [join(repo, "scripts/build-server.ts"), out, "--web", web], { encoding: "utf8", cwd: repo });
     expect(build.status, build.stderr).toBe(0);
-    bundle = join(out, "gh-writer.mjs");
+    bundle = join(out, "writer.mjs");
   }, 60_000);
 
   it("serves the web app beside it and the API, away from the repository's node_modules", async () => {
@@ -281,7 +281,7 @@ describe("server bundle", () => {
   });
 });
 
-describe("gh-writer migrate", () => {
+describe("writer migrate", () => {
   it("moves the sample to format v2 in one commit, with the template's tools; it compiles the same and its own validator passes", () => {
     const novel = join(tmp, "migrate-me");
     cpSync(sample, novel, { recursive: true });
@@ -332,7 +332,7 @@ describe("gh-writer migrate", () => {
   });
 });
 
-describe("gh-writer compile", () => {
+describe("writer compile", () => {
   it("writes each format into compiled/ (which ignores itself), dated from the commit, chapters as asked", () => {
     const novel = join(tmp, "compile-me");
     cpSync(sample, novel, { recursive: true });

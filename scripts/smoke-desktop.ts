@@ -6,7 +6,7 @@
 //   3. Quit (stdin closed): the server exits 0 and nothing of the app is left running.
 //   With --gui, also start the app itself (a display is needed: xvfb-run) and quit it with SIGTERM.
 //
-// Usage: <packaged node> smoke-desktop.mjs --root /usr/lib/gh-writer --app /usr/bin/gh-writer --sample <sample novel> [--gui]
+// Usage: <packaged node> smoke-desktop.mjs --root /usr/lib/writer --app /usr/bin/writer --sample <sample novel> [--gui]
 // CI bundles it (scripts/build-smoke.ts), since a clean machine has no node_modules.
 import { execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -17,8 +17,8 @@ import { parseArgs } from "node:util";
 import { fakeGitHub } from "../packages/server/test/fake-github.ts";
 
 const { values } = parseArgs({ options: { root: { type: "string" }, app: { type: "string" }, sample: { type: "string" }, gui: { type: "boolean" } } });
-const root = values.root ?? "/usr/lib/gh-writer";
-const app = values.app ?? "/usr/bin/gh-writer";
+const root = values.root ?? "/usr/lib/writer";
+const app = values.app ?? "/usr/bin/writer";
 const sample = values.sample ?? new URL("../examples/sample-novel", import.meta.url).pathname;
 const node = join(root, "runtime/node/node");
 const bundledGit = join(root, "runtime/git");
@@ -39,9 +39,9 @@ const onPath = (process.env.PATH ?? "").split(delimiter).some((dir) => {
     return false;
   }
 });
-if (onPath && !process.env.GH_WRITER_SMOKE_ALLOW_GIT) fail("git is installed on this machine: the smoke test proves the app needs none (GH_WRITER_SMOKE_ALLOW_GIT=1 to run anyway).");
+if (onPath && !process.env.WRITER_SMOKE_ALLOW_GIT) fail("git is installed on this machine: the smoke test proves the app needs none (WRITER_SMOKE_ALLOW_GIT=1 to run anyway).");
 
-const scratch = mkdtempSync(join(tmpdir(), "gh-writer-smoke-"));
+const scratch = mkdtempSync(join(tmpdir(), "writer-smoke-"));
 const home = join(scratch, "home");
 mkdirSync(home);
 cpSync(sample, join(scratch, "seed"), { recursive: true });
@@ -61,20 +61,20 @@ git(scratch, "clone", "-q", "--bare", join(scratch, "seed"), fake.repoPath("ada"
 const serverEnv: Record<string, string> = {
   PATH: process.env.PATH!.split(delimiter).filter((d) => !d.startsWith(root)).join(delimiter),
   HOME: home,
-  GH_WRITER_CONFIG_DIR: join(scratch, "config"),
-  GH_WRITER_GIT: bundledGit,
-  GH_WRITER_ASKPASS: app,
-  GH_WRITER_APP_VERSION: "0.0.0-smoke",
-  GH_WRITER_GITHUB_URL: fake.url,
-  GH_WRITER_GITHUB_API_URL: fake.url,
-  GH_WRITER_GITHUB_CLIENT_ID: fake.clientId,
+  WRITER_CONFIG_DIR: join(scratch, "config"),
+  WRITER_GIT: bundledGit,
+  WRITER_ASKPASS: app,
+  WRITER_APP_VERSION: "0.0.0-smoke",
+  WRITER_GITHUB_URL: fake.url,
+  WRITER_GITHUB_API_URL: fake.url,
+  WRITER_GITHUB_CLIENT_ID: fake.clientId,
   // No Secret Service on a bare test machine: the sign-in is kept in memory.
-  GH_WRITER_TOKEN_STORE: "memory",
+  WRITER_TOKEN_STORE: "memory",
 };
 
 const leftovers = () => {
   try {
-    return execFileSync("pgrep", ["-f", join(root, "server/gh-writer.mjs")], { encoding: "utf8" }).trim();
+    return execFileSync("pgrep", ["-f", join(root, "server/writer.mjs")], { encoding: "utf8" }).trim();
   } catch {
     return "";
   }
@@ -87,7 +87,7 @@ const exited = (child: ChildProcess, ms: number) =>
 
 try {
   step("Starting the packaged server");
-  const server = spawn(node, [join(root, "server/gh-writer.mjs"), "serve", "--sidecar"], { env: serverEnv, stdio: ["pipe", "pipe", "inherit"] });
+  const server = spawn(node, [join(root, "server/writer.mjs"), "serve", "--sidecar"], { env: serverEnv, stdio: ["pipe", "pipe", "inherit"] });
   const line = await new Promise<string>((resolve, reject) => {
     let out = "";
     server.stdout!.setEncoding("utf8").on("data", (d: string) => (out += d).includes("\n") && resolve(out.slice(0, out.indexOf("\n"))));

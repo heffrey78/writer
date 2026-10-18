@@ -1,20 +1,20 @@
-import type { Entity, Novel, Scene, YamlEdit } from "@gh-writer/core";
+import type { Entity, Novel, Scene, YamlEdit } from "@writer/core";
 import { Popover } from "radix-ui";
 import { useId, useMemo, useState } from "react";
 import { plural } from "../bible/types.ts";
-import { gridKey } from "@gh-writer/core/diagrams";
+import { gridKey } from "@writer/core/diagrams";
 import { readSize, SceneGrid, SizeSelect, type GridMark } from "../diagrams/scene-grid.tsx";
 import { ExportMenu } from "../diagrams/export-menu.tsx";
-import { presenceSvg } from "@gh-writer/core/snapshots";
+import { presenceSvg } from "@writer/core/snapshots";
 import { entryEdits, type EntryChange } from "../novel/plotline-edits.ts";
 import { useSceneEdit } from "../novel/scene-edit.ts";
 import type { Workspace } from "../novel/workspace.ts";
 import { Button } from "../ui/button.tsx";
-import { DEFAULT_GAP, gaps, zoomed, type Gap } from "@gh-writer/core/diagrams";
+import { DEFAULT_GAP, gaps, zoomed, type Gap } from "@writer/core/diagrams";
 import { GapControls } from "../diagrams/gap-controls.tsx";
 import { amount, readGap, writeGap } from "../diagrams/gap-param.ts";
 import { useViewParams } from "../ui/view-params.ts";
-import { presence, sceneList, sortRows, totals, type Presence, type RowOrder } from "@gh-writer/core/diagrams";
+import { presence, sceneList, sortRows, totals, type Presence, type RowOrder } from "@writer/core/diagrams";
 
 const number = new Intl.NumberFormat();
 const ORDERS: [RowOrder, string][] = [

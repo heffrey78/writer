@@ -1,8 +1,8 @@
 import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { deflateSync } from "node:zlib";
-import { loadNovel, validate } from "@gh-writer/core";
-import { nodeSource } from "@gh-writer/core/node";
+import { loadNovel, validate } from "@writer/core";
+import { nodeSource } from "@writer/core/node";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { BibleOperations, createServer, hashText, Library, NovelWorkspace, sessionCookie } from "../src/index.ts";
 import { gitIn, novelRepo, scratch } from "./fixtures.ts";

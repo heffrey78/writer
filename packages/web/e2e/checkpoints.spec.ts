@@ -78,7 +78,7 @@ test("brings the whole manuscript back, with unsaved text kept in the automatic 
   // The automatic checkpoint holds what was there, and is listed when asked for.
   await page.getByRole("button", { name: /^Drafts: / }).click();
   await expect(panel(page).getByText("automatic", { exact: true })).toHaveCount(0);
-  await panel(page).getByRole("checkbox", { name: /Show the checkpoints gh-writer made/ }).check();
+  await panel(page).getByRole("checkbox", { name: /Show the checkpoints Writer made/ }).check();
   await expect(panel(page).getByRole("listitem").first()).toContainText("Before restoring the manuscript from “First draft”");
   await axe(page);
 });

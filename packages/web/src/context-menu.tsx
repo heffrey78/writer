@@ -1,4 +1,4 @@
-import { contributedMenuItems, setAppContextMenu, type ContextMenuGroup } from "@gh-writer/editor";
+import { contributedMenuItems, setAppContextMenu, type ContextMenuGroup } from "@writer/editor";
 import { ContextMenu } from "radix-ui";
 import { Fragment, useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { useNavigate } from "react-router";

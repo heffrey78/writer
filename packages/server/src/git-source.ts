@@ -1,4 +1,4 @@
-import { memorySource, type FileSource } from "@gh-writer/core";
+import { memorySource, type FileSource } from "@writer/core";
 import { gitPlumbing } from "./git.ts";
 
 /*

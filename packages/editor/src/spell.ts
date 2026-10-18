@@ -13,7 +13,7 @@ import type { SpellRequest } from "./spell.worker.ts";
  * The browser's own spell checker can't be given the story's names, has no API for
  * suggestions and differs between webviews, so checking is done by nspell (Hunspell-compatible)
  * with a Hunspell dictionary, in a Web Worker. Known words are the story bible's names and
- * aliases plus the novel's dictionary.txt (see @gh-writer/core/dictionary).
+ * aliases plus the novel's dictionary.txt (see @writer/core/dictionary).
  *
  * Paragraphs are checked once typing pauses, and only paragraphs that changed: results are
  * cached per node, and ProseMirror reuses untouched nodes. Misspellings are inline decorations

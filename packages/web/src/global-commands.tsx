@@ -41,7 +41,7 @@ export function GlobalCommands() {
         : { id: "app.github.connect", title: "Connect to GitHub…", group: "App", keywords: ["sign in", "log in", "account"], run: () => useConnect.getState().show() },
       { id: "app.shortcuts", title: "Keyboard shortcuts", group: "App", keys: APP_KEYS[1]!.keys, run: () => useOverlay.getState().set("shortcuts") },
       { id: "app.identity", title: "Your name and email…", group: "App", keywords: ["git", "author", "identity", "signature"], run: () => useIdentityDialog.getState().show() },
-      { id: "app.about", title: "About gh-writer", group: "App", keywords: ["version", "update", "licence", "license"], run: () => useAbout.getState().set(true) },
+      { id: "app.about", title: "About Writer", group: "App", keywords: ["version", "update", "licence", "license"], run: () => useAbout.getState().set(true) },
     ],
     [openNovel, showLibrary, novels, signedIn, queryClient],
   );

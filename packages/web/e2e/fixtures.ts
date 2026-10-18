@@ -11,7 +11,7 @@ const repo = fileURLToPath(new URL("../../..", import.meta.url));
 export const sample = join(repo, "examples/sample-novel");
 const cli = join(repo, "packages/cli/src/main.ts");
 
-/** A running `gh-writer serve`. */
+/** A running `writer serve`. */
 export interface Server {
   launchUrl: string;
   url: string;
@@ -29,13 +29,13 @@ export interface App {
   /** The server's own address. */
   url: string;
   env: NodeJS.ProcessEnv;
-  /** Start (or restart) the server; options are `gh-writer serve` arguments. */
+  /** Start (or restart) the server; options are `writer serve` arguments. */
   restart: (...args: string[]) => Promise<void>;
   /** Stop the server (SIGTERM, a clean shutdown). */
   stop: () => Promise<void>;
   /** Kill the server outright (SIGKILL): no shutdown, no last commit, as in a crash. */
   kill: () => Promise<void>;
-  /** Another gh-writer on this machine (another "computer" when given its own config dir), stopped after the test. */
+  /** Another Writer on this machine (another "computer" when given its own config dir), stopped after the test. */
   serveAnother: (args: string[], env?: Record<string, string>) => Promise<Server>;
   /** A git repository holding a copy of the sample novel, committed. */
   novelRepo: (name?: string) => string;
@@ -134,19 +134,19 @@ export const test = base.extend<{ app: App; csp: void }>({
     { auto: true },
   ],
   app: async ({}, use, testInfo) => {
-    const home = mkdtempSync(join(tmpdir(), "gh-writer-web-"));
+    const home = mkdtempSync(join(tmpdir(), "writer-web-"));
     writeFileSync(join(home, ".gitconfig"), "[user]\n\tname = Test Author\n\temail = author@example.com\n[init]\n\tdefaultBranch = main\n");
     const github = await fakeGitHub({ gitRoot: join(home, "github") });
     const { GH_TOKEN: _gh, GITHUB_TOKEN: _github, ...outside } = process.env;
     const env: NodeJS.ProcessEnv = {
       ...outside,
       // Never the author's keychain or github.com: a fake GitHub, and the sign-in kept in memory.
-      GH_WRITER_GITHUB_URL: github.url,
-      GH_WRITER_GITHUB_API_URL: github.url,
-      GH_WRITER_GITHUB_CLIENT_ID: github.clientId,
-      GH_WRITER_TOKEN_STORE: "memory",
+      WRITER_GITHUB_URL: github.url,
+      WRITER_GITHUB_API_URL: github.url,
+      WRITER_GITHUB_CLIENT_ID: github.clientId,
+      WRITER_TOKEN_STORE: "memory",
       HOME: home,
-      GH_WRITER_CONFIG_DIR: join(home, "config"),
+      WRITER_CONFIG_DIR: join(home, "config"),
       GIT_CONFIG_GLOBAL: join(home, ".gitconfig"),
       GIT_CONFIG_NOSYSTEM: "1",
       FORCE_COLOR: "0",
@@ -199,12 +199,12 @@ export const test = base.extend<{ app: App; csp: void }>({
     await use(app);
     await Promise.all([stop(child), ...others.map((o) => stop(o))]);
     await github.close();
-    if (testInfo.status !== testInfo.expectedStatus) await testInfo.attach("gh-writer serve output", { body: log, contentType: "text/plain" });
+    if (testInfo.status !== testInfo.expectedStatus) await testInfo.attach("writer serve output", { body: log, contentType: "text/plain" });
     rmSync(home, { recursive: true, force: true });
   },
 });
 
-/** Start `gh-writer serve` and wait for its launch URL. */
+/** Start `writer serve` and wait for its launch URL. */
 function serve(args: string[], env: NodeJS.ProcessEnv, log: (s: string) => void): Promise<{ child: ChildProcess; launchUrl: string }> {
   const child = spawn("node", [cli, "serve", "--no-open", ...args], { cwd: env.HOME, env, stdio: ["ignore", "pipe", "pipe"] });
   return new Promise((resolve, reject) => {
@@ -219,8 +219,8 @@ function serve(args: string[], env: NodeJS.ProcessEnv, log: (s: string) => void)
       out += chunk.toString();
       log(chunk.toString());
     });
-    child.once("exit", (code, signal) => log(`[gh-writer serve exited: ${code ?? signal}]\n`));
-    child.once("exit", (code) => reject(new Error(`gh-writer serve exited (${code}):\n${out}`)));
+    child.once("exit", (code, signal) => log(`[writer serve exited: ${code ?? signal}]\n`));
+    child.once("exit", (code) => reject(new Error(`writer serve exited (${code}):\n${out}`)));
   });
 }
 

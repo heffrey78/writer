@@ -1,4 +1,4 @@
-import { bookImages, numberWords, type Align, type Block, type Book, type Run } from "@gh-writer/core";
+import { bookImages, numberWords, type Align, type Block, type Book, type Run } from "@writer/core";
 import type { CoverImage } from "./cover.ts";
 import { isoSeconds, xml } from "./xml.ts";
 import { zip, type ZipEntry } from "./zip.ts";

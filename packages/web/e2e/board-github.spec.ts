@@ -102,5 +102,5 @@ test("a board deleted on GitHub is said to be, and can be made again", async ({ 
 test("a sign-in without Projects is told to reconnect", async ({ page, app }) => {
   await open(page, app, { project: false });
   await panel(page).getByRole("button", { name: "Put this board on GitHub" }).click();
-  await expect(panel(page).getByRole("alert")).toContainText("doesn't allow gh-writer to use Projects");
+  await expect(panel(page).getByRole("alert")).toContainText("doesn't allow Writer to use Projects");
 });

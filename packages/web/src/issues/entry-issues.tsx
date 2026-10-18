@@ -1,5 +1,5 @@
-import type { IssueLabel } from "@gh-writer/client";
-import { entityLabel, entityOfLabel, type Entity, type Novel } from "@gh-writer/core";
+import type { IssueLabel } from "@writer/client";
+import { entityLabel, entityOfLabel, type Entity, type Novel } from "@writer/core";
 import { useId } from "react";
 import { Link } from "react-router";
 import { useGitHubRepo } from "../github/repo.ts";

@@ -1,4 +1,4 @@
-import { passageIssueBody, readAnchor } from "@gh-writer/core";
+import { passageIssueBody, readAnchor } from "@writer/core";
 import type { Page } from "@playwright/test";
 import { axe, expect, test, type App } from "./fixtures.ts";
 

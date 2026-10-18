@@ -1,6 +1,6 @@
-import { type Conflicts, type FileResolution } from "@gh-writer/client";
-import type { Novel } from "@gh-writer/core";
-import { ConflictResolver, type ResolvedFile } from "@gh-writer/editor/react";
+import { type Conflicts, type FileResolution } from "@writer/client";
+import type { Novel } from "@writer/core";
+import { ConflictResolver, type ResolvedFile } from "@writer/editor/react";
 import { useQuery } from "@tanstack/react-query";
 import { Dialog, VisuallyHidden } from "radix-ui";
 import { useState, type ReactNode } from "react";

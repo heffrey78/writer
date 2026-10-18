@@ -1,4 +1,4 @@
-import { mentions, readFrontMatter, type Novel, type YamlEdit } from "@gh-writer/core";
+import { mentions, readFrontMatter, type Novel, type YamlEdit } from "@writer/core";
 
 /** The scene list a mention of each entity type adds to: plotlines and themes are the author's to list. */
 const listFor = (type: string): "characters" | "locations" | "entities" | undefined =>

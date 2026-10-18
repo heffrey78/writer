@@ -1,4 +1,4 @@
-import { countWords, type Novel } from "@gh-writer/core";
+import { countWords, type Novel } from "@writer/core";
 import { ChevronDown, ChevronRight, Ellipsis, FilePlus, FolderPlus, History, Layers, Plus } from "lucide-react";
 import { ContextMenu, DropdownMenu } from "radix-ui";
 import { memo, useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent } from "react";

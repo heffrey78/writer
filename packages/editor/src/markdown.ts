@@ -1,4 +1,4 @@
-import { ID_PATTERN, picturePath } from "@gh-writer/core";
+import { ID_PATTERN, picturePath } from "@writer/core";
 import type { AlignType, BlockContent, List as MdList, ListItem, Nodes, PhrasingContent, Root, RootContent, TableCell, TableRow } from "mdast";
 import { fromMarkdown } from "mdast-util-from-markdown";
 import { gfmFromMarkdown, gfmToMarkdown } from "mdast-util-gfm";

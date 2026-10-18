@@ -1,9 +1,9 @@
 name: Compile
 
 # Compiles the manuscript to Word (standard manuscript format), EPUB and PDF, with the same files
-# as the gh-writer app makes from the same commit. Runs on demand (Actions → Compile → Run workflow),
+# as the Writer app makes from the same commit. Runs on demand (Actions → Compile → Run workflow),
 # keeping the files with the run, and for every named checkpoint pushed from the app (a checkpoint/…
-# tag), attaching them to a Release named after it. Checkpoints gh-writer takes by itself (before a
+# tag), attaching them to a Release named after it. Checkpoints Writer takes by itself (before a
 # restore) are skipped.
 on:
   push:
@@ -46,7 +46,7 @@ jobs:
           git fetch --force origin "+refs/tags/$TAG:refs/tags/$TAG"
           message=$(git tag --list --format='%(contents)' "$TAG")
           if printf '%s\n' "$message" | grep -q '^Checkpoint: *auto$'; then
-            echo "A checkpoint gh-writer took by itself: nothing to compile."
+            echo "A checkpoint Writer took by itself: nothing to compile."
             echo "skip=true" >> "$GITHUB_OUTPUT"
           fi
           name=$(printf '%s\n' "$message" | head -n 1)
@@ -75,5 +75,5 @@ jobs:
           if gh release view "$TAG" > /dev/null 2>&1; then
             gh release upload "$TAG" compiled/* --clobber
           else
-            gh release create "$TAG" compiled/* --verify-tag --title "$NAME" --notes "The manuscript at the checkpoint “$NAME”, compiled by gh-writer."
+            gh release create "$TAG" compiled/* --verify-tag --title "$NAME" --notes "The manuscript at the checkpoint “$NAME”, compiled by Writer."
           fi

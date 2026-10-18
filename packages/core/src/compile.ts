@@ -75,7 +75,7 @@ export interface Book {
 }
 
 export interface CompileOptions {
-  /** A preset in compile.yaml; default: the first there, or gh-writer's own. */
+  /** A preset in compile.yaml; default: the first there, or Writer's own. */
   preset?: string;
   /** The chapters to compile, by ID, inclusive; default the whole book. */
   from?: string;
@@ -89,7 +89,7 @@ export class CompileError extends Error {
   }
 }
 
-/** The presets to choose from: compile.yaml's, or gh-writer's own "manuscript". */
+/** The presets to choose from: compile.yaml's, or Writer's own "manuscript". */
 export function presets(novel: Novel): Record<string, CompilePreset> {
   return novel.compile?.presets ?? { manuscript: {} };
 }

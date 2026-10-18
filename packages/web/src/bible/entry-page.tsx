@@ -1,17 +1,17 @@
-import type { EntityFields, Reference } from "@gh-writer/client";
-import { entityOfLabel, type Entity, type Novel, type Relationship, type SceneLink } from "@gh-writer/core";
+import type { EntityFields, Reference } from "@writer/client";
+import { entityOfLabel, type Entity, type Novel, type Relationship, type SceneLink } from "@writer/core";
 import { useGitHubRepo } from "../github/repo.ts";
 import { EntryIssues } from "../issues/entry-issues.tsx";
 import { useIssueList } from "../issues/use-issues.ts";
 import { useNotice } from "../novel/notice.tsx";
-import { SceneEditor, type SpellService } from "@gh-writer/editor/react";
+import { SceneEditor, type SpellService } from "@writer/editor/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Trash2, X } from "lucide-react";
 import { AlertDialog } from "radix-ui";
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { Link, useNavigate } from "react-router";
 import { useStore } from "zustand";
-import { imageUrl } from "@gh-writer/client";
+import { imageUrl } from "@writer/client";
 import { api, keys } from "../api.ts";
 import type { Workspace } from "../novel/workspace.ts";
 import { ErrorAlert } from "../ui/alert.tsx";
@@ -412,4 +412,4 @@ function FieldEditor({
 }
 
 /** "Rival of Ben Varn, from “The Betrayal”", read from this entry's side. */
-export { describeRelationship as describe } from "@gh-writer/core/diagrams";
+export { describeRelationship as describe } from "@writer/core/diagrams";

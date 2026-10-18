@@ -1,4 +1,4 @@
-import { editYaml, isId, type YamlEdit } from "@gh-writer/core";
+import { editYaml, isId, type YamlEdit } from "@writer/core";
 import { isMap, parseDocument } from "yaml";
 import { OperationError } from "./operations.ts";
 import type { Env } from "./bible-routes.ts";

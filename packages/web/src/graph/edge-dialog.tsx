@@ -1,4 +1,4 @@
-import type { Novel, Relationship } from "@gh-writer/core";
+import type { Novel, Relationship } from "@writer/core";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog } from "radix-ui";
 import { api, keys } from "../api.ts";

@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createServer, Library, sessionCookie, type RunningServer } from "@gh-writer/server";
+import { createServer, Library, sessionCookie, type RunningServer } from "@writer/server";
 import { createApi, type Api, type CloneProgress } from "../src/index.ts";
 
 const sample = fileURLToPath(new URL("../../../examples/sample-novel", import.meta.url));
@@ -14,7 +14,7 @@ let api: Api;
 let bare: string;
 
 beforeAll(async () => {
-  tmp = mkdtempSync(join(tmpdir(), "gh-writer-clone-"));
+  tmp = mkdtempSync(join(tmpdir(), "writer-clone-"));
   const config = join(tmp, "gitconfig");
   writeFileSync(config, "[user]\n\tname = Test\n\temail = test@example.com\n[init]\n\tdefaultBranch = main\n");
   process.env.GIT_CONFIG_GLOBAL = config;

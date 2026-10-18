@@ -7,7 +7,10 @@ import type { GitAuth } from "./git.ts";
  * response, a log line, a file, or a repository's git config.
  */
 
-/** The gh-writer OAuth App's client ID (#100): public, and shipped in the app. GH_WRITER_GITHUB_CLIENT_ID overrides it. */
+/**
+ * The OAuth App's client ID (#100): public, and shipped in the app. WRITER_GITHUB_CLIENT_ID overrides it.
+ * It's still gh-writer's app, so GitHub's sign-in page names gh-writer until Writer registers its own.
+ */
 export const GITHUB_CLIENT_ID: string | undefined = "Ov23lidsTX79zar9Gxxv";
 
 /**
@@ -21,7 +24,7 @@ const NEEDED = ["repo", "workflow"];
 /** What the drafting board needs as well: without it, only the board asks for a reconnect. */
 const BOARD = ["project"];
 
-const SERVICE = "gh-writer";
+const SERVICE = "writer";
 /** A request to GitHub that takes longer is given up (as offline). */
 const TIMEOUT_MS = 15_000;
 const ACCOUNT = "github";
@@ -84,10 +87,10 @@ export function keychainStore(): TokenStore {
 const noKeychain = () =>
   new GitHubError(
     "NO_KEYCHAIN",
-    "gh-writer keeps your GitHub sign-in in the system keychain, and couldn't reach it. On Linux, install and unlock a Secret Service keyring (GNOME Keyring or KWallet), then try again.",
+    "Writer keeps your GitHub sign-in in the system keychain, and couldn't reach it. On Linux, install and unlock a Secret Service keyring (GNOME Keyring or KWallet), then try again.",
   );
 
-/** The status of a signed-in account: who, and any permission gh-writer needs that the token lacks. */
+/** The status of a signed-in account: who, and any permission Writer needs that the token lacks. */
 function signedInStatus({ scopes, ...account }: GitHubAccount, deviceFlow: boolean): AccountStatus {
   const missing = scopes ? NEEDED.filter((s) => !scopes.includes(s)) : [];
   const board = scopes ? BOARD.filter((s) => !scopes.includes(s)) : [];
@@ -99,7 +102,7 @@ export function unreachable(e: unknown): boolean {
   return e instanceof TypeError || (e instanceof DOMException && (e.name === "TimeoutError" || e.name === "AbortError"));
 }
 
-/** A store in memory, gone when the server stops: for tests (GH_WRITER_TOKEN_STORE=memory). */
+/** A store in memory, gone when the server stops: for tests (WRITER_TOKEN_STORE=memory). */
 export function memoryStore(): TokenStore {
   let token: string | undefined;
   return {
@@ -143,7 +146,7 @@ export interface AccountStatus {
   offline?: boolean;
   /** Why the keychain couldn't be read, when it couldn't. */
   keychain?: string;
-  /** Signed in, but without permissions gh-writer needs (e.g. an older sign-in without `workflow`): reconnect. */
+  /** Signed in, but without permissions Writer needs (e.g. an older sign-in without `workflow`): reconnect. */
   missingScopes?: string[];
   /** Signed in, but without what the drafting board needs (`project`): only the board asks for a reconnect. */
   missingBoardScopes?: string[];
@@ -212,13 +215,13 @@ export class GitHub {
     this.#fetch = f;
   }
 
-  /** From the environment: GH_WRITER_GITHUB_CLIENT_ID, GH_WRITER_GITHUB_URL, GH_WRITER_GITHUB_API_URL, GH_WRITER_TOKEN_STORE=memory. */
+  /** From the environment: WRITER_GITHUB_CLIENT_ID, WRITER_GITHUB_URL, WRITER_GITHUB_API_URL, WRITER_TOKEN_STORE=memory. */
   static fromEnv(env: NodeJS.ProcessEnv = process.env): GitHub {
     return new GitHub({
-      clientId: env.GH_WRITER_GITHUB_CLIENT_ID || GITHUB_CLIENT_ID,
-      ...(env.GH_WRITER_GITHUB_URL ? { webUrl: env.GH_WRITER_GITHUB_URL } : {}),
-      ...(env.GH_WRITER_GITHUB_API_URL ? { apiUrl: env.GH_WRITER_GITHUB_API_URL } : {}),
-      ...(env.GH_WRITER_TOKEN_STORE === "memory" ? { store: memoryStore() } : {}),
+      clientId: env.WRITER_GITHUB_CLIENT_ID || GITHUB_CLIENT_ID,
+      ...(env.WRITER_GITHUB_URL ? { webUrl: env.WRITER_GITHUB_URL } : {}),
+      ...(env.WRITER_GITHUB_API_URL ? { apiUrl: env.WRITER_GITHUB_API_URL } : {}),
+      ...(env.WRITER_TOKEN_STORE === "memory" ? { store: memoryStore() } : {}),
     });
   }
 
@@ -262,7 +265,7 @@ export class GitHub {
 
   /** Start the device flow: the author enters the code at the verification address. */
   async startDevice(): Promise<DeviceCode> {
-    if (!this.clientId) throw new GitHubError("NO_CLIENT_ID", "Signing in with a code isn't set up in this copy of gh-writer (it has no GitHub OAuth App client ID). Sign in with the gh CLI instead: gh auth login.");
+    if (!this.clientId) throw new GitHubError("NO_CLIENT_ID", "Signing in with a code isn't set up in this copy of Writer (it has no GitHub OAuth App client ID). Sign in with the gh CLI instead: gh auth login.");
     const res = await this.#post(`${this.webUrl}/login/device/code`, { client_id: this.clientId, scope: SCOPES.join(" ") });
     const body = (await res.json()) as { device_code?: string; user_code?: string; verification_uri?: string; expires_in?: number; interval?: number; error_description?: string };
     if (!res.ok || !body.device_code || !body.user_code || !body.verification_uri) {
@@ -357,7 +360,7 @@ export class GitHub {
     if (token) await this.#who(token).catch(() => {});
   }
 
-  /** Forget the token. gh-writer has no client secret, so it can't revoke it: github.com → Settings → Applications can. */
+  /** Forget the token. Writer has no client secret, so it can't revoke it: github.com → Settings → Applications can. */
   async signOut(): Promise<void> {
     this.#device = undefined;
     this.#account = undefined;
@@ -370,11 +373,11 @@ export class GitHub {
    */
   async api(path: string, init: { method?: string; body?: unknown; headers?: Record<string, string> } = {}): Promise<Response> {
     const token = await this.#store.get();
-    if (!token) throw new GitHubError("NO_SIGN_IN", "Connect gh-writer to GitHub first.");
+    if (!token) throw new GitHubError("NO_SIGN_IN", "Connect Writer to GitHub first.");
     const res = await this.#request(token, path, init);
     if (res.status === 401) {
       await this.#forget();
-      throw new GitHubError("NO_SIGN_IN", "GitHub no longer accepts gh-writer's sign-in (it was revoked or has expired). Connect to GitHub again.");
+      throw new GitHubError("NO_SIGN_IN", "GitHub no longer accepts Writer's sign-in (it was revoked or has expired). Connect to GitHub again.");
     }
     return res;
   }
@@ -397,9 +400,9 @@ export class GitHub {
     const error = body.errors?.[0];
     if (limited || error?.type === "RATE_LIMITED") {
       const reset = Number(res.headers.get("x-ratelimit-reset"));
-      throw new GitHubError("RATE_LIMITED", "GitHub has had enough requests from gh-writer for now.", Number.isFinite(reset) && reset > 0 ? new Date(reset * 1000).toISOString() : undefined);
+      throw new GitHubError("RATE_LIMITED", "GitHub has had enough requests from Writer for now.", Number.isFinite(reset) && reset > 0 ? new Date(reset * 1000).toISOString() : undefined);
     }
-    if (error?.type === "INSUFFICIENT_SCOPES") throw new GitHubError("NEEDS_SCOPE", "This GitHub sign-in doesn't allow gh-writer to use Projects. Reconnect GitHub to grant it.");
+    if (error?.type === "INSUFFICIENT_SCOPES") throw new GitHubError("NEEDS_SCOPE", "This GitHub sign-in doesn't allow Writer to use Projects. Reconnect GitHub to grant it.");
     if (error?.type === "NOT_FOUND") throw new GitHubError("NOT_FOUND", error.message ?? "GitHub doesn't have that (or doesn't let this sign-in see it).");
     if (error || !res.ok || body.data === undefined) {
       const message = error?.message ?? body.message ?? res.statusText;
@@ -465,7 +468,7 @@ export class GitHub {
         Accept: "application/vnd.github+json",
         Authorization: `Bearer ${token}`,
         "X-GitHub-Api-Version": "2022-11-28",
-        "User-Agent": "gh-writer",
+        "User-Agent": "writer",
         ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
       },
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
@@ -476,7 +479,7 @@ export class GitHub {
   #post(url: string, form: Record<string, string>): Promise<Response> {
     return this.#fetch(url, {
       method: "POST",
-      headers: { Accept: "application/json", "Content-Type": "application/x-www-form-urlencoded", "User-Agent": "gh-writer" },
+      headers: { Accept: "application/json", "Content-Type": "application/x-www-form-urlencoded", "User-Agent": "writer" },
       body: new URLSearchParams(form).toString(),
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });

@@ -1,4 +1,4 @@
-import { coverUrl, type LibraryEntry } from "@gh-writer/client";
+import { coverUrl, type LibraryEntry } from "@writer/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FolderOpen, GitBranch, MoreHorizontal, Plus, X } from "lucide-react";
 import { DropdownMenu } from "radix-ui";

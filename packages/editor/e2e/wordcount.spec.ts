@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { countWords } from "@gh-writer/core";
+import { countWords } from "@writer/core";
 import { expect, test, type Page } from "@playwright/test";
 import { splitSceneFile } from "../src/index.ts";
 import { caretAfter, open, settled, textbox } from "./helpers.ts";

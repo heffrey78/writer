@@ -1,6 +1,6 @@
 # Untitled Novel
 
-This novel uses the [gh-writer](https://github.com/heffrey78/gh-writer) format: plain Markdown and YAML files that you can edit in the gh-writer app, on github.com, or in any text editor.
+This novel uses the [Writer](https://github.com/heffrey78/writer) format: plain Markdown and YAML files that you can edit in the Writer app, on github.com, or in any text editor.
 
 ## Where things go
 
@@ -40,6 +40,6 @@ Every push that changes the story also runs the **Diagrams** workflow, which red
 
 ## Compiling the book
 
-The **Compile** workflow makes the manuscript into a Word file in standard manuscript format, an EPUB e-book and a PDF. It runs for every named checkpoint you make in the gh-writer app, attaching the files to a Release named after it (under Releases on the repository page), and on demand from the Actions tab (choose a preset and a range of chapters; the files are kept with the run). Presets live in `compile.yaml`. To compile locally: `node .github/gh-writer/compile.mjs` (files go to `compiled/`).
+The **Compile** workflow makes the manuscript into a Word file in standard manuscript format, an EPUB e-book and a PDF. It runs for every named checkpoint you make in the Writer app, attaching the files to a Release named after it (under Releases on the repository page), and on demand from the Actions tab (choose a preset and a range of chapters; the files are kept with the run). Presets live in `compile.yaml`. To compile locally: `node .github/gh-writer/compile.mjs` (files go to `compiled/`).
 
-The full format is specified in [docs/format/v2.md](https://github.com/heffrey78/gh-writer/blob/main/docs/format/v2.md).
+The full format is specified in [docs/format/v2.md](https://github.com/heffrey78/writer/blob/main/docs/format/v2.md).

@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { countWords, loadNovel } from "@gh-writer/core";
-import { nodeSource } from "@gh-writer/core/node";
+import { countWords, loadNovel } from "@writer/core";
+import { nodeSource } from "@writer/core/node";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Checkpoints, Committer, createServer, Library, sessionCookie, Syncer, type Checkpoint, type RestoreResult } from "../src/index.ts";
 import { gitIn, novelRepo, scratch } from "./fixtures.ts";

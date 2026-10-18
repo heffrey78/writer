@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { bookImages, type Book, type Novel } from "@gh-writer/core";
+import { bookImages, type Book, type Novel } from "@writer/core";
 import { unzlibSync, zlibSync } from "fflate";
 
 /*

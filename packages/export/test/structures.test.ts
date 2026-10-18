@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import { compileBook, loadNovel, memorySource, type Book } from "@gh-writer/core";
+import { compileBook, loadNovel, memorySource, type Book } from "@writer/core";
 import { strFromU8, unzipSync } from "fflate";
 import { JSDOM } from "jsdom";
 import { getDocument, OPS } from "pdfjs-dist/legacy/build/pdf.mjs";

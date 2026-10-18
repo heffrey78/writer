@@ -1,4 +1,4 @@
-import type { Novel } from "@gh-writer/core";
+import type { Novel } from "@writer/core";
 import { useState } from "react";
 import { Button } from "../ui/button.tsx";
 import { Modal } from "../ui/dialog.tsx";

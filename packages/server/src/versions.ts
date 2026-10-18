@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { editYaml, loadNovel } from "@gh-writer/core";
-import { nodeSource } from "@gh-writer/core/node";
+import { editYaml, loadNovel } from "@writer/core";
+import { nodeSource } from "@writer/core/node";
 import { slug, wordsIn, type Checkpoint, type Checkpoints } from "./checkpoints.ts";
 import { operationInProgress, type Committer } from "./committer.ts";
 import { commitMerge, ConflictError, openConflicts, prepareMerge, type Conflicts, type FileResolution, type PreparedMerge } from "./conflicts.ts";

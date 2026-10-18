@@ -1,4 +1,4 @@
-import { slugify } from "@gh-writer/core";
+import { slugify } from "@writer/core";
 
 /*
  * Pictures (#168): what shape each kind of picture is, and the geometry of cropping one. Kept apart

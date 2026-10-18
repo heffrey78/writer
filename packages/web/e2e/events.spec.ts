@@ -111,7 +111,7 @@ test("in a novel in format v1, the first change asks to move it to the new forma
 
   await page.getByRole("button", { name: "Edit when and how long" }).click();
   const ask = page.getByRole("alertdialog", { name: "Move this novel to the new format?" });
-  await expect(ask).toContainText("Copies of gh-writer from before this one won't open it afterwards.");
+  await expect(ask).toContainText("Copies of Writer from before this one won't open it afterwards.");
   for (const colorScheme of ["light", "dark"] as const) {
     await page.emulateMedia({ colorScheme });
     await axe(page);

@@ -148,14 +148,14 @@ test("checks spelling, knowing the story's names, and adds words to dictionary.t
   await expect.poll(() => (existsSync(join(m.here, "dictionary.txt")) ? m.read(m.here, "dictionary.txt").split("\n") : [])).toContain("brigde");
 });
 
-test("says when gh-writer stops answering", async ({ page, app }) => {
+test("says when Writer stops answering", async ({ page, app }) => {
   const m = machines(app);
   await open(page, app, m.here);
   await app.stop();
-  await expect(page.getByRole("alert")).toContainText("gh-writer isn't answering", { timeout: 10_000 });
+  await expect(page.getByRole("alert")).toContainText("Writer isn't answering", { timeout: 10_000 });
 });
 
-test("an error on the event stream alone says nothing while gh-writer answers; offline it does, until it's back (#197)", async ({ page, app }) => {
+test("an error on the event stream alone says nothing while Writer answers; offline it does, until it's back (#197)", async ({ page, app }) => {
   const m = machines(app);
   // The page's event streams, to report an error on as WebKit can while the stream holds.
   await page.addInitScript(() => {
@@ -170,7 +170,7 @@ test("an error on the event stream alone says nothing while gh-writer answers; o
   });
   await open(page, app, m.here);
   const error = () => page.evaluate(() => (window as unknown as { sources: EventSource[] }).sources.at(-1)!.dispatchEvent(new Event("error")));
-  const banner = page.getByRole("alert").filter({ hasText: "gh-writer isn't answering" });
+  const banner = page.getByRole("alert").filter({ hasText: "Writer isn't answering" });
 
   const health = page.waitForResponse((r) => r.url().endsWith("/api/health"));
   await error();

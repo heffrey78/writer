@@ -72,7 +72,7 @@ describe("writing modes", () => {
 
   test("modes persist to local storage, without the actions", () => {
     writingModes.getState().set({ focus: true, typewriter: true });
-    expect(JSON.parse(localStorage.getItem("gh-writer:writing-modes")!).state).toEqual({ focus: true, dim: false, typewriter: true, pinCount: false, spellcheck: true, linkSuggestions: false });
+    expect(JSON.parse(localStorage.getItem("writer:writing-modes")!).state).toEqual({ focus: true, dim: false, typewriter: true, pinCount: false, spellcheck: true, linkSuggestions: false });
   });
 
   test("commands describe themselves for the palette", () => {

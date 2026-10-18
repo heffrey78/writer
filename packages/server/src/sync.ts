@@ -85,9 +85,9 @@ export interface SyncerDeps {
   committer?: Committer;
   /** Runs the step that changes the work tree with writes to the novel and background commits held off. Default: commits only. */
   exclusive?: <T>(fn: () => Promise<T>) => Promise<T>;
-  /** gh-writer's GitHub credentials for the remote's URL, if any (otherwise git uses the author's own). */
+  /** Writer's GitHub credentials for the remote's URL, if any (otherwise git uses the author's own). */
   auth?: GitAuthSource;
-  /** The remote refused gh-writer's credentials: the connection should check whether they still hold. */
+  /** The remote refused Writer's credentials: the connection should check whether they still hold. */
   onAuthRefused?: () => void;
 }
 
@@ -271,7 +271,7 @@ export class Syncer {
       const failure = classifyGitError(e);
       if (auth && failure.code === "AUTH") {
         this.#onAuthRefused?.();
-        throw new GitFailure("AUTH", "GitHub didn't accept gh-writer's sign-in for this repository: it may have been revoked, or your account can't push to it. Connect to GitHub again, or check your access.", failure.detail);
+        throw new GitFailure("AUTH", "GitHub didn't accept Writer's sign-in for this repository: it may have been revoked, or your account can't push to it. Connect to GitHub again, or check your access.", failure.detail);
       }
       throw e;
     }

@@ -1,4 +1,4 @@
-import { countText, countWords, proseText } from "@gh-writer/core";
+import { countText, countWords, proseText } from "@writer/core";
 import { Extension } from "@tiptap/core";
 import type { Node } from "@tiptap/pm/model";
 import { Plugin, PluginKey, type EditorState } from "@tiptap/pm/state";
@@ -129,7 +129,7 @@ export const writingSession = createStore<WritingSessionStore>()(
         })),
     }),
     {
-      name: "gh-writer:writing-session",
+      name: "writer:writing-session",
       storage: createJSONStorage(() => safe(() => sessionStorage)),
       partialize: ({ startedAt, scenes }) => ({ startedAt, scenes }),
     },

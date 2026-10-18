@@ -1,12 +1,12 @@
-# @gh-writer/editor
+# @writer/editor
 
 The scene prose editor: a TipTap (ProseMirror) schema for scene prose, a lossless round-trip between it and the Markdown in a novel repository ([format spec](../../docs/format/v2.md)), and a React editor component.
 
 ## React component
 
 ```tsx
-import { SceneEditor } from "@gh-writer/editor/react";
-import "@gh-writer/editor/styles.css";
+import { SceneEditor } from "@writer/editor/react";
+import "@writer/editor/styles.css";
 
 <SceneEditor key={scene.id} markdown={scene.body} onChange={(body) => save(scene.id, body)} />;
 ```
@@ -49,7 +49,7 @@ Typewriter scrolling follows typing and keyboard movement, but not clicks, so th
 ### Word counts
 
 ```tsx
-import { WordCount } from "@gh-writer/editor/react";
+import { WordCount } from "@writer/editor/react";
 
 <WordCount chapterWords={chapterTotal} />; // chapterWords only for a single-scene editor
 ```
@@ -65,7 +65,7 @@ The counts are also available headless: `countNode`, `documentCounts`, and the `
 ### Find and replace
 
 ```tsx
-import { FindReplace } from "@gh-writer/editor/react";
+import { FindReplace } from "@writer/editor/react";
 
 <FindReplace
   manuscript={chapters.map((c) => ({ id: c.id, title: c.title, scenes: c.scenes.map((s) => ({ id: s.id, title: s.title, markdown: s.body })) }))}
@@ -95,8 +95,8 @@ The panel searches the scene holding the caret, its chapter or the whole manuscr
 ### Spell check
 
 ```tsx
-import { createWorkerSpellService } from "@gh-writer/editor";
-import { addToDictionary, knownWords, readDictionary } from "@gh-writer/core/dictionary";
+import { createWorkerSpellService } from "@writer/editor";
+import { addToDictionary, knownWords, readDictionary } from "@writer/core/dictionary";
 
 const spell = createWorkerSpellService({ aff, dic }, knownWords(novel, await readDictionary(source)));
 <SceneEditor spell={{ service: spell, onAddWord: (word) => saveDictionary(addToDictionary(dictionaryText, word)) }} />;
@@ -105,14 +105,14 @@ const spell = createWorkerSpellService({ aff, dic }, knownWords(novel, await rea
 Misspelled words are underlined as an inline decoration with `aria-invalid="spelling"`. Mod+. (or a right-click) opens a menu of suggestions, with "Add to dictionary" and "Ignore". When the app draws the right-click menu itself (`setAppContextMenu(true)`), a right-click adds those to its menu instead (`contributeMenuItems`, read with `contributedMenuItems`). In the menu, arrows move, Enter chooses and Escape returns to the text. The "Spell check" command turns checking off and on; the setting persists with the writing modes.
 
 - **Engine:** nspell, a Hunspell-compatible checker, running in a Web Worker. The browser's own checker can't learn the story's names, has no API for suggestions and differs between webviews. The app supplies the Hunspell dictionary (`aff` and `dic` text); the playground uses `dictionary-en`, which is US English. `createLocalSpellService` runs the same engine on the main thread, for tests.
-- **Known words:** every word of the bible's names and aliases, plus the novel's `dictionary.txt` (see the [format spec](../../docs/format/v2.md)), from `knownWords` in `@gh-writer/core/dictionary`. "Add to dictionary" calls `onAddWord`, for the app to save with `addToDictionary`, which inserts in sorted order so the change is one line. "Ignore" lasts the session. Possessives of known words ("Mirela's") are accepted.
+- **Known words:** every word of the bible's names and aliases, plus the novel's `dictionary.txt` (see the [format spec](../../docs/format/v2.md)), from `knownWords` in `@writer/core/dictionary`. "Add to dictionary" calls `onAddWord`, for the app to save with `addToDictionary`, which inserts in sorted order so the change is one line. "Ignore" lasts the session. Possessives of known words ("Mirela's") are accepted.
 - **Not checked:** mention labels, raw Markdown, words with digits, underscores or dots (numbers, IDs, abbreviations), and single letters.
 - **Cost:** paragraphs are checked after typing pauses (500 ms), and only those that changed, because results are cached per node. On the 10,600-word chapter benchmark, the 95th-percentile keystroke latency with spell check on is 21 ms.
 
 ### Chapter view
 
 ```tsx
-import { ChapterEditor } from "@gh-writer/editor/react";
+import { ChapterEditor } from "@writer/editor/react";
 
 <ChapterEditor
   key={chapter.id}
@@ -137,7 +137,7 @@ The headless pieces are `chapterContent` (the extensions, with `chapter` as the 
 ### Conflict resolver
 
 ```tsx
-import { ConflictResolver } from "@gh-writer/editor/react";
+import { ConflictResolver } from "@writer/editor/react";
 
 // After a sync conflict (server: GET /conflicts):
 <ConflictResolver
@@ -147,7 +147,7 @@ import { ConflictResolver } from "@gh-writer/editor/react";
 />;
 
 // After a save refused because the file changed on disk (autosave's onConflict):
-const { chunks } = merge2(conflict.mine, conflict.disk?.content ?? ""); // from @gh-writer/core
+const { chunks } = merge2(conflict.mine, conflict.disk?.content ?? ""); // from @writer/core
 <ConflictResolver files={[{ path: conflict.path, chunks }]} onResolve={(o) => autosave.resolve(conflict.path, (o[conflict.path] as { content: string }).content)} />;
 ```
 
@@ -166,12 +166,12 @@ A choice moves on to the next open conflict, and any choice can be changed befor
 
 ### Playground
 
-`npm run playground -w @gh-writer/editor` serves a test page with every sample-novel scene and chapter, a formatting sampler and a generated 10,000-word chapter, beside a live view of each file as it would be saved. `/?resolve` shows the conflict resolver on two versions of The Station. `npm run test:e2e` runs the Playwright tests against it, including an axe accessibility audit. Run `npx playwright install chromium` in this package once first.
+`npm run playground -w @writer/editor` serves a test page with every sample-novel scene and chapter, a formatting sampler and a generated 10,000-word chapter, beside a live view of each file as it would be saved. `/?resolve` shows the conflict resolver on two versions of The Station. `npm run test:e2e` runs the Playwright tests against it, including an axe accessibility audit. Run `npx playwright install chromium` in this package once first.
 
 ## Headless API
 
 ```ts
-import { joinSceneFile, parseProse, serializeProse, splitSceneFile } from "@gh-writer/editor";
+import { joinSceneFile, parseProse, serializeProse, splitSceneFile } from "@writer/editor";
 
 const scene = splitSceneFile(fileText);          // front matter is kept byte for byte
 const doc = parseProse(scene.body);              // ProseMirror document

@@ -1,4 +1,4 @@
-import type { Novel, Scene } from "@gh-writer/core";
+import type { Novel, Scene } from "@writer/core";
 
 export interface CorkboardFilter {
   pov?: string;

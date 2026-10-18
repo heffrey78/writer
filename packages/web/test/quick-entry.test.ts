@@ -1,5 +1,5 @@
-import { editFrontMatter } from "@gh-writer/core";
-import { joinSceneFile, splitSceneFile } from "@gh-writer/editor";
+import { editFrontMatter } from "@writer/core";
+import { joinSceneFile, splitSceneFile } from "@writer/editor";
 import { describe, expect, it } from "vitest";
 import { createStore } from "zustand/vanilla";
 import { unlink } from "../src/bible/quick-entry.ts";

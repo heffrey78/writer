@@ -1,5 +1,5 @@
 //! The server, run beside the app (D9): Node's official binary running the bundled server with
-//! `gh-writer serve --sidecar`. It prints one JSON line once it's listening, and stops when its stdin
+//! `writer serve --sidecar`. It prints one JSON line once it's listening, and stops when its stdin
 //! closes, so it goes with the app however the app goes, crashes included.
 
 use std::fs::{self, File};
@@ -33,7 +33,7 @@ impl Resources {
         let git = dir.join("runtime/git");
         Self {
             node: dir.join("runtime/node").join(if cfg!(windows) { "node.exe" } else { "node" }),
-            server: dir.join("server/gh-writer.mjs"),
+            server: dir.join("server/writer.mjs"),
             git: (git.is_dir() && !system_git).then_some(git),
             licenses: dir.join("licenses"),
         }
@@ -89,10 +89,10 @@ impl Sidecar {
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(log_file)
-            .env("GH_WRITER_APP_VERSION", version)
-            .env("GH_WRITER_LICENSES", &resources.licenses);
+            .env("WRITER_APP_VERSION", version)
+            .env("WRITER_LICENSES", &resources.licenses);
         if let Some(git) = &resources.git {
-            command.env("GH_WRITER_GIT", git).env("GH_WRITER_ASKPASS", askpass);
+            command.env("WRITER_GIT", git).env("WRITER_ASKPASS", askpass);
         }
         #[cfg(windows)]
         {

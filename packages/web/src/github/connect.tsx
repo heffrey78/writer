@@ -1,4 +1,4 @@
-import { ApiError, type DeviceCode, type GitHubStatus } from "@gh-writer/client";
+import { ApiError, type DeviceCode, type GitHubStatus } from "@writer/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Copy, ExternalLink } from "lucide-react";
 import { DropdownMenu } from "radix-ui";
@@ -63,7 +63,7 @@ export function AccountItems({ item }: { item: string }) {
   if (!signedIn) {
     return (
       <>
-        {expired && <p className="max-w-64 px-2 py-1.5 text-xs text-warn">GitHub stopped accepting gh-writer's sign-in (it was revoked or has expired).</p>}
+        {expired && <p className="max-w-64 px-2 py-1.5 text-xs text-warn">GitHub stopped accepting Writer's sign-in (it was revoked or has expired).</p>}
         <DropdownMenu.Item className={item} onSelect={() => show()}>
           <GitHubMark className="size-4" />
           {expired ? "Reconnect GitHub…" : "Connect GitHub…"}
@@ -90,7 +90,7 @@ export function AccountItems({ item }: { item: string }) {
       {missingScopes && (
         <>
           <p className="max-w-64 px-2 pb-1.5 text-xs text-warn">
-            This sign-in doesn't allow {missingScopes.join(" and ")}, which gh-writer needs to put novels on GitHub. Reconnect to grant it.
+            This sign-in doesn't allow {missingScopes.join(" and ")}, which Writer needs to put novels on GitHub. Reconnect to grant it.
           </p>
           <DropdownMenu.Item className={item} onSelect={() => show()}>
             Reconnect GitHub…
@@ -107,7 +107,7 @@ export function AccountItems({ item }: { item: string }) {
 type Step = { kind: "choose" } | { kind: "code"; code: DeviceCode; outcome?: "expired" | "denied" };
 
 /**
- * Connect gh-writer to GitHub: with gh's account when the gh CLI is signed in, or with a code the
+ * Connect Writer to GitHub: with gh's account when the gh CLI is signed in, or with a code the
  * author enters on github.com (the device flow), polled until GitHub says yes, no, or time's up.
  */
 export function ConnectDialog() {
@@ -175,7 +175,7 @@ function Connect({ then, onClose }: { then: (() => void) | undefined; onClose: (
       {step.kind === "choose" ? (
         <div className="grid gap-3 text-sm">
           <p className="text-muted">
-            gh-writer uses your GitHub account to clone and sync your novels, and to put new ones on GitHub. Your sign-in is kept in this computer's keychain.
+            Writer uses your GitHub account to clone and sync your novels, and to put new ones on GitHub. Your sign-in is kept in this computer's keychain.
           </p>
           {status?.keychain && <ErrorAlert title="The keychain can't be reached">{status.keychain}</ErrorAlert>}
           {status?.gh && (
@@ -191,7 +191,7 @@ function Connect({ then, onClose }: { then: (() => void) | undefined; onClose: (
             status &&
             !status.gh && (
               <p>
-                Signing in with a code isn't set up in this copy of gh-writer yet. Sign in with the GitHub CLI instead (<code className="font-mono">gh auth login</code>), then come back.
+                Signing in with a code isn't set up in this copy of Writer yet. Sign in with the GitHub CLI instead (<code className="font-mono">gh auth login</code>), then come back.
               </p>
             )
           )}

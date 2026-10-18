@@ -1,4 +1,4 @@
-import type { Novel } from "@gh-writer/core";
+import type { Novel } from "@writer/core";
 import { useEffect, useRef } from "react";
 import { Navigate, useLocation, useNavigate, useParams, useSearchParams } from "react-router";
 import { cn } from "../ui/cn.ts";

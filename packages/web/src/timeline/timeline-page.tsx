@@ -1,14 +1,14 @@
-import { overlaps, storyTimeline, type Novel, type TimelineItem } from "@gh-writer/core";
+import { overlaps, storyTimeline, type Novel, type TimelineItem } from "@writer/core";
 import { Fragment, useMemo } from "react";
 import { Link } from "react-router";
 import { Button } from "../ui/button.tsx";
 import { cn } from "../ui/cn.ts";
-import { timelineMermaid, timelineSvg } from "@gh-writer/core/snapshots";
+import { timelineMermaid, timelineSvg } from "@writer/core/snapshots";
 import { ExportMenu } from "../diagrams/export-menu.tsx";
 import { useNewEvent } from "../events/new-event.tsx";
 import { DayOne } from "./day-one.tsx";
 import { useViewParams } from "../ui/view-params.ts";
-import { itemId, itemTitle, jump, lanesOf, timeline, when, type LaneMode } from "@gh-writer/core/diagrams";
+import { itemId, itemTitle, jump, lanesOf, timeline, when, type LaneMode } from "@writer/core/diagrams";
 
 const SLOT = 152;
 const HEAD = 168;

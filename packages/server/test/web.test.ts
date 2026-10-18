@@ -15,7 +15,7 @@ beforeAll(async () => {
   cleanUp = s.cleanUp;
   const web = s.fresh("dist");
   mkdirSync(join(web, "assets"), { recursive: true });
-  writeFileSync(join(web, "index.html"), '<!doctype html><title>gh-writer</title><script type="module" src="/assets/app-1a2b.js"></script>');
+  writeFileSync(join(web, "index.html"), '<!doctype html><title>Writer</title><script type="module" src="/assets/app-1a2b.js"></script>');
   writeFileSync(join(web, "assets/app-1a2b.js"), "console.log('app')");
   writeFileSync(join(web, "favicon.svg"), "<svg/>");
   outside = s.fresh("secret");
@@ -34,7 +34,7 @@ describe("the web app", () => {
     for (const path of ["/", "/novels/lib_abc123", "/novels/lib_abc123/scenes/sc_1"]) {
       const r = await send(server.port, path, { headers });
       expect(r.status, path).toBe(200);
-      expect(r.body).toContain("<title>gh-writer</title>");
+      expect(r.body).toContain("<title>Writer</title>");
       expect(r.headers["content-security-policy"]).toBe(CONTENT_SECURITY_POLICY);
       expect(r.headers["cache-control"]).toBe("no-cache");
     }

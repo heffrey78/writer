@@ -1,8 +1,8 @@
 import type { Editor } from "@tiptap/core";
 import { StrictMode, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { countWords, loadNovel, memorySource, uniqueId } from "@gh-writer/core";
-import { addToDictionary, knownWords, parseDictionary } from "@gh-writer/core/dictionary";
+import { countWords, loadNovel, memorySource, uniqueId } from "@writer/core";
+import { addToDictionary, knownWords, parseDictionary } from "@writer/core/dictionary";
 import { useStore } from "zustand";
 import {
   createWorkerSpellService,

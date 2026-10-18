@@ -1,7 +1,7 @@
 import { readdir, readFile, unlink } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
-import { loadNovel, parseYaml, picturePath, pictures, SCHEMA_VERSION, slugify, uniqueFileName, type FileSource, type Novel } from "@gh-writer/core";
-import { nodeSource } from "@gh-writer/core/node";
+import { loadNovel, parseYaml, picturePath, pictures, SCHEMA_VERSION, slugify, uniqueFileName, type FileSource, type Novel } from "@writer/core";
+import { nodeSource } from "@writer/core/node";
 import { watch, type FSWatcher } from "chokidar";
 import { BibleOperations } from "./bible.ts";
 import { BoardStore } from "./board.ts";
@@ -37,7 +37,7 @@ export interface WorkspaceOptions {
   commit?: CommitterOptions | false;
   /** Sync with the remote; false turns it off. */
   sync?: SyncerOptions | false;
-  /** gh-writer's GitHub sign-in, used for GitHub remotes when there is one. */
+  /** Writer's GitHub sign-in, used for GitHub remotes when there is one. */
   github?: GitHub;
 }
 

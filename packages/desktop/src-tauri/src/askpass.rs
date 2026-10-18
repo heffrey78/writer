@@ -1,10 +1,10 @@
 //! The app's executable as git's askpass program (D9). The server runs git with GIT_ASKPASS set to
-//! this executable and the GitHub token in GH_WRITER_GIT_TOKEN, for that one command. git runs it
+//! this executable and the GitHub token in WRITER_GIT_TOKEN, for that one command. git runs it
 //! with its prompt as the only argument and reads the answer from stdout. No shell is involved,
 //! which MinGit may not have.
 
 /// The environment variable holding the token, set by the server for one git command.
-const TOKEN_VAR: &str = "GH_WRITER_GIT_TOKEN";
+const TOKEN_VAR: &str = "WRITER_GIT_TOKEN";
 
 /// Whether the app was started by git to answer a prompt rather than to open a window.
 pub fn is_prompt(args: &[String]) -> bool {

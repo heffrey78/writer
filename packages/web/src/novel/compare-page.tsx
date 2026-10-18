@@ -1,4 +1,4 @@
-import type { ChapterComparison, ChangeStatus, Checkpoint, Comparison, FieldChange, ParagraphDiff, SceneComparison, Version } from "@gh-writer/client";
+import type { ChapterComparison, ChangeStatus, Checkpoint, Comparison, FieldChange, ParagraphDiff, SceneComparison, Version } from "@writer/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeftRight, ChevronRight } from "lucide-react";
 import { useId, useState } from "react";

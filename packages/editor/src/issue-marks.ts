@@ -1,4 +1,4 @@
-import { resolveAnchor } from "@gh-writer/core";
+import { resolveAnchor } from "@writer/core";
 import { Extension, type Editor } from "@tiptap/core";
 import type { Node } from "@tiptap/pm/model";
 import { Plugin, PluginKey } from "@tiptap/pm/state";

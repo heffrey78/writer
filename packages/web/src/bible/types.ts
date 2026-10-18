@@ -1,5 +1,5 @@
-import type { Entity, Novel } from "@gh-writer/core";
-import type { MentionEntity } from "@gh-writer/editor";
+import type { Entity, Novel } from "@writer/core";
+import type { MentionEntity } from "@writer/editor";
 
 /** A type's name for a list of its entries: "Characters". */
 export const plural = (label: string) => (/(s|x|ch|sh)$/i.test(label) ? `${label}es` : /[^aeiou]y$/i.test(label) ? `${label.slice(0, -1)}ies` : `${label}s`);

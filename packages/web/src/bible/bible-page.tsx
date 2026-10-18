@@ -1,4 +1,4 @@
-import { entryPresences, proseText, storyTimeline, type Entity, type EntryPresence, type Novel } from "@gh-writer/core";
+import { entryPresences, proseText, storyTimeline, type Entity, type EntryPresence, type Novel } from "@writer/core";
 import { useNewEvent } from "../events/new-event.tsx";
 import { whenOf } from "../novel/scene-details.tsx";
 import { Plus, Search } from "lucide-react";

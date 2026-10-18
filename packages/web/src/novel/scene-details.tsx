@@ -1,6 +1,6 @@
-import { countWords, dayOneFor, readFrontMatter, sceneFacts, type Novel, type YamlEdit } from "@gh-writer/core";
-import { chapterTitle } from "@gh-writer/core/diagrams";
-import { joinSceneFile } from "@gh-writer/editor";
+import { countWords, dayOneFor, readFrontMatter, sceneFacts, type Novel, type YamlEdit } from "@writer/core";
+import { chapterTitle } from "@writer/core/diagrams";
+import { joinSceneFile } from "@writer/editor";
 import { ChevronLeft, ChevronRight, Pencil, Pin, Plus, X } from "lucide-react";
 import { DropdownMenu } from "radix-ui";
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";

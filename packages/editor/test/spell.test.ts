@@ -3,9 +3,9 @@ import "./dom.ts";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { Editor } from "@tiptap/core";
-import { loadNovel } from "@gh-writer/core";
-import { knownWords } from "@gh-writer/core/dictionary";
-import { nodeSource } from "@gh-writer/core/node";
+import { loadNovel } from "@writer/core";
+import { knownWords } from "@writer/core/dictionary";
+import { nodeSource } from "@writer/core/node";
 import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 import {
   closeSpellingMenu,

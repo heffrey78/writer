@@ -1,4 +1,4 @@
-import { countWords, parseMarkdown } from "@gh-writer/core";
+import { countWords, parseMarkdown } from "@writer/core";
 
 /** One staged file: its git status and its text before and after. */
 export interface FileChange {

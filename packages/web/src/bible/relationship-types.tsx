@@ -1,5 +1,5 @@
-import { nextSeriesSlot, relationshipStyle, SERIES, slugify, type Novel, type Relationship, type RelationshipLine, type SeriesSlot } from "@gh-writer/core";
-import { describeRelationship as describe } from "@gh-writer/core/diagrams";
+import { nextSeriesSlot, relationshipStyle, SERIES, slugify, type Novel, type Relationship, type RelationshipLine, type SeriesSlot } from "@writer/core";
+import { describeRelationship as describe } from "@writer/core/diagrams";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog } from "radix-ui";
 import { useId, useState } from "react";

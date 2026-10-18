@@ -1,6 +1,6 @@
-import { ApiError } from "@gh-writer/client";
-import type { Novel } from "@gh-writer/core";
-import { slugify } from "@gh-writer/core";
+import { ApiError } from "@writer/client";
+import type { Novel } from "@writer/core";
+import { slugify } from "@writer/core";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog } from "radix-ui";
 import { useState, type FormEvent, type ReactNode } from "react";

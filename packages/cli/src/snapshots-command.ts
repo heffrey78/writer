@@ -1,8 +1,8 @@
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
-import { loadNovel } from "@gh-writer/core";
-import { nodeSource } from "@gh-writer/core/node";
-import { SNAPSHOT_MARKER, snapshots } from "@gh-writer/core/snapshots";
+import { loadNovel } from "@writer/core";
+import { nodeSource } from "@writer/core/node";
+import { SNAPSHOT_MARKER, snapshots } from "@writer/core/snapshots";
 
 export interface SnapshotsOptions {
   /** Only report whether the snapshots are current: exit 1 if any would change. */

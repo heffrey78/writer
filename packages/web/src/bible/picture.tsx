@@ -1,5 +1,5 @@
-import { imageUrl } from "@gh-writer/client";
-import type { Novel } from "@gh-writer/core";
+import { imageUrl } from "@writer/client";
+import type { Novel } from "@writer/core";
 import { useQuery } from "@tanstack/react-query";
 import { ImagePlus, Pencil } from "lucide-react";
 import { DropdownMenu } from "radix-ui";

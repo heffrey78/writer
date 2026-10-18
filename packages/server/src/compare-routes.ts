@@ -1,5 +1,5 @@
-import { loadNovel, type Novel } from "@gh-writer/core";
-import { compareNovels, compareProse } from "@gh-writer/core/compare";
+import { loadNovel, type Novel } from "@writer/core";
+import { compareNovels, compareProse } from "@writer/core/compare";
 import type { Hono } from "hono";
 import type { Env } from "./bible-routes.ts";
 import { CheckpointError } from "./checkpoints.ts";

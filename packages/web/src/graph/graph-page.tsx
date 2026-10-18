@@ -1,4 +1,4 @@
-import { backlinks, type Novel } from "@gh-writer/core";
+import { backlinks, type Novel } from "@writer/core";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 import { api } from "../api.ts";
@@ -12,11 +12,11 @@ import { useTheme } from "../theme.ts";
 import { Button } from "../ui/button.tsx";
 import { Picker } from "../ui/picker.tsx";
 import { useViewParams } from "../ui/view-params.ts";
-import { relationshipMermaid, relationshipSvg } from "@gh-writer/core/snapshots";
+import { relationshipMermaid, relationshipSvg } from "@writer/core/snapshots";
 import { ExportMenu } from "../diagrams/export-menu.tsx";
 import { EdgeDialog } from "./edge-dialog.tsx";
 import { GraphCanvas } from "./graph-canvas.tsx";
-import { graphAt, RELATIONSHIP_GRAPH, type GraphFilter } from "@gh-writer/core/diagrams";
+import { graphAt, RELATIONSHIP_GRAPH, type GraphFilter } from "@writer/core/diagrams";
 import { PAGE } from "../ui/page.ts";
 import { cn } from "../ui/cn.ts";
 

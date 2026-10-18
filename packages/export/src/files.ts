@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { slugify, type Book } from "@gh-writer/core";
+import { slugify, type Book } from "@writer/core";
 import type { CoverImage } from "./cover.ts";
 import { toDocx } from "./docx.ts";
 import { toEpub } from "./epub.ts";

@@ -1,5 +1,5 @@
 {
-  "name": "@gh-writer/client",
+  "name": "@writer/client",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -9,9 +9,9 @@
   },
   "dependencies": {
     "zustand": "^5.0.15",
-    "@gh-writer/core": "0.1.0"
+    "@writer/core": "0.1.0"
   },
   "devDependencies": {
-    "@gh-writer/server": "0.1.0"
+    "@writer/server": "0.1.0"
   }
 }

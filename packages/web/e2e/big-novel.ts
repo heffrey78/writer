@@ -1,6 +1,6 @@
 import { cpSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { ID_ALPHABET } from "@gh-writer/core";
+import { ID_ALPHABET } from "@writer/core";
 import { sample } from "./fixtures.ts";
 
 /** IDs that sort and never clash with the sample's: sc_000001, sc_000002… in the format's alphabet. */

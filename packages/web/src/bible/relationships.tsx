@@ -1,5 +1,5 @@
-import type { Entity, Novel, Relationship } from "@gh-writer/core";
-import { describeRelationship as describe } from "@gh-writer/core/diagrams";
+import type { Entity, Novel, Relationship } from "@writer/core";
+import { describeRelationship as describe } from "@writer/core/diagrams";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog } from "radix-ui";
 import { useId, useState, type FormEvent, type ReactNode } from "react";

@@ -1,5 +1,5 @@
-import type { IssueFilter } from "@gh-writer/client";
-import type { Novel } from "@gh-writer/core";
+import type { IssueFilter } from "@writer/client";
+import type { Novel } from "@writer/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { MessageSquare, Plus, RefreshCw, Search } from "lucide-react";
 import { useEffect, useId, useState } from "react";

@@ -1,11 +1,11 @@
-# @gh-writer/web
+# @writer/web
 
-The gh-writer app: what the author sees in the browser. `gh-writer serve` serves its build (`dist/`) from the local server ([packages/server](../server/README.md)), at every path outside `/api`.
+The Writer app: what the author sees in the browser. `writer serve` serves its build (`dist/`) from the local server ([packages/server](../server/README.md)), at every path outside `/api`.
 
 ```sh
-npm run build              # build the app (gh-writer serve serves dist/)
-npm run dev                # Vite on http://localhost:5180, with a real gh-writer server inside
-npm run test:e2e -w @gh-writer/web   # build, then Playwright against real servers
+npm run build              # build the app (writer serve serves dist/)
+npm run dev                # Vite on http://localhost:5180, with a real writer server inside
+npm run test:e2e -w @writer/web   # build, then Playwright against real servers
 ```
 
 ## Structure
@@ -19,8 +19,8 @@ npm run test:e2e -w @gh-writer/web   # build, then Playwright against real serve
 | `src/novel/` | A novel's workspace: navigation, the writing view, save and sync state, conflicts, spell check |
 | `src/commands.ts`, `src/palette.tsx` | The command registry, the palette (Mod+K) and the shortcut reference (Mod+/) |
 | `src/ui/` | Shared controls (button, field, alert, confirmation dialog), in the shadcn/ui manner |
-| `src/api.ts` | The `@gh-writer/client` API on the page's origin, and the TanStack Query client and keys |
-| `e2e/` | Playwright tests; `fixtures.ts` starts `gh-writer serve` for each test |
+| `src/api.ts` | The `@writer/client` API on the page's origin, and the TanStack Query client and keys |
+| `e2e/` | Playwright tests; `fixtures.ts` starts `writer serve` for each test |
 
 Server state goes through TanStack Query, UI state through Zustand. Components are Radix primitives (via `radix-ui`) styled with Tailwind.
 
@@ -31,13 +31,13 @@ Server state goes through TanStack Query, UI state through Zustand. Components a
 `src/novel/workspace.ts` holds what isn't rendering, so it's tested headless against a real server (`test/workspace.test.ts`):
 
 - **Files.** Each open scene file, split into its front matter (kept byte for byte) and the body the editor edits, with the text and hash last known on disk.
-- **Saving.** Edits go through `@gh-writer/client`'s autosave, which writes after a 2 s pause with the hash they build on.
+- **Saving.** Edits go through `@writer/client`'s autosave, which writes after a 2 s pause with the hash they build on.
 - **Changes on disk** arrive from the server's event stream. A scene with no unsaved text reloads in place, in the editor too. That includes text typed but not yet reported by the editor, which the workspace asks for. A scene with unsaved text is left alone: its next save is refused (409), and the workspace then merges it paragraph by paragraph (core's `merge3`) with the disk version, against the text it started from. A clean merge applies by itself. A clash opens the conflict resolver ("Yours" and "On disk"), and nothing is written until the author chooses.
 - **Other files** (new scenes, order files, the bible) reload the novel's model and the navigation.
 
 **Sync.** The badge follows the sync status from the event stream: Synced, Syncing…, n ahead or behind, Offline, Sign-in needed, Conflict, Local only. Its popover explains the state, shows the last sync and the commit status, and has Sync now, which saves pending text first. A conflict opens the resolver on the server's conflicts. Finishing commits the merge and pushes it. If the conflicts changed meanwhile, the fresh ones are shown.
 
-If the server stops answering, a banner says so. The unsaved text stays in the tab (session storage) and is saved when gh-writer is back.
+If the server stops answering, a banner says so. The unsaved text stays in the tab (session storage) and is saved when Writer is back.
 
 **Spell check** uses the English Hunspell dictionary, fetched on first use and checked in a worker, the bible's names, and the novel's `dictionary.txt`. "Add to dictionary" writes that file. **Find and replace** searches the open chapter live and every other scene from the model; replacements in closed scenes are written to their files.
 
@@ -74,7 +74,7 @@ Items can also be dragged: before or after an item of the same kind, or onto a c
 
 ## Exporting diagrams
 
-Every diagram page (Graph, Plotlines, Presence, Timeline) has **Export**: **Download SVG** saves what the page shows (the graph at its scene with its filters, the presence type chosen, the timeline's lanes), and **Download Mermaid (.mmd)** and **Copy Mermaid**, for the graph and the timeline, give it as Mermaid text, to keep as a file or paste into a ```` ```mermaid ```` block on GitHub. They come from the same renderers (`@gh-writer/core/snapshots`) as the snapshots that `gh-writer snapshots` and the novel's Diagrams workflow keep in `diagrams/`.
+Every diagram page (Graph, Plotlines, Presence, Timeline) has **Export**: **Download SVG** saves what the page shows (the graph at its scene with its filters, the presence type chosen, the timeline's lanes), and **Download Mermaid (.mmd)** and **Copy Mermaid**, for the graph and the timeline, give it as Mermaid text, to keep as a file or paste into a ```` ```mermaid ```` block on GitHub. They come from the same renderers (`@writer/core/snapshots`) as the snapshots that `writer snapshots` and the novel's Diagrams workflow keep in `diagrams/`.
 
 ## Plotline swimlanes
 
@@ -167,7 +167,7 @@ The theme follows the OS. Choosing Light or Dark in the top bar sets `data-theme
 
 ## Dev loop
 
-`npm run dev` starts Vite with a plugin that runs a gh-writer server in the same process, using the author's library (or `GH_WRITER_CONFIG_DIR`'s). The plugin proxies `/api` to it, with the session cookie attached. Host and Origin are rewritten to the server's own, so its security checks run as in production. Open http://localhost:5180; there's no token to copy. That convenience is the catch: any request to the dev server's `/api` gets the session, so keep `npm run dev` for development. Vite listens on localhost only, and its own host check stays on.
+`npm run dev` starts Vite with a plugin that runs a writer server in the same process, using the author's library (or `WRITER_CONFIG_DIR`'s). The plugin proxies `/api` to it, with the session cookie attached. Host and Origin are rewritten to the server's own, so its security checks run as in production. Open http://localhost:5180; there's no token to copy. That convenience is the catch: any request to the dev server's `/api` gets the session, so keep `npm run dev` for development. Vite listens on localhost only, and its own host check stays on.
 
 ## Resilience
 
@@ -175,8 +175,8 @@ The theme follows the OS. Choosing Light or Dark in the top bar sets `data-theme
 
 | Promise | Test |
 |---|---|
-| Draft, close the app, reopen: all work is there, no git by hand | Close the tab straight after typing (it saves on the way out), quit gh-writer (it commits as it stops), start it again: the text is on disk, committed as "Draft: …", and in the editor. |
-| A crash loses at most the autosave interval | Type, let it save, type more, and SIGKILL the server about 0.1 s later. Only the last moment's typing is missing from disk. Starting gh-writer again on the same address and opening it in the same tab saves even that, from the tab's session storage. |
+| Draft, close the app, reopen: all work is there, no git by hand | Close the tab straight after typing (it saves on the way out), quit Writer (it commits as it stops), start it again: the text is on disk, committed as "Draft: …", and in the editor. |
+| A crash loses at most the autosave interval | Type, let it save, type more, and SIGKILL the server about 0.1 s later. Only the last moment's typing is missing from disk. Starting Writer again on the same address and opening it in the same tab saves even that, from the tab's session storage. |
 | A session with the network down syncs once it's back | The remote is unreachable from the start ("Offline"). Write in two chapters, then bring the remote back and touch nothing: the retry syncs. The remote has both edits, and another clone pulls identical files. |
 | The same scene on two machines gives a resolvable conflict, not a corrupted file | Two servers on two clones, the same ending rewritten in both apps. One syncs, the other meets the conflict and keeps both in the resolver, then the first syncs again. One file, the same on both machines and the remote, with both endings, no conflict markers, one merge commit, and a novel that validates. |
 | Restoring a checkpoint can be undone | `e2e/checkpoints.spec.ts` |
@@ -219,7 +219,7 @@ The server answers the page only with its session cookie (see the server's secur
 
 ## Tests
 
-`e2e/fixtures.ts` gives each test a temporary home: its own git identity, config folder (library.json) and clone folder. It starts `gh-writer serve --no-open` there and reads the launch URL from its output. The library tests cover:
+`e2e/fixtures.ts` gives each test a temporary home: its own git identity, config folder (library.json) and clone folder. It starts `writer serve --no-open` there and reads the launch URL from its output. The library tests cover:
 
 - the token exchange
 - opening a folder by keyboard, and a book's menu showing its folder

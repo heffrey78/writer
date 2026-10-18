@@ -1,9 +1,9 @@
 import { Background, BaseEdge, ConnectionMode, Controls, Handle, MarkerType, Position, ReactFlow, useInternalNode, useNodesState, type ColorMode, type Edge, type EdgeChange, type EdgeProps, type Node, type NodeChange, type NodeProps } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import type { GraphEdge, GraphNode } from "@gh-writer/core/diagrams";
+import type { GraphEdge, GraphNode } from "@writer/core/diagrams";
 import { memo, useCallback, useEffect, useMemo, useRef } from "react";
 
-export type { GraphEdge, GraphNode } from "@gh-writer/core/diagrams";
+export type { GraphEdge, GraphNode } from "@writer/core/diagrams";
 
 export interface GraphCanvasProps {
   nodes: GraphNode[];

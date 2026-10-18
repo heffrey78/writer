@@ -1,4 +1,4 @@
-import type { GapThreshold } from "@gh-writer/core/diagrams";
+import type { GapThreshold } from "@writer/core/diagrams";
 
 const number = new Intl.NumberFormat();
 

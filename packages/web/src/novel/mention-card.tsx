@@ -1,5 +1,5 @@
-import { proseText, relationshipsAt, type Novel, type Scene } from "@gh-writer/core";
-import type { MentionTarget } from "@gh-writer/editor";
+import { proseText, relationshipsAt, type Novel, type Scene } from "@writer/core";
+import type { MentionTarget } from "@writer/editor";
 import type { Editor } from "@tiptap/core";
 import { X } from "lucide-react";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";

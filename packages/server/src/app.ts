@@ -60,7 +60,7 @@ export function createApp({ token, port, library, workspaces, github, web }: App
 
   // Without a built web app (tests, a bare server), the launch URL lands here.
   const placeholder = (title: string) =>
-    `<!doctype html><meta charset="utf-8"><title>gh-writer</title>\n<p>gh-writer is running${title ? `: <strong>${escapeHtml(title)}</strong>` : ""}.</p>`;
+    `<!doctype html><meta charset="utf-8"><title>Writer</title>\n<p>Writer is running${title ? `: <strong>${escapeHtml(title)}</strong>` : ""}.</p>`;
   app.get("/", (c) => c.html(placeholder("")));
   app.get("/novels/:id", (c) => {
     const novel = library.get(c.req.param("id"));

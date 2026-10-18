@@ -1,4 +1,4 @@
-import { createApi } from "@gh-writer/client";
+import { createApi } from "@writer/client";
 import { focusManager, QueryClient } from "@tanstack/react-query";
 
 /** The local server's API, on the page's own origin and session cookie. */

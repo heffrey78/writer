@@ -1,4 +1,4 @@
-import { picturePath } from "@gh-writer/core";
+import { picturePath } from "@writer/core";
 import { Mark, Node, markInputRule, mergeAttributes, nodeInputRule, textblockTypeInputRule, wrappingInputRule, type Attributes, type Editor } from "@tiptap/core";
 import type { Node as ProseNode } from "@tiptap/pm/model";
 import { Plugin, PluginKey, TextSelection } from "@tiptap/pm/state";

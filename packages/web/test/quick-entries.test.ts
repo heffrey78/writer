@@ -1,4 +1,4 @@
-import { ApiError, type Api, type StorageLike } from "@gh-writer/client";
+import { ApiError, type Api, type StorageLike } from "@writer/client";
 import { afterEach, describe, expect, it } from "vitest";
 import { createQuickEntries, type QuickEntries, type QuickEntry } from "../src/bible/quick-entries.ts";
 
@@ -58,7 +58,7 @@ describe("quick entries", () => {
   });
 
   it("tries again, waiting longer, while the server can't be reached", async () => {
-    const { api, calls } = server(new ApiError(0, "NETWORK", "gh-writer isn't answering"), new ApiError(503, "UNAVAILABLE", "busy"));
+    const { api, calls } = server(new ApiError(0, "NETWORK", "Writer isn't answering"), new ApiError(503, "UNAVAILABLE", "busy"));
     const made: QuickEntry[] = [];
     entries = createQuickEntries({ api, novelId: "n", storage: null, retryDelay: 5, onMade: (e) => made.push(e) });
     entries.add(MIRA);

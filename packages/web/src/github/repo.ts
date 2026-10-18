@@ -1,4 +1,4 @@
-import type { GitHubRepo } from "@gh-writer/client";
+import type { GitHubRepo } from "@writer/client";
 import { useQuery } from "@tanstack/react-query";
 import { api, keys } from "../api.ts";
 

@@ -1,15 +1,15 @@
 [package]
-name = "gh-writer"
+name = "writer"
 version = "0.1.0"
-description = "gh-writer's desktop app: the server bundle on its own Node and git, in a window (D9)"
+description = "Writer's desktop app: the server bundle on its own Node and git, in a window (D9)"
 license = "MIT"
 authors = ["Jeff Wikstrom"]
-repository = "https://github.com/heffrey78/gh-writer"
+repository = "https://github.com/heffrey78/writer"
 edition = "2024"
 rust-version = "1.85"
 
 [lib]
-name = "gh_writer_desktop"
+name = "writer_desktop"
 crate-type = ["rlib"]
 
 [build-dependencies]

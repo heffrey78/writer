@@ -1,9 +1,9 @@
-# @gh-writer/client
+# @writer/client
 
 The browser side of the local server ([packages/server](../server/README.md)): a typed API client and autosave.
 
 ```ts
-import { createApi, createAutosave } from "@gh-writer/client";
+import { createApi, createAutosave } from "@writer/client";
 import { useStore } from "zustand";
 
 const api = createApi(); // same origin, session cookie
@@ -14,7 +14,7 @@ autosave.attach(window); // flush on page hide and before unload
 
 const { content, hash } = await api.readFile(novelId, scene.file);
 autosave.track(scene.file, hash); // the version the edits build on
-const { frontMatter, body } = splitSceneFile(content); // from @gh-writer/editor
+const { frontMatter, body } = splitSceneFile(content); // from @writer/editor
 
 <SceneEditor key={scene.id} markdown={body} onChange={(next) => autosave.change(scene.file, joinSceneFile({ frontMatter, body: next }))} />;
 

@@ -1,4 +1,4 @@
-import { projection, streak, type Novel } from "@gh-writer/core";
+import { projection, streak, type Novel } from "@writer/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useId, useState, type FormEvent, type ReactNode } from "react";
 import { api, keys } from "../api.ts";

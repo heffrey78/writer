@@ -15,7 +15,7 @@ let session: Record<string, string>;
 let origin: string;
 
 beforeAll(async () => {
-  tmp = mkdtempSync(join(tmpdir(), "gh-writer-server-"));
+  tmp = mkdtempSync(join(tmpdir(), "writer-server-"));
   library = await Library.open({ configDir: tmp });
 });
 

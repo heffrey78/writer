@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { validate } from "@gh-writer/core";
-import { nodeSource } from "@gh-writer/core/node";
+import { validate } from "@writer/core";
+import { nodeSource } from "@writer/core/node";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createServer, DEFAULT_TEMPLATE, Library, sessionCookie, type LibraryEntry } from "../src/index.ts";
 import { gitIn, scratch } from "./fixtures.ts";

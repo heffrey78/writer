@@ -1,4 +1,4 @@
-import { ApiError, type Api, type StorageLike } from "@gh-writer/client";
+import { ApiError, type Api, type StorageLike } from "@writer/client";
 import { createStore, type StoreApi } from "zustand/vanilla";
 
 /** A bible entry made where the author was (an @ mention, a scene's details), on its way to its file. */

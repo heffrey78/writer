@@ -1,4 +1,4 @@
-import type { Novel } from "@gh-writer/core";
+import type { Novel } from "@writer/core";
 import { useQuery } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { api } from "../api.ts";

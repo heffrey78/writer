@@ -53,7 +53,7 @@ test("the desktop app quitting: flushAll() has what was just typed on disk when 
   await openNovel(page, app.launchUrl);
   await typeAtEnd(page, " Typed as the app quits.");
   // Well inside the editor's pause and the autosave interval, as when the author quits mid-sentence.
-  await page.evaluate(() => (window as unknown as { ghWriter: { flushAll(): Promise<void> } }).ghWriter.flushAll());
+  await page.evaluate(() => (window as unknown as { writer: { flushAll(): Promise<void> } }).writer.flushAll());
   expect(read(here, BRIDGE)).toMatch(/ Typed as the app quits\.\n$/);
 });
 
@@ -65,7 +65,7 @@ test("draft, close the tab and quit, reopen: all the work is there and committed
   // Close the tab at once, well inside the autosave interval: it saves on the way out.
   await page.close({ runBeforeUnload: true });
   await expect.poll(() => read(here, BRIDGE), { timeout: 10_000 }).toMatch(/ Drafted just before closing\.\n$/);
-  // Quit gh-writer (Ctrl+C): saved work is committed as it stops.
+  // Quit Writer (Ctrl+C): saved work is committed as it stops.
   await app.stop();
   expect(app.git(here, "status", "--porcelain")).toBe("");
   expect(app.git(here, "log", "-1", "--format=%s")).toMatch(/^Draft: Walking the Span \(\+4 words\)/);
@@ -96,7 +96,7 @@ test("a crash loses at most the text typed within the autosave interval, and the
   const missing = onDisk.includes("Typed in the last moment.") ? "" : " Typed in the last moment.";
   test.info().annotations.push({ type: "resilience", description: `missing after the crash: ${JSON.stringify(missing)}, typed in the last ${window} ms` });
 
-  // Start gh-writer again on the same address and open it in the same tab: the tab still holds the text.
+  // Start Writer again on the same address and open it in the same tab: the tab still holds the text.
   await app.restart(here, "--port", port);
   await openNovel(page, app.launchUrl);
   await expect.poll(() => read(here, BRIDGE), { timeout: 10_000 }).toMatch(/ Saved before the crash\. Typed in the last moment\.\n$/);
@@ -139,7 +139,7 @@ test("the same scene edited on two machines ends in a resolvable conflict, never
   test.setTimeout(90_000);
   const { remote, here, other } = machines(app);
   await app.restart(here);
-  const machineB = await app.serveAnother([other], { GH_WRITER_CONFIG_DIR: join(app.home, "config-b") });
+  const machineB = await app.serveAnother([other], { WRITER_CONFIG_DIR: join(app.home, "config-b") });
   const pageB = await context.newPage();
   await openNovel(page, app.launchUrl);
   await openNovel(pageB, machineB.launchUrl);

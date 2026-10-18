@@ -1,4 +1,4 @@
-import { entryPresence, type Entity, type EntryPresence, type Novel, type PresenceMark } from "@gh-writer/core";
+import { entryPresence, type Entity, type EntryPresence, type Novel, type PresenceMark } from "@writer/core";
 import { useMemo, type CSSProperties, type ReactNode } from "react";
 import { Link } from "react-router";
 import { cn } from "../ui/cn.ts";

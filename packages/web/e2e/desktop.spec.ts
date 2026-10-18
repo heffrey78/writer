@@ -21,7 +21,7 @@ test("a novel opens in its own window, the library comes forward from a novel, a
 
   const [{ id }] = (await calls(page, "open_novel")) as [{ id: string }];
   await page.goto(`${app.url}/novels/${id}`);
-  await page.getByRole("link", { name: "gh-writer: your novels" }).click();
+  await page.getByRole("link", { name: "Writer: your novels" }).click();
   await expect.poll(() => calls(page, "show_library")).toEqual([{ path: "/" }]);
   await expect(page).toHaveURL(new RegExp(`/novels/${id}`));
 });
@@ -50,10 +50,10 @@ test("a folder from the shell (dropped on the library, or passed to the app) ope
   await expect(page.getByRole("dialog", { name: "Open a folder" }).getByRole("alert")).toContainText("Couldn't open that folder");
 });
 
-test("the shell's About opens About gh-writer; in a browser there's no Choose…", async ({ page, app }) => {
+test("the shell's About opens About Writer; in a browser there's no Choose…", async ({ page, app }) => {
   await asDesktop(page, { pending: [{ name: "about" }] });
   await launch(page, app);
-  await expect(page.getByRole("dialog", { name: "About gh-writer" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "About Writer" })).toBeVisible();
 
   const browser = await page.context().newPage();
   await launch(browser, app);

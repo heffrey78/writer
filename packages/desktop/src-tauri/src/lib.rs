@@ -1,4 +1,4 @@
-//! gh-writer's desktop app (D2, D9): windows on the same server and web app as `gh-writer serve`, with
+//! Writer's desktop app (D2, D9): windows on the same server and web app as `writer serve`, with
 //! the server run beside it on the app's own Node and git. The library has a window of its own, and
 //! each novel opens in one of its own. The app starts the server, sends its windows there once it's
 //! listening, keeps them to the server's pages (anything else opens in the writer's browser), and on
@@ -110,7 +110,7 @@ fn novel_label(id: &str) -> Option<String> {
 
 // Commands the server's pages may call (capabilities/default.json grants exactly these).
 
-/// The page has saved everything: window.ghWriter.flushAll() has settled.
+/// The page has saved everything: window.writer.flushAll() has settled.
 #[tauri::command]
 fn flushed(window: WebviewWindow, shell: tauri::State<'_, Shell>) {
     if let Some(done) = shell.flushing.lock().unwrap().remove(window.label()) {
@@ -234,7 +234,7 @@ fn deliver(app: &AppHandle, label: &str, command: PageCommand) {
     match app.get_webview_window(label) {
         Some(window) if ready => {
             let json = serde_json::to_string(&command).unwrap_or_default();
-            let _ = window.eval(format!("window.ghWriter && window.ghWriter.run({json})"));
+            let _ = window.eval(format!("window.writer && window.writer.run({json})"));
         }
         _ => shell.pending.lock().unwrap().entry(label.to_string()).or_default().push(command),
     }
@@ -279,7 +279,7 @@ fn open_window(app: &AppHandle, label: &str, path: &str) -> tauri::Result<Webvie
     // Every window starts on the loading page and is then sent to the server. Opened straight at the
     // server's sign-in address, WebKitGTK doesn't keep the session cookie that address sets.
     let builder = WebviewWindowBuilder::new(app, label, WebviewUrl::App("index.html".into()))
-        .title("gh-writer")
+        .title("Writer")
         .inner_size(1280.0, 860.0)
         .min_inner_size(640.0, 480.0)
         .on_navigation(move |url| {
@@ -318,11 +318,11 @@ fn flush(window: &WebviewWindow) {
     let shell = window.state::<Shell>();
     let (done, saved) = mpsc::channel();
     shell.flushing.lock().unwrap().insert(window.label().to_string(), done);
-    let script = "Promise.resolve(window.ghWriter && window.ghWriter.flushAll()).finally(() => window.__TAURI__.core.invoke('flushed'))";
+    let script = "Promise.resolve(window.writer && window.writer.flushAll()).finally(() => window.__TAURI__.core.invoke('flushed'))";
     let answered = window.eval(script).is_ok() && saved.recv_timeout(FLUSH_TIMEOUT).is_ok();
     shell.flushing.lock().unwrap().remove(window.label());
     if !answered {
-        eprintln!("gh-writer: the page in window {:?} didn't say it had saved within {} s", window.label(), FLUSH_TIMEOUT.as_secs());
+        eprintln!("Writer: the page in window {:?} didn't say it had saved within {} s", window.label(), FLUSH_TIMEOUT.as_secs());
     }
 }
 
@@ -346,7 +346,7 @@ fn quit(app: &AppHandle) {
         if let Some(sidecar) = app.state::<Shell>().sidecar.lock().unwrap().take() {
             sidecar.stop();
         }
-        eprintln!("gh-writer: pages saved in {} ms, server stopped in {} ms", saved.as_millis(), (started.elapsed() - saved).as_millis());
+        eprintln!("Writer: pages saved in {} ms, server stopped in {} ms", saved.as_millis(), (started.elapsed() - saved).as_millis());
         app.exit(0);
     });
 }
@@ -406,7 +406,7 @@ fn start_server(app: &AppHandle) {
     })();
     match started {
         Ok((sidecar, server)) => {
-            eprintln!("gh-writer: server listening at {} after {} ms", server.url, starting.elapsed().as_millis());
+            eprintln!("Writer: server listening at {} after {} ms", server.url, starting.elapsed().as_millis());
             let shell = app.state::<Shell>();
             let previous = shell.server.lock().unwrap().replace(server.clone());
             *shell.sidecar.lock().unwrap() = Some(sidecar);
@@ -424,8 +424,8 @@ fn start_server(app: &AppHandle) {
         }
         Err(message) => {
             app.dialog()
-                .message(format!("gh-writer couldn't start.\n\n{message}"))
-                .title("gh-writer")
+                .message(format!("Writer couldn't start.\n\n{message}"))
+                .title("Writer")
                 .kind(MessageDialogKind::Error)
                 .blocking_show();
             app.state::<Shell>().quitting.store(true, Ordering::SeqCst);
@@ -464,8 +464,8 @@ fn watch_server(app: AppHandle) {
         let log = app.path().app_log_dir().map(|dir| dir.join("server.log").display().to_string()).unwrap_or_default();
         let restart = app
             .dialog()
-            .message(format!("gh-writer's server stopped unexpectedly. Your saved work is safe; anything typed in the last few seconds comes back when the page reopens.\n\nWhat it said is in {log}."))
-            .title("gh-writer")
+            .message(format!("Writer's server stopped unexpectedly. Your saved work is safe; anything typed in the last few seconds comes back when the page reopens.\n\nWhat it said is in {log}."))
+            .title("Writer")
             .kind(MessageDialogKind::Warning)
             .buttons(MessageDialogButtons::OkCancelCustom("Restart".into(), "Quit".into()))
             .blocking_show();
@@ -506,7 +506,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<()> {
         .item(&PredefinedMenuItem::paste(app, None)?)
         .item(&PredefinedMenuItem::select_all(app, None)?)
         .build()?;
-    let help = SubmenuBuilder::new(app, "Help").item(&MenuItemBuilder::with_id("about", "About gh-writer").build(app)?).build()?;
+    let help = SubmenuBuilder::new(app, "Help").item(&MenuItemBuilder::with_id("about", "About Writer").build(app)?).build()?;
     app.set_menu(MenuBuilder::new(app).items(&[&file, &edit, &help]).build()?)?;
     *shell.recent_menu.lock().unwrap() = Some(recent);
     *shell.system_git_item.lock().unwrap() = Some(system_git);
@@ -542,7 +542,7 @@ fn on_menu(app: &AppHandle, id: &str) {
             }
             if let Ok(dir) = app.path().app_config_dir() {
                 if let Err(e) = settings.save(&dir) {
-                    eprintln!("gh-writer: {e}");
+                    eprintln!("Writer: {e}");
                 }
             }
             restart_server(app);
@@ -614,7 +614,7 @@ pub fn run() {
             _ => {}
         })
         .build(tauri::generate_context!())
-        .expect("gh-writer's window couldn't be set up")
+        .expect("Writer's window couldn't be set up")
         .run(|app, event| match event {
             // Quitting, or the last window closed: quit() saves and stops the server first, then
             // exits through app.exit(), which asks again and is let through.

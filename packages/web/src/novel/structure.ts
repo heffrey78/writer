@@ -1,4 +1,4 @@
-import type { Chapter, Novel } from "@gh-writer/core";
+import type { Chapter, Novel } from "@writer/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router";
 import { api, keys } from "../api.ts";

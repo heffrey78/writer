@@ -1,6 +1,6 @@
-import type { Issue } from "@gh-writer/client";
-import { readAnchor, resolveAnchor, type IssueAnchor, type Novel, type Scene } from "@gh-writer/core";
-import { sceneText } from "@gh-writer/editor";
+import type { Issue } from "@writer/client";
+import { readAnchor, resolveAnchor, type IssueAnchor, type Novel, type Scene } from "@writer/core";
+import { sceneText } from "@writer/editor";
 
 /** Where an issue about a passage stands: its anchor, its scene (wherever it moved), and whether the passage is still there. */
 export interface PassageOf {

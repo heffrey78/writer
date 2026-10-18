@@ -1,9 +1,9 @@
 {
-  "name": "@gh-writer/web",
+  "name": "@writer/web",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "The gh-writer app: library, writing workspace and the rest of the UI, served by the local server.",
+  "description": "The Writer app: library, writing workspace and the rest of the UI, served by the local server.",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -11,9 +11,9 @@
     "screenshots": "vite build && playwright test -c screenshots.config.ts"
   },
   "dependencies": {
-    "@gh-writer/client": "0.1.0",
-    "@gh-writer/core": "0.1.0",
-    "@gh-writer/editor": "0.1.0",
+    "@writer/client": "0.1.0",
+    "@writer/core": "0.1.0",
+    "@writer/editor": "0.1.0",
     "@tanstack/react-query": "^5.104.1",
     "@xyflow/react": "^12.12.0",
     "clsx": "^2.1.1",
@@ -30,7 +30,7 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
-    "@gh-writer/server": "0.1.0",
+    "@writer/server": "0.1.0",
     "@playwright/test": "^1.63.0",
     "@tailwindcss/vite": "^4.3.3",
     "@testing-library/react": "^16.3.3",

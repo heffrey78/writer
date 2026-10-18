@@ -46,7 +46,7 @@ afterAll(async () => {
   cleanUp();
 });
 
-describe("git with gh-writer's GitHub connection", () => {
+describe("git with Writer's GitHub connection", () => {
   it("clones from GitHub over HTTPS when signed in, and only then", async () => {
     const url = `${fake.url}/ada/varn.git`;
     const signedOut = await connection(false);
@@ -119,20 +119,20 @@ describe("git with gh-writer's GitHub connection", () => {
       const program = join(dir, "askpass");
       writeFileSync(
         program,
-        `#!/bin/sh\nprintf '%s\\n' "$1" >> '${log}'\ncase "$1" in Username*) echo x-access-token;; Password*) printf '%s\\n' "$GH_WRITER_GIT_TOKEN";; *) exit 1;; esac\n`,
+        `#!/bin/sh\nprintf '%s\\n' "$1" >> '${log}'\ncase "$1" in Username*) echo x-access-token;; Password*) printf '%s\\n' "$WRITER_GIT_TOKEN";; *) exit 1;; esac\n`,
       );
       chmodSync(program, 0o755);
       return { program, prompts: () => (existsSync(log) ? readFileSync(log, "utf8").split("\n").filter(Boolean) : []) };
     }
 
     afterEach(() => {
-      delete process.env.GH_WRITER_ASKPASS;
-      delete process.env.GH_WRITER_GIT;
+      delete process.env.WRITER_ASKPASS;
+      delete process.env.WRITER_GIT;
     });
 
     it("clones and syncs through it, with the stale helpers cleared, and fails as AUTH once the token is refused", async () => {
       const { program, prompts } = askpass();
-      process.env.GH_WRITER_ASKPASS = program;
+      process.env.WRITER_ASKPASS = program;
       const stale = fresh("gitconfig-stale-askpass");
       writeFileSync(stale, `${readFileSync(globalConfig, "utf8")}[credential]\n\thelper = "!f() { echo username=ada; echo password=stale; }; f"\n`);
       process.env.GIT_CONFIG_GLOBAL = stale;
@@ -159,7 +159,7 @@ describe("git with gh-writer's GitHub connection", () => {
       }
     });
 
-    it("runs every git command with the git in GH_WRITER_GIT, telling it where its parts are", async () => {
+    it("runs every git command with the git in WRITER_GIT, telling it where its parts are", async () => {
       // A portable git's layout, whose git notes how it was run and hands over to the system's.
       const root = fresh("portable-git");
       const log = join(root, "calls.log");
@@ -169,7 +169,7 @@ describe("git with gh-writer's GitHub connection", () => {
         `#!/bin/sh\nprintf '%s %s %s\\n' "$GIT_EXEC_PATH" "$GIT_TEMPLATE_DIR" "$1" >> '${log}'\nunset GIT_EXEC_PATH GIT_TEMPLATE_DIR GIT_SSL_CAINFO\nexec git "$@"\n`,
       );
       chmodSync(join(root, "bin/git"), 0o755);
-      process.env.GH_WRITER_GIT = root;
+      process.env.WRITER_GIT = root;
 
       expect(gitInstall()).toMatchObject({ binary: join(root, "bin/git"), bundled: true });
       const github = await connection();
@@ -184,8 +184,8 @@ describe("git with gh-writer's GitHub connection", () => {
     const runtime = join(fileURLToPath(new URL("../../../", import.meta.url)), `dist/runtime/${process.platform}-${process.arch}/git`);
     it.skipIf(!existsSync(runtime))("clones and syncs with the portable git itself (npm run fetch:runtime)", async () => {
       const { program, prompts } = askpass();
-      process.env.GH_WRITER_ASKPASS = program;
-      process.env.GH_WRITER_GIT = runtime;
+      process.env.WRITER_ASKPASS = program;
+      process.env.WRITER_GIT = runtime;
       // The portable git's version, not the system's.
       const { major, minor, patch } = await git().version();
       expect(`git version ${major}.${minor}.${patch}`).toBe(execFileSync(join(runtime, "bin/git"), ["version"], { encoding: "utf8" }).trim());
@@ -202,10 +202,10 @@ describe("git with gh-writer's GitHub connection", () => {
       expect(prompts().length).toBeGreaterThanOrEqual(2);
     });
 
-    const app = join(fileURLToPath(new URL("../../../", import.meta.url)), "packages/desktop/src-tauri/target/debug/gh-writer");
+    const app = join(fileURLToPath(new URL("../../../", import.meta.url)), "packages/desktop/src-tauri/target/debug/writer");
     it.skipIf(!existsSync(runtime) || !existsSync(app))("clones and syncs with the portable git asking the desktop app's own executable (npm run desktop)", async () => {
-      process.env.GH_WRITER_ASKPASS = app;
-      process.env.GH_WRITER_GIT = runtime;
+      process.env.WRITER_ASKPASS = app;
+      process.env.WRITER_GIT = runtime;
       const github = await connection();
       const novel = await (await openLibrary()).clone(`${fake.url}/ada/varn.git`, { auth: (u) => github.gitAuth(u) });
       const syncer = new Syncer(novel.path, { intervalMs: 0 }, { auth: (u) => github.gitAuth(u) });

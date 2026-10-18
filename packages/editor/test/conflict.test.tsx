@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import "./dom.ts";
-import { merge2, merge3 } from "@gh-writer/core";
+import { merge2, merge3 } from "@writer/core";
 import { cleanup, fireEvent, render, within } from "@testing-library/react";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { ConflictResolver, type ConflictFileView } from "../src/react.tsx";

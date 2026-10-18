@@ -4,9 +4,9 @@
 // Usage: node scripts/compile-sample.ts [outdir]   (default dist/sample)
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { compileBook, loadNovel } from "@gh-writer/core";
-import { nodeSource } from "@gh-writer/core/node";
-import { coverImage, toDocx, toEpub, toPdf } from "@gh-writer/export";
+import { compileBook, loadNovel } from "@writer/core";
+import { nodeSource } from "@writer/core/node";
+import { coverImage, toDocx, toEpub, toPdf } from "@writer/export";
 
 const out = process.argv[2] ?? "dist/sample";
 const source = nodeSource(new URL("../examples/sample-novel/", import.meta.url).pathname);

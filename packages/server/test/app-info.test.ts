@@ -16,7 +16,7 @@ function releases(answer: () => Response) {
 }
 
 const release = (tag: string, extra: Record<string, unknown> = {}) =>
-  Response.json({ tag_name: tag, html_url: `https://github.com/heffrey78/gh-writer/releases/tag/${tag}`, body: "What's new.", draft: false, prerelease: false, ...extra });
+  Response.json({ tag_name: tag, html_url: `https://github.com/heffrey78/writer/releases/tag/${tag}`, body: "What's new.", draft: false, prerelease: false, ...extra });
 
 describe("newer", () => {
   it("compares versions as numbers, with or without a v, and never a pre-release", () => {
@@ -33,7 +33,7 @@ describe("UpdateCheck", () => {
   it("offers a newer release, with its page and notes, and nothing for the same or an older one", async () => {
     const { fetch } = releases(() => release("v0.2.0"));
     const check = new UpdateCheck("https://api.example", { fetch });
-    expect(await check.newerThan("0.1.0")).toEqual({ version: "0.2.0", url: "https://github.com/heffrey78/gh-writer/releases/tag/v0.2.0", notes: "What's new." });
+    expect(await check.newerThan("0.1.0")).toEqual({ version: "0.2.0", url: "https://github.com/heffrey78/writer/releases/tag/v0.2.0", notes: "What's new." });
     expect(await check.newerThan("0.2.0")).toBeNull();
     expect(await check.newerThan("0.3.0")).toBeNull();
   });
@@ -48,7 +48,7 @@ describe("UpdateCheck", () => {
     now += 30 * 60 * 1000;
     fail = false;
     expect(await check.newerThan("0.1.0")).toBeNull();
-    expect(asked).toEqual(["https://api.example/repos/heffrey78/gh-writer/releases/latest"]);
+    expect(asked).toEqual(["https://api.example/repos/heffrey78/writer/releases/latest"]);
 
     now += 31 * 60 * 1000;
     expect(await check.newerThan("0.1.0")).toMatchObject({ version: "0.2.0" });
@@ -77,13 +77,13 @@ describe("GET /api/app and /api/app/licenses", () => {
   let library: Library;
 
   beforeAll(async () => {
-    tmp = mkdtempSync(join(tmpdir(), "gh-writer-app-"));
+    tmp = mkdtempSync(join(tmpdir(), "writer-app-"));
     library = await Library.open({ configDir: tmp });
   });
   afterAll(() => rmSync(tmp, { recursive: true, force: true }));
   afterEach(() => {
-    delete process.env.GH_WRITER_APP_VERSION;
-    delete process.env.GH_WRITER_LICENSES;
+    delete process.env.WRITER_APP_VERSION;
+    delete process.env.WRITER_LICENSES;
   });
 
   async function ask(path: string) {
@@ -104,18 +104,18 @@ describe("GET /api/app and /api/app/licenses", () => {
   });
 
   it("in the desktop app: its version, and the licence texts it ships, by name", async () => {
-    process.env.GH_WRITER_APP_VERSION = "0.1.0";
+    process.env.WRITER_APP_VERSION = "0.1.0";
     const dir = join(tmp, "licenses");
     mkdirSync(dir);
     writeFileSync(join(dir, "git-COPYING.txt"), "GNU GENERAL PUBLIC LICENSE");
-    writeFileSync(join(dir, "gh-writer-LICENSE.md"), "MIT License");
+    writeFileSync(join(dir, "writer-LICENSE.md"), "MIT License");
     writeFileSync(join(dir, "README"), "not a licence");
-    process.env.GH_WRITER_LICENSES = dir;
+    process.env.WRITER_LICENSES = dir;
     expect(await ask("/api/app")).toMatchObject({ desktop: true, version: "0.1.0", update: null });
     expect(await ask("/api/app/licenses")).toEqual({
       licenses: [
-        { name: "gh-writer-LICENSE.md", text: "MIT License" },
         { name: "git-COPYING.txt", text: "GNU GENERAL PUBLIC LICENSE" },
+        { name: "writer-LICENSE.md", text: "MIT License" },
       ],
     });
   });

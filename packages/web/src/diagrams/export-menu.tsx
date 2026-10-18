@@ -4,7 +4,7 @@ import { useNotice } from "../novel/notice.tsx";
 import { Button } from "../ui/button.tsx";
 
 /**
- * Take a diagram out of gh-writer: as an SVG file, and as Mermaid text where the diagram can be said
+ * Take a diagram out of Writer: as an SVG file, and as Mermaid text where the diagram can be said
  * in it. Both come from the same renderers as the snapshots on github.com, for what the page shows.
  */
 export function ExportMenu({ name, svg, mermaid }: { name: string; svg: () => string; mermaid?: (() => string) | undefined }) {

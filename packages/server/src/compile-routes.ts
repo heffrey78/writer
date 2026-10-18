@@ -1,6 +1,6 @@
-import { compileBook, CompileError } from "@gh-writer/core";
-import { nodeSource } from "@gh-writer/core/node";
-import { commitDate, fileName, isFormat, MEDIA_TYPES, readCover, readPictures, render } from "@gh-writer/export";
+import { compileBook, CompileError } from "@writer/core";
+import { nodeSource } from "@writer/core/node";
+import { commitDate, fileName, isFormat, MEDIA_TYPES, readCover, readPictures, render } from "@writer/export";
 import type { Hono } from "hono";
 import { body, type Env } from "./bible-routes.ts";
 import { gitPlumbing } from "./git.ts";

@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { loadNovel, validateNovel } from "@gh-writer/core";
-import { nodeSource } from "@gh-writer/core/node";
+import { loadNovel, validateNovel } from "@writer/core";
+import { nodeSource } from "@writer/core/node";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { BibleOperations, createServer, Library, ManuscriptOperations, sessionCookie } from "../src/index.ts";
 import { gitIn, novelRepo, scratch } from "./fixtures.ts";

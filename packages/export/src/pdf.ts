@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import nodeZlib from "node:zlib";
-import { numberWords, type Block, type Book, type Run } from "@gh-writer/core";
+import { numberWords, type Block, type Book, type Run } from "@writer/core";
 import { zlibSync } from "fflate";
 import * as fontkit from "fontkit";
 import PDFDocument from "pdfkit";
@@ -27,7 +27,7 @@ export interface PdfFonts {
 export interface PdfOptions {
   /** The PDF's dates: the commit's, so the same commit gives the same file. */
   date?: Date;
-  /** Default: Liberation Serif, shipped with gh-writer. */
+  /** Default: Liberation Serif, shipped with Writer. */
   fonts?: PdfFonts;
   /** The book's cover, alone on the first page. */
   cover?: CoverImage;
@@ -57,9 +57,9 @@ export function readFonts(dir: URL): PdfFonts {
 }
 
 let bundled: PdfFonts | undefined;
-/** Liberation Serif, from gh-writer's fonts folder (or beside the server bundle: GH_WRITER_FONTS). */
+/** Liberation Serif, from Writer's fonts folder (or beside the server bundle: WRITER_FONTS). */
 export function defaultFonts(): PdfFonts {
-  const dir = process.env.GH_WRITER_FONTS;
+  const dir = process.env.WRITER_FONTS;
   bundled ??= readFonts(dir ? pathToFileURL(join(dir, "/")) : new URL("../fonts/", import.meta.url));
   return bundled;
 }
@@ -88,7 +88,7 @@ export function toPdf(book: Book, { date = new Date(0), fonts = defaultFonts(), 
     font: fonts.regular as unknown as string,
     bufferPages: true,
     autoFirstPage: true,
-    info: { Title: book.title, Author: book.author, Creator: "gh-writer", Producer: "gh-writer", CreationDate: date, ModDate: date },
+    info: { Title: book.title, Author: book.author, Creator: "writer", Producer: "writer", CreationDate: date, ModDate: date },
     lang: book.language,
     displayTitle: true,
   });

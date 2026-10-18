@@ -71,7 +71,7 @@ describe("compiling the manuscript", () => {
   it("puts the chapters and their scenes in reading order, parts marked, scenes set apart by breaks", async () => {
     const { novel, source } = await open();
     const book = await compileBook(novel, source);
-    expect(book).toMatchObject({ title: "The Bridge at Varn", author: "gh-writer sample", language: "en", sceneBreak: "#", header: { surname: "sample", shortTitle: "BRIDGE AT VARN" } });
+    expect(book).toMatchObject({ title: "The Bridge at Varn", author: "Writer sample", language: "en", sceneBreak: "#", header: { surname: "sample", shortTitle: "BRIDGE AT VARN" } });
     expect(book.chapters.map((c) => [c.number, c.heading, c.part?.title])).toEqual([
       [1, "Chapter One: Arrival", "Return"],
       [2, "Chapter Two: Old Debts", undefined],

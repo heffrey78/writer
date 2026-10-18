@@ -20,17 +20,17 @@ export class GitFailure extends Error {
 
 const GUIDANCE: Record<Exclude<GitErrorCode, "GIT">, string> = {
   AUTH:
-    "GitHub didn't accept your credentials, or none are set up. Connect gh-writer to GitHub (Connect GitHub, at the top of the page); or for an https:// address, run `gh auth setup-git` " +
+    "GitHub didn't accept your credentials, or none are set up. Connect Writer to GitHub (Connect GitHub, at the top of the page); or for an https:// address, run `gh auth setup-git` " +
     "(or sign in with Git Credential Manager); for a git@github.com: address, add an SSH key to GitHub " +
     "(https://github.com/settings/keys) and load it with ssh-add. Then try again.",
   SCOPE:
-    "GitHub won't let gh-writer add or change the novel's GitHub workflows (.github/workflows) without the workflow permission. " +
+    "GitHub won't let Writer add or change the novel's GitHub workflows (.github/workflows) without the workflow permission. " +
     "Reconnect to GitHub with a code to grant it: Sign out of GitHub, then Connect GitHub. (With gh's account, run `gh auth refresh -s workflow` first.)",
   NOT_FOUND: "No repository at that address. Check the owner and name, and that your GitHub account can see it.",
   NETWORK: "Couldn't reach the server. Check your connection and try again.",
   REJECTED: "The remote has changes this copy doesn't have yet: bring them in, then push again.",
   DESTINATION_EXISTS: "The destination folder already exists and isn't empty. Choose another folder.",
-  GIT_MISSING: "git isn't installed or isn't on the PATH. Install git (https://git-scm.com) and restart gh-writer.",
+  GIT_MISSING: "git isn't installed or isn't on the PATH. Install git (https://git-scm.com) and restart Writer.",
   BAD_REPO: "That isn't a repository address. Use owner/name or a URL such as https://github.com/owner/name.",
 };
 
@@ -100,24 +100,24 @@ export function repoName(url: string): string {
   return name && name !== ".." && name !== "." ? name : "novel";
 }
 
-/** gh-writer's GitHub token for one host's https remotes (e.g. "https://github.com"), for one git command. */
+/** Writer's GitHub token for one host's https remotes (e.g. "https://github.com"), for one git command. */
 export interface GitAuth {
   origin: string;
   token: string;
 }
 
-/** The credentials for a remote URL, if gh-writer has any for it. */
+/** The credentials for a remote URL, if Writer has any for it. */
 export type GitAuthSource = (url: string) => Promise<GitAuth | undefined>;
 
-const TOKEN_VAR = "GH_WRITER_GIT_TOKEN";
+const TOKEN_VAR = "WRITER_GIT_TOKEN";
 
 /**
  * Which git runs: the system's, on the PATH, or the portable git the desktop app ships (D9), whose
- * folder is GH_WRITER_GIT. That git doesn't find its own parts unaided, so its environment says where
+ * folder is WRITER_GIT. That git doesn't find its own parts unaided, so its environment says where
  * they are, and on Linux where its certificates are.
  */
 export function gitInstall(): { binary: string; bundled: boolean; env: Record<string, string> } {
-  const root = process.env.GH_WRITER_GIT;
+  const root = process.env.WRITER_GIT;
   if (!root) return { binary: "git", bundled: false, env: {} };
   const windows = process.platform === "win32";
   const prefix = windows ? join(root, "mingw64") : root;
@@ -138,19 +138,19 @@ export function gitInstall(): { binary: string; bundled: boolean; env: Record<st
  * own helpers for that host, so a stale stored credential can't win. Nothing is written to any git
  * config file, and the token never appears in git's arguments.
  *
- * With an askpass program (GH_WRITER_ASKPASS: the desktop app's own executable), git, finding no
+ * With an askpass program (WRITER_ASKPASS: the desktop app's own executable), git, finding no
  * helper, asks it instead (`askpassEnv`). Otherwise a helper written in shell answers, which git
  * runs through sh: fine where git is installed, but MinGit may have no shell.
  */
 function credentialConfig(origin: string): string[] {
-  if (process.env.GH_WRITER_ASKPASS) return [`credential.${origin}.helper=`];
+  if (process.env.WRITER_ASKPASS) return [`credential.${origin}.helper=`];
   const helper = `!f() { test "$1" = get && echo username=x-access-token && echo "password=$${TOKEN_VAR}"; }; f`;
   return [`credential.${origin}.helper=`, `credential.${origin}.helper=${helper}`];
 }
 
-/** For a command with gh-writer's credentials: the token, and the askpass program that answers with it. */
+/** For a command with Writer's credentials: the token, and the askpass program that answers with it. */
 function credentialEnv(auth: GitAuth): Record<string, string> {
-  const askpass = process.env.GH_WRITER_ASKPASS;
+  const askpass = process.env.WRITER_ASKPASS;
   return { [TOKEN_VAR]: auth.token, ...(askpass ? { GIT_ASKPASS: askpass } : {}) };
 }
 
@@ -158,7 +158,7 @@ function credentialEnv(auth: GitAuth): Record<string, string> {
  * simple-git for `dir`. git must never wait for a password in the terminal the server runs in:
  * prompts are off and ssh runs in batch mode (unless the author set their own ssh command), so a
  * missing credential fails fast as AUTH. Credentials come from the author's git setup, or for a
- * GitHub remote from gh-writer's own sign-in (`auth`).
+ * GitHub remote from Writer's own sign-in (`auth`).
  */
 export function git(dir?: string, onProgress?: (e: SimpleGitProgressEvent) => void, signal?: AbortSignal, auth?: GitAuth): SimpleGit {
   const env = { ...gitEnv(), ...(auth ? credentialEnv(auth) : {}) };

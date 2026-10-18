@@ -1,6 +1,6 @@
 import { rm } from "node:fs/promises";
 import { resolve as resolvePath } from "node:path";
-import { merge3, type MergeChunk } from "@gh-writer/core";
+import { merge3, type MergeChunk } from "@writer/core";
 import { hashText } from "./files.ts";
 import { git, gitPlumbing } from "./git.ts";
 

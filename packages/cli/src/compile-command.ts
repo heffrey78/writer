@@ -1,8 +1,8 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
-import { compileBook, CompileError, loadNovel } from "@gh-writer/core";
-import { nodeSource } from "@gh-writer/core/node";
-import { commitDate, fileName, FORMATS, isFormat, readCover, readPictures, render, type Format, type PdfFonts } from "@gh-writer/export";
+import { compileBook, CompileError, loadNovel } from "@writer/core";
+import { nodeSource } from "@writer/core/node";
+import { commitDate, fileName, FORMATS, isFormat, readCover, readPictures, render, type Format, type PdfFonts } from "@writer/export";
 
 export interface CompileOptions {
   /** Comma-separated: docx, epub, pdf (default all three). */
@@ -13,7 +13,7 @@ export interface CompileOptions {
   to?: string;
   /** Where the files go (default: compiled/ in the novel, which ignores itself in git). */
   out?: string;
-  /** The PDF's type (default: gh-writer's own Liberation Serif). */
+  /** The PDF's type (default: Writer's own Liberation Serif). */
   fonts?: PdfFonts;
 }
 
@@ -51,7 +51,7 @@ export async function runCompile(dir: string, options: CompileOptions = {}, out:
   const { pictures, problems } = await readPictures(root, book);
   const target = options.out ? resolve(options.out) : join(root, "compiled");
   await mkdir(target, { recursive: true });
-  if (!options.out) await writeFile(join(target, ".gitignore"), "# Compiled files: made by `gh-writer compile`, not kept in git.\n*\n");
+  if (!options.out) await writeFile(join(target, ".gitignore"), "# Compiled files: made by `writer compile`, not kept in git.\n*\n");
   const written: string[] = [];
   const missing = new Set<string>();
   for (const format of new Set(formats as Format[])) {

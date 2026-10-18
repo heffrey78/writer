@@ -1,4 +1,4 @@
-import type { Novel } from "@gh-writer/core";
+import type { Novel } from "@writer/core";
 import { chapterTitle } from "../novel/navigation.tsx";
 import type { PickerItem } from "../ui/picker.tsx";
 

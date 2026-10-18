@@ -1,5 +1,5 @@
-import { addDays, countWords, unbalanced, type Novel, type WritingDay } from "@gh-writer/core";
-import { chapterTitle } from "@gh-writer/core/diagrams";
+import { addDays, countWords, unbalanced, type Novel, type WritingDay } from "@writer/core";
+import { chapterTitle } from "@writer/core/diagrams";
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { cn } from "../ui/cn.ts";
 

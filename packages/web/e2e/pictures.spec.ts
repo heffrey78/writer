@@ -193,7 +193,7 @@ test("the book's cover: set from the shelf, shown there and in Compile, in the E
 
   // From the book's menu on the shelf.
   await page.goto(`${app.url}/`);
-  const book = page.getByRole("list", { name: "Novels" }).getByRole("link", { name: "The Bridge at Varn, by gh-writer sample" });
+  const book = page.getByRole("list", { name: "Novels" }).getByRole("link", { name: "The Bridge at Varn, by Writer sample" });
   await expect(book).toBeVisible();
   await expect(book.getByRole("img")).toHaveCount(0);
   const bytes = await makePicture(page, { width: 2000, height: 3000, name: "cover-art.jpg" });

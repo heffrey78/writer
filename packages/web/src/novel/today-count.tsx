@@ -1,4 +1,4 @@
-import { useWritingModes } from "@gh-writer/editor/react";
+import { useWritingModes } from "@writer/editor/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { Link } from "react-router";

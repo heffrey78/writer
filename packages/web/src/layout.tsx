@@ -39,7 +39,7 @@ export function Shell({
 }) {
   const showLibrary = useShowLibrary();
   useEffect(() => {
-    document.title = title ? `${title} · gh-writer` : "gh-writer";
+    document.title = title ? `${title} · Writer` : "writer";
   }, [title]);
   return (
     <div className={cn("flex flex-col", wide ? "h-dvh" : "min-h-dvh")}>
@@ -57,10 +57,10 @@ export function Shell({
             showLibrary();
           }}
           className="flex shrink-0 items-center gap-2 rounded-md px-1 font-semibold"
-          aria-label={heading ? "gh-writer: your novels" : undefined}
+          aria-label={heading ? "Writer: your novels" : undefined}
         >
           <Logo />
-          {!heading && "gh-writer"}
+          {!heading && "writer"}
         </Link>
         <HistoryButtons />
         {heading && <div className="flex min-w-0 items-center gap-1">{heading}</div>}
@@ -129,7 +129,7 @@ function MoreMenu({ items }: { items?: ReactNode }) {
               <Keyboard className="size-4" aria-hidden /> Keyboard shortcuts
             </DropdownMenu.Item>
             <DropdownMenu.Item className={MENU_ITEM} onSelect={() => useAbout.getState().set(true)}>
-              <Info className="size-4" aria-hidden /> About gh-writer
+              <Info className="size-4" aria-hidden /> About Writer
             </DropdownMenu.Item>
           </DropdownMenu.Content>
         </DropdownMenu.Portal>

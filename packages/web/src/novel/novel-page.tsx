@@ -1,7 +1,7 @@
-import type { SyncStatus } from "@gh-writer/client";
-import type { Novel } from "@gh-writer/core";
-import { writingModes } from "@gh-writer/editor";
-import { useWritingModes } from "@gh-writer/editor/react";
+import type { SyncStatus } from "@writer/client";
+import type { Novel } from "@writer/core";
+import { writingModes } from "@writer/editor";
+import { useWritingModes } from "@writer/editor/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, Navigate, Route, Routes, useLocation, useNavigate, useParams } from "react-router";
@@ -283,7 +283,7 @@ export function NovelPage() {
     <Shell wide heading={heading} actions={actions} menu={menu} chrome={!focus} title={book.config?.title ?? "Untitled"}>
       {!connected && (
         <p role="alert" className="border-b border-warn/40 bg-warn-soft px-4 py-2 text-sm">
-          gh-writer isn't answering. Your unsaved text is kept in this tab; start gh-writer again and it will be saved.
+          Writer isn't answering. Your unsaved text is kept in this tab; start Writer again and it will be saved.
         </p>
       )}
       <div className={focus ? "h-full" : cn("grid h-full", collapsed ? "grid-cols-[3.25rem_minmax(0,1fr)]" : "grid-cols-[3.25rem_minmax(0,1fr)] md:grid-cols-[16rem_minmax(0,1fr)]")}>
@@ -373,19 +373,19 @@ function Missing({ what }: { what: string }) {
   );
 }
 
-const LATEST_RELEASE = "https://github.com/heffrey78/gh-writer/releases/latest";
+const LATEST_RELEASE = "https://github.com/heffrey78/writer/releases/latest";
 
 /** A novel in a newer format than this copy reads: shown, never written, lest it be written wrong (D11). */
 function TooNew() {
   return (
     <div className="mx-auto max-w-xl px-6 py-10">
-      <h1 className="text-2xl font-semibold">This novel needs a newer gh-writer</h1>
+      <h1 className="text-2xl font-semibold">This novel needs a newer Writer</h1>
       <p className="mt-3">
-        It was saved in a newer format than this copy of gh-writer can read, probably by a newer copy on another computer. To keep from saving it wrongly, this copy won't open it.
+        It was saved in a newer format than this copy of Writer can read, probably by a newer copy on another computer. To keep from saving it wrongly, this copy won't open it.
       </p>
       <p className="mt-3">
         <a href={LATEST_RELEASE} target="_blank" rel="noreferrer" className="text-accent underline">
-          Get the latest gh-writer
+          Get the latest Writer
         </a>
         , then open the novel again. Nothing in it has changed.
       </p>

@@ -1,4 +1,4 @@
-import { type BoardConflict, type BoardStatus, type SceneStatusName } from "@gh-writer/client";
+import { type BoardConflict, type BoardStatus, type SceneStatusName } from "@writer/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ExternalLink } from "lucide-react";
 import { useEffect, useRef, type ReactNode } from "react";
@@ -53,10 +53,10 @@ export function BoardOnGitHub({ novelId }: { novelId: string }) {
   if (!github || !status) body = <p className="text-muted">Opening…</p>;
   else if (!github.signedIn) {
     body = (
-      <Row text="Connect gh-writer to GitHub to put this board on GitHub, for its board, table and roadmap views.">{reconnect("Connect GitHub", refresh)}</Row>
+      <Row text="Connect Writer to GitHub to put this board on GitHub, for its board, table and roadmap views.">{reconnect("Connect GitHub", refresh)}</Row>
     );
   } else if (github.missingBoardScopes?.length && !status.project) {
-    body = <Row text="gh-writer's GitHub sign-in doesn't allow it to use Projects yet. Reconnect to grant it, then put the board on GitHub.">{reconnect("Reconnect GitHub", refresh)}</Row>;
+    body = <Row text="Writer's GitHub sign-in doesn't allow it to use Projects yet. Reconnect to grant it, then put the board on GitHub.">{reconnect("Reconnect GitHub", refresh)}</Row>;
   } else if (!status.project) {
     body = (
       <Row
@@ -90,7 +90,7 @@ export function BoardOnGitHub({ novelId }: { novelId: string }) {
         </div>
         <Summary status={status} />
         {github.missingBoardScopes?.length ? (
-          <Row text="gh-writer's GitHub sign-in no longer allows it to use Projects, so the board can't be kept up to date.">{reconnect("Reconnect GitHub", () => sync.mutate())}</Row>
+          <Row text="Writer's GitHub sign-in no longer allows it to use Projects, so the board can't be kept up to date.">{reconnect("Reconnect GitHub", () => sync.mutate())}</Row>
         ) : null}
         <Problem status={status} />
         {status.conflicts.length > 0 && (

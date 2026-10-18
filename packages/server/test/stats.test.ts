@@ -1,8 +1,8 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { countWords, loadNovel, writingDays } from "@gh-writer/core";
-import { nodeSource } from "@gh-writer/core/node";
+import { countWords, loadNovel, writingDays } from "@writer/core";
+import { nodeSource } from "@writer/core/node";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { uncommittedChange, writingHistory } from "../src/index.ts";
 import { gitIn, novelRepo, scratch } from "./fixtures.ts";

@@ -1,8 +1,8 @@
-import type { Reference } from "@gh-writer/client";
-import { imageUrl } from "@gh-writer/client";
-import { readFrontMatter, sceneNeighbours, storyTimeline, type Novel, type StoryEvent, type YamlEdit } from "@gh-writer/core";
-import { joinSceneFile } from "@gh-writer/editor";
-import { SceneEditor, type SpellService } from "@gh-writer/editor/react";
+import type { Reference } from "@writer/client";
+import { imageUrl } from "@writer/client";
+import { readFrontMatter, sceneNeighbours, storyTimeline, type Novel, type StoryEvent, type YamlEdit } from "@writer/core";
+import { joinSceneFile } from "@writer/editor";
+import { SceneEditor, type SpellService } from "@writer/editor/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { PenLine, Trash2 } from "lucide-react";
 import { AlertDialog } from "radix-ui";

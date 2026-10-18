@@ -2,7 +2,7 @@
 import "./dom.ts";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { countWords } from "@gh-writer/core";
+import { countWords } from "@writer/core";
 import { Editor } from "@tiptap/core";
 import { Transform } from "@tiptap/pm/transform";
 import { act, cleanup, render, screen } from "@testing-library/react";
@@ -120,7 +120,7 @@ describe("writing session", () => {
   test("the session survives a reload in sessionStorage", () => {
     writingSession.getState().record("a", 10);
     writingSession.getState().record("a", 25);
-    const stored = JSON.parse(sessionStorage.getItem("gh-writer:writing-session")!).state;
+    const stored = JSON.parse(sessionStorage.getItem("writer:writing-session")!).state;
     expect(stored.scenes).toEqual({ a: { baseline: 10, current: 25 } });
   });
 });

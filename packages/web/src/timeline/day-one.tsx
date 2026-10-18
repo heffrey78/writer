@@ -1,4 +1,4 @@
-import { apartInTime, storyTimeline, type Novel } from "@gh-writer/core";
+import { apartInTime, storyTimeline, type Novel } from "@writer/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { useId, useMemo, useState } from "react";
 import { api, keys } from "../api.ts";

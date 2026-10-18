@@ -27,8 +27,8 @@ await build({
   banner: {
     js: [
       "#!/usr/bin/env node",
-      `// gh-writer ${what} ${version}. Generated file, do not edit.`,
-      `// Source: https://github.com/heffrey78/gh-writer. Usage: ${usage}`,
+      `// Writer ${what} ${version}. Generated file, do not edit.`,
+      `// Source: https://github.com/heffrey78/writer. Usage: ${usage}`,
       'import { createRequire as __cr } from "node:module"; const require = __cr(import.meta.url);',
     ].join("\n"),
   },

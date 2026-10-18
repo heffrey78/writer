@@ -1,6 +1,6 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { countWords, parseMarkdown, wordChange, writingDays, type CommitWords } from "@gh-writer/core";
+import { countWords, parseMarkdown, wordChange, writingDays, type CommitWords } from "@writer/core";
 import type { Hono } from "hono";
 import { body, operation, type Env } from "./bible-routes.ts";
 import { gitPlumbing } from "./git.ts";

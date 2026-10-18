@@ -117,7 +117,7 @@ describe("a novel in a newer format (D11)", () => {
       ["POST", "/checkpoints", { name: "Before" }],
     ] as const) {
       const r = await api(method, path, body);
-      expect([path, r.status, json(r)]).toEqual([path, 409, { code: "TOO_NEW", error: "This novel is in format v99, newer than this copy of gh-writer reads (v2). Update gh-writer to change it." }]);
+      expect([path, r.status, json(r)]).toEqual([path, 409, { code: "TOO_NEW", error: "This novel is in format v99, newer than this copy of Writer reads (v2). Update Writer to change it." }]);
     }
     expect(readFileSync(join(root, SCENE), "utf8")).toBe(before);
     expect((await api("POST", "/sync")).status).toBe(200);

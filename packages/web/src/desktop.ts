@@ -4,9 +4,9 @@ import { useNavigate } from "react-router";
 /**
  * The page's side of the desktop app (D9). In the app, a page can ask the shell for what a browser
  * page can't do: choose a folder, open a novel in a window of its own, bring the library forward. The
- * shell in turn runs commands in the page (`window.ghWriter.run`: its menu's New novel…, a folder
+ * shell in turn runs commands in the page (`window.writer.run`: its menu's New novel…, a folder
  * dropped on the library or passed on the command line), and before it quits asks the page to save
- * (`window.ghWriter.flushAll`). In a browser none of this is there, and the app works as a web page.
+ * (`window.writer.flushAll`). In a browser none of this is there, and the app works as a web page.
  */
 
 interface Invoke {
@@ -26,7 +26,7 @@ export const desktop = shell !== undefined;
 
 declare global {
   interface Window {
-    ghWriter?: { flushAll(): Promise<void>; run(command: ShellCommand): void };
+    writer?: { flushAll(): Promise<void>; run(command: ShellCommand): void };
   }
 }
 
@@ -41,7 +41,7 @@ function run(command: ShellCommand): void {
   else waiting.push(command);
 }
 
-window.ghWriter = {
+window.writer = {
   async flushAll() {
     await Promise.allSettled([...flushes].map((flush) => flush()));
   },

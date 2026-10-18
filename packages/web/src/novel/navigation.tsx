@@ -1,1 +1,1 @@
-export { chapterTitle } from "@gh-writer/core/diagrams";
+export { chapterTitle } from "@writer/core/diagrams";

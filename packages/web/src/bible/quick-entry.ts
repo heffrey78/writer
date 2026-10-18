@@ -1,5 +1,5 @@
-import { readFrontMatter, uniqueId, type Novel, type YamlEdit } from "@gh-writer/core";
-import { joinSceneFile } from "@gh-writer/editor";
+import { readFrontMatter, uniqueId, type Novel, type YamlEdit } from "@writer/core";
+import { joinSceneFile } from "@writer/editor";
 import { useRef } from "react";
 import { create } from "zustand";
 import type { Workspace } from "../novel/workspace.ts";
