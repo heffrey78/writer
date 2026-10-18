@@ -1,5 +1,5 @@
 import type { SyncStatus } from "@writer/client";
-import type { Book } from "@writer/core";
+import { pieceLevel, pieceSections, sectionById, type Book } from "@writer/core";
 import { writingModes } from "@writer/editor";
 import { useWritingModes } from "@writer/editor/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -208,9 +208,9 @@ export function NovelPage() {
         run: () => void navigate(`/novels/${novelId}/bible/${e.id}`),
       })),
       ...(model?.events ?? []).map((e) => ({ id: `novel.event.${e.id}`, title: `Off the page: ${e.title}`, group: "Go to", keywords: ["event"], run: () => void navigate(`/novels/${novelId}/event/${e.id}`) })),
-      ...(model?.chapters ?? []).flatMap((c): Command[] => [
+      ...(model ? pieceSections(model) : []).flatMap((c): Command[] => [
         { id: `novel.chapter.${c.id}`, title: `Chapter: ${chapterTitle(model!, c)}`, group: "Go to", run: () => void navigate(`/novels/${novelId}/chapter/${c.id}`) },
-        ...c.sceneIds.flatMap((id): Command[] => {
+        ...c.childIds.flatMap((id): Command[] => {
           const s = model!.allPieces.find((x) => x.id === id);
           return s
             ? [{ id: `novel.scene.${s.id}`, title: `Scene: ${s.title}`, group: "Go to", keywords: [chapterTitle(model!, c)], run: () => void navigate(`/novels/${novelId}/scene/${s.id}`) }]
@@ -295,7 +295,7 @@ export function NovelPage() {
           <div className="md:overflow-y-auto">
             <ErrorBoundary what="this view" remount={sameView}>
               <Routes>
-                <Route index element={book.chapters[0] ? <Navigate to={`/novels/${novelId}/chapter/${book.chapters[0].id}`} replace /> : <EmptyManuscript />} />
+                <Route index element={pieceSections(book)[0] ? <Navigate to={`/novels/${novelId}/chapter/${pieceSections(book)[0]!.id}`} replace /> : <EmptyManuscript />} />
                 <Route path="chapter/:chapterId" element={<ChapterRoute novelId={novelId} novel={book} workspace={workspace} spell={spell} entries={entries} />} />
                 <Route path="scene/:sceneId" element={<SceneRoute novelId={novelId} novel={book} workspace={workspace} spell={spell} entries={entries} />} />
                 <Route
@@ -343,14 +343,14 @@ type RouteProps = { novelId: string; novel: Book; workspace: Workspace; spell: R
 
 function ChapterRoute(props: RouteProps) {
   const { chapterId } = useParams();
-  const chapter = props.novel.chapters.find((c) => c.id === chapterId) ?? props.novel.allChapters.find((c) => c.id === chapterId);
+  const chapter = pieceSections(props.novel).find((c) => c.id === chapterId) ?? props.novel.allSections.find((c) => c.id === chapterId && c.level === pieceLevel(props.novel));
   return chapter ? <WritingView {...props} view={{ chapter }} /> : <Missing what="chapter" />;
 }
 
 function SceneRoute(props: RouteProps) {
   const { sceneId } = useParams();
   const scene = props.novel.allPieces.find((s) => s.id === sceneId);
-  const chapter = props.novel.allChapters.find((c) => c.id === scene?.chapterId);
+  const chapter = sectionById(props.novel, scene?.sectionId);
   return scene ? <WritingView {...props} view={{ scene, chapter }} /> : <Missing what="scene" />;
 }
 

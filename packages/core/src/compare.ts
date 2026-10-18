@@ -4,7 +4,7 @@ import { gfmFromMarkdown } from "mdast-util-gfm";
 import { toString } from "mdast-util-to-string";
 import { gfm } from "micromark-extension-gfm";
 import { chapterTitle, describeRelationship } from "./diagrams.ts";
-import type { Chapter, Entity, Book, Relationship, Piece, StoryEvent } from "./model.ts";
+import { pieceSections, sectionById, type Section, type Entity, type Book, type Relationship, type Piece, type StoryEvent } from "./model.ts";
 import type { StoryTime } from "./types.ts";
 import { diffParagraphs, diffSequences, type ParagraphDiff } from "./word-diff.ts";
 import { countWords } from "./words.ts";
@@ -96,8 +96,8 @@ export interface Comparison {
 export function compareNovels(before: Book, after: Book): Comparison {
   const sceneA = new Map(before.allPieces.map((s) => [s.id, s]));
   const sceneB = new Map(after.allPieces.map((s) => [s.id, s]));
-  const chapterA = new Map(before.chapters.map((c) => [c.id, c]));
-  const chapterB = new Map(after.chapters.map((c) => [c.id, c]));
+  const chapterA = new Map(pieceSections(before).map((c) => [c.id, c]));
+  const chapterB = new Map(pieceSections(after).map((c) => [c.id, c]));
 
   // Moved: scenes (and chapters) both have, out of the longest run they share in reading order.
   const movedScenes = outOfOrder(
@@ -105,22 +105,22 @@ export function compareNovels(before: Book, after: Book): Comparison {
     after.allPieces.map((s) => s.id).filter((id) => sceneA.has(id)),
   );
   const movedChapters = outOfOrder(
-    before.chapters.map((c) => c.id).filter((id) => chapterB.has(id)),
-    after.chapters.map((c) => c.id).filter((id) => chapterA.has(id)),
+    pieceSections(before).map((c) => c.id).filter((id) => chapterB.has(id)),
+    pieceSections(after).map((c) => c.id).filter((id) => chapterA.has(id)),
   );
 
-  const scene = (id: string, chapter: Chapter): SceneComparison => {
+  const scene = (id: string, chapter: Section): SceneComparison => {
     const a = sceneA.get(id);
     const b = sceneB.get(id);
     const fields = sceneFields(before, a, after, b);
     const prose = (a?.body ?? "") !== (b?.body ?? "");
-    const fromChapter = a?.chapterId !== undefined && b && a.chapterId !== b.chapterId ? chapterA.get(a.chapterId) : undefined;
+    const fromChapter = a?.sectionId !== undefined && b && a.sectionId !== b.sectionId ? chapterA.get(a.sectionId) : undefined;
     const status: ChangeStatus = !a ? "added" : !b ? "removed" : prose || fields.length ? "changed" : "unchanged";
     return {
       id,
       title: (b ?? a)!.title,
       status,
-      moved: !!a && !!b && (movedScenes.has(id) || a.chapterId !== b.chapterId),
+      moved: !!a && !!b && (movedScenes.has(id) || a.sectionId !== b.sectionId),
       ...(fromChapter && chapter.id !== fromChapter.id ? { movedFrom: chapterTitle(before, fromChapter) } : {}),
       fields,
       prose,
@@ -129,23 +129,23 @@ export function compareNovels(before: Book, after: Book): Comparison {
   };
 
   const chapters: ChapterComparison[] = [];
-  for (const id of interleave(before.chapters.map((c) => c.id), after.chapters.map((c) => c.id))) {
+  for (const id of interleave(pieceSections(before).map((c) => c.id), pieceSections(after).map((c) => c.id))) {
     const a = chapterA.get(id);
     const b = chapterB.get(id);
     const chapter = (b ?? a)!;
     // A chapter's scenes now, and those it had that are gone from the book, where they were.
-    const kept = b ? b.sceneIds : [];
-    const gone = (a?.sceneIds ?? []).filter((s) => !sceneB.has(s));
-    const ids = interleave(a?.sceneIds.filter((s) => kept.includes(s) || gone.includes(s)) ?? [], kept);
+    const kept = b ? b.childIds : [];
+    const gone = (a?.childIds ?? []).filter((s) => !sceneB.has(s));
+    const ids = interleave(a?.childIds.filter((s) => kept.includes(s) || gone.includes(s)) ?? [], kept);
     const scenes = ids.filter((s) => sceneA.has(s) || sceneB.has(s)).map((s) => scene(s, chapter));
     const fields = [
       field("Title", a && chapterTitle(before, a), b && chapterTitle(after, b), !!a && !!b),
       field("Synopsis", a?.synopsis, b?.synopsis, !!a && !!b),
-      field("Part", a && partTitle(before, a), b && partTitle(after, b), !!a && !!b),
+      field(after.kind.levels.at(-2)?.label ?? "", a && partTitle(before, a), b && partTitle(after, b), !!a && !!b),
     ].filter((f): f is FieldChange => !!f);
     const words = scenes.reduce((w, s) => ({ before: w.before + s.words.before, after: w.after + s.words.after }), { before: 0, after: 0 });
     // A chapter whose scenes left is changed, though they're listed where they went.
-    const lost = (a?.sceneIds ?? []).some((s) => sceneB.has(s) && !kept.includes(s));
+    const lost = (a?.childIds ?? []).some((s) => sceneB.has(s) && !kept.includes(s));
     const status: ChangeStatus = !a ? "added" : !b ? "removed" : fields.length || lost || scenes.some((s) => s.status !== "unchanged" || s.moved) ? "changed" : "unchanged";
     chapters.push({ id, title: chapterTitle(b ? after : before, chapter), status, moved: !!a && !!b && movedChapters.has(id), fields, scenes, words });
   }
@@ -254,8 +254,8 @@ function field(label: string, before: string | undefined, after: string | undefi
 const names = (novel: Book, ids: readonly string[] | undefined) => (ids ?? []).map((id) => novel.entities.find((e) => e.id === id)?.name ?? id).join(", ") || undefined;
 const nameOf = (novel: Book, id: string | undefined) => (id ? (novel.entities.find((e) => e.id === id)?.name ?? id) : undefined);
 
-function partTitle(novel: Book, chapter: Chapter): string | undefined {
-  return chapter.partId ? novel.allParts.find((p) => p.id === chapter.partId)?.title : undefined;
+function partTitle(novel: Book, chapter: Section): string | undefined {
+  return sectionById(novel, chapter.parentId)?.title;
 }
 
 function when(time: StoryTime | undefined): string | undefined {

@@ -5,6 +5,7 @@ import { body, operation, type Env } from "./bible-routes.ts";
  * POST /:id/manuscript/scenes                { chapter, title, after? } → 201 { id, commit }
  * POST /:id/manuscript/chapters              { part, title?, after? } → 201 { id, commit }
  * POST /:id/manuscript/parts                 { title, after? } → 201 { id, commit }
+ * POST /:id/manuscript/sections              { level, parent?, title?, after? } → 201 { id, commit }: at any level of the book's kind
  * POST /:id/manuscript/items/:item/rename    { title }
  * POST /:id/manuscript/items/:item/move      { to?, index }
  * POST /:id/manuscript/items/:item/delete    { notes?: "keep" | "delete" }: notes left on no scene kept unattached or deleted;
@@ -29,6 +30,10 @@ export function manuscriptRoutes(routes: Hono<Env>): void {
   routes.post("/:id/manuscript/parts", async (c) => {
     const b = await body(c);
     return operation(c, () => m(c).createPart({ title: str(b.title), ...after(b) }), 201);
+  });
+  routes.post("/:id/manuscript/sections", async (c) => {
+    const b = await body(c);
+    return operation(c, () => m(c).createSection(str(b.level), typeof b.parent === "string" ? b.parent : null, { title: str(b.title), ...after(b) }), 201);
   });
   routes.post("/:id/manuscript/items/:item/rename", async (c) => {
     const b = await body(c);

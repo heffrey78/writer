@@ -1,4 +1,4 @@
-import type { Entity, Book, Piece, YamlEdit } from "@writer/core";
+import { outerSections, pieceSections, type Entity, type Book, type Piece, type YamlEdit } from "@writer/core";
 import { Popover } from "radix-ui";
 import { useId, useMemo, useState } from "react";
 import { plural } from "../bible/types.ts";
@@ -117,14 +117,14 @@ export function PresencePage({ novelId, novel, workspace }: { novelId: string; n
           Show
           <select value={zoom ?? ""} onChange={(e) => setParams({ zoom: e.target.value || undefined })} className="h-8 rounded-md border border-rule bg-raised px-2 font-normal">
             <option value="">The whole book</option>
-            {novel.parts.map((p) => (
+            {outerSections(novel).map((p) => (
               <option key={p.id} value={p.id}>
                 Part: {p.title}
               </option>
             ))}
-            {novel.chapters.map((c) => (
+            {pieceSections(novel).map((c) => (
               <option key={c.id} value={c.id}>
-                Chapter: {c.title ?? `Chapter ${novel.chapters.indexOf(c) + 1}`}
+                Chapter: {c.title ?? `Chapter ${pieceSections(novel).indexOf(c) + 1}`}
               </option>
             ))}
           </select>

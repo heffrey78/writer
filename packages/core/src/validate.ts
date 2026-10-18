@@ -1,6 +1,6 @@
 import { idPrefix, RECORD_PREFIXES } from "./ids.ts";
 import { loadBook } from "./load.ts";
-import { allRecords, mentions, picturePath, pictures, type Book, type Picture, type RecordRef } from "./model.ts";
+import { allRecords, levelLabel, mentions, pieceLevel, picturePath, pictures, sectionsAt, type Book, type Picture, type RecordRef } from "./model.ts";
 import type { FileSource } from "./source.ts";
 import { overlaps, storyTimeline, type TimelineItem } from "./time.ts";
 import type { Diagnostic, Severity } from "./types.ts";
@@ -68,8 +68,11 @@ export function validateBook(novel: Book): Diagnostic[] {
   const typeByKey = new Map(novel.entityTypes.map((t) => [t.key, t]));
   // The book's own prefix, its levels' and its pieces' are its kind's; the rest every book shares.
   const { kind } = novel;
-  const recordPrefix = (k: RecordRef["kind"]) =>
-    k === "novel" ? kind.prefix : k === "scene" ? kind.piece.prefix : (kind.levels.find((l) => l.key === k)?.prefix ?? RECORD_PREFIXES[k as keyof typeof RECORD_PREFIXES]);
+  const recordPrefix = (r: RecordRef) =>
+    r.kind === "book" ? kind.prefix : r.kind === "piece" ? kind.piece.prefix : r.kind === "section" ? kind.levels.find((l) => l.key === r.level)?.prefix : RECORD_PREFIXES[r.kind as keyof typeof RECORD_PREFIXES];
+  /** What a record is, in the kind's words: "scene", "chapter", "novel", an entry's type, "event". */
+  const describe = (r: RecordRef) =>
+    r.kind === "entity" ? r.type! : r.kind === "piece" ? kind.piece.key : r.kind === "section" ? r.level! : r.kind === "book" ? kind.key : r.kind;
 
   // IDs: duplicates and prefixes.
   for (const r of records) {
@@ -78,7 +81,7 @@ export function validateBook(novel: Book): Diagnostic[] {
       const where = first.file === r.file ? "earlier in this file" : `in ${first.file}`;
       push("error", "E_DUPLICATE_ID", r.file, `ID ${r.id} is already used ${where}`);
     }
-    const expected = r.kind === "entity" ? typeByKey.get(r.type!)?.prefix : recordPrefix(r.kind);
+    const expected = r.kind === "entity" ? typeByKey.get(r.type!)?.prefix : recordPrefix(r);
     const actual = idPrefix(r.id);
     if (expected && actual && actual !== expected) {
       push("error", "E_ID_PREFIX", r.file, `${describe(r)} ID ${r.id} should start with "${expected}_"`);
@@ -95,9 +98,9 @@ export function validateBook(novel: Book): Diagnostic[] {
       push("error", "E_DANGLING_REF", file, `${field} refers to ${id}, which does not exist`, where);
       return;
     }
-    const kind = target.kind === "entity" ? target.type! : target.kind;
-    const custom = target.kind === "entity" && !builtinTypes.has(kind);
-    if (!allowed.includes(kind) && !(allowed.includes("*entity") && target.kind === "entity") && !(allowed.includes("*custom") && custom)) {
+    const what = describe(target);
+    const custom = target.kind === "entity" && !builtinTypes.has(what);
+    if (!allowed.includes(what) && !(allowed.includes("*entity") && target.kind === "entity") && !(allowed.includes("*custom") && custom)) {
       const wanted = allowed.map((a) => (a === "*entity" ? "a bible entity" : a === "*custom" ? "an entry of a custom type" : `a ${a}`)).join(" or ");
       push("error", "E_REF_TYPE", file, `${field} must be ${wanted}, but ${id} is ${article(describe(target))}`, where);
     }
@@ -228,13 +231,16 @@ export function validateBook(novel: Book): Diagnostic[] {
         push("warning", "W_FILENAME_ORDER", path, `${kind} "${name}" is number ${i + 1} in reading order`);
       }
     });
-  checkPrefixes(novel.parts, "Part folder");
-  if (novel.topLevel === "parts") {
-    for (const part of novel.parts) checkPrefixes(novel.chapters.filter((c) => c.partId === part.id), "Chapter folder");
-  } else {
-    checkPrefixes(novel.chapters, "Chapter folder");
+  // The top level's folders, then level by level what each section holds, outermost first.
+  const [top] = novel.levels;
+  if (top) checkPrefixes(sectionsAt(novel, top), `${levelLabel(novel, top)} folder`);
+  for (const level of novel.levels) {
+    for (const section of sectionsAt(novel, level)) {
+      const inner = novel.sections.filter((c) => c.parentId === section.id);
+      if (level === pieceLevel(novel)) checkPrefixes(novel.pieces.filter((p) => p.sectionId === section.id), `${kind.piece.label} file`);
+      else if (inner.length) checkPrefixes(inner, `${levelLabel(novel, inner[0]!.level)} folder`);
+    }
   }
-  for (const c of novel.chapters) checkPrefixes(novel.pieces.filter((s) => s.chapterId === c.id), "Scene file");
 
   return out;
 }
@@ -309,9 +315,6 @@ function isProse(line: string): boolean {
   return !/^\s{0,3}([#>|<]|[-*+]\s|\d+[.)]\s|(=+|-+|\*{3,}|_{3,})\s*$)/.test(line);
 }
 
-function describe(r: RecordRef): string {
-  return r.kind === "entity" ? r.type! : r.kind;
-}
 
 function article(word: string): string {
   return /^[aeiou]/.test(word) ? `an ${word}` : `a ${word}`;

@@ -1,4 +1,4 @@
-import type { Book, Piece } from "@writer/core";
+import { pieceSections, type Book, type Piece } from "@writer/core";
 import { GripVertical } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
 import { Link, useSearchParams } from "react-router";
@@ -83,7 +83,7 @@ export function OutlineCards({ novelId, novel, workspace }: { novelId: string; n
     if (id && target) void moveTo(id, target.id, target.after);
   };
 
-  const chapters = novel.chapters.map((c) => ({ chapter: c, scenes: visible.filter((s) => s.chapterId === c.id) })).filter((g) => g.scenes.length || !filtered);
+  const chapters = pieceSections(novel).map((c) => ({ chapter: c, scenes: visible.filter((s) => s.sectionId === c.id) })).filter((g) => g.scenes.length || !filtered);
   const characters = novel.entities.filter((e) => e.type === "character").sort((a, b) => a.name.localeCompare(b.name));
   const plotlines = novel.entities.filter((e) => e.type === "plotline").sort((a, b) => a.name.localeCompare(b.name));
 

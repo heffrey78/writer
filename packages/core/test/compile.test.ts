@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { bookImages, compileBook, countWords, flatBlocks, loadBook, memorySource, numberWords, type CompiledBook, type FileSource } from "../src/index.ts";
+import { bookImages, compileBook, countWords, flatBlocks, loadBook, memorySource, numberWords, pieceSections, type CompiledBook, type FileSource } from "../src/index.ts";
 
 const ROOT = fileURLToPath(new URL("../../../examples/sample-novel/", import.meta.url));
 const sample: Record<string, string> = Object.fromEntries(
@@ -78,8 +78,8 @@ describe("compiling the manuscript", () => {
       [3, "Chapter Three: Night Crossing", "The Sale"],
       [4, "Chapter Four: Varn Holds", undefined],
     ]);
-    for (const [i, chapter] of novel.chapters.entries()) {
-      const scenes = chapter.sceneIds.filter((id) => novel.allPieces.find((s) => s.id === id)?.body.trim());
+    for (const [i, chapter] of pieceSections(novel).entries()) {
+      const scenes = chapter.childIds.filter((id) => novel.allPieces.find((s) => s.id === id)?.body.trim());
       expect(book.chapters[i]!.blocks.filter((b) => b.kind === "break").length, chapter.id).toBeGreaterThanOrEqual(scenes.length - 1);
       expect(book.chapters[i]!.blocks[0]?.kind).toBe("paragraph");
       expect(book.chapters[i]!.blocks.at(-1)?.kind).toBe("paragraph");
@@ -108,7 +108,7 @@ describe("compiling the manuscript", () => {
     const { novel, source } = await open({
       [STATION]: `${station}She said it _twice_, **loudly**, and _**both**_.\n\nA line\\\nbroken.\n\n<!-- a note for later -->\n\n***\n\n> A letter, quoted.\n`,
     });
-    const book = await compileBook(novel, source, { to: novel.chapters[0]!.id });
+    const book = await compileBook(novel, source, { to: pieceSections(novel)[0]!.id });
     const blocks = book.chapters[0]!.blocks;
     expect(blocks[0]).toEqual({ kind: "paragraph", runs: [{ text: "She said it " }, { text: "twice", em: true }, { text: ", " }, { text: "loudly", strong: true }, { text: ", and " }, { text: "both", em: true, strong: true }, { text: "." }] });
     expect(blocks[1]).toEqual({ kind: "paragraph", runs: [{ text: "A line\nbroken." }] });
@@ -120,13 +120,13 @@ describe("compiling the manuscript", () => {
 
   it("compiles a range of chapters, keeping their numbers", async () => {
     const { novel, source } = await open();
-    const book = await compileBook(novel, source, { from: novel.chapters[1]!.id, to: novel.chapters[2]!.id });
+    const book = await compileBook(novel, source, { from: pieceSections(novel)[1]!.id, to: pieceSections(novel)[2]!.id });
     expect(book.chapters.map((c) => [c.number, c.heading, c.part?.title])).toEqual([
       [2, "Chapter Two: Old Debts", undefined],
       [3, "Chapter Three: Night Crossing", "The Sale"],
     ]);
     expect(book.words).toBeLessThan((await compileBook(novel, source)).words);
-    await expect(compileBook(novel, source, { from: novel.chapters[2]!.id, to: novel.chapters[1]!.id })).rejects.toThrow("ends before it starts");
+    await expect(compileBook(novel, source, { from: pieceSections(novel)[2]!.id, to: pieceSections(novel)[1]!.id })).rejects.toThrow("ends before it starts");
     await expect(compileBook(novel, source, { from: "ch_nope00" })).rejects.toThrow("isn't in the book");
   });
 

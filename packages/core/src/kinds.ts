@@ -7,13 +7,24 @@ import type { IssueKind } from "./issue-kinds.ts";
  * one. A book in format v2 has no `kind`: every one is a novel (V2_KIND).
  */
 
-/** A level of sections above the pieces, such as a part or a chapter. */
+/**
+ * A level of sections above the pieces, such as a part or a chapter. A section is a folder with
+ * _<key>.yaml in it: its ID, title and synopsis, and its children in order under the next level's
+ * `list` (the pieces' at the innermost level).
+ */
 export interface LevelDef {
   key: string;
   label: string;
   prefix: string;
-  /** Whether a book may go without it, as a novel may have no parts. */
+  /** The key its sections are listed under, in _order.yaml or the level above's file: "chapters". */
+  list: string;
+  /**
+   * Whether a book may go without it, as a novel may have no parts. Only outer levels may be: a book
+   * starts at one of its kind's levels and has every level after it.
+   */
   optional?: boolean;
+  /** Whether its sections must have a title, as a part must and a chapter needn't. */
+  titled?: boolean;
 }
 
 /** A stage a piece moves through, in order: idea, outlined, drafted… */
@@ -33,7 +44,7 @@ export interface BookKind {
   /** The levels of sections, outermost first. */
   levels: readonly LevelDef[];
   /** The writing unit: one file of prose. */
-  piece: { key: string; label: string; prefix: string };
+  piece: { key: string; label: string; prefix: string; list: string };
   folders: {
     /** The sections and pieces. */
     content: string;
@@ -66,6 +77,12 @@ export function kindByKey(key: string): BookKind {
   const kind = registry.get(key);
   if (!kind) throw new Error(`No kind of book “${key}” is registered: the app's entry point registers the kinds it ships`);
   return kind;
+}
+
+/** The levels a book of the kind may start at: each optional outer level, then the first that isn't. */
+export function startLevels(kind: BookKind): LevelDef[] {
+  const first = kind.levels.findIndex((l) => !l.optional);
+  return kind.levels.slice(0, first + 1);
 }
 
 /** A level of the kind, by its key. */

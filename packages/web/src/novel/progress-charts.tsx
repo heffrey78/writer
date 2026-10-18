@@ -1,4 +1,4 @@
-import { addDays, countWords, unbalanced, type Book, type WritingDay } from "@writer/core";
+import { addDays, countWords, pieceSections, unbalanced, type Book, type WritingDay } from "@writer/core";
 import { chapterTitle } from "@writer/core/diagrams";
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { cn } from "../ui/cn.ts";
@@ -363,8 +363,8 @@ function ChapterLengths({ novel }: { novel: Book }) {
   const [ref, width] = useWidth<HTMLDivElement>();
   const chapters = useMemo(
     () =>
-      novel.chapters.map((c) => {
-        const scenes = c.sceneIds.map((id) => novel.allPieces.find((s) => s.id === id)).filter((s) => s !== undefined).map((s) => ({ id: s.id, title: s.title, words: countWords(s.body) }));
+      pieceSections(novel).map((c) => {
+        const scenes = c.childIds.map((id) => novel.allPieces.find((s) => s.id === id)).filter((s) => s !== undefined).map((s) => ({ id: s.id, title: s.title, words: countWords(s.body) }));
         return { id: c.id, title: chapterTitle(novel, c), scenes, words: scenes.reduce((n, s) => n + s.words, 0) };
       }),
     [novel],

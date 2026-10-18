@@ -1,4 +1,4 @@
-import { countWords, type Book, type Piece } from "@writer/core";
+import { countWords, outerSections, pieceSections, type Book, type Piece } from "@writer/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { GripVertical } from "lucide-react";
 import { Fragment, useEffect, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
@@ -61,10 +61,10 @@ export function OutlineTable({ novelId, novel, workspace }: { novelId: string; n
     if (id && move) void structure.move(id, move.index, move.to);
   };
 
-  const groups = novel.chapters.map((c) => ({
+  const groups = pieceSections(novel).map((c) => ({
     chapter: c,
-    part: novel.parts.find((p) => p.id === c.partId),
-    scenes: c.sceneIds.map((id) => novel.allPieces.find((s) => s.id === id)).filter((s): s is Piece => s !== undefined),
+    part: outerSections(novel).find((p) => p.id === c.parentId),
+    scenes: c.childIds.map((id) => novel.allPieces.find((s) => s.id === id)).filter((s): s is Piece => s !== undefined),
   }));
 
   return (

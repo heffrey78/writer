@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
-import { compileBook, CompileError, loadBook } from "@writer/core";
+import { compileBook, CompileError, loadBook, pieceSections } from "@writer/core";
 import { nodeSource } from "@writer/core/node";
 import { commitDate, fileName, FORMATS, isFormat, readCover, readPictures, render, type Format, type PdfFonts } from "@writer/export";
 
@@ -56,7 +56,7 @@ export async function runCompile(dir: string, options: CompileOptions = {}, out:
   const missing = new Set<string>();
   for (const format of new Set(formats as Format[])) {
     const rendered = await render(book, format, { date, cover, pictures, ...(options.fonts ? { fonts: options.fonts } : {}) });
-    const path = join(target, fileName(book, novel.chapters.length, format));
+    const path = join(target, fileName(book, pieceSections(novel).length, format));
     await writeFile(path, rendered.bytes);
     written.push(relative(process.cwd(), path) || path);
     rendered.missing.forEach((c) => missing.add(c));

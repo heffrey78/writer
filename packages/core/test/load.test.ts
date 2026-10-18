@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { loadBook, memorySource, mentions, notesMentioning, notesOfScene, relationshipsAt, type Book } from "../src/index.ts";
+import { loadBook, memorySource, mentions, notesMentioning, notesOfScene, relationshipsAt, sectionsAt, type Book } from "../src/index.ts";
 import { nodeSource } from "../src/node.ts";
 
 const SAMPLE = fileURLToPath(new URL("../../../examples/sample-novel", import.meta.url));
@@ -15,9 +15,10 @@ describe("loading the sample novel", () => {
 
   it("builds the structure in reading order", () => {
     expect(novel.config?.title).toBe("The Bridge at Varn");
-    expect(novel.topLevel).toBe("parts");
-    expect(novel.parts.map((p) => p.title)).toEqual(["Return", "The Sale"]);
-    expect(novel.chapters.map((c) => c.title)).toEqual(["Arrival", "Old Debts", "Night Crossing", "Varn Holds"]);
+    expect(novel.levels).toEqual(["part", "chapter"]);
+    expect(sectionsAt(novel, "part").map((p) => p.title)).toEqual(["Return", "The Sale"]);
+    expect(sectionsAt(novel, "chapter").map((c) => c.title)).toEqual(["Arrival", "Old Debts", "Night Crossing", "Varn Holds"]);
+    expect(novel.sections.map((s) => s.title)).toEqual(["Return", "Arrival", "Old Debts", "The Sale", "Night Crossing", "Varn Holds"]);
     expect(novel.pieces.map((s) => s.title)).toEqual([
       "The Station", "Walking the Span", "Tomas's Workshop", "Ben's Ledger",
       "The Betrayal", "The Flood", "Mirela's Offer", "The Last Rivet",
@@ -83,7 +84,7 @@ describe("loader structure checks", () => {
   it("loads a novel without parts", async () => {
     const n = await tiny();
     expect(n.diagnostics).toEqual([]);
-    expect(n.topLevel).toBe("chapters");
+    expect(n.levels).toEqual(["chapter"]);
     expect(n.pieces.map((s) => s.id)).toEqual(["sc_aaaaaa", "sc_bbbbbb"]);
   });
 

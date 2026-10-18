@@ -1,4 +1,4 @@
-import { editYaml, type Entity, type Book, type Piece } from "@writer/core";
+import { editYaml, outerSections, type Entity, type Book, type Piece } from "@writer/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { Popover } from "radix-ui";
 import { useId, useMemo, useState } from "react";
@@ -107,7 +107,7 @@ export function SwimlanesPage({ novelId, novel, workspace }: { novelId: string; 
           Show
           <select value={zoom ?? ""} onChange={(e) => setParams({ zoom: e.target.value || undefined })} className="h-8 rounded-md border border-rule bg-raised px-2 font-normal">
             <option value="">The whole book</option>
-            {novel.parts.map((p) => (
+            {outerSections(novel).map((p) => (
               <option key={p.id} value={p.id}>
                 Part: {p.title}
               </option>

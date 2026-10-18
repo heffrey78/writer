@@ -1,4 +1,4 @@
-import { compileBook, CompileError } from "@writer/core";
+import { compileBook, CompileError, pieceSections } from "@writer/core";
 import { nodeSource } from "@writer/core/node";
 import { commitDate, fileName, isFormat, MEDIA_TYPES, readCover, readPictures, render } from "@writer/export";
 import type { Hono } from "hono";
@@ -39,7 +39,7 @@ export function compileRoutes(routes: Hono<Env>): void {
     return new Response(Buffer.from(bytes), {
       headers: {
         "content-type": MEDIA_TYPES[format],
-        "content-disposition": `attachment; filename="${fileName(book, novel.chapters.length, format)}"`,
+        "content-disposition": `attachment; filename="${fileName(book, pieceSections(novel).length, format)}"`,
         "x-missing-characters": encodeURIComponent(missing.join("")),
         ...(problem ? { "x-cover-problem": encodeURIComponent(problem) } : {}),
         ...(problems.length ? { "x-picture-problems": encodeURIComponent(problems.join("\n")) } : {}),

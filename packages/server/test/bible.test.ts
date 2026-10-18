@@ -334,7 +334,7 @@ describe("events", () => {
     expect(lastCommit()).toBe("Manuscript: write “The plans are stolen” as a scene");
     clean();
     const novel = await valid();
-    expect(novel.chapters.find((c) => c.id === "ch_01dde6")?.sceneIds.at(-1)).toBe(scene);
+    expect(novel.sections.find((c) => c.id === "ch_01dde6")?.childIds.at(-1)).toBe(scene);
 
     await bible.writeAsScene("evt_1eave5", { chapter: "ch_01dde6", keep: false }, manuscript);
     expect(existsSync(join(dir, LEAVING))).toBe(false);

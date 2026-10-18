@@ -158,7 +158,7 @@ function gridSvg(novel: Book, g: Grid): string {
   let b = `<text x="20" y="26" ${FONT} font-size="14" font-weight="600" fill="${C.ink}">${esc(g.title)}</text>\n`;
   let x = HEADER;
   for (const p of parts) {
-    b += `<text x="${x + 4}" y="${top + 14}" ${FONT} font-size="10" font-weight="600" letter-spacing="0.5" fill="${C.muted}">${esc(cut(p.part.title.toUpperCase(), Math.floor((p.span * COL) / 6.5)))}</text>\n<line x1="${x}" y1="${top}" x2="${x}" y2="${bodyY + g.rows.length * ROW}" stroke="${C.rule}"/>\n`;
+    b += `<text x="${x + 4}" y="${top + 14}" ${FONT} font-size="10" font-weight="600" letter-spacing="0.5" fill="${C.muted}">${esc(cut((p.part.title ?? "").toUpperCase(), Math.floor((p.span * COL) / 6.5)))}</text>\n<line x1="${x}" y1="${top}" x2="${x}" y2="${bodyY + g.rows.length * ROW}" stroke="${C.rule}"/>\n`;
     x += p.span * COL;
   }
   x = HEADER;

@@ -1,5 +1,5 @@
 import { ApiError, type Conflicts, type FileResolution, type Version } from "@writer/client";
-import type { Book } from "@writer/core";
+import { pieceLevel, type Book } from "@writer/core";
 import { ConflictResolver, type ResolvedFile } from "@writer/editor/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Split } from "lucide-react";
@@ -64,7 +64,7 @@ export function stayIfThere(queryClient: ReturnType<typeof useQueryClient>, nove
   const novel = queryClient.getQueryData<{ novel: Book }>(keys.novel(novelId))?.novel;
   const [, kind, id] = /\/(chapter|scene)\/([^/]+)$/.exec(pathname) ?? [];
   if (!novel || !kind) return;
-  const there = kind === "chapter" ? novel.allChapters.some((c) => c.id === id) : novel.allPieces.some((s) => s.id === id);
+  const there = kind === "chapter" ? novel.allSections.some((c) => c.id === id && c.level === pieceLevel(novel)) : novel.allPieces.some((s) => s.id === id);
   if (!there) void navigate(`/novels/${novelId}`);
 }
 

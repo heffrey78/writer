@@ -1,4 +1,4 @@
-import type { Chapter, Book } from "@writer/core";
+import { pieceLevel, pieceSections, sectionById, type Book, type Section } from "@writer/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router";
 import { api, keys } from "../api.ts";
@@ -7,31 +7,34 @@ import { chapterTitle } from "./navigation.tsx";
 import { useNotice } from "./notice.tsx";
 import type { Workspace } from "./workspace.ts";
 
-export type ItemKind = "part" | "chapter" | "scene";
+/** What an item is, in the kind's words: the piece's key ("scene") or the section's level ("chapter", "part"). */
+export type ItemKind = string;
 
 /** What an ID is in the manuscript, with its title for messages. */
 export function itemOf(novel: Book, id: string): { kind: ItemKind; title: string } | undefined {
-  const scene = novel.allPieces.find((s) => s.id === id);
-  if (scene) return { kind: "scene", title: scene.title };
-  const chapter = novel.allChapters.find((c) => c.id === id);
-  if (chapter) return { kind: "chapter", title: chapterTitle(novel, chapter) };
-  const part = novel.allParts.find((p) => p.id === id);
-  return part ? { kind: "part", title: part.title } : undefined;
+  const piece = novel.allPieces.find((s) => s.id === id);
+  if (piece) return { kind: novel.kind.piece.key, title: piece.title };
+  const section = sectionById(novel, id);
+  return section ? { kind: section.level, title: chapterTitle(novel, section) } : undefined;
 }
 
 /** The ordered list an item sits in, and the container it belongs to (null: the top level). */
 export function siblingsOf(novel: Book, id: string): { container: string | null; list: string[] } | undefined {
-  const scene = novel.allPieces.find((s) => s.id === id);
-  if (scene) {
-    const chapter = novel.allChapters.find((c) => c.id === scene.chapterId);
-    return chapter ? { container: chapter.id, list: chapter.sceneIds } : undefined;
+  const piece = novel.allPieces.find((s) => s.id === id);
+  if (piece) {
+    const section = sectionById(novel, piece.sectionId);
+    return section ? { container: section.id, list: section.childIds } : undefined;
   }
-  const chapter = novel.allChapters.find((c) => c.id === id);
-  if (chapter) {
-    if (chapter.partId) return { container: chapter.partId, list: novel.allParts.find((p) => p.id === chapter.partId)?.chapterIds ?? [] };
-    return { container: null, list: novel.chapters.map((c) => c.id) };
-  }
-  return novel.allParts.some((p) => p.id === id) ? { container: null, list: novel.parts.map((p) => p.id) } : undefined;
+  const section = sectionById(novel, id);
+  if (!section) return undefined;
+  if (section.parentId) return { container: section.parentId, list: sectionById(novel, section.parentId)?.childIds ?? [] };
+  return { container: null, list: novel.sections.filter((s) => !s.parentId).map((s) => s.id) };
+}
+
+/** Whether a piece's section is `id`, or inside it. */
+export function within(novel: Book, sectionId: string | undefined, id: string): boolean {
+  const section = sectionById(novel, sectionId);
+  return !!section && (section.id === id || within(novel, section.parentId, id));
 }
 
 /**
@@ -45,12 +48,12 @@ export function stepMove(novel: Book, id: string, direction: -1 | 1): { index: n
   const i = at.list.indexOf(id);
   const j = i + direction;
   if (j >= 0 && j < at.list.length) return { index: j, to: at.container };
-  if (itemOf(novel, id)?.kind !== "scene") return undefined;
-  const chapters = novel.chapters;
+  if (!novel.allPieces.some((p) => p.id === id)) return undefined;
+  const chapters = pieceSections(novel);
   const c = chapters.findIndex((x) => x.id === at.container);
-  const next: Chapter | undefined = chapters[c + direction];
+  const next: Section | undefined = chapters[c + direction];
   if (!next) return undefined;
-  return { index: direction < 0 ? next.sceneIds.length : 0, to: next.id };
+  return { index: direction < 0 ? next.childIds.length : 0, to: next.id };
 }
 
 /** Moving `id` to just before or after `target`, an item of the same kind: the server's index and container. */
@@ -118,20 +121,22 @@ export function useStructure(novelId: string, novel: Book, workspace: Workspace)
         void navigate(`/novels/${novelId}/scene/${id}`);
         return `Added the scene “${title}”.`;
       }),
-    createPart: (title: string, after?: string | null) => run("add the part", () => m.createPart(novelId, title, after), () => `Added the part “${title}”. Add a chapter to it from its menu.`),
-    createChapter: (part: string | null, title: string | undefined, after?: string | null) =>
-      run("add the chapter", () => m.createChapter(novelId, part, title, after), ({ id }) => {
-        void navigate(`/novels/${novelId}/chapter/${id}`);
-        return `Added the chapter${title ? ` “${title}”` : ""}.`;
-      }),
+    /** A section at a level of the book's kind: one that holds pieces opens, as a chapter does. */
+    createSection: (level: string, parent: string | null, title: string | undefined, after?: string | null) => {
+      const { levels } = novel.kind;
+      const child = levels[levels.findIndex((l) => l.key === level) + 1];
+      return run(`add the ${level}`, () => m.createSection(novelId, level, parent, title, after), ({ id }) => {
+        if (!child) {
+          void navigate(`/novels/${novelId}/chapter/${id}`);
+          return `Added the ${level}${title ? ` “${title}”` : ""}.`;
+        }
+        return `Added the ${level}${title ? ` “${title}”` : ""}. Add a ${child.key} to it from its menu.`;
+      });
+    },
     remove: async (id: string) => {
       const item = itemOf(novel, id);
       // Notes on only what's going (heffrey78/gh-writer#222): kept unattached or deleted too, as the author says.
-      const gone = new Set(
-        novel.allPieces
-          .filter((s) => s.id === id || s.chapterId === id || novel.allChapters.some((c) => c.id === s.chapterId && c.partId === id))
-          .map((s) => s.id),
-      );
+      const gone = new Set(novel.allPieces.filter((s) => s.id === id || within(novel, s.sectionId, id)).map((s) => s.id));
       const left = novel.notes.filter((n) => n.scenes.length > 0 && n.scenes.every((s) => gone.has(s)));
       const notes = left.length ? await useNotesLeft.getState().ask(`the ${item?.kind ?? "item"} “${item?.title ?? id}”`, left) : undefined;
       if (notes === null) return undefined;
@@ -147,8 +152,8 @@ export function useStructure(novelId: string, novel: Book, workspace: Workspace)
     split: (scene: string, paragraph: number, title: string) =>
       run("split the scene", () => m.split(novelId, scene, paragraph, title), () => `Split “${name(scene)}”: the rest is now “${title}”.`),
     merge: (scene: string) => {
-      const chapter = novel.allChapters.find((c) => c.sceneIds.includes(scene));
-      const next = chapter?.sceneIds[chapter.sceneIds.indexOf(scene) + 1];
+      const chapter = novel.allSections.find((c) => c.level === pieceLevel(novel) && c.childIds.includes(scene));
+      const next = chapter?.childIds[chapter.childIds.indexOf(scene) + 1];
       return run("merge the scenes", () => m.merge(novelId, scene), () => `Merged “${next ? name(next) : "the next scene"}” into “${name(scene)}”.`);
     },
   };

@@ -1,4 +1,4 @@
-import { countWords, type Book } from "@writer/core";
+import { countWords, pieceLevel, sectionById, type Book, type LevelDef, type Section } from "@writer/core";
 import { ChevronDown, ChevronRight, Ellipsis, FilePlus, FolderPlus, History, Layers, Plus } from "lucide-react";
 import { ContextMenu, DropdownMenu } from "radix-ui";
 import { memo, useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
@@ -7,7 +7,7 @@ import { useCommands, type Command } from "../commands.ts";
 import { Button } from "../ui/button.tsx";
 import { cn } from "../ui/cn.ts";
 import { chapterTitle } from "./navigation.tsx";
-import { dropMove, stepMove, useStructure, type ItemKind, type Structure } from "./structure.ts";
+import { dropMove, itemOf, stepMove, useStructure, type ItemKind, type Structure } from "./structure.ts";
 import type { Workspace } from "./workspace.ts";
 import { MoveToDialog, RecentlyDeletedDialog, TitleDialog } from "./structure-dialogs.tsx";
 
@@ -15,7 +15,10 @@ const number = new Intl.NumberFormat();
 
 interface TreeNode {
   id: string;
+  /** The piece's key ("scene") or the section's level ("chapter", "part"). */
   kind: ItemKind;
+  /** A piece, a section that holds pieces (it opens, as a chapter does), or one further out (it folds, as a part does). */
+  role: "piece" | "inner" | "outer";
   title: string;
   level: number;
   parent: string | null;
@@ -26,10 +29,16 @@ interface TreeNode {
   hasChildren: boolean;
 }
 
-type Dialog = { kind: "new-part"; after: string | null } | { kind: "rename"; id: string; title: string } | { kind: "new-scene"; chapter: string; after?: string | null } | { kind: "new-chapter"; part: string | null; after: string | null } | { kind: "move"; id: string; what: "scene" | "chapter" } | { kind: "deleted" };
+type Dialog =
+  | { kind: "rename"; id: string; title: string }
+  | { kind: "new-scene"; chapter: string; after?: string | null }
+  | { kind: "new-section"; level: LevelDef; parent: string | null; after: string | null }
+  | { kind: "move"; id: string }
+  | { kind: "deleted" };
 
 /**
- * The manuscript as a tree: parts, chapters and scenes with word counts. Arrows move, Enter opens,
+ * The manuscript as a tree: its sections at each level of its kind (a novel's parts and chapters) and
+ * its pieces (scenes), with word counts. Arrows move, Enter opens,
  * F2 renames, Delete deletes (with Undo), Alt+Up/Down moves an item, letters jump; drag and drop
  * reorders; the context menu (right-click, Shift+F10) has the rest.
  */
@@ -45,27 +54,41 @@ export function ManuscriptTree({ novelId, novel, structure, current }: { novelId
   const refocus = useRef<string | undefined>(undefined);
   const tree = useRef<HTMLDivElement>(null);
 
+  const { levels, piece } = novel.kind;
+  const inner = pieceLevel(novel);
+  const levelOf = (key: string) => levels.find((l) => l.key === key);
+  /** The level a section's children are at; none for one that holds pieces. */
+  const childLevel = (key: string) => levels[levels.findIndex((l) => l.key === key) + 1];
+  const parentLevel = (key: string) => levels[levels.findIndex((l) => l.key === key) - 1];
+
   const all = useMemo(() => {
     const out: TreeNode[] = [];
     const words = new Map(novel.allPieces.map((s) => [s.id, countWords(s.body)]));
-    const chapterNodes = (chapterIds: string[], level: number, parent: string | null) => {
-      const chapters = chapterIds.map((id) => novel.allChapters.find((c) => c.id === id)).filter((c) => c !== undefined);
-      chapters.forEach((c, i) => {
-        const scenes = c.sceneIds.map((id) => novel.allPieces.find((s) => s.id === id)).filter((s) => s !== undefined);
-        out.push({ id: c.id, kind: "chapter", title: chapterTitle(novel, c), level, parent, pos: i + 1, size: chapters.length, words: scenes.reduce((n, s) => n + (words.get(s.id) ?? 0), 0), hasChildren: scenes.length > 0 });
-        scenes.forEach((s, j) => out.push({ id: s.id, kind: "scene", title: s.title, level: level + 1, parent: c.id, pos: j + 1, size: scenes.length, words: words.get(s.id) ?? 0, hasChildren: false }));
-      });
-    };
-    if (novel.topLevel === "parts") {
-      novel.parts.forEach((p, i) => {
+    /** Sections in a list, each followed by what it holds; returns their words. */
+    const sectionNodes = (sections: Section[], level: number, parent: string | null): number => {
+      let total = 0;
+      sections.forEach((s, i) => {
         const at = out.length;
-        out.push({ id: p.id, kind: "part", title: p.title, level: 1, parent: null, pos: i + 1, size: novel.parts.length, words: 0, hasChildren: p.chapterIds.length > 0 });
-        chapterNodes(p.chapterIds, 2, p.id);
-        out[at]!.words = out.slice(at + 1).filter((n) => n.kind === "chapter").reduce((n, c) => n + c.words, 0);
+        out.push({ id: s.id, kind: s.level, role: s.level === inner ? "inner" : "outer", title: chapterTitle(novel, s), level, parent, pos: i + 1, size: sections.length, words: 0, hasChildren: false });
+        let n = 0;
+        if (s.level === inner) {
+          const pieces = s.childIds.map((id) => novel.allPieces.find((p) => p.id === id)).filter((p) => p !== undefined);
+          pieces.forEach((p, j) => out.push({ id: p.id, kind: piece.key, role: "piece", title: p.title, level: level + 1, parent: s.id, pos: j + 1, size: pieces.length, words: words.get(p.id) ?? 0, hasChildren: false }));
+          n = pieces.reduce((w, p) => w + (words.get(p.id) ?? 0), 0);
+          out[at]!.hasChildren = pieces.length > 0;
+        } else {
+          const children = novel.sections.filter((c) => c.parentId === s.id);
+          n = sectionNodes(children, level + 1, s.id);
+          out[at]!.hasChildren = children.length > 0;
+        }
+        out[at]!.words = n;
+        total += n;
       });
-    } else chapterNodes(novel.chapters.map((c) => c.id), 1, null);
+      return total;
+    };
+    sectionNodes(novel.sections.filter((s) => !s.parentId), 1, null);
     return out;
-  }, [novel]);
+  }, [novel, inner, piece.key]);
 
   // Visible: everything whose ancestors are all expanded.
   const visible = useMemo(() => {
@@ -93,9 +116,11 @@ export function ManuscriptTree({ novelId, novel, structure, current }: { novelId
   }, [all]);
 
   const open = (n: TreeNode) => {
-    if (n.kind === "part") return toggle(n.id);
-    void navigate(`/novels/${novelId}/${n.kind}/${n.id}`);
+    if (n.role === "outer") return toggle(n.id);
+    void navigate(`/novels/${novelId}/${n.role === "piece" ? "scene" : "chapter"}/${n.id}`);
   };
+  /** What a rename starts from: a section's own title (none for an untitled chapter, not "Chapter 3"). */
+  const titleOf = (n: TreeNode) => (n.role === "piece" ? n.title : (sectionById(novel, n.id)?.title ?? ""));
   const toggle = (id: string) =>
     setCollapsed((c) => {
       const next = new Set(c);
@@ -151,7 +176,7 @@ export function ManuscriptTree({ novelId, novel, structure, current }: { novelId
         return open(n);
       case "F2":
         e.preventDefault();
-        return setDialog({ kind: "rename", id: n.id, title: n.kind === "chapter" ? (novel.allChapters.find((c) => c.id === n.id)?.title ?? "") : n.title });
+        return setDialog({ kind: "rename", id: n.id, title: titleOf(n) });
       case "Delete":
         e.preventDefault();
         focusNode(visible[i + 1]?.id ?? visible[i - 1]?.id);
@@ -170,10 +195,11 @@ export function ManuscriptTree({ novelId, novel, structure, current }: { novelId
 
   // ——— Drag and drop ———
   const canDrop = (target: TreeNode, at: "before" | "after" | "inside") => {
-    const kind = all.find((x) => x.id === dragging.current)?.kind;
-    if (!kind || target.id === dragging.current) return false;
-    if (at === "inside") return (kind === "scene" && target.kind === "chapter") || (kind === "chapter" && target.kind === "part");
-    return kind === target.kind;
+    const dragged = all.find((x) => x.id === dragging.current);
+    if (!dragged || target.id === dragging.current) return false;
+    // Inside: a piece into a section that holds pieces, a section into one of the level above.
+    if (at === "inside") return dragged.role === "piece" ? target.role === "inner" : parentLevel(dragged.kind)?.key === target.kind;
+    return dragged.kind === target.kind;
   };
   const onDragOver = (e: DragEvent, target: TreeNode) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -193,8 +219,8 @@ export function ManuscriptTree({ novelId, novel, structure, current }: { novelId
     dragging.current = undefined;
     if (!id || !target) return;
     if (target.at === "inside") {
-      // Into a chapter (a scene) or a part (a chapter): at its end.
-      const list = novel.allChapters.find((c) => c.id === target.id)?.sceneIds ?? novel.allParts.find((p) => p.id === target.id)?.chapterIds ?? [];
+      // Into a section (a scene into a chapter, a chapter into a part): at its end.
+      const list = sectionById(novel, target.id)?.childIds ?? [];
       void structure.move(id, list.filter((x) => x !== id).length, target.id);
       return;
     }
@@ -207,27 +233,21 @@ export function ManuscriptTree({ novelId, novel, structure, current }: { novelId
   const actions = (n: TreeNode): Action[] => {
     const up = stepMove(novel, n.id, -1);
     const down = stepMove(novel, n.id, 1);
-    const chapterOf = n.kind === "scene" ? n.parent : n.kind === "chapter" ? n.id : null;
+    const chapterOf = n.role === "piece" ? n.parent : n.role === "inner" ? n.id : null;
+    const child = childLevel(n.kind);
+    // Where it can move to: a piece to another section that holds pieces, a section to another of the level above.
+    const moveTo = n.role === "piece" ? inner : n.kind !== novel.levels[0] ? parentLevel(n.kind)?.key : undefined;
     return [
-      ...(n.kind !== "part" ? [{ label: "Open", run: () => open(n) }] : []),
-      { label: "Rename…", keys: "F2", run: () => setDialog({ kind: "rename", id: n.id, title: n.kind === "chapter" ? (novel.allChapters.find((c) => c.id === n.id)?.title ?? "") : n.title }) },
-      ...(chapterOf ? [{ label: `New scene ${n.kind === "scene" ? "after this" : "at the start"}`, run: () => setDialog({ kind: "new-scene", chapter: chapterOf, after: n.kind === "scene" ? n.id : null }) }] : []),
-      ...(n.kind !== "scene"
-        ? [
-            {
-              label: `New chapter ${n.kind === "part" ? "at the start" : "after this"}`,
-              run: () => setDialog(n.kind === "part" ? { kind: "new-chapter", part: n.id, after: null } : { kind: "new-chapter", part: n.parent, after: n.id }),
-            },
-          ]
-        : []),
-      ...(n.kind === "part" ? [{ label: "New part after this", run: () => setDialog({ kind: "new-part", after: n.id }) }] : []),
+      ...(n.role !== "outer" ? [{ label: "Open", run: () => open(n) }] : []),
+      { label: "Rename…", keys: "F2", run: () => setDialog({ kind: "rename", id: n.id, title: titleOf(n) }) },
+      ...(chapterOf ? [{ label: `New ${piece.key} ${n.role === "piece" ? "after this" : "at the start"}`, run: () => setDialog({ kind: "new-scene", chapter: chapterOf, after: n.role === "piece" ? n.id : null }) }] : []),
+      ...(n.role === "outer" && child ? [{ label: `New ${child.key} at the start`, run: () => setDialog({ kind: "new-section", level: child, parent: n.id, after: null }) }] : []),
+      ...(n.role !== "piece" ? [{ label: `New ${n.kind} after this`, run: () => setDialog({ kind: "new-section", level: levelOf(n.kind)!, parent: n.parent, after: n.id }) }] : []),
       "separator",
       { label: "Move up", keys: "Alt+↑", disabled: !up, run: () => void structure.step(n.id, -1) },
       { label: "Move down", keys: "Alt+↓", disabled: !down, run: () => void structure.step(n.id, 1) },
-      ...(n.kind === "scene" || (n.kind === "chapter" && novel.topLevel === "parts")
-        ? [{ label: n.kind === "scene" ? "Move to chapter…" : "Move to part…", run: () => setDialog({ kind: "move", id: n.id, what: n.kind === "scene" ? "scene" : "chapter" }) }]
-        : []),
-      ...(n.kind === "scene" && n.pos < n.size ? [{ label: "Merge with the next scene", run: () => void structure.merge(n.id) }] : []),
+      ...(moveTo ? [{ label: `Move to ${moveTo}…`, run: () => setDialog({ kind: "move", id: n.id }) }] : []),
+      ...(n.role === "piece" && n.pos < n.size ? [{ label: `Merge with the next ${piece.key}`, run: () => void structure.merge(n.id) }] : []),
       "separator",
       { label: "Delete", keys: "Del", danger: true, run: () => void structure.remove(n.id) },
     ];
@@ -252,29 +272,48 @@ export function ManuscriptTree({ novelId, novel, structure, current }: { novelId
     </ContextMenu.Portal>
   );
 
-  const currentChapter = novel.allPieces.find((s) => s.id === current)?.chapterId ?? (novel.allChapters.some((c) => c.id === current) ? current : novel.chapters[0]?.id);
+  const currentChapter = novel.allPieces.find((s) => s.id === current)?.sectionId ?? (novel.allSections.some((c) => c.id === current && c.level === inner) ? current : novel.sections.find((c) => c.level === inner)?.id);
   const currentNode = all.find((n) => n.id === current);
-  const currentPart = novel.allChapters.find((c) => c.id === currentChapter)?.partId;
+  /** The open chapter's section at a level: itself, or what it's in (its part). */
+  const currentAt = (level: string): string | undefined => {
+    let s = sectionById(novel, currentChapter);
+    while (s && s.level !== level) s = sectionById(novel, s.parentId);
+    return s?.id;
+  };
+  /** Where "New <level>" puts a section: in the open chapter's section of the level above (or the first), after its own. */
+  const newSection = (level: LevelDef): Dialog => {
+    const above = parentLevel(level.key);
+    const parent = level.key === novel.levels[0] || !above ? null : (currentAt(above.key) ?? novel.sections.find((s) => s.level === above.key)?.id ?? null);
+    const after = currentAt(level.key) ?? (level.key === inner ? null : (novel.sections.filter((s) => s.level === level.key).at(-1)?.id ?? null));
+    return { kind: "new-section", level, parent, after };
+  };
+  /** Levels the book uses, innermost first, as the New menu lists them; one that needs a section above it that isn't there yet can't be added. */
+  const usable = [...novel.levels].reverse().map((key) => {
+    const level = levelOf(key)!;
+    const above = parentLevel(key);
+    return { level, disabled: key !== novel.levels[0] && !!above && !novel.sections.some((s) => s.level === above.key) };
+  });
   // The toolbar's ⋯ acts on the item last focused in the tree, or the open one.
   const target = all.find((n) => n.id === focused) ?? currentNode;
   useCommands((): Command[] => {
     const here = currentNode;
     return [
-      ...(currentChapter ? [{ id: "tree.newScene", title: "New scene", group: "Manuscript", run: () => setDialog({ kind: "new-scene", chapter: currentChapter, ...(here?.kind === "scene" ? { after: here.id } : {}) }) }] : []),
-      { id: "tree.newChapter", title: "New chapter", group: "Manuscript", run: () => setDialog({ kind: "new-chapter", part: novel.topLevel === "parts" ? (novel.allChapters.find((c) => c.id === currentChapter)?.partId ?? novel.parts[0]?.id ?? null) : null, after: currentChapter ?? null }) },
-      ...(novel.topLevel === "parts" ? [{ id: "tree.newPart", title: "New part", group: "Manuscript", run: () => setDialog({ kind: "new-part", after: currentPart ?? novel.parts.at(-1)?.id ?? null }) }] : []),
-      ...novel.parts.flatMap((p): Command[] => [
-        { id: `tree.renamePart.${p.id}`, title: `Rename part “${p.title}”…`, group: "Manuscript", run: () => setDialog({ kind: "rename", id: p.id, title: p.title }) },
-        { id: `tree.deletePart.${p.id}`, title: `Delete part “${p.title}”`, group: "Manuscript", run: () => void structure.remove(p.id) },
-      ]),
+      ...(currentChapter ? [{ id: "tree.newScene", title: `New ${piece.key}`, group: "Manuscript", run: () => setDialog({ kind: "new-scene", chapter: currentChapter, ...(here?.role === "piece" ? { after: here.id } : {}) }) }] : []),
+      ...usable.map(({ level }) => ({ id: level.key === inner ? "tree.newChapter" : `tree.new.${level.key}`, title: `New ${level.key}`, group: "Manuscript", run: () => setDialog(newSection(level)) })),
+      ...novel.sections
+        .filter((s) => s.level !== inner)
+        .flatMap((s): Command[] => [
+          { id: `tree.rename.${s.id}`, title: `Rename ${s.level} “${s.title ?? ""}”…`, group: "Manuscript", run: () => setDialog({ kind: "rename", id: s.id, title: s.title ?? "" }) },
+          { id: `tree.delete.${s.id}`, title: `Delete ${s.level} “${s.title ?? ""}”`, group: "Manuscript", run: () => void structure.remove(s.id) },
+        ]),
       { id: "tree.deleted", title: "Recently deleted", group: "Manuscript", run: () => setDialog({ kind: "deleted" }) },
       ...(here
         ? [
-            { id: "tree.rename", title: `Rename ${here.kind}…`, group: "Manuscript", keys: "F2", run: () => setDialog({ kind: "rename", id: here.id, title: here.kind === "chapter" ? (novel.allChapters.find((c) => c.id === here.id)?.title ?? "") : here.title }) },
+            { id: "tree.rename", title: `Rename ${here.kind}…`, group: "Manuscript", keys: "F2", run: () => setDialog({ kind: "rename", id: here.id, title: titleOf(here) }) },
             { id: "tree.up", title: `Move ${here.kind} up`, group: "Manuscript", keys: "Alt-ArrowUp", run: () => void structure.step(here.id, -1) },
             { id: "tree.down", title: `Move ${here.kind} down`, group: "Manuscript", keys: "Alt-ArrowDown", run: () => void structure.step(here.id, 1) },
-            ...(here.kind === "scene" ? [{ id: "tree.moveTo", title: "Move scene to chapter…", group: "Manuscript", run: () => setDialog({ kind: "move", id: here.id, what: "scene" }) }] : []),
-            ...(here.kind === "scene" && here.pos < here.size ? [{ id: "tree.merge", title: "Merge scene with the next", group: "Manuscript", run: () => void structure.merge(here.id) }] : []),
+            ...(here.role === "piece" ? [{ id: "tree.moveTo", title: `Move ${piece.key} to ${inner}…`, group: "Manuscript", run: () => setDialog({ kind: "move", id: here.id }) }] : []),
+            ...(here.role === "piece" && here.pos < here.size ? [{ id: "tree.merge", title: `Merge ${piece.key} with the next`, group: "Manuscript", run: () => void structure.merge(here.id) }] : []),
             { id: "tree.delete", title: `Delete ${here.kind}`, group: "Manuscript", keys: "Delete", run: () => void structure.remove(here.id) },
           ]
         : []),
@@ -298,20 +337,16 @@ export function ManuscriptTree({ novelId, novel, structure, current }: { novelId
                 disabled={!currentChapter}
                 onSelect={() => currentChapter && setDialog({ kind: "new-scene", chapter: currentChapter, ...(current && novel.allPieces.some((s) => s.id === current) ? { after: current } : {}) })}
               >
-                <FilePlus className="size-4" aria-hidden /> Scene
+                <FilePlus className="size-4" aria-hidden /> {piece.label}
               </DropdownMenu.Item>
-              <DropdownMenu.Item
-                className={cn(itemClass, "justify-start gap-2")}
-                disabled={novel.topLevel === "parts" && !novel.parts.length}
-                onSelect={() => setDialog({ kind: "new-chapter", part: novel.topLevel === "parts" ? (novel.allChapters.find((c) => c.id === currentChapter)?.partId ?? novel.parts[0]?.id ?? null) : null, after: currentChapter ?? null })}
-              >
-                <FolderPlus className="size-4" aria-hidden /> Chapter
-              </DropdownMenu.Item>
-              {novel.topLevel === "parts" && (
-                <DropdownMenu.Item className={cn(itemClass, "justify-start gap-2")} onSelect={() => setDialog({ kind: "new-part", after: currentPart ?? novel.parts.at(-1)?.id ?? null })}>
-                  <Layers className="size-4" aria-hidden /> Part
-                </DropdownMenu.Item>
-              )}
+              {usable.map(({ level, disabled }) => {
+                const Icon = level.key === inner ? FolderPlus : Layers;
+                return (
+                  <DropdownMenu.Item key={level.key} className={cn(itemClass, "justify-start gap-2")} disabled={disabled} onSelect={() => setDialog(newSection(level))}>
+                    <Icon className="size-4" aria-hidden /> {level.label}
+                  </DropdownMenu.Item>
+                );
+              })}
             </DropdownMenu.Content>
           </DropdownMenu.Portal>
         </DropdownMenu.Root>
@@ -375,9 +410,9 @@ export function ManuscriptTree({ novelId, novel, structure, current }: { novelId
                 className={cn(
                   "relative flex cursor-pointer items-center gap-1 rounded-md py-1 pr-2 outline-none hover:bg-paper focus-visible:outline-2 focus-visible:outline-accent",
                   n.id === current && "bg-accent-soft font-medium",
-                  n.kind === "part" && "mt-2 text-xs font-semibold tracking-wide text-muted uppercase",
-                  n.kind === "scene" && "text-muted",
-                  n.id === current && n.kind === "scene" && "text-ink",
+                  n.role === "outer" && "mt-2 text-xs font-semibold tracking-wide text-muted uppercase",
+                  n.role === "piece" && "text-muted",
+                  n.id === current && n.role === "piece" && "text-ink",
                   drop?.id === n.id && drop.at === "inside" && "ring-2 ring-accent",
                   drop?.id === n.id && drop.at === "before" && "before:absolute before:inset-x-0 before:-top-px before:h-0.5 before:bg-accent",
                   drop?.id === n.id && drop.at === "after" && "after:absolute after:inset-x-0 after:-bottom-px after:h-0.5 after:bg-accent",
@@ -398,7 +433,7 @@ export function ManuscriptTree({ novelId, novel, structure, current }: { novelId
                   <span className="size-4 shrink-0" aria-hidden />
                 )}
                 <span className="min-w-0 flex-1 truncate">{n.title}</span>
-                {n.kind !== "part" && (
+                {n.role !== "outer" && (
                   <span className="text-xs text-muted tabular-nums" aria-hidden>
                     {number.format(n.words)}
                   </span>
@@ -412,9 +447,9 @@ export function ManuscriptTree({ novelId, novel, structure, current }: { novelId
 
       {dialog?.kind === "rename" && (
         <TitleDialog
-          title={`Rename ${itemKind(novel, dialog.id)}`}
+          title={`Rename ${itemOf(novel, dialog.id)?.kind ?? "it"}`}
           initial={dialog.title}
-          required={itemKind(novel, dialog.id) !== "chapter"}
+          required={titleRequired(novel, dialog.id)}
           action="Rename"
           submit={(title) => structure.rename(dialog.id, title)}
           onClose={() => {
@@ -423,19 +458,26 @@ export function ManuscriptTree({ novelId, novel, structure, current }: { novelId
           }}
         />
       )}
-      {dialog?.kind === "new-part" && <TitleDialog title="New part" action="Add part" submit={(title) => structure.createPart(title, dialog.after)} onClose={() => setDialog(undefined)} />}
-      {dialog?.kind === "new-scene" && <TitleDialog title="New scene" action="Add scene" submit={(title) => structure.createScene(dialog.chapter, title, dialog.after)} onClose={() => setDialog(undefined)} />}
-      {dialog?.kind === "new-chapter" && (
-        <TitleDialog title="New chapter" label="Title (optional)" required={false} action="Add chapter" submit={(title) => structure.createChapter(dialog.part, title || undefined, dialog.after)} onClose={() => setDialog(undefined)} />
+      {dialog?.kind === "new-scene" && <TitleDialog title={`New ${piece.key}`} action={`Add ${piece.key}`} submit={(title) => structure.createScene(dialog.chapter, title, dialog.after)} onClose={() => setDialog(undefined)} />}
+      {dialog?.kind === "new-section" && (
+        <TitleDialog
+          title={`New ${dialog.level.key}`}
+          {...(dialog.level.titled ? {} : { label: "Title (optional)", required: false })}
+          action={`Add ${dialog.level.key}`}
+          submit={(title) => structure.createSection(dialog.level.key, dialog.parent, title || undefined, dialog.after)}
+          onClose={() => setDialog(undefined)}
+        />
       )}
-      {dialog?.kind === "move" && <MoveToDialog novel={novel} id={dialog.id} kind={dialog.what} structure={structure} onClose={() => setDialog(undefined)} />}
+      {dialog?.kind === "move" && <MoveToDialog novel={novel} id={dialog.id} structure={structure} onClose={() => setDialog(undefined)} />}
       {dialog?.kind === "deleted" && <RecentlyDeletedDialog novelId={novelId} structure={structure} onClose={() => setDialog(undefined)} />}
     </div>
   );
 }
 
-function itemKind(novel: Book, id: string): ItemKind {
-  return novel.allPieces.some((s) => s.id === id) ? "scene" : novel.allChapters.some((c) => c.id === id) ? "chapter" : "part";
+/** Whether renaming an item needs a title: a piece's, and a section's whose level is `titled` (a part's, not a chapter's). */
+function titleRequired(novel: Book, id: string): boolean {
+  const section = sectionById(novel, id);
+  return !section || !!novel.kind.levels.find((l) => l.key === section.level)?.titled;
 }
 
 /**

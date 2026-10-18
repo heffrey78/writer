@@ -1,4 +1,4 @@
-import type { Book } from "@writer/core";
+import { levelLabel, pieceLevel, sectionById, type Book } from "@writer/core";
 import { useQuery } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { api } from "../api.ts";
@@ -39,17 +39,19 @@ export function TitleDialog({ title, label = "Title", initial = "", required = t
   );
 }
 
-/** Move a scene to another chapter (at its end), or a chapter to another part. */
-export function MoveToDialog({ novel, id, kind, structure, onClose }: { novel: Book; id: string; kind: "scene" | "chapter"; structure: Structure; onClose: () => void }) {
-  const items =
-    kind === "scene"
-      ? novel.chapters.map((c) => ({ value: c.id, label: chapterTitle(novel, c), group: novel.parts.find((p) => p.id === c.partId)?.title ?? "" }))
-      : novel.parts.map((p) => ({ value: p.id, label: p.title }));
+/** Move a piece to another section that holds pieces (a scene to another chapter, at its end), or a section to another of the level above (a chapter to another part). */
+export function MoveToDialog({ novel, id, structure, onClose }: { novel: Book; id: string; structure: Structure; onClose: () => void }) {
+  const isPiece = novel.allPieces.some((p) => p.id === id);
+  const { levels } = novel.kind;
+  const level = isPiece ? pieceLevel(novel) : levels[levels.findIndex((l) => l.key === sectionById(novel, id)?.level) - 1]?.key;
+  const label = level ? levelLabel(novel, level) : "";
+  const items = novel.sections
+    .filter((s) => s.level === level)
+    .map((s) => ({ value: s.id, label: chapterTitle(novel, s), group: sectionById(novel, s.parentId)?.title ?? "" }));
   const [to, setTo] = useState<string>();
-  const size = (target: string) =>
-    kind === "scene" ? (novel.allChapters.find((c) => c.id === target)?.sceneIds.filter((s) => s !== id).length ?? 0) : (novel.allParts.find((p) => p.id === target)?.chapterIds.filter((c) => c !== id).length ?? 0);
+  const size = (target: string) => sectionById(novel, target)?.childIds.filter((c) => c !== id).length ?? 0;
   return (
-    <Frame title={kind === "scene" ? "Move to chapter" : "Move to part"} onClose={onClose}>
+    <Frame title={`Move to ${level ?? ""}`} onClose={onClose}>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -57,7 +59,7 @@ export function MoveToDialog({ novel, id, kind, structure, onClose }: { novel: B
         }}
         className="grid gap-3"
       >
-        <Picker label={kind === "scene" ? "Chapter" : "Part"} items={items} value={to} onChange={setTo} />
+        <Picker label={label} items={items} value={to} onChange={setTo} />
         <div className="flex justify-end gap-2">
           <Button onClick={onClose}>Cancel</Button>
           <Button type="submit" variant="primary" disabled={!to}>
@@ -69,7 +71,7 @@ export function MoveToDialog({ novel, id, kind, structure, onClose }: { novel: B
   );
 }
 
-/** Scenes, chapters and parts deleted from the manuscript, each with Restore. */
+/** Pieces and sections deleted from the manuscript (scenes, chapters, parts), each with Restore. */
 export function RecentlyDeletedDialog({ novelId, structure, onClose }: { novelId: string; structure: Structure; onClose: () => void }) {
   const deleted = useQuery({ queryKey: ["deleted", novelId], queryFn: () => api.manuscript.recentlyDeleted(novelId), staleTime: 0 });
   return (

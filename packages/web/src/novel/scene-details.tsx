@@ -1,4 +1,4 @@
-import { countWords, dayOneFor, readFrontMatter, sceneFacts, type Book, type YamlEdit } from "@writer/core";
+import { countWords, dayOneFor, pieceSections, readFrontMatter, sceneFacts, type Book, type YamlEdit } from "@writer/core";
 import { chapterTitle } from "@writer/core/diagrams";
 import { joinSceneFile } from "@writer/editor";
 import { ChevronLeft, ChevronRight, Pencil, Pin, Plus, X } from "lucide-react";
@@ -194,10 +194,10 @@ export function SceneDetails({
 
   // Where the scene is: its chapter, its place in it, and its neighbours.
   const scene = novel.allPieces.find((s) => s.file === path);
-  const chapter = scene && novel.chapters.find((c) => c.sceneIds.includes(scene.id));
-  const at = chapter && scene ? chapter.sceneIds.indexOf(scene.id) : -1;
-  const prev = chapter && at > 0 ? chapter.sceneIds[at - 1] : undefined;
-  const next = chapter && at >= 0 ? chapter.sceneIds[at + 1] : undefined;
+  const chapter = scene && pieceSections(novel).find((c) => c.childIds.includes(scene.id));
+  const at = chapter && scene ? chapter.childIds.indexOf(scene.id) : -1;
+  const prev = chapter && at > 0 ? chapter.childIds[at - 1] : undefined;
+  const next = chapter && at >= 0 ? chapter.childIds[at + 1] : undefined;
   // What the rest of the book says about it: worked out again when the book is, not as it's typed.
   const facts = useMemo(() => (scene ? sceneFacts(novel, scene.id) : []), [novel, scene?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -465,7 +465,7 @@ export function SceneDetails({
             {title}
           </h2>
           <p className="text-xs text-muted">
-            {chapter ? `${chapterTitle(novel, chapter)} · scene ${at + 1} of ${chapter.sceneIds.length}` : "Not in a chapter"}
+            {chapter ? `${chapterTitle(novel, chapter)} · scene ${at + 1} of ${chapter.childIds.length}` : "Not in a chapter"}
             {/* Its length as it's written (the text's own count, from its file). */}
             {file && ` · ${words.format(countWords(file.body))} words`}
           </p>

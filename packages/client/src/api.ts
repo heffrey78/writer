@@ -306,7 +306,8 @@ export type Reference =
 export interface DeletedItem {
   commit: string;
   date: string;
-  kind: "scene" | "chapter" | "part";
+  /** The piece's key in the book's kind ("scene"), or the section's level ("chapter", "part"). */
+  kind: string;
   id: string;
   title: string;
   path: string;
@@ -855,6 +856,9 @@ function manuscriptApi(root: (novelId: string) => string, request: Request) {
     createChapter: (novelId: string, part: string | null, title?: string, after?: string | null) =>
       call<OperationResult & { id: string }>("POST", novelId, "/chapters", { part, ...(title ? { title } : {}), ...(after !== undefined ? { after } : {}) }),
     createPart: (novelId: string, title: string, after?: string | null) => call<OperationResult & { id: string }>("POST", novelId, "/parts", { title, ...(after !== undefined ? { after } : {}) }),
+    /** A section at a level of the book's kind, in `parent` (null: at the top). */
+    createSection: (novelId: string, level: string, parent: string | null, title?: string, after?: string | null) =>
+      call<OperationResult & { id: string }>("POST", novelId, "/sections", { level, parent, ...(title ? { title } : {}), ...(after !== undefined ? { after } : {}) }),
     rename: (novelId: string, id: string, title: string) => call<OperationResult>("POST", novelId, `${item(id)}/rename`, { title }),
     /** To position `index` in container `to` (a chapter for a scene, a part for a chapter; omitted: where it is). */
     move: (novelId: string, id: string, index: number, to?: string | null) => call<OperationResult>("POST", novelId, `${item(id)}/move`, { index, ...(to !== undefined ? { to } : {}) }),

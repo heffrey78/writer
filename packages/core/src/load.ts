@@ -1,6 +1,6 @@
 import { reservedPrefixes, type EntityTypeDef } from "./ids.ts";
-import { kindByKey, V2_KIND, type BookKind } from "./kinds.ts";
-import type { Chapter, Entity, Book, Part, PlotlineRef, Relationship, Piece, StoryEvent, ThemeRef } from "./model.ts";
+import { kindByKey, startLevels, V2_KIND, type BookKind, type LevelDef } from "./kinds.ts";
+import type { Section, Entity, Book, PlotlineRef, Relationship, Piece, StoryEvent, ThemeRef } from "./model.ts";
 import { parseMarkdown, parseYaml } from "./parse.ts";
 import { checkSchema, type SchemaKind } from "./schemas.ts";
 import { joinPath, type FileSource } from "./source.ts";
@@ -10,16 +10,15 @@ import type { CompileFile, Diagnostic, NovelFile, RelationshipTypeFile, PieceSta
 export const SCHEMA_VERSION = 2;
 
 /**
- * Load a novel repository into a story model.
+ * Load a book's repository into a story model, read as a book of `bookKind`: a novel by default, as
+ * every book in format v2 is.
  *
  * Loading never throws on bad content: parse, schema and structure problems are
  * collected in `novel.diagnostics`, and the model holds whatever could be read.
  * Cross-reference checks are done separately by `validateBook`.
  */
-export async function loadBook(source: FileSource): Promise<Book> {
+export async function loadBook(source: FileSource, bookKind: BookKind = kindByKey(V2_KIND)): Promise<Book> {
   const diagnostics: Diagnostic[] = [];
-  // Format v2 has no `kind`: every book in it is a novel.
-  const bookKind = kindByKey(V2_KIND);
   const { content, codex, notes: notesFolder, events: eventsFolder } = bookKind.folders;
   const order = `${content}/_order.yaml`;
   const novel: Book = {
@@ -27,12 +26,10 @@ export async function loadBook(source: FileSource): Promise<Book> {
     config: undefined,
     entityTypes: [...bookKind.entityTypes],
     relationshipTypes: [],
-    topLevel: undefined,
-    parts: [],
-    chapters: [],
+    levels: [],
+    sections: [],
     pieces: [],
-    allParts: [],
-    allChapters: [],
+    allSections: [],
     allPieces: [],
     entities: [],
     relationships: [],
@@ -43,7 +40,7 @@ export async function loadBook(source: FileSource): Promise<Book> {
   };
 
   /** Read, parse and schema-check a YAML file. Returns undefined if missing or unparseable. */
-  async function yamlFile(path: string, kind: SchemaKind): Promise<Record<string, unknown> | undefined> {
+  async function yamlFile(path: string, kind: SchemaKind | string): Promise<Record<string, unknown> | undefined> {
     const text = await source.read(path);
     if (text === undefined) return undefined;
     const parsed = parseYaml(text, path);
@@ -101,108 +98,105 @@ export async function loadBook(source: FileSource): Promise<Book> {
   return novel;
 
   async function loadManuscript() {
+    const { levels, piece } = bookKind;
+    const label = (key: string) => levels.find((l) => l.key === key)!.label;
+    const innermost = levels.at(-1)!;
     const orderData = await yamlFile(order, "manuscript-order");
     if (orderData === undefined && (await source.read(order)) === undefined) {
       diagnostics.push(error("E_MISSING_FILE", order, `${order} is missing`));
     }
-    const topLevel = orderData && "parts" in orderData ? "parts" : orderData && "chapters" in orderData ? "chapters" : undefined;
-    novel.topLevel = topLevel;
+    // The level the book starts at is the one its _order.yaml lists; it has every level after it.
+    const start = startLevels(bookKind).find((l) => orderData && l.list in orderData);
+    novel.levels = start ? levels.slice(levels.indexOf(start)).map((l) => l.key) : [];
+    const misplacedPiece = `${piece.label} files must be inside a ${innermost.label.toLowerCase()} folder`;
 
-    const discoveredParts: Part[] = [];
-    const discoveredChapters: Chapter[] = [];
+    const top: Section[] = [];
     for (const entry of await source.list(content)) {
       const path = joinPath(content, entry.name);
       if (!entry.dir) {
-        if (entry.name.endsWith(".md")) diagnostics.push(error("E_MISPLACED", path, "Scene files must be inside a chapter folder"));
+        if (entry.name.endsWith(".md")) diagnostics.push(error("E_MISPLACED", path, misplacedPiece));
         continue;
       }
-      const children = await source.list(path);
-      if (children.some((c) => c.name === "_part.yaml")) {
-        const part = await loadPart(path);
-        if (part) discoveredParts.push(part);
-      } else if (children.some((c) => c.name === "_chapter.yaml")) {
-        const chapter = await loadChapter(path, undefined);
-        if (chapter) discoveredChapters.push(chapter);
-      } else {
-        diagnostics.push(error("E_MISPLACED", path, "Folder has neither _part.yaml nor _chapter.yaml"));
+      const names = new Set((await source.list(path)).map((c) => c.name));
+      const level = levels.find((l) => names.has(`_${l.key}.yaml`));
+      if (!level) {
+        diagnostics.push(error("E_MISPLACED", path, `Folder has ${noneOf(levels.map((l) => `_${l.key}.yaml`))}`));
+        continue;
+      }
+      const section = await loadSection(path, level, undefined);
+      if (section) top.push(section);
+    }
+
+    if (start) {
+      for (const s of top.filter((s) => s.level !== start.key)) {
+        const deeper = levels.findIndex((l) => l.key === s.level) > levels.indexOf(start);
+        diagnostics.push(error("E_MISPLACED", s.file, deeper
+          ? `${label(s.level)} folder at the top level of a book organised in ${start.list}`
+          : `${label(s.level)} folder in a book organised directly in ${start.list}`));
       }
     }
 
-    if (topLevel === "parts") {
-      for (const c of discoveredChapters) diagnostics.push(error("E_MISPLACED", c.file, "Chapter folder at the top level of a book organised in parts"));
-    } else if (topLevel === "chapters") {
-      for (const p of discoveredParts) diagnostics.push(error("E_MISPLACED", p.file, "Part folder in a book organised directly in chapters"));
-    }
-
-    // Reading order.
-    const orderList = topLevel ? strList(orderData?.[topLevel]) : [];
-    if (topLevel === "parts") {
-      novel.parts = resolveOrder(orderList, discoveredParts, order, "/parts", "part");
-      novel.chapters = novel.parts.flatMap((p) =>
-        resolveOrder(p.chapterIds, novel.allChapters.filter((c) => c.partId === p.id), p.file, "/chapters", "chapter"));
-    } else if (topLevel === "chapters") {
-      novel.chapters = resolveOrder(orderList, discoveredChapters, order, "/chapters", "chapter");
-    }
-    // Chapters inside parts that are not themselves ordered still need their scenes checked.
-    for (const p of novel.allParts) {
-      if (!novel.parts.includes(p)) resolveOrder(p.chapterIds, novel.allChapters.filter((c) => c.partId === p.id), p.file, "/chapters", "chapter");
-    }
-    const orderedChapters = new Set(novel.chapters);
-    for (const c of novel.allChapters) {
-      const scenes = resolveOrder(c.sceneIds, novel.allPieces.filter((s) => s.chapterId === c.id && s.file.startsWith(`${c.dir}/`)), c.file, "/scenes", "scene");
-      if (orderedChapters.has(c)) novel.pieces.push(...scenes);
-    }
-    // Keep the pieces in chapter reading order.
-    const chapterRank = new Map(novel.chapters.map((c, i) => [c.id, i]));
-    novel.pieces.sort((a, b) => (chapterRank.get(a.chapterId!) ?? 0) - (chapterRank.get(b.chapterId!) ?? 0));
-    novel.pieces.forEach((s, i) => (s.position = i));
-  }
-
-  async function loadPart(dir: string): Promise<Part | undefined> {
-    const file = joinPath(dir, "_part.yaml");
-    const data = await yamlFile(file, "part");
-    if (!data || !str(data["id"])) return undefined;
-    const part: Part = {
-      id: str(data["id"])!,
-      title: str(data["title"]) ?? "",
-      synopsis: str(data["synopsis"]),
-      chapterIds: strList(data["chapters"]),
-      dir,
-      file,
+    // Reading order: each listed section, then what it lists, all the way down.
+    const listed = new Set<Section>();
+    const visit = (s: Section) => {
+      listed.add(s);
+      novel.sections.push(s);
+      const pieces = childrenOf(s);
+      if (pieces.kind === "pieces") novel.pieces.push(...pieces.ordered);
+      else pieces.ordered.forEach(visit);
     };
-    novel.allParts.push(part);
-    for (const entry of await source.list(dir)) {
-      const path = joinPath(dir, entry.name);
-      if (entry.dir) {
-        if ((await source.list(path)).some((c) => c.name === "_chapter.yaml")) await loadChapter(path, part.id);
-        else diagnostics.push(error("E_MISPLACED", path, "Folder inside a part has no _chapter.yaml"));
-      } else if (entry.name.endsWith(".md")) {
-        diagnostics.push(error("E_MISPLACED", path, "Scene files must be inside a chapter folder"));
+    if (start) {
+      const ordered = resolveOrder(strList(orderData?.[start.list]), top.filter((s) => s.level === start.key), order, `/${start.list}`, start.label.toLowerCase());
+      ordered.forEach(visit);
+    }
+    // Sections that aren't listed still need what they hold checked.
+    for (const s of novel.allSections) if (!listed.has(s)) childrenOf(s);
+    novel.pieces.forEach((p, i) => (p.position = i));
+
+    /** What a section holds, in the order its file lists (reporting what's amiss there). */
+    function childrenOf(s: Section): { kind: "pieces"; ordered: Piece[] } | { kind: "sections"; ordered: Section[] } {
+      const at = levels.findIndex((l) => l.key === s.level);
+      if (s.level === innermost.key) {
+        const present = novel.allPieces.filter((p) => p.sectionId === s.id && p.file.startsWith(`${s.dir}/`));
+        return { kind: "pieces", ordered: resolveOrder(s.childIds, present, s.file, `/${piece.list}`, piece.label.toLowerCase()) };
       }
+      const next = levels[at + 1]!;
+      const present = novel.allSections.filter((c) => c.parentId === s.id);
+      return { kind: "sections", ordered: resolveOrder(s.childIds, present, s.file, `/${next.list}`, next.label.toLowerCase()) };
     }
-    return part;
-  }
 
-  async function loadChapter(dir: string, partId: string | undefined): Promise<Chapter | undefined> {
-    const file = joinPath(dir, "_chapter.yaml");
-    const data = await yamlFile(file, "chapter");
-    if (!data || !str(data["id"])) return undefined;
-    const chapter: Chapter = {
-      id: str(data["id"])!,
-      title: str(data["title"]),
-      synopsis: str(data["synopsis"]),
-      sceneIds: strList(data["scenes"]),
-      partId,
-      dir,
-      file,
-    };
-    novel.allChapters.push(chapter);
-    for (const entry of await source.list(dir)) {
-      const path = joinPath(dir, entry.name);
-      if (entry.dir) diagnostics.push(error("E_MISPLACED", path, "Chapters cannot contain folders"));
-      else if (entry.name.endsWith(".md")) await loadScene(path, chapter.id);
+    /** A section's folder: its _<level>.yaml, then what's in it. Undefined when its file can't be read. */
+    async function loadSection(dir: string, level: LevelDef, parentId: string | undefined): Promise<Section | undefined> {
+      const file = joinPath(dir, `_${level.key}.yaml`);
+      const data = await yamlFile(file, level.key);
+      if (!data || !str(data["id"])) return undefined;
+      const inner = level === innermost;
+      const next = levels[levels.indexOf(level) + 1];
+      const section: Section = {
+        id: str(data["id"])!,
+        level: level.key,
+        title: level.titled ? (str(data["title"]) ?? "") : str(data["title"]),
+        synopsis: str(data["synopsis"]),
+        childIds: strList(data[inner ? piece.list : next!.list]),
+        parentId,
+        dir,
+        file,
+      };
+      novel.allSections.push(section);
+      for (const entry of await source.list(dir)) {
+        const path = joinPath(dir, entry.name);
+        if (inner) {
+          if (entry.dir) diagnostics.push(error("E_MISPLACED", path, `${capitalize(level.list)} cannot contain folders`));
+          else if (entry.name.endsWith(".md")) await loadScene(path, section.id);
+        } else if (entry.dir) {
+          if ((await source.list(path)).some((c) => c.name === `_${next!.key}.yaml`)) await loadSection(path, next!, section.id);
+          else diagnostics.push(error("E_MISPLACED", path, `Folder inside a ${level.label.toLowerCase()} has no _${next!.key}.yaml`));
+        } else if (entry.name.endsWith(".md")) {
+          diagnostics.push(error("E_MISPLACED", path, misplacedPiece));
+        }
+      }
+      return section;
     }
-    return chapter;
   }
 
   async function loadScene(file: string, chapterId: string) {
@@ -232,7 +226,7 @@ export async function loadBook(source: FileSource): Promise<Book> {
       when: storyTime(d["when"]),
       duration: str(d["duration"]),
       tags: strList(d["tags"]),
-      chapterId,
+      sectionId: chapterId,
       position: -1,
       body: md.body,
       bodyLine: md.bodyLine,
@@ -456,6 +450,13 @@ function storyTime(v: unknown): StoryTime | undefined {
   if (typeof v["at"] === "string") return { at: v["at"] };
   if (typeof v["day"] === "number") return typeof v["time"] === "string" ? { day: v["day"], time: v["time"] } : { day: v["day"] };
   return undefined;
+}
+
+/** "neither _part.yaml nor _chapter.yaml", "no _chapter.yaml", "none of _a.yaml, _b.yaml or _c.yaml". */
+function noneOf(names: string[]): string {
+  if (names.length === 1) return `no ${names[0]}`;
+  if (names.length === 2) return `neither ${names[0]} nor ${names[1]}`;
+  return `none of ${names.slice(0, -1).join(", ")} or ${names.at(-1)}`;
 }
 
 function capitalize(s: string): string {

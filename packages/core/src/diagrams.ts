@@ -1,5 +1,5 @@
 import { relationshipStyle, type SeriesSlot } from "./palette.ts";
-import { countWords, mentions, relationshipsAt, storyTimeline, type Chapter, type Entity, type Book, type Part, type Relationship, type Piece, type StoryInstant, type TimelineItem } from "./index.ts";
+import { countWords, mentions, relationshipsAt, storyTimeline, levelLabel, sectionById, sectionsAt, type Section, type Entity, type Book, type Relationship, type Piece, type StoryInstant, type TimelineItem } from "./index.ts";
 
 /*
  * The data behind every diagram: the relationship graph, the plotline swimlanes, the presence matrix
@@ -7,8 +7,8 @@ import { countWords, mentions, relationshipsAt, storyTimeline, type Chapter, typ
  * diagram on github.com always shows what the app does.
  */
 
-/** A chapter's title, or "Chapter N" for one without. */
-export const chapterTitle = (novel: Book, chapter: Chapter) => chapter.title ?? `Chapter ${novel.chapters.indexOf(chapter) + 1}`;
+/** A section's title, or its level and number for one without ("Chapter 3"). */
+export const chapterTitle = (novel: Book, chapter: Section) => chapter.title ?? `${levelLabel(novel, chapter.level)} ${sectionsAt(novel, chapter.level).findIndex((s) => s.id === chapter.id) + 1}`;
 
 /** A relationship as a sentence from `id`'s side: "Rivals with Ben Varn, from “The Betrayal” (After the bridge betrayal.)". */
 export function describeRelationship(novel: Book, id: string, r: Relationship): string {
@@ -53,16 +53,18 @@ export const gridKey = (row: string, scene: string) => `${row}|${scene}`;
 
 /** Scenes grouped for column headers: by chapter, and by part when the book has them. */
 export function sceneColumns(novel: Book, scenes: Piece[]) {
-  const chapters: { chapter: Chapter; title: string; span: number }[] = [];
-  const parts: { part: Part; span: number }[] = [];
+  const chapters: { chapter: Section; title: string; span: number }[] = [];
+  const parts: { part: Section; span: number }[] = [];
+  // By ID: in the browser the model is JSON, so a listed section and the same one in allSections are two objects.
+  const listed = new Set(novel.sections.map((s) => s.id));
   for (const scene of scenes) {
-    const chapter = novel.chapters.find((c) => c.id === scene.chapterId);
-    if (!chapter) continue;
+    const chapter = sectionById(novel, scene.sectionId);
+    if (!chapter || !listed.has(chapter.id)) continue;
     const last = chapters.at(-1);
     if (last?.chapter.id === chapter.id) last.span++;
     else chapters.push({ chapter, title: chapterTitle(novel, chapter), span: 1 });
-    const part = novel.parts.find((p) => p.id === chapter.partId);
-    if (!part) continue;
+    const part = sectionById(novel, chapter.parentId);
+    if (!part || !listed.has(part.id)) continue;
     const lastPart = parts.at(-1);
     if (lastPart?.part.id === part.id) lastPart.span++;
     else parts.push({ part, span: 1 });
@@ -189,8 +191,8 @@ export interface Swimlanes {
   /** Scenes in reading order. */
   scenes: Piece[];
   /** Column groups over the scenes: chapters, and (when the book has them) parts. */
-  chapters: { chapter: Chapter; title: string; span: number }[];
-  parts: { part: Part; span: number }[];
+  chapters: { chapter: Section; title: string; span: number }[];
+  parts: { part: Section; span: number }[];
   /** How a scene advances a plotline, by `${plotline}|${scene}`; absent: it doesn't. */
   marks: Map<string, Mark>;
   /** Each scene's words, counted once (gaps in words read them on every threshold). */
@@ -247,13 +249,14 @@ export function gaps(s: { lanes: { id: string }[]; scenes: Piece[]; marks: Map<s
   return out;
 }
 
-/** The scenes a zoom shows: a part's, a chapter's, or (no zoom, or one that's gone) all. */
+/** The scenes a zoom shows: those anywhere in a section (a part, a chapter), or (no zoom, or one that's gone) all. */
 export function zoomed(novel: Book, scenes: Piece[], zoom: string | undefined): Piece[] {
-  if (!zoom) return scenes;
-  const part = novel.parts.find((p) => p.id === zoom);
-  if (part) return scenes.filter((s) => part.chapterIds.includes(s.chapterId ?? ""));
-  const chapter = novel.chapters.find((c) => c.id === zoom);
-  return chapter ? scenes.filter((s) => s.chapterId === chapter.id) : scenes;
+  if (!zoom || !novel.sections.some((s) => s.id === zoom)) return scenes;
+  const within = (id: string | undefined): boolean => {
+    const section = sectionById(novel, id);
+    return !!section && (section.id === zoom || within(section.parentId));
+  };
+  return scenes.filter((s) => within(s.sectionId));
 }
 
 // ——— Presence ———

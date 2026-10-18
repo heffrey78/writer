@@ -11,22 +11,23 @@ import type {
   StoryTime,
 } from "./types.ts";
 
-/** A novel loaded into memory. Collections are in reading order where that applies. */
+/** A book loaded into memory. Collections are in reading order where that applies. */
 export interface Book {
   /** What kind of book it is: data, so it travels with the model to the browser. */
   kind: BookKind;
   config: NovelFile | undefined;
   entityTypes: EntityTypeDef[];
   relationshipTypes: RelationshipTypeFile[];
-  /** Whether the manuscript is organised in parts or directly in chapters. */
-  topLevel: "parts" | "chapters" | undefined;
-  /** Parts, chapters and scenes listed in order files, in reading order. */
-  parts: Part[];
-  chapters: Chapter[];
+  /**
+   * The levels of its kind the book uses, outermost first, as its _order.yaml says: a novel in parts
+   * uses part and chapter, one without them only chapter. Empty when there's no order to go by.
+   */
+  levels: string[];
+  /** Sections and pieces listed in order files, in reading order: each section before what it holds. */
+  sections: Section[];
   pieces: Piece[];
-  /** Every part, chapter and scene found on disk, including ones missing from order files. */
-  allParts: Part[];
-  allChapters: Chapter[];
+  /** Every section and piece found on disk, including ones missing from order files. */
+  allSections: Section[];
   allPieces: Piece[];
   entities: Entity[];
   relationships: Relationship[];
@@ -40,22 +41,19 @@ export interface Book {
   diagnostics: Diagnostic[];
 }
 
-export interface Part {
+/** A section of the book at one of its kind's levels, such as a part or a chapter. */
+export interface Section {
   id: string;
-  title: string;
-  synopsis?: string;
-  chapterIds: string[];
-  /** Folder of the part, and its _part.yaml. */
-  dir: string;
-  file: string;
-}
-
-export interface Chapter {
-  id: string;
+  /** Its level's key in the book's kind: "part", "chapter". */
+  level: string;
+  /** A level that's `titled` always has one ("" when the file has none). */
   title?: string;
   synopsis?: string;
-  sceneIds: string[];
-  partId?: string;
+  /** What it holds, in order, as its file lists them: sections of the next level, or pieces. */
+  childIds: string[];
+  /** The section it's in; none at the book's outermost level. */
+  parentId?: string;
+  /** Its folder, and the _<level>.yaml in it. */
   dir: string;
   file: string;
 }
@@ -87,7 +85,7 @@ export interface Piece {
   when?: StoryTime;
   duration?: string;
   tags: string[];
-  chapterId?: string;
+  sectionId?: string;
   /** Position in reading order, or -1 if the scene is not in any order file. */
   position: number;
   body: string;
@@ -149,7 +147,7 @@ export interface Note {
   file: string;
 }
 
-export type RecordKind = "novel" | "part" | "chapter" | "scene" | "entity" | "relationship" | "event" | "note";
+export type RecordKind = "book" | "section" | "piece" | "entity" | "relationship" | "event" | "note";
 
 export interface RecordRef {
   kind: RecordKind;
@@ -157,15 +155,18 @@ export interface RecordRef {
   file: string;
   /** Entity type key, for entities. */
   type?: string;
+  /** Level key, for sections. */
+  level?: string;
 }
 
 /** Every record with an ID, in discovery order. Duplicate IDs appear more than once. */
 export function allRecords(novel: Book): RecordRef[] {
   const out: RecordRef[] = [];
-  if (novel.config?.id) out.push({ kind: "novel", id: novel.config.id, file: "novel.yaml" });
-  for (const p of novel.allParts) out.push({ kind: "part", id: p.id, file: p.file });
-  for (const c of novel.allChapters) out.push({ kind: "chapter", id: c.id, file: c.file });
-  for (const s of novel.allPieces) out.push({ kind: "scene", id: s.id, file: s.file });
+  if (novel.config?.id) out.push({ kind: "book", id: novel.config.id, file: "novel.yaml" });
+  // Outer levels first: of two sections with one ID, the outer one is found first.
+  const depth = (s: Section) => novel.kind.levels.findIndex((l) => l.key === s.level);
+  for (const s of [...novel.allSections].sort((a, b) => depth(a) - depth(b))) out.push({ kind: "section", id: s.id, file: s.file, level: s.level });
+  for (const s of novel.allPieces) out.push({ kind: "piece", id: s.id, file: s.file });
   for (const e of novel.entities) out.push({ kind: "entity", id: e.id, file: e.file, type: e.type });
   for (const r of novel.relationships) out.push({ kind: "relationship", id: r.id, file: r.file });
   for (const e of novel.events) out.push({ kind: "event", id: e.id, file: e.file });
@@ -187,6 +188,27 @@ export function entityById(novel: Book, id: string): Entity | undefined {
 export function pieceById(novel: Book, id: string): Piece | undefined {
   return novel.allPieces.find((s) => s.id === id);
 }
+
+/** The innermost level of the book's kind: the one whose sections hold the pieces. */
+export const pieceLevel = (book: Book) => book.kind.levels.at(-1)!.key;
+
+/** The book's sections at a level, in reading order. */
+export const sectionsAt = (book: Book, level: string) => book.sections.filter((s) => s.level === level);
+
+/** The sections that hold the pieces (a novel's chapters), in reading order. */
+export const pieceSections = (book: Book) => sectionsAt(book, pieceLevel(book));
+
+/** The sections one level out from the pieces' (a novel's parts), in reading order: none in a book without that level. */
+export function outerSections(book: Book): Section[] {
+  const level = book.kind.levels.at(-2);
+  return level ? sectionsAt(book, level.key) : [];
+}
+
+/** A section by its ID, listed or not. */
+export const sectionById = (book: Book, id: string | undefined) => (id === undefined ? undefined : book.allSections.find((s) => s.id === id));
+
+/** A section's label in the book's kind: "Part", "Chapter". */
+export const levelLabel = (book: Book, level: string) => book.kind.levels.find((l) => l.key === level)?.label ?? level;
 
 function positionOf(novel: Book, sceneId: string | undefined): number | undefined {
   if (sceneId === undefined) return undefined;

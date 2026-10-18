@@ -105,7 +105,7 @@ export class NovelWorkspace {
       onChange: () => this.syncer?.branchChanged(),
     });
     this.bible = new BibleOperations(root, (fn) => this.exclusive(fn));
-    this.manuscript = new ManuscriptOperations(root, (fn) => this.exclusive(fn));
+    this.manuscript = new ManuscriptOperations(root, (fn) => this.exclusive(fn), () => this.kind);
     this.issues = github ? new IssueStore(root, github, () => this.githubRepo(), async () => (await this.loadModel()).novel, () => this.kind) : undefined;
     this.board = github
       ? new BoardStore(root, github, () => this.githubRepo(), {

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { countWords, editFrontMatter, type Book, type PieceStatus, type StatusDef } from "@writer/core";
+import { countWords, editFrontMatter, levelLabel, outerSections, pieceSections, type Book, type PieceStatus, type StatusDef } from "@writer/core";
 import { git } from "./git.ts";
 import { GitHubError, type GitHub, type GitHubRepo } from "./github.ts";
 import type { TextFile } from "./files.ts";
@@ -698,11 +698,11 @@ interface Wanted {
 /** What the board should show for each scene of the book, in reading order. */
 function desired(novel: Book): Map<string, Wanted> {
   const names = uniqueNames(novel.entities.filter((e) => e.type === "character").map((e) => [e.id, e.name]));
-  const parts = uniqueNames(novel.parts.map((p, i) => [p.id, p.title ? `${i + 1}. ${p.title}` : `Part ${i + 1}`]));
-  const chapters = uniqueNames(novel.chapters.map((c, i) => [c.id, c.title ? `${i + 1}. ${c.title}` : `Chapter ${i + 1}`]));
+  const parts = uniqueNames(outerSections(novel).map((p, i) => [p.id, p.title ? `${i + 1}. ${p.title}` : `${levelLabel(novel, p.level)} ${i + 1}`]));
+  const chapters = uniqueNames(pieceSections(novel).map((c, i) => [c.id, c.title ? `${i + 1}. ${c.title}` : `${levelLabel(novel, c.level)} ${i + 1}`]));
   const out = new Map<string, Wanted>();
   novel.pieces.forEach((s, i) => {
-    const chapter = novel.chapters.find((c) => c.id === s.chapterId);
+    const chapter = pieceSections(novel).find((c) => c.id === s.sectionId);
     out.set(s.id, {
       id: s.id,
       file: s.file,
@@ -710,7 +710,7 @@ function desired(novel: Book): Map<string, Wanted> {
         status: s.status,
         title: s.title || "Untitled scene",
         pov: (s.pov && names.get(s.pov)) ?? null,
-        part: (chapter?.partId && parts.get(chapter.partId)) ?? null,
+        part: (chapter?.parentId && parts.get(chapter.parentId)) ?? null,
         chapter: (chapter && chapters.get(chapter.id)) ?? null,
         words: countWords(s.body),
         order: i + 1,

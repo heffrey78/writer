@@ -2,7 +2,7 @@ export * from "./ids.ts";
 export * from "./types.ts";
 export * from "./model.ts";
 export { loadBook, SCHEMA_VERSION } from "./load.ts";
-export { kindByKey, levelOf, registerKind, V2_KIND, type BookKind, type LevelDef, type StatusDef } from "./kinds.ts";
+export { kindByKey, levelOf, registerKind, startLevels, V2_KIND, type BookKind, type LevelDef, type StatusDef } from "./kinds.ts";
 export { eventFile, migration, type Migration, type MigrationWrite } from "./migrate.ts";
 export { parseMarkdown, parseYaml } from "./parse.ts";
 export { checkSchema, schemaFor, SCHEMAS, type SchemaKind } from "./schemas.ts";

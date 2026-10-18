@@ -3,7 +3,7 @@ import { fromMarkdown } from "mdast-util-from-markdown";
 import { gfmFromMarkdown } from "mdast-util-gfm";
 import { toString } from "mdast-util-to-string";
 import { gfm } from "micromark-extension-gfm";
-import { picturePath, type Book } from "./model.ts";
+import { outerSections, pieceSections, picturePath, type Book } from "./model.ts";
 import { parseMarkdown } from "./parse.ts";
 import type { FileSource } from "./source.ts";
 import type { CompilePreset } from "./types.ts";
@@ -103,20 +103,20 @@ export async function compileBook(novel: Book, source: Pick<FileSource, "read">,
   const title = novel.config?.title ?? "Untitled";
   const author = preset.title_page?.author ?? novel.config?.author ?? "";
 
-  const chapters = novel.chapters;
+  const chapters = pieceSections(novel);
   const first = options.from ? chapters.findIndex((c) => c.id === options.from) : 0;
   const last = options.to ? chapters.findIndex((c) => c.id === options.to) : chapters.length - 1;
   if (first < 0 || last < 0) throw new CompileError("The range names a chapter that isn't in the book.");
   if (first > last) throw new CompileError("The range ends before it starts.");
 
   const byId = new Map(novel.allPieces.map((s) => [s.id, s]));
-  const parts = new Map(novel.parts.map((p, i) => [p.id, { ...p, number: i + 1 }]));
+  const parts = new Map(outerSections(novel).map((p, i) => [p.id, { ...p, number: i + 1 }]));
   const chapterOut: CompiledChapter[] = [];
   let words = 0;
   for (let i = first; i <= last; i++) {
     const chapter = chapters[i]!;
     const blocks: Block[] = [];
-    for (const sceneId of chapter.sceneIds) {
+    for (const sceneId of chapter.childIds) {
       const scene = byId.get(sceneId);
       if (!scene) continue;
       const body = prose(scene.body);
@@ -126,13 +126,13 @@ export async function compileBook(novel: Book, source: Pick<FileSource, "read">,
       blocks.push(...trimBreaks(body));
       words += countWords(scene.body);
     }
-    const part = chapter.partId ? parts.get(chapter.partId) : undefined;
-    const opensPart = part && part.chapterIds[0] === chapter.id;
+    const part = chapter.parentId ? parts.get(chapter.parentId) : undefined;
+    const opensPart = part && part.childIds[0] === chapter.id;
     chapterOut.push({
       id: chapter.id,
       number: i + 1,
       heading: heading(preset, i + 1, chapter.title),
-      ...(opensPart ? { part: { id: part.id, title: part.title, number: part.number } } : {}),
+      ...(opensPart ? { part: { id: part.id, title: part.title ?? "", number: part.number } } : {}),
       blocks,
     });
   }

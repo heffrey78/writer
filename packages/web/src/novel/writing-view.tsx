@@ -1,4 +1,4 @@
-import { readAnchor, readFrontMatter, type Chapter, type Book, type Piece } from "@writer/core";
+import { pieceSections, readAnchor, readFrontMatter, type Section, type Book, type Piece } from "@writer/core";
 import { countWords } from "@writer/core";
 import {
   appContextMenu,
@@ -63,7 +63,7 @@ interface Props {
   novel: Book;
   workspace: Workspace;
   /** A chapter (continuous) or a single scene. */
-  view: { chapter: Chapter } | { scene: Piece; chapter: Chapter | undefined };
+  view: { chapter: Section } | { scene: Piece; chapter: Section | undefined };
   spell: { service: SpellService; onAddWord: (word: string) => void } | undefined;
   /** Where entries made from the @ menu go (see createQuickEntries). */
   entries?: QuickEntries | undefined;
@@ -79,7 +79,7 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
   const [editor, setEditor] = useState<Editor>();
   const byId = useMemo(() => new Map(novel.allPieces.map((s) => [s.id, s])), [novel]);
   const scenes = useMemo(
-    () => ("scene" in view ? [view.scene] : view.chapter.sceneIds.map((id) => byId.get(id)).filter((s): s is Piece => s !== undefined)),
+    () => ("scene" in view ? [view.scene] : view.chapter.childIds.map((id) => byId.get(id)).filter((s): s is Piece => s !== undefined)),
     [view, byId],
   );
   const paths = scenes.map((s) => s.file);
@@ -327,16 +327,16 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
   const liveScene = useStore(liveCounts, (c) => c.scene);
   const chapterWords =
     "scene" in view && view.chapter
-      ? view.chapter.sceneIds.filter((id) => id !== view.scene.id).reduce((n, id) => n + countWords(byId.get(id)?.body ?? ""), liveScene)
+      ? view.chapter.childIds.filter((id) => id !== view.scene.id).reduce((n, id) => n + countWords(byId.get(id)?.body ?? ""), liveScene)
       : undefined;
 
   // Find and replace searches every scene; open ones live in the editor. Scene IDs here are file paths.
   const manuscript: Manuscript = useMemo(
     () =>
-      novel.chapters.map((c) => ({
+      pieceSections(novel).map((c) => ({
         id: c.id,
         title: chapterTitle(novel, c),
-        scenes: c.sceneIds.flatMap((id) => {
+        scenes: c.childIds.flatMap((id) => {
           const s = byId.get(id);
           return s ? [{ id: s.file, title: s.title, markdown: s.body }] : [];
         }),
@@ -354,7 +354,7 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
     const scene = novel.allPieces.find((s) => s.file === path);
     if (!scene) return;
     // In the chapter view, open the chapter holding it; otherwise the scene.
-    if (!("scene" in view) && scene.chapterId) void navigate(`/novels/${novelId}/chapter/${scene.chapterId}`);
+    if (!("scene" in view) && scene.sectionId) void navigate(`/novels/${novelId}/chapter/${scene.sectionId}`);
     else void navigate(`/novels/${novelId}/scene/${scene.id}`);
   };
 

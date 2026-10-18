@@ -6,10 +6,10 @@ export const novel: BookKind = {
   label: "Novel",
   prefix: "nv",
   levels: [
-    { key: "part", label: "Part", prefix: "pt", optional: true },
-    { key: "chapter", label: "Chapter", prefix: "ch" },
+    { key: "part", label: "Part", prefix: "pt", list: "parts", optional: true, titled: true },
+    { key: "chapter", label: "Chapter", prefix: "ch", list: "chapters" },
   ],
-  piece: { key: "scene", label: "Scene", prefix: "sc" },
+  piece: { key: "scene", label: "Scene", prefix: "sc", list: "scenes" },
   folders: { content: "manuscript", codex: "bible", notes: "notes", events: "events" },
   entityTypes: [
     { key: "character", prefix: "char", folder: "characters", label: "Character", color: "1f77b4", builtin: true },

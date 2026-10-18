@@ -303,15 +303,15 @@ export class Versions {
         await atomicWrite(await writablePath(this.root, existing.file, content), content);
         files.push(existing.file);
       } else {
-        const chapter = here.allChapters.find((c) => c.id === scene.chapterId);
+        const chapter = here.allSections.find((c) => c.id === scene.sectionId);
         if (!chapter) throw new VersionError("NOT_HERE", `“${scene.title}” is in a chapter this version doesn't have: adopt the whole version, or add the chapter first.`);
         let path = `${chapter.dir}/${scene.file.split("/").at(-1)}`;
         for (let n = 2; await readFile(join(this.root, path)).then(() => true, () => false); n++) path = `${chapter.dir}/${scene.file.split("/").at(-1)!.replace(/\.md$/, `-${n}.md`)}`;
         await atomicWrite(await writablePath(this.root, path, content), content);
         // After the scene it follows in the other version, if that's here; else first, or last.
-        const order = there.allChapters.find((c) => c.id === chapter.id)?.sceneIds ?? [];
-        const before = order.slice(0, order.indexOf(sceneId)).reverse().find((s) => chapter.sceneIds.includes(s));
-        const scenes = [...chapter.sceneIds];
+        const order = there.allSections.find((c) => c.id === chapter.id)?.childIds ?? [];
+        const before = order.slice(0, order.indexOf(sceneId)).reverse().find((s) => chapter.childIds.includes(s));
+        const scenes = [...chapter.childIds];
         scenes.splice(before ? scenes.indexOf(before) + 1 : order.indexOf(sceneId) === 0 ? 0 : scenes.length, 0, sceneId);
         const yaml = editYaml(await readFile(join(this.root, chapter.file), "utf8"), [{ path: ["scenes"], value: scenes }]);
         await atomicWrite(await writablePath(this.root, chapter.file, yaml), yaml);

@@ -96,7 +96,7 @@ describe("creating and renaming", () => {
     const { id: part } = await ops.createPart({ title: "Afterwards" });
     expect(read("manuscript/03-afterwards/_part.yaml")).toBe(`id: ${part}\ntitle: Afterwards\nchapters: []\n`);
     await ops.createScene(chapter, { title: "Back Again" });
-    expect((await valid()).chapters.find((c) => c.id === chapter)?.sceneIds).toHaveLength(1);
+    expect((await valid()).sections.find((c) => c.id === chapter)?.childIds).toHaveLength(1);
   });
 
   it("renames a scene, chapter and part; the names on disk follow, references don't change", async () => {
@@ -226,14 +226,16 @@ describe("random reshaping", () => {
         const before = await sceneContent();
         for (const [a, b, c, chapterMove] of steps) {
           const novel = await loadBook(nodeSource(dir));
+          const chapters = novel.allSections.filter((s) => s.level === "chapter");
+          const parts = novel.allSections.filter((s) => s.level === "part");
           if (chapterMove) {
-            const chapter = novel.allChapters[a % novel.allChapters.length]!;
-            const part = novel.allParts[b % novel.allParts.length]!;
-            await ops.move(chapter.id, { to: part.id, index: c % (part.chapterIds.length + 1) });
+            const chapter = chapters[a % chapters.length]!;
+            const part = parts[b % parts.length]!;
+            await ops.move(chapter.id, { to: part.id, index: c % (part.childIds.length + 1) });
           } else {
             const scene = novel.allPieces[a % novel.allPieces.length]!;
-            const chapter = novel.allChapters[b % novel.allChapters.length]!;
-            await ops.move(scene.id, { to: chapter.id, index: c % (chapter.sceneIds.length + 1) });
+            const chapter = chapters[b % chapters.length]!;
+            await ops.move(scene.id, { to: chapter.id, index: c % (chapter.childIds.length + 1) });
           }
         }
         // Structure must stay valid. A reorder may put a relationship's end before its start
@@ -242,8 +244,8 @@ describe("random reshaping", () => {
         expect([...novel.diagnostics, ...validateBook(novel)].filter((d) => d.severity === "error" && d.code !== "E_REL_RANGE")).toEqual([]);
         expect(await sceneContent()).toEqual(before);
         // Reading order is the order files' order, and every file name's number matches its place.
-        for (const chapter of novel.allChapters) {
-          chapter.sceneIds.forEach((id, i) => expect(novel.allPieces.find((s) => s.id === id)!.file).toMatch(new RegExp(`/${String(i + 1).padStart(2, "0")}-[^/]+\\.md$`)));
+        for (const chapter of novel.allSections.filter((s) => s.level === "chapter")) {
+          chapter.childIds.forEach((id, i) => expect(novel.allPieces.find((s) => s.id === id)!.file).toMatch(new RegExp(`/${String(i + 1).padStart(2, "0")}-[^/]+\\.md$`)));
         }
         clean();
       }),

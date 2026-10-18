@@ -1,4 +1,4 @@
-import { backlinks, type Book } from "@writer/core";
+import { backlinks, pieceSections, type Book } from "@writer/core";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 import { api } from "../api.ts";
@@ -45,7 +45,7 @@ export function GraphPage({ novelId, novel }: { novelId: string; novel: Book }) 
   const scenes = novel.pieces;
   const index = Math.max(0, scenes.findIndex((s) => s.id === params.get("at")));
   const scene = scenes[index];
-  const chapter = scene && novel.chapters.find((c) => c.id === scene.chapterId);
+  const chapter = scene && pieceSections(novel).find((c) => c.id === scene.sectionId);
 
   const filter: GraphFilter = {
     ...(list(params.get("types")) ? { types: list(params.get("types"))! } : {}),

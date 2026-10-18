@@ -1,4 +1,4 @@
-import type { Book } from "@writer/core";
+import { pieceSections, type Book } from "@writer/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { useId, useState } from "react";
 import { api, keys } from "../api.ts";
@@ -34,13 +34,13 @@ export function CompileDialog({ novelId, novel, workspace, onClose }: { novelId:
   const presets = Object.keys(novel.compile?.presets ?? { manuscript: {} });
   const [preset, setPreset] = useState(presets[0]!);
   const [whole, setWhole] = useState(true);
-  const [from, setFrom] = useState(novel.chapters[0]?.id ?? "");
-  const [to, setTo] = useState(novel.chapters.at(-1)?.id ?? "");
+  const [from, setFrom] = useState(pieceSections(novel)[0]?.id ?? "");
+  const [to, setTo] = useState(pieceSections(novel).at(-1)?.id ?? "");
   const [formats, setFormats] = useState<Set<Format>>(new Set(["docx", "epub", "pdf"]));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
   const ids = { preset: useId(), from: useId(), to: useId() };
-  const reversed = !whole && novel.chapters.findIndex((c) => c.id === from) > novel.chapters.findIndex((c) => c.id === to);
+  const reversed = !whole && pieceSections(novel).findIndex((c) => c.id === from) > pieceSections(novel).findIndex((c) => c.id === to);
 
   const compile = async () => {
     setBusy(true);
@@ -102,7 +102,7 @@ export function CompileDialog({ novelId, novel, workspace, onClose }: { novelId:
             <div className="flex flex-wrap items-center gap-2 pl-6">
               <label htmlFor={ids.from}>From</label>
               <select id={ids.from} value={from} onChange={(e) => setFrom(e.target.value)} className="h-9 rounded-md border border-rule bg-raised px-2">
-                {novel.chapters.map((c) => (
+                {pieceSections(novel).map((c) => (
                   <option key={c.id} value={c.id}>
                     {chapterTitle(novel, c)}
                   </option>
@@ -110,7 +110,7 @@ export function CompileDialog({ novelId, novel, workspace, onClose }: { novelId:
               </select>
               <label htmlFor={ids.to}>to</label>
               <select id={ids.to} value={to} onChange={(e) => setTo(e.target.value)} className="h-9 rounded-md border border-rule bg-raised px-2">
-                {novel.chapters.map((c) => (
+                {pieceSections(novel).map((c) => (
                   <option key={c.id} value={c.id}>
                     {chapterTitle(novel, c)}
                   </option>

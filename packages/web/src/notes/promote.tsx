@@ -1,4 +1,4 @@
-import type { Book, Note } from "@writer/core";
+import { pieceSections, type Book, type Note } from "@writer/core";
 import { chapterTitle } from "@writer/core/diagrams";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog } from "radix-ui";
@@ -19,7 +19,7 @@ export function PromoteNoteDialog({ novelId, novel, note, flush, open, onOpenCha
   const queryClient = useQueryClient();
   const id = useId();
   const [to, setTo] = useState<"event" | "scene">("event");
-  const [chapter, setChapter] = useState(novel.chapters.at(-1)?.id ?? "");
+  const [chapter, setChapter] = useState(pieceSections(novel).at(-1)?.id ?? "");
   const [keep, setKeep] = useState(true);
   const moving = to === "event" && needsFormatMove(novel);
   const promote = useMutation({
@@ -62,7 +62,7 @@ export function PromoteNoteDialog({ novelId, novel, note, flush, open, onOpenCha
               <label className="grid gap-1.5 font-medium">
                 Chapter
                 <select value={chapter} onChange={(e) => setChapter(e.target.value)} className="h-9 rounded-md border border-rule bg-raised px-2 font-normal">
-                  {novel.chapters.map((c) => (
+                  {pieceSections(novel).map((c) => (
                     <option key={c.id} value={c.id}>
                       {chapterTitle(novel, c)}
                     </option>

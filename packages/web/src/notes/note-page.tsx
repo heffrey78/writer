@@ -1,5 +1,5 @@
 import { imageUrl } from "@writer/client";
-import { readFrontMatter, type Book, type Note } from "@writer/core";
+import { pieceSections, readFrontMatter, type Book, type Note } from "@writer/core";
 import { joinSceneFile } from "@writer/editor";
 import { SceneEditor, type SpellService } from "@writer/editor/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -160,8 +160,8 @@ export function NotePage({
               <Chips items={note.scenes.map((id) => ({ id, label: sceneTitle(id), remove: () => void setScenes(note.scenes.filter((x) => x !== id)) }))} />
               <Picker
                 label="Add to scenes"
-                items={novel.chapters.flatMap((c) =>
-                  c.sceneIds.filter((id) => !note.scenes.includes(id)).map((id) => ({ value: id, label: sceneTitle(id), group: chapterTitle(novel, c) })),
+                items={pieceSections(novel).flatMap((c) =>
+                  c.childIds.filter((id) => !note.scenes.includes(id)).map((id) => ({ value: id, label: sceneTitle(id), group: chapterTitle(novel, c) })),
                 )}
                 value={undefined}
                 onChange={(v) => v && void setScenes([...note.scenes, v])}

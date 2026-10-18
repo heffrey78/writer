@@ -286,6 +286,7 @@ Deleting an entry or an event that a note mentions is refused (`409 REFERENCED`)
 |---|---|---|
 | `POST /manuscript/scenes` `{ chapter, title, after? }` | A new scene (status `idea`) after `after` (`null`: first; omitted: last) | `Manuscript: add scene “…”` |
 | `POST /manuscript/chapters` `{ part, title?, after? }`, `POST /manuscript/parts` `{ title, after? }` | A new, empty chapter (in a part, or at the top of a book in chapters) or part | `Manuscript: add chapter “…”` |
+| `POST /manuscript/sections` `{ level, parent?, title?, after? }` | A new, empty section at any level of the book's kind (#24), in `parent` (a section of the level above) or at the top, where only the level the book starts at may be. Refused (`BAD_REQUEST`) where the level doesn't belong, or without a title for a level whose sections must have one | `Manuscript: add <level> “…”` |
 | `POST /manuscript/items/:id/rename` `{ title }` | A new title; the file or folder name follows (its number stays) | `Manuscript: rename scene to “…”` |
 | `POST /manuscript/items/:id/move` `{ to?, index }` | To position `index` in a chapter (a scene), a part (a chapter), or among parts; `to` omitted: a reorder in place | `Manuscript: move scene “…”` |
 | `POST /manuscript/scenes/:id/split` `{ paragraph, title }` | Before paragraph `paragraph` (0-based): the rest becomes a new scene right after, keeping status, point of view, people, places, plotlines, themes and tags | `Manuscript: split “…”, the rest as “…”` |

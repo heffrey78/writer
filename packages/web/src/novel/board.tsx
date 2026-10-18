@@ -1,4 +1,4 @@
-import { countWords, type Book, type Piece, type PieceStatus } from "@writer/core";
+import { countWords, outerSections, pieceSections, type Book, type Piece, type PieceStatus } from "@writer/core";
 import { GripVertical } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
 import { Link, useSearchParams } from "react-router";
@@ -39,8 +39,8 @@ export function OutlineBoard({ novelId, novel, workspace }: { novelId: string; n
 
   const counts = useMemo(() => new Map(novel.pieces.map((s) => [s.id, countWords(s.body)])), [novel]);
   const visible = novel.pieces.filter((s) => {
-    const chapter = novel.chapters.find((c) => c.id === s.chapterId);
-    return (!filter.pov || s.pov === filter.pov) && (!filter.chapter || s.chapterId === filter.chapter) && (!filter.part || chapter?.partId === filter.part);
+    const chapter = pieceSections(novel).find((c) => c.id === s.sectionId);
+    return (!filter.pov || s.pov === filter.pov) && (!filter.chapter || s.sectionId === filter.chapter) && (!filter.part || chapter?.parentId === filter.part);
   });
   const total = visible.reduce((n, s) => n + (counts.get(s.id) ?? 0), 0);
 
@@ -92,8 +92,8 @@ export function OutlineBoard({ novelId, novel, workspace }: { novelId: string; n
       <BoardOnGitHub novelId={novelId} />
       <div role="group" aria-label="Filters" className="flex flex-wrap items-end gap-3">
         <FilterSelect label="Point of view" value={filter.pov} onChange={(v) => setFilter("pov", v)} options={characters.map((c) => [c.id, c.name])} />
-        {novel.parts.length > 0 && <FilterSelect label="Part" value={filter.part} onChange={(v) => setFilter("part", v)} options={novel.parts.map((p, i) => [p.id, p.title || `Part ${i + 1}`])} />}
-        <FilterSelect label="Chapter" value={filter.chapter} onChange={(v) => setFilter("chapter", v)} options={novel.chapters.map((c) => [c.id, chapterTitle(novel, c)])} />
+        {outerSections(novel).length > 0 && <FilterSelect label="Part" value={filter.part} onChange={(v) => setFilter("part", v)} options={outerSections(novel).map((p, i) => [p.id, p.title || `Part ${i + 1}`])} />}
+        <FilterSelect label="Chapter" value={filter.chapter} onChange={(v) => setFilter("chapter", v)} options={pieceSections(novel).map((c) => [c.id, chapterTitle(novel, c)])} />
         {filtered && (
           <Button size="sm" onClick={() => setParams({}, { replace: true })}>
             Clear filters
@@ -127,7 +127,7 @@ export function OutlineBoard({ novelId, novel, workspace }: { novelId: string; n
               {column.length ? (
                 <ol className="grid gap-2">
                   {column.map((scene) => {
-                    const chapter = novel.chapters.find((c) => c.id === scene.chapterId);
+                    const chapter = pieceSections(novel).find((c) => c.id === scene.sectionId);
                     return (
                       <li key={scene.id} aria-label={scene.title} className="grid gap-1 rounded-md border border-rule bg-raised p-2 text-sm shadow-sm">
                         <div className="flex items-start gap-1">

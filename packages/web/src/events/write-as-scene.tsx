@@ -1,4 +1,4 @@
-import { mentions, type Book, type StoryEvent } from "@writer/core";
+import { mentions, pieceSections, type Book, type StoryEvent } from "@writer/core";
 import { chapterTitle } from "@writer/core/diagrams";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog } from "radix-ui";
@@ -17,7 +17,7 @@ export function WriteAsSceneDialog({ novelId, novel, event, open, onOpenChange }
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const id = useId();
-  const [chapter, setChapter] = useState(novel.chapters.at(-1)?.id ?? "");
+  const [chapter, setChapter] = useState(pieceSections(novel).at(-1)?.id ?? "");
   const mentioned = [...novel.allPieces, ...novel.entities, ...novel.events].some((r) => mentions(r.body).some((m) => m.id === event.id));
   const [keep, setKeep] = useState(true);
   const moving = needsFormatMove(novel);
@@ -49,7 +49,7 @@ export function WriteAsSceneDialog({ novelId, novel, event, open, onOpenChange }
             <label className="grid gap-1.5 font-medium">
               Chapter
               <select value={chapter} onChange={(e) => setChapter(e.target.value)} className="h-9 rounded-md border border-rule bg-raised px-2 font-normal">
-                {novel.chapters.map((c) => (
+                {pieceSections(novel).map((c) => (
                   <option key={c.id} value={c.id}>
                     {chapterTitle(novel, c)}
                   </option>
