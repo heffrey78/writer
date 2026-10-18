@@ -40,7 +40,8 @@ test("adds a character, fills in the details and notes, all saved to its file", 
   await expect(page.getByRole("textbox", { name: "Other names" })).toBeFocused();
   await page.keyboard.type("Ilse, the Aunt");
   await page.keyboard.press("Enter");
-  await expect(page.getByText("Also Ilse, the Aunt")).toBeVisible();
+  // Exactly: the gallery's card behind the profile says "also Ilse, the Aunt" too, once it has caught up.
+  await expect(page.getByText("Also Ilse, the Aunt", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Edit other names" })).toBeFocused();
   await page.getByRole("button", { name: "Add a summary" }).click();
   await page.keyboard.type("Ada's aunt, who never left.");
