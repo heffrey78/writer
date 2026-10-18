@@ -1,4 +1,4 @@
-import { countWords, dayOneFor, pieceSections, readFrontMatter, sceneFacts, type Book, type YamlEdit } from "@writer/core";
+import { countWords, dayOneFor, pieceSections, readFrontMatter, sceneFacts, type Book, type FieldDef, type ItemProp, type YamlEdit } from "@writer/core";
 import { chapterTitle } from "@writer/core/diagrams";
 import { joinSceneFile } from "@writer/editor";
 import { ChevronLeft, ChevronRight, Pencil, Pin, Plus, X } from "lucide-react";
@@ -49,11 +49,33 @@ export const usePins = create<{ keys: string[]; toggle: (key: string) => void }>
 
 const listOf = (fm: Record<string, unknown>, key: string): Ref[] => (Array.isArray(fm[key]) ? (fm[key] as Ref[]) : []);
 
-/** When a scene happens, as read: "Day 3, 18:30", a date, or nothing; and how long, as "45 min". */
-export function whenOf(fm: Record<string, unknown>): { when: string; duration: string } {
-  const w = fm.when && typeof fm.when === "object" ? (fm.when as { at?: string; day?: number; time?: string }) : undefined;
+/** When a scene happens, as read: "Day 3, 18:30", a date, or nothing; and how long, as "45 min". `keys`: a story-time field's. */
+export function whenOf(fm: Record<string, unknown>, keys = { when: "when", duration: "duration" }): { when: string; duration: string } {
+  const value = fm[keys.when];
+  const w = value && typeof value === "object" ? (value as { at?: string; day?: number; time?: string }) : undefined;
   const when = w?.at !== undefined ? storyDate(w.at) : w?.day !== undefined ? `Day ${w.day}${w.time ? `, ${w.time}` : ""}` : "";
-  return { when, duration: str(fm.duration) && readableDuration(str(fm.duration)) };
+  const duration = str(fm[keys.duration]);
+  return { when, duration: duration && readableDuration(duration) };
+}
+
+/** A story-time field's keys. */
+const timeKeys = (f: FieldDef) => ({ when: f.key, duration: f.type.kind === "story-time" ? f.type.durationKey : "duration" });
+
+/** What an item of a list field carries, as its card shows it: " (major) “First crack”", " (faint)". */
+function carried(f: FieldDef, item: Record<string, unknown>): string {
+  if (f.type.kind !== "entities") return "";
+  return (f.type.item ?? [])
+    .filter((p) => p.onCard !== false)
+    .map((p) => {
+      const v = item[p.key];
+      if (p.kind === "choice") {
+        const value = typeof v === "string" ? v : p.default;
+        return value ? ` (${value})` : "";
+      }
+      if (p.kind === "scale") return v === undefined ? "" : ` (${p.labels[String(v)] ?? String(v)})`;
+      return str(v) && ` “${str(v)}”`;
+    })
+    .join("");
 }
 
 /**
@@ -64,21 +86,24 @@ export function detailTexts(novel: Book, fm: Record<string, unknown>): Record<st
   const name = (id: string) => novel.entities.find((e) => e.id === id)?.name ?? id;
   const names = (ids: string[]) => ids.map(name).join(", ");
   const typeOf = (id: string) => novel.entities.find((e) => e.id === id)?.type ?? novel.entityTypes.find((t) => id.startsWith(`${t.prefix}_`))?.key;
-  const { when, duration } = whenOf(fm);
-  const texts: Record<string, string> = {
-    pov: str(fm.pov) && name(str(fm.pov)),
-    locations: names(listOf(fm, "locations").map(refId)),
-    characters: names(listOf(fm, "characters").map(refId)),
-    when: [when, duration].filter(Boolean).join(" · "),
-    plotlines: names(listOf(fm, "plotlines").map(refId)),
-  };
-  for (const t of novel.entityTypes.filter((t) => !t.builtin).sort((a, b) => a.label.localeCompare(b.label))) {
-    texts[`type:${t.key}`] = names(listOf(fm, "entities").map(refId).filter((id) => typeOf(id) === t.key));
+  const texts: Record<string, string> = {};
+  for (const f of novel.kind.fields) {
+    const t = f.type;
+    if (t.kind === "entity") texts[f.key] = str(fm[f.key]) && name(str(fm[f.key]));
+    else if (t.kind === "entities") texts[f.key] = names(listOf(fm, f.key).map(refId));
+    else if (t.kind === "story-time") {
+      const { when, duration } = whenOf(fm, timeKeys(f));
+      texts[f.key] = [when, duration].filter(Boolean).join(" · ");
+    } else {
+      for (const type of ownTypes(novel)) texts[`type:${type.key}`] = names(listOf(fm, f.key).map(refId).filter((id) => typeOf(id) === type.key));
+    }
   }
-  texts.themes = names(listOf(fm, "themes").map(refId));
   texts.tags = (Array.isArray(fm.tags) ? (fm.tags as unknown[]) : []).map(String).join(", ");
   return texts;
 }
+
+/** The book's own entry types, beyond its kind's, by name: each a row of an own-entities field. */
+const ownTypes = (novel: Book) => novel.entityTypes.filter((t) => !t.builtin).sort((a, b) => a.label.localeCompare(b.label));
 
 /** A scene's pinned line: its pinned details that it has, in the card's order. */
 export function pinnedLine(novel: Book, fm: Record<string, unknown>, keys: readonly string[]): string {
@@ -168,13 +193,6 @@ export function SceneDetails({
     const noun = novel.entityTypes.find((t) => t.key === type)?.label.toLowerCase();
     return newEntry && noun ? { create: { noun, create: (n) => newEntry(type, n) } } : {};
   };
-  // After the built-in four, by name.
-  const customTypes = novel.entityTypes.filter((t) => !t.builtin).sort((a, b) => a.label.localeCompare(b.label));
-  /** The scene's `entities` of a custom type, with each one's place in the whole list. */
-  const ofCustom = (type: string) =>
-    list("entities")
-      .map((r, i) => ({ id: refId(r), i }))
-      .filter(({ id }) => (novel.entities.find((e) => e.id === id)?.type ?? novel.entityTypes.find((t) => id.startsWith(`${t.prefix}_`))?.key) === type);
 
   const list = (key: string): Ref[] => (Array.isArray(fm[key]) ? (fm[key] as Ref[]) : []);
   /** Add an item to a list: appended in its place, or the list made. */
@@ -202,8 +220,6 @@ export function SceneDetails({
   const facts = useMemo(() => (scene ? sceneFacts(novel, scene.id) : []), [novel, scene?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!file) return null;
-  const when = fm.when && typeof fm.when === "object" ? (fm.when as { at?: string; day?: number; time?: string }) : undefined;
-  const whenKind = when?.at !== undefined ? "date" : when?.day !== undefined ? "day" : "";
   const tags = Array.isArray(fm.tags) ? (fm.tags as string[]) : [];
   const statuses = novel.kind.statuses.map((s) => s.key);
   const status = statuses.includes(fm.status as string) ? (fm.status as string) : statuses[0]!;
@@ -223,159 +239,145 @@ export function SceneDetails({
   );
 
   /** Each row: its key, label, whether it has anything, how it reads and how it's edited. */
-  const rows: { key: string; label: string; filled: boolean; view: ReactNode; edit: ReactNode; plain?: boolean }[] = [
-    {
-      key: "pov",
-      label: "Point of view",
-      filled: !!str(fm.pov),
-      view: str(fm.pov) && link(str(fm.pov)),
-      edit: (
-        <Picker
-          label="Point of view"
-          items={ofType("character")}
-          value={str(fm.pov) || undefined}
-          onChange={(v) => set("pov", v)}
-          placeholder="No point of view"
-          allowNone
-          {...making("character")}
+  type Row = { key: string; label: string; filled: boolean; view: ReactNode; edit: ReactNode; plain?: boolean };
+  /** A list field's rows: one, or (the book's own types) one for each type. */
+  const fieldRows = (f: FieldDef): Row[] => {
+    const t = f.type;
+    const group = f.group ?? f.label;
+    if (t.kind === "entity") {
+      const id = str(fm[f.key]);
+      return [
+        {
+          key: f.key,
+          label: f.label,
+          filled: !!id,
+          view: id && link(id),
+          edit: <Picker label={f.label} items={ofType(t.entityType)} value={id || undefined} onChange={(v) => set(f.key, v)} placeholder={`No ${f.label.toLowerCase()}`} allowNone {...making(t.entityType)} />,
+        },
+      ];
+    }
+    if (t.kind === "story-time") {
+      const keys = timeKeys(f);
+      const value = fm[keys.when];
+      const when = value && typeof value === "object" ? (value as { at?: string; day?: number; time?: string }) : undefined;
+      const read = whenOf(fm, keys);
+      return [
+        {
+          key: f.key,
+          label: f.label,
+          plain: true,
+          filled: when?.at !== undefined || when?.day !== undefined || !!str(fm[keys.duration]),
+          view: (
+            <>
+              {read.when || "Not set"}
+              {read.duration && <span className="text-muted"> · {read.duration}</span>}
+            </>
+          ),
+          edit: <StoryTimeFields when={when} duration={str(fm[keys.duration])} edit={edit} novel={novel} keys={keys} />,
+        },
+      ];
+    }
+    if (t.kind === "own-entities") {
+      return ownTypes(novel).map((type) => {
+        const chosen = list(f.key)
+          .map((r, i) => ({ id: refId(r), i }))
+          .filter(({ id }) => (novel.entities.find((e) => e.id === id)?.type ?? novel.entityTypes.find((x) => id.startsWith(`${x.prefix}_`))?.key) === type.key);
+        const label = plural(type.label);
+        return {
+          key: `type:${type.key}`,
+          label,
+          filled: chosen.length > 0,
+          view: names(chosen.map((c) => c.id)),
+          edit: (
+            <Group label={label}>
+              <Chips items={chosen.map(({ id, i }) => ({ id, label: name(id), remove: () => removeAt(f.key, i) }))} />
+              {pickerFor(`type:${type.key}`, label, type.key, chosen.map((c) => c.id), (v) => append(f.key, v))}
+            </Group>
+          ),
+        };
+      });
+    }
+    const items = list(f.key);
+    const chosen = items.map(refId);
+    const props = (t.item ?? []).filter((p) => p.onCard !== false);
+    if (!props.length) {
+      return [
+        {
+          key: f.key,
+          label: f.label,
+          filled: chosen.length > 0,
+          view: names(chosen),
+          edit: (
+            <Group label={group}>
+              <Chips items={chosen.map((id, i) => ({ id, label: name(id), remove: () => removeAt(f.key, i) }))} />
+              {pickerFor(f.key, group, t.entityType, chosen, (v) => append(f.key, v))}
+            </Group>
+          ),
+        },
+      ];
+    }
+    // Entries that carry something (a plotline's weight and beat, a theme's strength): each its own small form.
+    const control = (p: ItemProp, i: number, label: string, item: Record<string, unknown>) =>
+      p.kind === "choice" ? (
+        <SelectField key={p.key} label={`${p.label} of “${label}”`} value={typeof item[p.key] === "string" ? (item[p.key] as string) : (p.default ?? "")} options={p.values.map((v) => [v, v])} onChange={(v) => setField(f.key, i, p.key, v)} />
+      ) : p.kind === "scale" ? (
+        <SelectField
+          key={p.key}
+          label={`${p.label} of “${label}”`}
+          value={item[p.key] === undefined ? "" : String(item[p.key])}
+          options={[["", "—"], ...Object.entries(p.options)]}
+          onChange={(v) => setField(f.key, i, p.key, v ? Number(v) : undefined)}
         />
-      ),
-    },
-    ...(
-      [
-        ["locations", "Where", "Locations", "location"],
-        ["characters", "Characters", "Characters", "character"],
-      ] as const
-    ).map(([key, label, group, type]) => {
-      const chosen = list(key).map(refId);
-      return {
-        key,
-        label,
-        filled: chosen.length > 0,
-        view: names(chosen),
+      ) : (
+        <TextField key={p.key} label={`${p.label} of “${label}”`} value={str(item[p.key])} onSave={(v) => setField(f.key, i, p.key, v)} />
+      );
+    return [
+      {
+        key: f.key,
+        label: f.label,
+        filled: items.length > 0,
+        view: items.map((r, i) => {
+          const item: Record<string, unknown> = typeof r === "string" ? {} : r;
+          return (
+            <span key={`${refId(r)}-${i}`}>
+              {i > 0 && ", "}
+              {link(refId(r))}
+              <span className="text-muted">{carried(f, item)}</span>
+            </span>
+          );
+        }),
         edit: (
           <Group label={group}>
-            <Chips items={chosen.map((id, i) => ({ id, label: name(id), remove: () => removeAt(key, i) }))} />
-            {pickerFor(key, group, type, chosen, (v) => append(key, v))}
+            <ul className="grid gap-2">
+              {items.map((r, i) => {
+                const label = name(refId(r));
+                const item: Record<string, unknown> = typeof r === "string" ? {} : r;
+                // One thing carried sits beside the name; more, each on a line of its own.
+                return props.length === 1 ? (
+                  <li key={`${refId(r)}-${i}`} className="flex items-end gap-2 rounded-md border border-rule p-2">
+                    <span className="flex-1 self-center font-medium">{label}</span>
+                    {control(props[0]!, i, label, item)}
+                    <RemoveButton label={label} onClick={() => removeAt(f.key, i)} />
+                  </li>
+                ) : (
+                  <li key={`${refId(r)}-${i}`} className="grid gap-1.5 rounded-md border border-rule p-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-medium">{label}</span>
+                      <RemoveButton label={label} onClick={() => removeAt(f.key, i)} />
+                    </div>
+                    {props.map((p) => control(p, i, label, item))}
+                  </li>
+                );
+              })}
+            </ul>
+            {pickerFor(f.key, group, t.entityType, chosen, (v) => append(f.key, v))}
           </Group>
         ),
-      };
-    }),
-    {
-      key: "when",
-      label: "When",
-      plain: true,
-      filled: whenKind !== "" || !!str(fm.duration),
-      view: (
-        <>
-          {whenOf(fm).when || "Not set"}
-          {whenOf(fm).duration && <span className="text-muted"> · {whenOf(fm).duration}</span>}
-        </>
-      ),
-      edit: <StoryTimeFields when={when} duration={str(fm.duration)} edit={edit} novel={novel} />,
-    },
-    {
-      key: "plotlines",
-      label: "Plotlines",
-      filled: list("plotlines").length > 0,
-      view: list("plotlines").map((p, i) => {
-        const item: Record<string, unknown> = typeof p === "string" ? {} : p;
-        return (
-          <span key={`${refId(p)}-${i}`}>
-            {i > 0 && ", "}
-            {link(refId(p))} <span className="text-muted">({item.weight === "minor" ? "minor" : "major"}){str(item.beat) && ` “${str(item.beat)}”`}</span>
-          </span>
-        );
-      }),
-      edit: (
-        <Group label="Plotlines">
-          <ul className="grid gap-2">
-            {list("plotlines").map((p, i) => {
-              const label = name(refId(p));
-              const item: Record<string, unknown> = typeof p === "string" ? {} : p;
-              return (
-                <li key={`${refId(p)}-${i}`} className="grid gap-1.5 rounded-md border border-rule p-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-medium">{label}</span>
-                    <RemoveButton label={label} onClick={() => removeAt("plotlines", i)} />
-                  </div>
-                  <SelectField
-                    label={`Weight of “${label}”`}
-                    value={item.weight === "minor" ? "minor" : "major"}
-                    options={[
-                      ["major", "major"],
-                      ["minor", "minor"],
-                    ]}
-                    onChange={(v) => setField("plotlines", i, "weight", v)}
-                  />
-                  <TextField label={`Beat of “${label}”`} value={str(item.beat)} onSave={(v) => setField("plotlines", i, "beat", v)} />
-                </li>
-              );
-            })}
-          </ul>
-          {pickerFor("plotlines", "Plotlines", "plotline", list("plotlines").map(refId), (v) => append("plotlines", v))}
-        </Group>
-      ),
-    },
-    ...customTypes.map((t) => {
-      const chosen = ofCustom(t.key);
-      const label = plural(t.label);
-      return {
-        key: `type:${t.key}`,
-        label,
-        filled: chosen.length > 0,
-        view: names(chosen.map((c) => c.id)),
-        edit: (
-          <Group label={label}>
-            <Chips items={chosen.map(({ id, i }) => ({ id, label: name(id), remove: () => removeAt("entities", i) }))} />
-            {pickerFor(`type:${t.key}`, label, t.key, chosen.map((c) => c.id), (v) => append("entities", v))}
-          </Group>
-        ),
-      };
-    }),
-    {
-      key: "themes",
-      label: "Themes",
-      filled: list("themes").length > 0,
-      view: list("themes").map((t, i) => {
-        const item: Record<string, unknown> = typeof t === "string" ? {} : t;
-        return (
-          <span key={`${refId(t)}-${i}`}>
-            {i > 0 && ", "}
-            {link(refId(t))}
-            {item.strength !== undefined && <span className="text-muted"> ({STRENGTH[String(item.strength)] ?? String(item.strength)})</span>}
-          </span>
-        );
-      }),
-      edit: (
-        <Group label="Themes">
-          <ul className="grid gap-2">
-            {list("themes").map((t, i) => {
-              const label = name(refId(t));
-              const item: Record<string, unknown> = typeof t === "string" ? {} : t;
-              return (
-                <li key={`${refId(t)}-${i}`} className="flex items-end gap-2 rounded-md border border-rule p-2">
-                  <span className="flex-1 self-center font-medium">{label}</span>
-                  <SelectField
-                    label={`Strength of “${label}”`}
-                    value={item.strength === undefined ? "" : String(item.strength)}
-                    options={[
-                      ["", "—"],
-                      ["1", "1 (faint)"],
-                      ["2", "2"],
-                      ["3", "3 (strong)"],
-                    ]}
-                    onChange={(v) => setField("themes", i, "strength", v ? Number(v) : undefined)}
-                  />
-                  <RemoveButton label={label} onClick={() => removeAt("themes", i)} />
-                </li>
-              );
-            })}
-          </ul>
-          {pickerFor("themes", "Themes", "theme", list("themes").map(refId), (v) => append("themes", v))}
-        </Group>
-      ),
-    },
+      },
+    ];
+  };
+  const rows: Row[] = [
+    ...novel.kind.fields.flatMap(fieldRows),
     {
       key: "tags",
       label: "Tags",
@@ -598,12 +600,15 @@ export function StoryTimeFields({
   duration,
   edit,
   novel,
+  keys = { when: "when", duration: "duration" },
 }: {
   when: { at?: string; day?: number; time?: string } | undefined;
   duration: string;
   edit: (edits: YamlEdit[]) => void;
   /** The book, for when Day 1 is: a day changed to a date offers to date Day 1 from it (heffrey78/gh-writer#239). */
   novel?: Book;
+  /** The front-matter keys of the time and how long it lasts (a story-time field's). */
+  keys?: { when: string; duration: string };
 }) {
   const whenKind = when?.at !== undefined ? "date" : when?.day !== undefined ? "day" : "";
   const set = (key: string, value: unknown) => edit([value === undefined || value === "" ? { path: [key], remove: true } : { path: [key], value }]);
@@ -621,7 +626,7 @@ export function StoryTimeFields({
         ]}
         onChange={(v) => {
           setWasDay(whenKind === "day" && v === "date" ? when?.day : undefined);
-          set("when", v === "day" ? { day: 1 } : v === "date" ? { at: new Date().toISOString().slice(0, 10) } : undefined);
+          set(keys.when, v === "day" ? { day: 1 } : v === "date" ? { at: new Date().toISOString().slice(0, 10) } : undefined);
         }}
       />
       {whenKind === "day" && (
@@ -631,14 +636,14 @@ export function StoryTimeFields({
             inputMode="numeric"
             value={String(when?.day ?? "")}
             check={(v) => /^-?\d+$/.test(v) || "A whole number"}
-            onSave={(v) => edit([{ path: ["when", "day"], value: Number(v) }])}
+            onSave={(v) => edit([{ path: [keys.when, "day"], value: Number(v) }])}
           />
           <TextField
             label="Time"
             placeholder="HH:MM"
             value={str(when?.time)}
             check={(v) => !v || TIME.test(v) || "Like 18:30"}
-            onSave={(v) => edit([v ? { path: ["when", "time"], value: v } : { path: ["when", "time"], remove: true }])}
+            onSave={(v) => edit([v ? { path: [keys.when, "time"], value: v } : { path: [keys.when, "time"], remove: true }])}
           />
         </div>
       )}
@@ -648,7 +653,7 @@ export function StoryTimeFields({
           placeholder="YYYY-MM-DD"
           value={str(when?.at)}
           check={(v) => AT.test(v) || "Like 1912-04-14 or 1912-04-14T23:40"}
-          onSave={(v) => edit([{ path: ["when", "at"], value: v }])}
+          onSave={(v) => edit([{ path: [keys.when, "at"], value: v }])}
         />
       )}
       {novel && !novel.config?.calendar?.start && wasDay !== undefined && whenKind === "date" && when?.at && AT.test(when.at) && (
@@ -660,7 +665,7 @@ export function StoryTimeFields({
         hint="Like PT45M (45 minutes) or P2D (two days)."
         value={duration}
         check={(v) => !v || DURATION.test(v) || "Like PT45M or P2D"}
-        onSave={(v) => set("duration", v)}
+        onSave={(v) => set(keys.duration, v)}
       />
     </Group>
   );
@@ -700,7 +705,6 @@ function DateDayOne({ day, date, onDone }: { day: number; date: string; onDone: 
 
 const words = new Intl.NumberFormat();
 
-const STRENGTH: Record<string, string> = { "1": "faint", "2": "medium", "3": "strong" };
 
 /** PT1H30M as "1 h 30 min", P2D as "2 days": an ISO 8601 duration read aloud, or as written if it isn't one. */
 export function readableDuration(iso: string): string {
