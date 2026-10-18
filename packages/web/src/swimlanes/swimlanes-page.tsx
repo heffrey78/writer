@@ -53,12 +53,12 @@ export function SwimlanesPage({ novelId, novel, workspace }: { novelId: string; 
   // By IDs, not positions: the lanes and columns can change (an edit, a reorder) under them.
   const [editing, setEditing] = useState<{ lane: string; scene: string; el: HTMLElement }>();
 
-  /** The threshold shown becomes the novel's own, in novel.yaml (committed with the next autosave). */
+  /** The threshold shown becomes the novel's own, in its manifest (committed with the next autosave). */
   const saveDefault = async () => {
     try {
       for (let attempt = 0; attempt < 2; attempt++) {
-        const { content, hash } = await api.readFile(novelId, "novel.yaml");
-        const result = await api.writeFile(novelId, "novel.yaml", editYaml(content, [{ path: ["plotline_gap"], value: threshold }]), hash);
+        const { content, hash } = await api.readFile(novelId, novel.manifest);
+        const result = await api.writeFile(novelId, novel.manifest, editYaml(content, [{ path: ["plotline_gap"], value: threshold }]), hash);
         if (result.ok) break;
       }
       await queryClient.invalidateQueries({ queryKey: keys.novel(novelId) });

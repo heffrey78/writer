@@ -1,6 +1,7 @@
+import { readFileSync } from "node:fs";
 import { readdir, readFile, unlink } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
-import { kindByKey, loadBook, parseYaml, picturePath, pictures, SCHEMA_VERSION, slugify, uniqueFileName, V2_KIND, type BookKind, type FileSource, type Book } from "@writer/core";
+import { EVENT_FILES_FORMAT, kindByKey, knownKind, loadBook, MANIFEST, parseYaml, picturePath, pictures, readManifest, SCHEMA_VERSION, slugify, uniqueFileName, V2_KIND, type BookKind, type FileSource, type Book } from "@writer/core";
 import { nodeSource } from "@writer/core/node";
 import { watch, type FSWatcher } from "chokidar";
 import { BibleOperations } from "./bible.ts";
@@ -170,23 +171,37 @@ export class NovelWorkspace {
   }
 
   /**
-   * The format the novel is in (novel.yaml's schema_version), when it's newer than this server reads:
-   * nothing may be written to it then, lest it be written as an older format (D11). Undefined otherwise.
+   * Why this server mustn't write to the book, if it mustn't: a format newer than it reads, or a kind
+   * of book it doesn't ship. Written by it, the book would be written wrong (D11, D15). Undefined otherwise.
    */
-  async tooNew(): Promise<number | undefined> {
-    const text = await readFile(join(this.root, "novel.yaml"), "utf8").catch(() => undefined);
-    const data = text === undefined ? undefined : parseYaml(text, "novel.yaml").data;
-    const version = typeof data === "object" && data !== null ? (data as Record<string, unknown>)["schema_version"] : undefined;
-    return typeof version === "number" && version > SCHEMA_VERSION ? version : undefined;
+  async tooNew(): Promise<string | undefined> {
+    const manifest = await readManifest(nodeSource(this.root));
+    if (!manifest) return undefined;
+    if (manifest.version > SCHEMA_VERSION) return `This book is in format v${manifest.version}, newer than this copy of Writer reads (v${SCHEMA_VERSION}). Update Writer to change it.`;
+    if (manifest.file !== MANIFEST && manifest.version > EVENT_FILES_FORMAT) return `This book's ${manifest.file} says format v${manifest.version}, which keeps a book's settings in ${MANIFEST}. Fix that to change it.`;
+    if (manifest.file === MANIFEST && (manifest.kind === undefined || !knownKind(manifest.kind))) return `This is a book of a kind this copy of Writer doesn't know (“${manifest.kind ?? "none named"}”). Update Writer to change it.`;
+    return undefined;
   }
 
   /**
    * The story model, with the hash of every file it was read from (the bases for writes), and a
    * version of each picture it shows from images/ (its size and time), so a replaced one is fetched anew.
    */
-  /** The book's kind, without reading the book. Format v2 has no `kind`: every book in it is a novel. */
+  /**
+   * The book's kind, from its manifest alone, without reading the rest: book.yaml's `kind`, or a novel
+   * for a book in format 1 or 2. A kind this build doesn't ship reads as a novel here; nothing is
+   * written to such a book (tooNew).
+   */
   get kind(): BookKind {
-    return kindByKey(V2_KIND);
+    const text = (() => {
+      try {
+        return readFileSync(join(this.root, MANIFEST), "utf8");
+      } catch {
+        return undefined;
+      }
+    })();
+    const key = text === undefined ? undefined : (parseYaml(text, MANIFEST).data as { kind?: unknown } | undefined)?.kind;
+    return (typeof key === "string" ? knownKind(key) : undefined) ?? kindByKey(V2_KIND);
   }
 
   async loadModel(): Promise<{ novel: Book; files: Record<string, string>; images: Record<string, string> }> {

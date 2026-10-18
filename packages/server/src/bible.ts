@@ -4,6 +4,7 @@ import {
   backlinks,
   editFrontMatter,
   editYaml,
+  EVENT_FILES_FORMAT,
   eventFile,
   mentions,
   proseText,
@@ -101,7 +102,6 @@ function checkStyle(style: RelationshipTypeFields["style"]): void {
 }
 
 const RELATIONSHIPS = "bible/relationships.yaml";
-const NOVEL = "novel.yaml";
 
 /**
  * The story bible's changes, each one commit: entities of any type, relationships (including a change
@@ -238,7 +238,7 @@ export class BibleOperations {
       const old = novel.config?.cover;
       const own = this.#ownPicture(novel, old, "novel");
       const cover = await this.#imagePath("cover", checkImage(bytes), own);
-      const writes: FileWrite[] = [{ path: cover, content: bytes }, { path: NOVEL, content: editYaml(await this.#read(NOVEL), [{ path: ["cover"], value: cover }]) }];
+      const writes: FileWrite[] = [{ path: cover, content: bytes }, { path: novel.manifest, content: editYaml(await this.#read(novel.manifest), [{ path: ["cover"], value: cover }]) }];
       if (own && own !== cover) writes.push({ path: own, content: null });
       return { ...(await transaction(this.root, writes, old ? "Change the book's cover" : "Add a cover to the book")), cover };
     });
@@ -250,7 +250,7 @@ export class BibleOperations {
       const old = novel.config?.cover;
       if (!old) return { commit: null, files: [] };
       const own = this.#ownPicture(novel, old, "novel");
-      const writes: FileWrite[] = [{ path: NOVEL, content: editYaml(await this.#read(NOVEL), [{ path: ["cover"], remove: true }]) }, ...(own ? [{ path: own, content: null }] : [])];
+      const writes: FileWrite[] = [{ path: novel.manifest, content: editYaml(await this.#read(novel.manifest), [{ path: ["cover"], remove: true }]) }, ...(own ? [{ path: own, content: null }] : [])];
       return transaction(this.root, writes, "Remove the book's cover");
     });
   }
@@ -519,10 +519,10 @@ export class BibleOperations {
     });
   }
 
-  /** Move the novel to the newest format (D11), on its own, in one commit. */
-  migrate(): Promise<OperationResult & { migrated: boolean }> {
+  /** Move the book to format `to` (the newest by default: D11, D15), on its own, in one commit. */
+  migrate(to?: number): Promise<OperationResult & { migrated: boolean }> {
     return this.#exclusive(async () => {
-      const { migration, result } = await migrateNovel(this.root);
+      const { migration, result } = await migrateNovel(this.root, undefined, to);
       if (migration.status === "refused") throw new OperationError("BAD_REQUEST", migration.reason);
       return { ...(result ?? { commit: null, files: [] }), migrated: migration.status === "migrate" };
     });
@@ -538,7 +538,8 @@ export class BibleOperations {
     fn: (novel: Book, read: (path: string) => Promise<string | undefined>, migrated: ReadonlySet<string>) => Promise<{ writes: FileWrite[]; message: string; extra: T }>,
   ): Promise<OperationResult & T> {
     return this.#exclusive(async () => {
-      const { migration, writes: moved } = await migrationWrites(this.root);
+      // An event change needs events as files (format 2), and no more: the book doesn't move to book.yaml for it.
+      const { migration, writes: moved } = await migrationWrites(this.root, undefined, EVENT_FILES_FORMAT);
       if (migration.status === "refused") throw new OperationError("BAD_REQUEST", migration.reason);
       if (migration.status === "migrate" && !migrate) {
         throw new OperationError("NEEDS_MIGRATION", `Off-page events are kept differently in format v${migration.to}: the novel must move to it first.`, { from: migration.from, to: migration.to });
@@ -594,8 +595,8 @@ export class BibleOperations {
       for (const [k, v] of Object.entries(changes)) if (v !== undefined) (v === null ? delete current[k] : (current[k] = v));
       // An empty target goes altogether, rather than leaving `target: {}`.
       const edits = Object.keys(current).length ? editsAt(["target"], changes as Record<string, unknown>) : [{ path: ["target"], remove: true as const }];
-      const content = editYaml(await this.#read(NOVEL), edits.filter((e) => !("value" in e) || e.value !== undefined));
-      return transaction(this.root, [{ path: NOVEL, content }], "Set the book's targets");
+      const content = editYaml(await this.#read(novel.manifest), edits.filter((e) => !("value" in e) || e.value !== undefined));
+      return transaction(this.root, [{ path: novel.manifest, content }], "Set the book's targets");
     });
   }
 
@@ -604,10 +605,10 @@ export class BibleOperations {
    * the day before). null removes it, and the calendar with it. One commit.
    */
   updateCalendar(start: string | null): Promise<OperationResult> {
-    return this.#run(async () => {
+    return this.#run(async (novel) => {
       if (start !== null && !(typeof start === "string" && /^\d{4}-\d{2}-\d{2}$/.test(start) && !Number.isNaN(Date.parse(`${start}T00:00:00Z`)))) throw new OperationError("BAD_REQUEST", "Day 1 is a date, YYYY-MM-DD.");
-      const content = editYaml(await this.#read(NOVEL), [start === null ? { path: ["calendar"], remove: true } : { path: ["calendar", "start"], value: start }]);
-      return transaction(this.root, [{ path: NOVEL, content }], start === null ? "Day 1 has no date" : "Set when Day 1 is");
+      const content = editYaml(await this.#read(novel.manifest), [start === null ? { path: ["calendar"], remove: true } : { path: ["calendar", "start"], value: start }]);
+      return transaction(this.root, [{ path: novel.manifest, content }], start === null ? "Day 1 has no date" : "Set when Day 1 is");
     });
   }
 
@@ -623,8 +624,8 @@ export class BibleOperations {
       }
       const folder = fields.folder ?? `${key}s`;
       const def = clean({ key, prefix: fields.prefix, folder, label: required(fields.label, "label"), color: fields.color });
-      const content = await this.#appendToList(NOVEL, "entity_types", def);
-      return transaction(this.root, [{ path: NOVEL, content }], `Bible: add the ${fields.label} type`);
+      const content = await this.#appendToList(novel.manifest, "entity_types", def);
+      return transaction(this.root, [{ path: novel.manifest, content }], `Bible: add the ${fields.label} type`);
     });
   }
 
@@ -634,8 +635,8 @@ export class BibleOperations {
       const custom = (novel.config?.entity_types ?? []) as { key: string }[];
       const index = custom.findIndex((t) => t.key === key);
       if (index < 0) throw new OperationError("NOT_FOUND", `No custom entity type “${key}”.`);
-      const content = editYaml(await this.#read(NOVEL), editsAt(["entity_types", index], changes));
-      return transaction(this.root, [{ path: NOVEL, content }], `Bible: edit the ${key} type`);
+      const content = editYaml(await this.#read(novel.manifest), editsAt(["entity_types", index], changes));
+      return transaction(this.root, [{ path: novel.manifest, content }], `Bible: edit the ${key} type`);
     });
   }
 
@@ -650,8 +651,8 @@ export class BibleOperations {
       checkStyle(fields.style);
       // Its own colour from the start, the first no type uses, so adding a type never repaints the others.
       const style = { color: fields.style?.color ?? nextSeriesSlot(novel), line: fields.style?.line ?? "solid" };
-      const content = await this.#appendToList(NOVEL, "relationship_types", clean({ ...fields, label: required(fields.label, "label"), style }));
-      return transaction(this.root, [{ path: NOVEL, content }], `Bible: add the “${fields.label}” relationship`);
+      const content = await this.#appendToList(novel.manifest, "relationship_types", clean({ ...fields, label: required(fields.label, "label"), style }));
+      return transaction(this.root, [{ path: novel.manifest, content }], `Bible: add the “${fields.label}” relationship`);
     });
   }
 
@@ -663,8 +664,8 @@ export class BibleOperations {
       checkStyle(style);
       // The style's own lines, so the rest of the type is left as written.
       const styleEdits = Object.entries(style ?? {}).map(([k, value]) => ({ path: ["relationship_types", index, "style", k], value }));
-      const content = editYaml(await this.#read(NOVEL), [...editsAt(["relationship_types", index], rest), ...styleEdits]);
-      return transaction(this.root, [{ path: NOVEL, content }], `Bible: edit the “${key}” relationship`);
+      const content = editYaml(await this.#read(novel.manifest), [...editsAt(["relationship_types", index], rest), ...styleEdits]);
+      return transaction(this.root, [{ path: novel.manifest, content }], `Bible: edit the “${key}” relationship`);
     });
   }
 

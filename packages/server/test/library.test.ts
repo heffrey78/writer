@@ -57,6 +57,29 @@ describe("Library.add", () => {
     await expect(library.add(dir)).rejects.toMatchObject({ code: "NOT_A_REPO" });
   });
 
+  it("adds a book in format 3, from its book.yaml (D15)", async () => {
+    const library = await openLibrary();
+    const dir = novelRepo();
+    writeFileSync(join(dir, "book.yaml"), readFileSync(join(dir, "novel.yaml"), "utf8").replace("schema_version: 2", "schema_version: 3\nkind: novel"));
+    rmSync(join(dir, "novel.yaml"));
+    expect(await library.add(dir)).toMatchObject({ title: "The Bridge at Varn" });
+  });
+
+  it("offers the books in gh-writer's library that aren't here, and brings them in as they are (#2)", async () => {
+    const library = await openLibrary();
+    const [theirs, both] = [novelRepo(), novelRepo()];
+    await library.add(both);
+    const ghWriter = fresh("gh-writer-config");
+    mkdirSync(ghWriter, { recursive: true });
+    const gone = join(tmp, "a-novel-since-deleted");
+    writeFileSync(join(ghWriter, "library.json"), JSON.stringify({ version: 1, novels: [{ path: theirs, title: "Theirs" }, { path: both, title: "Both" }, { path: gone, title: "Gone" }] }));
+    expect(await library.ghWriterBooks(ghWriter)).toEqual([{ path: theirs, title: "The Bridge at Varn" }]);
+    const { added, failed } = await library.importGhWriter(ghWriter);
+    expect([added.map((n) => n.path), failed]).toEqual([[theirs], []]);
+    expect(await library.ghWriterBooks(ghWriter)).toEqual([]);
+    expect(await library.ghWriterBooks(fresh("no-gh-writer"))).toEqual([]);
+  });
+
   it("rejects a git repository without novel.yaml", async () => {
     const library = await openLibrary();
     const dir = novelRepo();

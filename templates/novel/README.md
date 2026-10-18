@@ -6,7 +6,7 @@ This novel uses the [Writer](https://github.com/heffrey78/writer) format: plain 
 
 | Path | What it holds |
 |---|---|
-| `novel.yaml` | Title, author, word target, and the kinds of relationships your story uses. |
+| `novel.yaml` | Title, author, word target, and the kinds of relationships your story uses. Writer can move it to `book.yaml`, which also says what kind of book this is (format 3). |
 | `dictionary.txt` | Words the spell checker should accept: invented words, dialect. Character and place names are known already. |
 | `manuscript/` | The book. Each chapter is a folder with a `_chapter.yaml`; each scene is a `.md` file inside it. Add part folders with a `_part.yaml` if your book has parts. |
 | `manuscript/_order.yaml`, `_part.yaml`, `_chapter.yaml` | **Reading order.** Moving a scene means moving its ID in these lists. The `01-` numbers in file names are just for tidy browsing. |
@@ -42,4 +42,4 @@ Every push that changes the story also runs the **Diagrams** workflow, which red
 
 The **Compile** workflow makes the manuscript into a Word file in standard manuscript format, an EPUB e-book and a PDF. It runs for every named checkpoint you make in the Writer app, attaching the files to a Release named after it (under Releases on the repository page), and on demand from the Actions tab (choose a preset and a range of chapters; the files are kept with the run). Presets live in `compile.yaml`. To compile locally: `node .github/gh-writer/compile.mjs` (files go to `compiled/`).
 
-The full format is specified in [docs/format/v2.md](https://github.com/heffrey78/writer/blob/main/docs/format/v2.md).
+The full format is specified in [docs/format/v3.md](https://github.com/heffrey78/writer/blob/main/docs/format/v3.md).

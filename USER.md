@@ -131,7 +131,7 @@ Each has an **Export** button for SVG; the relationships and the timeline also e
 - **Length of the book** over time, toward the target.
 - **Chapters and their scenes**: each chapter's length divided into its scenes, with the ones unusually long or short named (over half again the median, or under half of it), to spot an unbalanced stretch.
 
-Set the **target length**, the **date** to reach it by and your **words a day** at the bottom of the page; they're kept with the book in `novel.yaml`. Each chart has *As a table* for the same numbers, and the arrow keys read it day by day (or scene by scene).
+Set the **target length**, the **date** to reach it by and your **words a day** at the bottom of the page; they're kept with the book in its settings file (`novel.yaml`, or `book.yaml` once it's in the new format). Each chart has *As a table* for the same numbers, and the arrow keys read it day by day (or scene by scene).
 
 ![Progress: the book against its target, today's words and streak, and the words per day](docs/screenshots/progress.png)
 
@@ -210,11 +210,11 @@ Issues are for the work around the book: plot holes, continuity errors, research
 - **E-book (EPUB)** for readers and e-readers.
 - **PDF**, laid out like the Word file.
 
-A scene's headings, lists, tables and pictures come out as themselves in all three, set beneath the chapter's heading. Compile the whole book or a range of chapters. Anything you've just typed is saved first. The **Cover** row shows the book's cover, if it has one, with *Change…* and *Remove* (or *Add a cover…*): it's the e-book's cover and the PDF's first page, and Word manuscripts go out without one, as agents expect. Presets in a `compile.yaml` file in the novel set the title page details, chapter headings ("Chapter Four: The Flood", or just the number or title), the scene break marker, and front and back matter such as a dedication; see the [format spec](docs/format/v2.md#compileyaml).
+A scene's headings, lists, tables and pictures come out as themselves in all three, set beneath the chapter's heading. Compile the whole book or a range of chapters. Anything you've just typed is saved first. The **Cover** row shows the book's cover, if it has one, with *Change…* and *Remove* (or *Add a cover…*): it's the e-book's cover and the PDF's first page, and Word manuscripts go out without one, as agents expect. Presets in a `compile.yaml` file in the novel set the title page details, chapter headings ("Chapter Four: The Flood", or just the number or title), the scene break marker, and front and back matter such as a dedication; see the [format spec](docs/format/v3.md#compileyaml).
 
 **On GitHub**, every named checkpoint you make becomes a Release of the novel's repository with the three files attached, and *Actions → Compile → Run workflow* compiles on demand. The files are identical to the app's for the same saved version.
 
-> **A novel started before compiling existed** doesn't have the Compile workflow yet. [Upgrading a novel's tools](docs/format/v2.md#upgrading-a-novels-tools) says which files to copy in from the template.
+> **A novel started before compiling existed** doesn't have the Compile workflow yet. [Upgrading a novel's tools](docs/format/v3.md#upgrading-a-novels-tools) says which files to copy in from the template.
 
 ![The Compile dialog](docs/screenshots/compile.png)
 
@@ -229,7 +229,7 @@ Everything is reachable from the keyboard. **Ctrl+K** opens the command palette,
 A novel is a folder of plain files you can read and edit anywhere: on github.com, in a text editor, or by hand.
 
 ```
-novel.yaml           title, author, word target, kinds of relationship
+novel.yaml           title, author, word target, kinds of relationship (book.yaml in format 3)
 compile.yaml         compile presets (optional)
 dictionary.txt       words the spell checker accepts
 manuscript/          parts, chapters (folders) and scenes (Markdown files)
@@ -240,9 +240,9 @@ notes/               your notes, one file each (not part of the story)
 diagrams/            generated diagram snapshots
 ```
 
-Write each paragraph on one line, and don't change the IDs (`char_7f3k2q`). The novel's own README explains more, and the [format spec](docs/format/v2.md) says everything.
+Write each paragraph on one line, and don't change the IDs (`char_7f3k2q`). The novel's own README explains more, and the [format spec](docs/format/v3.md) says everything.
 
-The format has a version, `schema_version` in `novel.yaml`. A newer Writer may move a novel to a newer format (it asks first). An older copy, on another computer say, then won't open the novel: it says to update Writer rather than show it wrongly or save over it. Syncing still works.
+The format has a version, `schema_version` in `novel.yaml` (or, from format 3, `book.yaml`, which also says what kind of book this is). Writer moves a novel to a newer format only once you agree: from format 1 the first time you change an off-page event, and to format 3 when you choose *Move this book to the new format…* in the command palette. An older copy, on another computer say, or gh-writer, then won't open the book: it says to update Writer rather than show it wrongly or save over it. Syncing still works.
 
 ## The command line
 
@@ -254,7 +254,7 @@ From the Writer folder:
 | `npx writer validate [dir]` | Check a novel's files for broken references and other problems |
 | `npx writer snapshots [dir]` | Redraw the diagram snapshots in `diagrams/` |
 | `npx writer compile [dir]` | Compile to `compiled/` in the novel. `--format docx,epub,pdf`, `--preset`, `--from`/`--to` (chapter IDs), `--out` |
-| `npx writer migrate [dir]` | Move a novel to the newest format as one commit, and update its tools in `.github/gh-writer/` ([format spec](docs/format/v2.md#versioning)) |
+| `npx writer migrate [dir]` | Move a novel to the newest format as one commit, and update its tools in `.github/gh-writer/` ([format spec](docs/format/v3.md#versioning)) |
 | `npx writer new-id <prefix>` | A new ID, for editing files by hand |
 
 In a novel's own folder, without Writer installed, the same tools run as `node .github/gh-writer/validate.mjs`, `snapshots.mjs` and `compile.mjs`.

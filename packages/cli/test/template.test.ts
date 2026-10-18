@@ -116,7 +116,7 @@ describe("novel template", () => {
       jobs: { snapshots: { if: string; steps: { run?: string }[] } };
     };
     expect(wf.on.push.branches).toEqual(["main"]);
-    expect(wf.on.push.paths).toEqual(["manuscript/**", "bible/**", "novel.yaml", "diagrams/layouts.yaml"]);
+    expect(wf.on.push.paths).toEqual(["manuscript/**", "bible/**", "book.yaml", "novel.yaml", "diagrams/layouts.yaml"]);
     expect(wf.permissions.contents).toBe("write");
     expect(wf.jobs.snapshots.if).toContain("is_template");
     const runs = wf.jobs.snapshots.steps.map((s) => s.run ?? "");

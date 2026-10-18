@@ -72,6 +72,11 @@ export function registerKind(kind: BookKind): void {
   registry.set(kind.key, kind);
 }
 
+/** A registered kind of book, or undefined for one this build doesn't ship. */
+export function knownKind(key: string): BookKind | undefined {
+  return registry.get(key);
+}
+
 /** A registered kind of book. Throws for one no entry point registered: that's a bug, not a book's fault. */
 export function kindByKey(key: string): BookKind {
   const kind = registry.get(key);

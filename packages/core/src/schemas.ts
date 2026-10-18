@@ -41,6 +41,7 @@ export function schemaFor(name: SchemaKind | string, bookKind: BookKind): object
   const level = bookKind.levels.find((l) => l.key === name);
   if (level) return sectionSchema(bookKind, level);
   if (name === "manuscript-order") return orderSchema(bookKind);
+  if (name === "book") return bookSchema();
   if (name === "scene") return { ...scene, properties: { ...scene.properties, status: { enum: bookKind.statuses.map((s) => s.key) } } };
   return SCHEMAS[name as SchemaKind];
 }
@@ -64,6 +65,17 @@ function sectionSchema(kind: BookKind, level: LevelDef): object {
   };
 }
 
+/** book.yaml (format 3): novel.yaml's settings, and the kind of book it is. */
+function bookSchema(): object {
+  return {
+    ...novel,
+    $id: `${BASE}book.schema.json`,
+    title: "book.yaml",
+    properties: { ...novel.properties, schema_version: { type: "integer", minimum: 3 }, kind: ref("nonEmptyText") },
+    required: [...novel.required, "kind"],
+  };
+}
+
 /** _order.yaml: exactly one list, of the level the book starts at. */
 function orderSchema(kind: BookKind): object {
   const lists = startLevels(kind).map((l) => l.list);
@@ -81,7 +93,7 @@ function orderSchema(kind: BookKind): object {
 }
 
 /** The schemas a book of `bookKind` has: one for each of its kind's levels in place of a novel's part and chapter. */
-const schemaNames = (bookKind: BookKind) => [...(Object.keys(SCHEMAS) as string[]).filter((n) => n !== "part" && n !== "chapter"), ...bookKind.levels.map((l) => l.key)];
+const schemaNames = (bookKind: BookKind) => [...(Object.keys(SCHEMAS) as string[]).filter((n) => n !== "part" && n !== "chapter"), "book", ...bookKind.levels.map((l) => l.key)];
 
 /** The compiled schemas, for each kind of book: one Ajv each, since the schemas share their $ids. */
 const compiled = new Map<string, Map<string, ValidateFunction>>();

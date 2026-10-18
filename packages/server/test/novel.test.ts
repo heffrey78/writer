@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { request as httpRequest } from "node:http";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -117,10 +117,36 @@ describe("a novel in a newer format (D11)", () => {
       ["POST", "/checkpoints", { name: "Before" }],
     ] as const) {
       const r = await api(method, path, body);
-      expect([path, r.status, json(r)]).toEqual([path, 409, { code: "TOO_NEW", error: "This novel is in format v99, newer than this copy of Writer reads (v2). Update Writer to change it." }]);
+      expect([path, r.status, json(r)]).toEqual([path, 409, { code: "TOO_NEW", error: "This book is in format v99, newer than this copy of Writer reads (v3). Update Writer to change it." }]);
     }
     expect(readFileSync(join(root, SCENE), "utf8")).toBe(before);
     expect((await api("POST", "/sync")).status).toBe(200);
+  });
+
+  it("reads a book of a kind this copy doesn't ship as unreadable, and refuses changes with 409 TOO_NEW (D15)", async () => {
+    const config = readFileSync(join(root, "novel.yaml"), "utf8");
+    rmSync(join(root, "novel.yaml"));
+    writeFileSync(join(root, "book.yaml"), config.replace(/^schema_version: \d+/m, "schema_version: 3\nkind: almanac"));
+    const model = json<{ novel: { diagnostics: { code: string }[] } }>(await api("GET", ""));
+    expect(model.novel.diagnostics.map((d) => d.code)).toEqual(["E_UNKNOWN_KIND"]);
+    const r = await api("POST", "/bible/entities", { type: "character", fields: { name: "Zed" } });
+    expect([r.status, json(r)]).toEqual([409, { code: "TOO_NEW", error: "This is a book of a kind this copy of Writer doesn't know (“almanac”). Update Writer to change it." }]);
+  });
+});
+
+describe("a novel in format v3 (D15)", () => {
+  it("reads as it did in format v2, and its settings change in book.yaml", async () => {
+    const config = readFileSync(join(root, "novel.yaml"), "utf8");
+    const v2 = json<{ novel: Record<string, unknown> }>(await api("GET", "")).novel;
+    rmSync(join(root, "novel.yaml"));
+    writeFileSync(join(root, "book.yaml"), config.replace(/^schema_version: \d+/m, "schema_version: 3\nkind: novel"));
+    const v3 = json<{ novel: Record<string, unknown> }>(await api("GET", "")).novel;
+    expect(v3["manifest"]).toBe("book.yaml");
+    expect(v3["diagnostics"]).toEqual([]);
+    expect({ ...v3, manifest: v2["manifest"], config: v2["config"] }).toEqual(v2);
+    expect((await api("PUT", "/target", { words: 120000 })).status).toBe(200);
+    expect(readFileSync(join(root, "book.yaml"), "utf8")).toContain("words: 120000");
+    expect(existsSync(join(root, "novel.yaml"))).toBe(false);
   });
 });
 

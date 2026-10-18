@@ -41,7 +41,7 @@ export async function body(c: Context): Promise<Record<string, unknown>> {
  * POST  /:id/notes/:note/pin                   { scene, pinned }: pinned to the top of the scene's notes (its other unpinned), or not
  * POST  /:id/notes/:note/delete                { base? }
  * POST  /:id/notes/:note/promote               { to: "event" | "scene", chapter?, keep, migrate? } → 201 { id, file }: what it became
- * POST  /:id/migrate                           → { migrated, commit }: the novel in the newest format, one commit (D11)
+ * POST  /:id/migrate                           { to? } → { migrated, commit }: the book in format `to` (the newest by default), one commit (D11, D15)
  * POST  /:id/bible/entity-types                { key, prefix, label, folder?, color? }
  * PATCH /:id/bible/entity-types/:key           { label?, color? }
  * POST  /:id/bible/relationship-types          { key, label, inverse_label?, symmetric?, from_types?, to_types? }
@@ -114,7 +114,10 @@ export function bibleRoutes(routes: Hono<Env>): void {
     const target = to === "scene" ? { to: "scene" as const, chapter: String(chapter ?? "") } : { to: "event" as const };
     return operation(c, () => bible(c).promoteNote(c.req.param("note"), target, { keep: keep === true, migrate: migrate === true }, c.var.ws.manuscript), 201);
   });
-  routes.post("/:id/migrate", async (c) => operation(c, () => bible(c).migrate()));
+  routes.post("/:id/migrate", async (c) => {
+    const { to } = await body(c);
+    return operation(c, () => bible(c).migrate(typeof to === "number" ? to : undefined));
+  });
   routes.post("/:id/bible/relationships/:rel/delete", async (c) => operation(c, () => bible(c).deleteRelationship(c.req.param("rel"))));
   routes.post("/:id/bible/entity-types", async (c) => operation(c, async () => bible(c).createEntityType((await body(c)) as never), 201));
   routes.patch("/:id/bible/entity-types/:key", async (c) => operation(c, async () => bible(c).updateEntityType(c.req.param("key"), (await body(c)) as never)));

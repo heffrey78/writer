@@ -346,7 +346,7 @@ describe("hardWrappedLines", () => {
 
 describe("rule documentation", () => {
   it("documents exactly the codes the validator can emit, with matching severities", () => {
-    const spec = readFileSync(new URL("../../../docs/format/v2.md", import.meta.url), "utf8");
+    const spec = readFileSync(new URL("../../../docs/format/v3.md", import.meta.url), "utf8");
     const documented = Object.fromEntries(
       [...spec.matchAll(/^\| `([EW]_[A-Z_]+)` \|/gm)].map((m) => [m[1]!, m[1]!.startsWith("E_") ? "error" : "warning"]),
     );

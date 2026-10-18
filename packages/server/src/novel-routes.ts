@@ -53,10 +53,8 @@ export function novelRoutes(library: Library, workspaces: Workspaces, github?: G
     c.set("ws", ws);
     // A novel in a newer format is read only: written by this server, it would be written wrong. Syncing may still bring it.
     if (c.req.method !== "GET" && c.req.method !== "HEAD" && !c.req.path.endsWith("/sync")) {
-      const version = await ws.tooNew();
-      if (version !== undefined) {
-        return c.json({ code: "TOO_NEW", error: `This novel is in format v${version}, newer than this copy of Writer reads (v${SCHEMA_VERSION}). Update Writer to change it.` }, 409);
-      }
+      const reason = await ws.tooNew();
+      if (reason !== undefined) return c.json({ code: "TOO_NEW", error: reason }, 409);
     }
     await next();
   });

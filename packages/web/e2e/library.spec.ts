@@ -133,6 +133,24 @@ test("says what to do when GitHub refuses the credentials", async ({ page, app }
   }
 });
 
+test("offers the books in gh-writer's library that aren't on the shelf, and brings them in as they are (#2)", async ({ page, app }) => {
+  const dir = app.novelRepo();
+  const ghWriter = join(app.home, "gh-writer-config");
+  mkdirSync(ghWriter, { recursive: true });
+  writeFileSync(join(ghWriter, "library.json"), JSON.stringify({ version: 1, novels: [{ id: "lib_9h0000", path: dir, title: "Varn", lastOpened: new Date().toISOString() }] }));
+  app.env.WRITER_GH_WRITER_CONFIG_DIR = ghWriter;
+  await app.restart();
+  await launch(page, app);
+  const offer = page.getByRole("region", { name: "Books in gh-writer" });
+  await expect(offer).toContainText("gh-writer has “The Bridge at Varn” that isn't on this shelf.");
+  await axe(page);
+  await offer.getByRole("button", { name: "Bring it in" }).click();
+  await expect(offer.getByRole("status")).toHaveText("Brought in “The Bridge at Varn” from gh-writer.");
+  await expect(novels(page)).toHaveCount(1);
+  await page.reload();
+  await expect(page.getByRole("region", { name: "Books in gh-writer" })).toHaveCount(0);
+});
+
 test("shows a notice for a novel whose folder has gone, and can dismiss it", async ({ page, app }) => {
   mkdirSync(join(app.home, "config"), { recursive: true });
   const gone = join(app.home, "novels", "gone");

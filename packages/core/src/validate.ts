@@ -1,16 +1,18 @@
 import { idPrefix, RECORD_PREFIXES } from "./ids.ts";
 import { loadBook } from "./load.ts";
+import { EVENT_FILES_FORMAT } from "./manifest.ts";
 import { allRecords, levelLabel, mentions, pieceLevel, picturePath, pictures, sectionsAt, type Book, type Picture, type RecordRef } from "./model.ts";
 import type { FileSource } from "./source.ts";
 import { overlaps, storyTimeline, type TimelineItem } from "./time.ts";
 import type { Diagnostic, Severity } from "./types.ts";
 
-/** Every diagnostic code, with its severity. docs/format/v2.md documents each one. */
+/** Every diagnostic code, with its severity. docs/format/v3.md documents each one. */
 export const RULES: Readonly<Record<string, Severity>> = {
   E_MISSING_FILE: "error",
   E_PARSE: "error",
   E_SCHEMA: "error",
   E_SCHEMA_VERSION: "error",
+  E_UNKNOWN_KIND: "error",
   E_ENTITY_TYPE: "error",
   E_UNKNOWN_FOLDER: "error",
   E_DUPLICATE_ID: "error",
@@ -57,7 +59,7 @@ const MENTIONABLE = ["*entity", "event"];
 
 /** Cross-reference checks and advisory warnings on a loaded novel. */
 export function validateBook(novel: Book): Diagnostic[] {
-  if (novel.diagnostics.some((d) => d.code === "E_SCHEMA_VERSION")) return [];
+  if (unreadable(novel)) return [];
   const out: Diagnostic[] = [];
   const push = (severity: Severity, code: string, file: string, message: string, extra: Partial<Diagnostic> = {}) =>
     out.push({ severity, code, file, message, ...extra });
@@ -158,7 +160,7 @@ export function validateBook(novel: Book): Diagnostic[] {
     for (const m of mentions(n.body)) ref(m.id, MENTIONABLE, n.file, "", `Mention "${m.text}"`, n.bodyLine + m.line - 1);
     for (const pic of pictures(n.body)) outsideImages(pic, n.file, n.bodyLine);
   }
-  if ((novel.config?.schema_version ?? 1) >= 2) {
+  if ((novel.config?.schema_version ?? 1) >= EVENT_FILES_FORMAT) {
     const leftover = novel.events.find((e) => e.index !== undefined);
     if (leftover) push("warning", "W_EVENTS_YAML", leftover.file, "Events in bible/events.yaml are format v1's: run writer migrate to give each its own file in bible/events/");
   }
@@ -166,10 +168,10 @@ export function validateBook(novel: Book): Diagnostic[] {
   // Relationship types.
   const relTypes = new Map<string, (typeof novel.relationshipTypes)[number]>();
   novel.relationshipTypes.forEach((t, i) => {
-    if (relTypes.has(t.key)) push("error", "E_SCHEMA", "novel.yaml", `Relationship type "${t.key}" is defined twice`, { pointer: `/relationship_types/${i}` });
+    if (relTypes.has(t.key)) push("error", "E_SCHEMA", novel.manifest, `Relationship type "${t.key}" is defined twice`, { pointer: `/relationship_types/${i}` });
     else relTypes.set(t.key, t);
     for (const k of [...(t.from_types ?? []), ...(t.to_types ?? [])]) {
-      if (!typeByKey.has(k)) push("error", "E_ENTITY_TYPE", "novel.yaml", `Relationship type "${t.key}" refers to unknown entity type "${k}"`, { pointer: `/relationship_types/${i}` });
+      if (!typeByKey.has(k)) push("error", "E_ENTITY_TYPE", novel.manifest, `Relationship type "${t.key}" refers to unknown entity type "${k}"`, { pointer: `/relationship_types/${i}` });
     }
   });
 
@@ -204,7 +206,7 @@ export function validateBook(novel: Book): Diagnostic[] {
 
     const type = relTypes.get(r.type);
     if (!type) {
-      push("error", "E_UNKNOWN_REL_TYPE", r.file, `Relationship type "${r.type}" is not defined in novel.yaml`, { pointer: `${p}/type` });
+      push("error", "E_UNKNOWN_REL_TYPE", r.file, `Relationship type "${r.type}" is not defined in ${novel.manifest}`, { pointer: `${p}/type` });
     } else {
       for (const [end, allowed] of [["from", type.from_types], ["to", type.to_types]] as const) {
         const target = index.get(r[end]);
@@ -250,7 +252,7 @@ export function validateBook(novel: Book): Diagnostic[] {
  * their folders rather than reading them: images can be large, and aren't text.
  */
 async function missingImages(novel: Book, source: FileSource): Promise<Diagnostic[]> {
-  if (novel.diagnostics.some((d) => d.code === "E_SCHEMA_VERSION")) return [];
+  if (unreadable(novel)) return [];
   const listings = new Map<string, Promise<Set<string>>>();
   const exists = (path: string) => {
     const slash = path.lastIndexOf("/");
@@ -265,7 +267,7 @@ async function missingImages(novel: Book, source: FileSource): Promise<Diagnosti
       return path ? [{ path, file, line: bodyLine + p.line - 1, what: `The picture “${p.alt || path}”` }] : [];
     });
   const wanted: { path: string; file: string; pointer?: string; line?: number; what: string }[] = [
-    ...(novel.config?.cover ? [{ path: novel.config.cover, file: "novel.yaml", pointer: "/cover", what: "The cover" }] : []),
+    ...(novel.config?.cover ? [{ path: novel.config.cover, file: novel.manifest, pointer: "/cover", what: "The cover" }] : []),
     ...novel.entities.flatMap((e) => (e.image ? [{ path: e.image, file: e.file, pointer: "/image", what: `${e.name}'s picture` }] : [])),
     ...novel.allPieces.flatMap((s) => inProse(s.body, s.file, s.bodyLine)),
     ...novel.entities.flatMap((e) => inProse(e.body, e.file, e.bodyLine)),
@@ -327,4 +329,9 @@ export function sortDiagnostics(ds: Diagnostic[]): Diagnostic[] {
     (a.severity === b.severity ? 0 : a.severity === "error" ? -1 : 1) ||
     (a.line ?? 0) - (b.line ?? 0) ||
     (a.pointer ?? "").localeCompare(b.pointer ?? ""));
+}
+
+/** Whether a book couldn't be read at all: a format newer than this build's, or a kind it doesn't ship. */
+export function unreadable(book: Book): boolean {
+  return book.diagnostics.some((d) => d.code === "E_SCHEMA_VERSION" || d.code === "E_UNKNOWN_KIND");
 }

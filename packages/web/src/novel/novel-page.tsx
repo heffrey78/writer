@@ -1,5 +1,5 @@
 import type { SyncStatus } from "@writer/client";
-import { pieceLevel, pieceSections, sectionById, type Book } from "@writer/core";
+import { pieceLevel, pieceSections, sectionById, unreadable, type Book } from "@writer/core";
 import { writingModes } from "@writer/editor";
 import { useWritingModes } from "@writer/editor/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -18,6 +18,7 @@ import { useNewEvent } from "../events/new-event.tsx";
 import { useNewNote } from "../notes/new-note.tsx";
 import { NotesPage } from "../notes/notes-page.tsx";
 import { NotesLeftDialog } from "../notes/notes-left.tsx";
+import { useNewFormat } from "../events/format-move.tsx";
 import { BookKindContext } from "./kind.ts";
 import { EntryOver, EventOver, NoteOver } from "./item-modals.tsx";
 import { cn } from "../ui/cn.ts";
@@ -169,9 +170,11 @@ export function NovelPage() {
   const conflict = sync.data?.state === "conflict";
   const versions = useVersions(novelId);
   const switchVersion = useSwitchVersion(novelId, workspace);
+  const newFormat = useNewFormat(novelId, model);
   useCommands(
     (): Command[] => [
       { id: "novel.syncNow", title: "Sync now", group: "Sync", run: () => syncNow.mutate() },
+      ...newFormat.commands,
       ...(conflict ? [{ id: "novel.resolve", title: "Resolve sync conflicts", group: "Sync", run: () => setResolving(true) }] : []),
       { id: "novel.drafts", title: "Drafts: versions and checkpoints", group: "Drafts", keywords: ["alternate", "ending", "try", "history", "restore"], run: () => useDrafts.getState().set(true) },
       { id: "novel.checkpoints", title: "Checkpoints: make or restore one", group: "Drafts", run: () => useDrafts.getState().set(true) },
@@ -218,7 +221,7 @@ export function NovelPage() {
         }),
       ]),
     ],
-    [model, conflict, novelId, navigate, repo, versions.data, switchVersion.mutate],
+    [model, conflict, novelId, navigate, repo, versions.data, switchVersion.mutate, newFormat.commands.length],
   );
 
   const heading = workspace && novel.data && (
@@ -273,10 +276,10 @@ export function NovelPage() {
   }
 
   const book = novel.data.novel;
-  if (book.diagnostics.some((d) => d.code === "E_SCHEMA_VERSION")) {
+  if (unreadable(book)) {
     return (
       <Shell heading={heading} actions={actions} title={book.config?.title ?? "Untitled"}>
-        <TooNew />
+        <TooNew kind={book.diagnostics.some((d) => d.code === "E_UNKNOWN_KIND")} />
       </Shell>
     );
   }
@@ -331,6 +334,7 @@ export function NovelPage() {
         <SaveConflicts novel={book} workspace={workspace} />
         <NoticeBar />
         <NotesLeftDialog />
+        {newFormat.dialog}
       </Shell>
     </BookKindContext.Provider>
   );
@@ -379,12 +383,15 @@ function Missing({ what }: { what: string }) {
 const LATEST_RELEASE = "https://github.com/heffrey78/writer/releases/latest";
 
 /** A novel in a newer format than this copy reads: shown, never written, lest it be written wrong (D11). */
-function TooNew() {
+/** A book this copy can't read: a newer format, or (`kind`) a kind of book it doesn't ship. */
+function TooNew({ kind }: { kind: boolean }) {
   return (
     <div className="mx-auto max-w-xl px-6 py-10">
-      <h1 className="text-2xl font-semibold">This novel needs a newer Writer</h1>
+      <h1 className="text-2xl font-semibold">This {kind ? "book" : "novel"} needs a newer Writer</h1>
       <p className="mt-3">
-        It was saved in a newer format than this copy of Writer can read, probably by a newer copy on another computer. To keep from saving it wrongly, this copy won't open it.
+        {kind
+          ? "It's a kind of book this copy of Writer doesn't know, probably made by a newer copy on another computer. To keep from saving it wrongly, this copy won't open it."
+          : "It was saved in a newer format than this copy of Writer can read, probably by a newer copy on another computer. To keep from saving it wrongly, this copy won't open it."}
       </p>
       <p className="mt-3">
         <a href={LATEST_RELEASE} target="_blank" rel="noreferrer" className="text-accent underline">

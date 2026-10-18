@@ -1,28 +1,31 @@
 import { reservedPrefixes, type EntityTypeDef } from "./ids.ts";
-import { kindByKey, startLevels, V2_KIND, type BookKind, type LevelDef } from "./kinds.ts";
+import { kindByKey, knownKind, startLevels, V2_KIND, type BookKind, type LevelDef } from "./kinds.ts";
+import { EVENT_FILES_FORMAT, MANIFEST, NOVEL_MANIFEST, readManifest, SCHEMA_VERSION } from "./manifest.ts";
 import type { Section, Entity, Book, PlotlineRef, Relationship, Piece, StoryEvent, ThemeRef } from "./model.ts";
 import { parseMarkdown, parseYaml } from "./parse.ts";
 import { checkSchema, type SchemaKind } from "./schemas.ts";
 import { joinPath, type FileSource } from "./source.ts";
 import type { CompileFile, Diagnostic, NovelFile, RelationshipTypeFile, PieceStatus, StoryTime } from "./types.ts";
 
-/** Highest novel repository schema version this build understands. */
-export const SCHEMA_VERSION = 2;
-
 /**
- * Load a book's repository into a story model, read as a book of `bookKind`: a novel by default, as
- * every book in format v2 is.
+ * Load a book's repository into a story model, as the kind of book its manifest names (D15): book.yaml's
+ * `kind`, or a novel for a book in format 1 or 2 (novel.yaml). `kind` reads it as another kind (tests).
  *
  * Loading never throws on bad content: parse, schema and structure problems are
  * collected in `novel.diagnostics`, and the model holds whatever could be read.
  * Cross-reference checks are done separately by `validateBook`.
  */
-export async function loadBook(source: FileSource, bookKind: BookKind = kindByKey(V2_KIND)): Promise<Book> {
+export async function loadBook(source: FileSource, kind?: BookKind): Promise<Book> {
   const diagnostics: Diagnostic[] = [];
+  const manifest = await readManifest(source);
+  const file = manifest?.file ?? NOVEL_MANIFEST;
+  const named = manifest?.kind === undefined ? undefined : knownKind(manifest.kind);
+  const bookKind = kind ?? named ?? kindByKey(V2_KIND);
   const { content, codex, notes: notesFolder, events: eventsFolder } = bookKind.folders;
   const order = `${content}/_order.yaml`;
   const novel: Book = {
     kind: bookKind,
+    manifest: file,
     config: undefined,
     entityTypes: [...bookKind.entityTypes],
     relationshipTypes: [],
@@ -58,22 +61,25 @@ export async function loadBook(source: FileSource, bookKind: BookKind = kindByKe
     return { data: isObject(parsed.data) ? parsed.data : {}, body: parsed.body, bodyLine: parsed.bodyLine };
   }
 
-  // novel.yaml
-  const config = await yamlFile("novel.yaml", "novel");
+  // The manifest: don't guess at a newer format, or at a kind this build doesn't ship. Report only that.
+  if (manifest && manifest.version > (file === MANIFEST ? SCHEMA_VERSION : EVENT_FILES_FORMAT)) {
+    novel.diagnostics = [error("E_SCHEMA_VERSION", file, manifest.version > SCHEMA_VERSION
+      ? `schema_version ${manifest.version} is newer than this validator supports (${SCHEMA_VERSION}); update Writer`
+      : `schema_version ${manifest.version} doesn't belong in ${NOVEL_MANIFEST}: format ${manifest.version} keeps a book's settings in ${MANIFEST}`)];
+    return novel;
+  }
+  if (manifest?.file === MANIFEST && !kind && !named) {
+    novel.diagnostics = [error("E_UNKNOWN_KIND", file, manifest.kind === undefined
+      ? `${MANIFEST} doesn't say what kind of book this is (kind)`
+      : `This is a book of a kind this Writer doesn't know (“${manifest.kind}”); update Writer`)];
+    return novel;
+  }
+  const config = await yamlFile(file, file === MANIFEST ? "book" : "novel");
   if (config === undefined) {
-    if ((await source.read("novel.yaml")) === undefined) {
-      diagnostics.push(error("E_MISSING_FILE", "novel.yaml", "novel.yaml is missing"));
-    }
+    if (!manifest) diagnostics.push(error("E_MISSING_FILE", NOVEL_MANIFEST, `${NOVEL_MANIFEST} is missing`));
   } else {
-    const version = config["schema_version"];
-    if (typeof version === "number" && version > SCHEMA_VERSION) {
-      // Don't guess at a newer format: report only this.
-      novel.diagnostics = [error("E_SCHEMA_VERSION", "novel.yaml",
-        `schema_version ${version} is newer than this validator supports (${SCHEMA_VERSION}); update Writer`)];
-      return novel;
-    }
     novel.config = config as unknown as NovelFile;
-    novel.entityTypes = entityTypes(config["entity_types"], diagnostics, bookKind);
+    novel.entityTypes = entityTypes(config["entity_types"], diagnostics, bookKind, file);
     novel.relationshipTypes = objList(config["relationship_types"]).filter((t) => str(t["key"])) as unknown as RelationshipTypeFile[];
   }
 
@@ -390,7 +396,7 @@ export async function loadBook(source: FileSource, bookKind: BookKind = kindByKe
   }
 }
 
-function entityTypes(raw: unknown, diagnostics: Diagnostic[], kind: BookKind): EntityTypeDef[] {
+function entityTypes(raw: unknown, diagnostics: Diagnostic[], kind: BookKind, file: string): EntityTypeDef[] {
   const types = [...kind.entityTypes];
   const reserved = reservedPrefixes(kind);
   objList(raw).forEach((t, i) => {
@@ -401,7 +407,7 @@ function entityTypes(raw: unknown, diagnostics: Diagnostic[], kind: BookKind): E
       reserved.has(prefix) || types.find((x) => x.prefix === prefix) ? `prefix "${prefix}"` :
       folder === kind.folders.events || types.find((x) => x.folder === folder) ? `folder "${folder}"` : undefined;
     if (clash) {
-      diagnostics.push({ ...error("E_ENTITY_TYPE", "novel.yaml", `Entity type ${clash} is reserved or already used`), pointer: `/entity_types/${i}` });
+      diagnostics.push({ ...error("E_ENTITY_TYPE", file, `Entity type ${clash} is reserved or already used`), pointer: `/entity_types/${i}` });
       return;
     }
     types.push({ key, prefix, folder, label: str(t["label"]) ?? key, color: str(t["color"]), builtin: false });

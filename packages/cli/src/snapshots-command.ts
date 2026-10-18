@@ -1,6 +1,6 @@
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
-import { loadBook } from "@writer/core";
+import { loadBook, MANIFEST, NOVEL_MANIFEST, unreadable } from "@writer/core";
 import { nodeSource } from "@writer/core/node";
 import { SNAPSHOT_MARKER, snapshots } from "@writer/core/snapshots";
 
@@ -17,7 +17,7 @@ export async function runSnapshots(dir: string, options: SnapshotsOptions = {}, 
   const root = resolve(dir);
   const novel = await loadBook(nodeSource(root));
   if (!novel.config) {
-    out(`No novel here: ${root} has no novel.yaml.`);
+    out(unreadable(novel) ? novel.diagnostics[0]!.message : `No book here: ${root} has no ${MANIFEST} or ${NOVEL_MANIFEST}.`);
     return 1;
   }
   const changed: string[] = [];

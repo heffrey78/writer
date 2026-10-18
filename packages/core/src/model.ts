@@ -15,6 +15,8 @@ import type {
 export interface Book {
   /** What kind of book it is: data, so it travels with the model to the browser. */
   kind: BookKind;
+  /** Its manifest's file: book.yaml (format 3), or novel.yaml (a novel in format 1 or 2). */
+  manifest: string;
   config: NovelFile | undefined;
   entityTypes: EntityTypeDef[];
   relationshipTypes: RelationshipTypeFile[];
@@ -162,7 +164,7 @@ export interface RecordRef {
 /** Every record with an ID, in discovery order. Duplicate IDs appear more than once. */
 export function allRecords(novel: Book): RecordRef[] {
   const out: RecordRef[] = [];
-  if (novel.config?.id) out.push({ kind: "book", id: novel.config.id, file: "novel.yaml" });
+  if (novel.config?.id) out.push({ kind: "book", id: novel.config.id, file: novel.manifest });
   // Outer levels first: of two sections with one ID, the outer one is found first.
   const depth = (s: Section) => novel.kind.levels.findIndex((l) => l.key === s.level);
   for (const s of [...novel.allSections].sort((a, b) => depth(a) - depth(b))) out.push({ kind: "section", id: s.id, file: s.file, level: s.level });

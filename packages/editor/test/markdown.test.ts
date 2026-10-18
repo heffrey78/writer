@@ -40,7 +40,7 @@ function markdownFiles(dir: string): string[] {
 }
 
 describe("unedited round-trip", () => {
-  const files = [...markdownFiles("examples/sample-novel"), ...markdownFiles("templates/novel"), join(root, "docs/format/v2.md")];
+  const files = [...markdownFiles("examples/sample-novel"), ...markdownFiles("templates/novel"), join(root, "docs/format/v3.md")];
 
   test.each(files.map((f) => [relative(root, f), f]))("%s", (_name, file) => {
     const text = readFileSync(file, "utf8");

@@ -1,7 +1,8 @@
 import { mkdir, readdir, readFile, realpath, rename, rm, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
-import { newId, parseYaml, slugify } from "@writer/core";
+import { MANIFEST, newId, NOVEL_MANIFEST, parseYaml, readManifest, slugify } from "@writer/core";
+import { nodeSource } from "@writer/core/node";
 import type { SimpleGitProgressEvent } from "simple-git";
 import { classifyGitError, cloneUrl, git, repoName, type GitAuthSource } from "./git.ts";
 import { DEFAULT_TEMPLATE, NeedsIdentity, writeNewNovel, type NewNovel } from "./new-novel.ts";
@@ -58,9 +59,26 @@ interface LibraryFile {
 export function defaultConfigDir(): string {
   const env = process.env;
   if (env.WRITER_CONFIG_DIR) return resolve(env.WRITER_CONFIG_DIR);
-  if (process.platform === "win32") return join(env.APPDATA ?? join(homedir(), "AppData", "Roaming"), "writer");
-  if (process.platform === "darwin") return join(homedir(), "Library", "Application Support", "writer");
-  return join(env.XDG_CONFIG_HOME || join(homedir(), ".config"), "writer");
+  return platformConfigDir("writer");
+}
+
+/**
+ * gh-writer's config directory, whose library.json lists the books to offer to import (#2):
+ * $WRITER_GH_WRITER_CONFIG_DIR, else gh-writer's own. None when Writer's config is elsewhere
+ * ($WRITER_CONFIG_DIR, as tests and experiments set it): that's a world of its own.
+ */
+export function ghWriterConfigDir(): string | undefined {
+  const env = process.env;
+  if (env.WRITER_GH_WRITER_CONFIG_DIR) return resolve(env.WRITER_GH_WRITER_CONFIG_DIR);
+  if (env.WRITER_CONFIG_DIR) return undefined;
+  return platformConfigDir("gh-writer");
+}
+
+function platformConfigDir(app: string): string {
+  const env = process.env;
+  if (process.platform === "win32") return join(env.APPDATA ?? join(homedir(), "AppData", "Roaming"), app);
+  if (process.platform === "darwin") return join(homedir(), "Library", "Application Support", app);
+  return join(env.XDG_CONFIG_HOME || join(homedir(), ".config"), app);
 }
 
 /**
@@ -113,7 +131,43 @@ export class Library {
     return this.#novels.find((n) => n.id === id);
   }
 
-  /** Check that `dir` is a git repository holding novel.yaml, and add it (or refresh its entry). */
+  /**
+   * gh-writer's books that aren't in this library (#2): those in its library.json whose folder is
+   * still a book. Its library stays as it is; importing adds the folders here, not copies.
+   */
+  async ghWriterBooks(configDir = ghWriterConfigDir()): Promise<{ path: string; title: string }[]> {
+    if (!configDir) return [];
+    let theirs: { path?: unknown; title?: unknown }[];
+    try {
+      theirs = (JSON.parse(await readFile(join(configDir, "library.json"), "utf8")) as { novels?: { path?: unknown; title?: unknown }[] }).novels ?? [];
+    } catch {
+      return [];
+    }
+    const mine = new Set((await this.list()).map((n) => n.path));
+    const out: { path: string; title: string }[] = [];
+    for (const n of theirs) {
+      if (typeof n.path !== "string" || mine.has(n.path)) continue;
+      const cover = await coverOf(n.path).catch(() => undefined);
+      if (cover) out.push({ path: n.path, title: cover.title });
+    }
+    return out;
+  }
+
+  /** Add gh-writer's books to this library: those added, and those that couldn't be, with why. */
+  async importGhWriter(configDir = ghWriterConfigDir()): Promise<{ added: LibraryEntry[]; failed: { path: string; error: string }[] }> {
+    const added: LibraryEntry[] = [];
+    const failed: { path: string; error: string }[] = [];
+    for (const { path } of await this.ghWriterBooks(configDir)) {
+      try {
+        added.push(await this.add(path));
+      } catch (e) {
+        failed.push({ path, error: e instanceof Error ? e.message : String(e) });
+      }
+    }
+    return { added, failed };
+  }
+
+  /** Check that `dir` is a git repository holding a book (book.yaml, or novel.yaml for a novel in format 1 or 2), and add it (or refresh its entry). */
   async add(folder: string): Promise<LibraryEntry> {
     const dir = expandHome(folder);
     const info = await stat(dir).catch(() => undefined);
@@ -129,7 +183,7 @@ export class Library {
     if (!isRepo) throw new LibraryError("NOT_A_REPO", `${path} isn't a git repository. A novel needs one to keep its history and sync with GitHub.`);
 
     const cover = await coverOf(path);
-    if (!cover) throw new LibraryError("NOT_A_NOVEL", `${path} has no novel.yaml, so it isn't a Writer novel.`);
+    if (!cover) throw new LibraryError("NOT_A_NOVEL", `${path} has no ${MANIFEST} or ${NOVEL_MANIFEST}, so it isn't a book Writer can open.`);
     const remote = await remoteOf(path);
 
     const lastOpened = new Date().toISOString();
@@ -198,7 +252,7 @@ export class Library {
     } catch (e) {
       await cleanUp();
       if (e instanceof LibraryError && e.code === "NOT_A_NOVEL") {
-        throw new LibraryError("NOT_A_NOVEL", `${url} has no novel.yaml, so it isn't a Writer novel. Nothing was kept.`);
+        throw new LibraryError("NOT_A_NOVEL", `${url} has no ${MANIFEST} or ${NOVEL_MANIFEST}, so it isn't a book Writer can open. Nothing was kept.`);
       }
       throw e;
     }
@@ -265,12 +319,14 @@ export class Library {
   }
 }
 
-/** The title and author in a novel's novel.yaml (the title defaults to the folder's name), or undefined without one. */
-/** What the shelf shows of a novel, from its novel.yaml: the title, the author and the cover image's path. */
+/**
+ * What the shelf shows of a book, from its manifest (book.yaml, or a novel's novel.yaml): the title
+ * (the folder's name without one), the author and the cover image's path. Undefined without a manifest.
+ */
 async function coverOf(path: string): Promise<{ title: string; author?: string; cover?: string } | undefined> {
-  const yaml = await readFile(join(path, "novel.yaml"), "utf8").catch(() => undefined);
-  if (yaml === undefined) return undefined;
-  const data = parseYaml(yaml, "novel.yaml").data as { title?: unknown; author?: unknown; cover?: unknown } | undefined;
+  const manifest = await readManifest(nodeSource(path));
+  if (!manifest) return undefined;
+  const data = parseYaml(manifest.text, manifest.file).data as { title?: unknown; author?: unknown; cover?: unknown } | undefined;
   const title = typeof data?.title === "string" && data.title.trim() ? data.title.trim() : basename(path);
   const author = typeof data?.author === "string" ? data.author.trim() : "";
   const cover = typeof data?.cover === "string" ? data.cover.trim() : "";

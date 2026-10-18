@@ -75,7 +75,7 @@ describe("schemas", () => {
 });
 
 describe("format spec examples", () => {
-  const spec = readFileSync(new URL("../../../docs/format/v2.md", import.meta.url), "utf8");
+  const spec = readFileSync(new URL("../../../docs/format/v3.md", import.meta.url), "utf8");
 
   /** Fenced yaml/markdown blocks under the "## ..." heading that starts with `heading`. */
   function blocks(heading: string): string[] {
@@ -86,8 +86,8 @@ describe("format spec examples", () => {
     );
   }
 
-  const cases: [string, SchemaKind[]][] = [
-    ["`novel.yaml`", ["novel"]],
+  const cases: [string, (SchemaKind | "book")[]][] = [
+    ["The manifest: `book.yaml`", ["book"]],
     ["Order files", ["manuscript-order", "manuscript-order", "part", "chapter"]],
     ["Scenes", ["scene"]],
     ["Bible entries", ["entity"]],

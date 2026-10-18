@@ -9,6 +9,7 @@ on:
     paths:
       - "manuscript/**"
       - "bible/**"
+      - "book.yaml"
       - "novel.yaml"
       - "diagrams/layouts.yaml"
   workflow_dispatch:

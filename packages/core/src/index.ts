@@ -1,13 +1,14 @@
 export * from "./ids.ts";
 export * from "./types.ts";
 export * from "./model.ts";
-export { loadBook, SCHEMA_VERSION } from "./load.ts";
-export { kindByKey, levelOf, registerKind, startLevels, V2_KIND, type BookKind, type LevelDef, type StatusDef } from "./kinds.ts";
+export { loadBook } from "./load.ts";
+export { EVENT_FILES_FORMAT, MANIFEST, NOVEL_MANIFEST, readManifest, SCHEMA_VERSION, type Manifest } from "./manifest.ts";
+export { kindByKey, knownKind, levelOf, registerKind, startLevels, V2_KIND, type BookKind, type LevelDef, type StatusDef } from "./kinds.ts";
 export { eventFile, migration, type Migration, type MigrationWrite } from "./migrate.ts";
 export { parseMarkdown, parseYaml } from "./parse.ts";
 export { checkSchema, schemaFor, SCHEMAS, type SchemaKind } from "./schemas.ts";
 export { joinPath, memorySource, type DirEntry, type FileSource } from "./source.ts";
-export { hardWrappedLines, RULES, sortDiagnostics, validate, validateBook, type ValidationResult } from "./validate.ts";
+export { hardWrappedLines, RULES, sortDiagnostics, unreadable, validate, validateBook, type ValidationResult } from "./validate.ts";
 export { countText, countWords, markdownWords, proseText, wordList } from "./words.ts";
 export { addDays, daysBetween, LONG, median, PACE_DAYS, projection, sceneWords, SHORT, streak, unbalanced, wordChange, writingDays, type CommitWords, type Projection, type Streak, type WritingDay } from "./stats.ts";
 export { merge2, merge3, resolveMerge, type MergeChunk, type MergeResult, type Resolution } from "./merge.ts";

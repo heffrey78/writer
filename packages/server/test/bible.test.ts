@@ -386,9 +386,12 @@ describe("events", () => {
       expect(validateBook(novel)).toEqual([]);
     });
 
-    it("migrates on its own, from POST /migrate", async () => {
-      expect(await bible.migrate()).toMatchObject({ migrated: true });
+    it("migrates on its own, from POST /migrate: as far as it's asked, else to the newest", async () => {
+      expect(await bible.migrate(2)).toMatchObject({ migrated: true });
       expect(lastCommit()).toBe("Format v2: off-page events as files");
+      expect(await bible.migrate(2)).toEqual({ commit: null, files: [], migrated: false });
+      expect(await bible.migrate()).toMatchObject({ migrated: true });
+      expect(lastCommit()).toBe("Format v3: the book's settings in book.yaml, naming its kind");
       expect(await bible.migrate()).toEqual({ commit: null, files: [], migrated: false });
       clean();
     });

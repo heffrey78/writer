@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
-import { compileBook, CompileError, loadBook, pieceSections } from "@writer/core";
+import { compileBook, CompileError, loadBook, MANIFEST, NOVEL_MANIFEST, pieceSections, unreadable } from "@writer/core";
 import { nodeSource } from "@writer/core/node";
 import { commitDate, fileName, FORMATS, isFormat, readCover, readPictures, render, type Format, type PdfFonts } from "@writer/export";
 
@@ -32,7 +32,7 @@ export async function runCompile(dir: string, options: CompileOptions = {}, out:
   const source = nodeSource(root);
   const novel = await loadBook(source);
   if (!novel.config) {
-    out(`No novel here: ${root} has no novel.yaml.`);
+    out(unreadable(novel) ? novel.diagnostics[0]!.message : `No book here: ${root} has no ${MANIFEST} or ${NOVEL_MANIFEST}.`);
     return 1;
   }
   let book;

@@ -62,7 +62,7 @@ export function ProgressPage({ novelId, novel }: { novelId: string; novel: Book 
       </section>
 
       <ProgressCharts days={days} words={words} target={target} novel={novel} today={today} />
-      <TargetForm novelId={novelId} target={target} />
+      <TargetForm novelId={novelId} manifest={novel.manifest} target={target} />
     </Page>
   );
 }
@@ -127,7 +127,7 @@ function Meter({ value, max, label, small }: { value: number; max: number; label
 }
 
 /** The target length, deadline and daily goal, saved in novel.yaml (one commit). */
-function TargetForm({ novelId, target }: { novelId: string; target: { words?: number; date?: string; daily?: number } | null }) {
+function TargetForm({ novelId, target, manifest }: { novelId: string; target: { words?: number; date?: string; daily?: number } | null; manifest: string }) {
   const queryClient = useQueryClient();
   const [words, setWords] = useState(target?.words?.toString() ?? "");
   const [date, setDate] = useState(target?.date ?? "");
@@ -173,7 +173,7 @@ function TargetForm({ novelId, target }: { novelId: string; target: { words?: nu
           {save.isPending ? "Saving…" : "Save targets"}
         </Button>
       </div>
-      <p className="text-xs text-muted">Kept with the book (in novel.yaml), so every computer you write on has them. Leave one empty to have none. A day counts toward the daily goal by the words you add; cutting doesn't count against it.</p>
+      <p className="text-xs text-muted">Kept with the book (in {manifest}), so every computer you write on has them. Leave one empty to have none. A day counts toward the daily goal by the words you add; cutting doesn't count against it.</p>
       {save.isError && <ErrorAlert title="The targets weren't saved">{save.error.message}</ErrorAlert>}
     </form>
   );

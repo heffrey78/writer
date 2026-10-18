@@ -26,7 +26,7 @@ browser ── web (React) ── client (API, autosave) ──HTTP──► ser
 cli ── serve / validate / snapshots / compile ───────────────┘
 ```
 
-The novel itself is the source of truth: plain Markdown and YAML files ([format spec](docs/format/v2.md), decision [D3](https://github.com/heffrey78/gh-writer/issues/23)). Story facts live in files and GitHub Issues hold work and discussion ([D1](https://github.com/heffrey78/gh-writer/issues/21)). The stack is TypeScript throughout, React, TipTap/ProseMirror, React Flow, Hono and the system git ([D4](https://github.com/heffrey78/gh-writer/issues/24)). Signing in to GitHub and using that for git is [D5](https://github.com/heffrey78/gh-writer/issues/91); compiling with our own TypeScript and pure-JavaScript libraries is [D6](https://github.com/heffrey78/gh-writer/issues/122); versions as branches, adopted by merging, compared commit to commit, are [D7](https://github.com/heffrey78/gh-writer/issues/129).
+The novel itself is the source of truth: plain Markdown and YAML files ([format spec](docs/format/v3.md), decision [D3](https://github.com/heffrey78/gh-writer/issues/23)). Story facts live in files and GitHub Issues hold work and discussion ([D1](https://github.com/heffrey78/gh-writer/issues/21)). The stack is TypeScript throughout, React, TipTap/ProseMirror, React Flow, Hono and the system git ([D4](https://github.com/heffrey78/gh-writer/issues/24)). Signing in to GitHub and using that for git is [D5](https://github.com/heffrey78/gh-writer/issues/91); compiling with our own TypeScript and pure-JavaScript libraries is [D6](https://github.com/heffrey78/gh-writer/issues/122); versions as branches, adopted by merging, compared commit to commit, are [D7](https://github.com/heffrey78/gh-writer/issues/129).
 
 ## Packages
 
@@ -46,7 +46,7 @@ Other folders:
 
 - `templates/novel`: the template every new novel starts from, including its workflows and vendored tools.
 - `examples/sample-novel`: *The Bridge at Varn*, the sample used by tests, screenshots and the playground.
-- `docs/format/v2.md`: the format spec.
+- `docs/format/v3.md`: the format spec.
 - `scripts/`: the bundler for vendored tools and the sample compile.
 
 ## Checks

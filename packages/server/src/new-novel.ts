@@ -1,7 +1,7 @@
 import { copyFile, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import { editYaml, loadBook, newId } from "@writer/core";
+import { editYaml, loadBook, MANIFEST, newId, NOVEL_MANIFEST } from "@writer/core";
 import { nodeSource } from "@writer/core/node";
 import { snapshots } from "@writer/core/snapshots";
 import { hasGitIdentity } from "./committer.ts";
@@ -16,7 +16,7 @@ export const DEFAULT_TEMPLATE = process.env.WRITER_TEMPLATE || fileURLToPath(new
 /** The template's placeholder IDs, replaced with fresh ones in every new novel (as its init.mjs does on GitHub). */
 const TEMPLATE_IDS = ["nv_temp1a", "ch_temp1a", "sc_temp1a"];
 const STORY_FILE = /\.(md|ya?ml)$/;
-const STORY_ROOTS = ["novel.yaml", "manuscript/", "bible/", "diagrams/"];
+const STORY_ROOTS = [MANIFEST, NOVEL_MANIFEST, "manuscript/", "bible/", "diagrams/"];
 
 export interface NewNovel {
   title: string;

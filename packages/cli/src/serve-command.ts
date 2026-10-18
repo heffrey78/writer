@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { MANIFEST, NOVEL_MANIFEST } from "@writer/core";
 import { createServer, GitFailure, Library, LibraryError, type LibraryEntry, type RunningServer } from "@writer/server";
 
 export interface ServeOptions {
@@ -36,7 +37,8 @@ export async function runServe(dir: string | undefined, { port = 0, open = true,
   let launchUrl: string;
   try {
     const library = await Library.open();
-    const target = dir ?? (existsSync(join(process.cwd(), "novel.yaml")) ? "." : undefined);
+    // In a book's folder, that book.
+    const target = dir ?? ([MANIFEST, NOVEL_MANIFEST].some((f) => existsSync(join(process.cwd(), f))) ? "." : undefined);
     let novel: LibraryEntry | undefined;
     if (target !== undefined) {
       try {

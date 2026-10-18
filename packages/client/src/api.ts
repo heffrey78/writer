@@ -427,7 +427,9 @@ export function createApi({ baseUrl = "", headers = {}, fetch = globalThis.fetch
     /** The licence texts the desktop app ships. */
     licenses: async () => (await request<{ licenses: License[] }>("GET", "/api/app/licenses")).data.licenses,
     /** The library, its notices, and the folder new novels and clones go in (~ for home). */
-    library: async () => (await request<{ novels: LibraryEntry[]; notices: LibraryNotice[]; folder: string }>("GET", "/api/library")).data,
+    library: async () => (await request<{ novels: LibraryEntry[]; notices: LibraryNotice[]; folder: string; ghWriter: { path: string; title: string }[] }>("GET", "/api/library")).data,
+    /** Bring the books in gh-writer's library into this one (#2): their folders, not copies. */
+    importGhWriter: async () => (await request<{ added: LibraryEntry[]; failed: { path: string; error: string }[] }>("POST", "/api/library/gh-writer")).data,
     /** Start a novel from the template. Rejects with NEEDS_IDENTITY when git doesn't know the author: send `identity` then. */
     createNovel: async (novel: NewNovel) => (await request<{ novel: LibraryEntry }>("POST", "/api/library/new", novel)).data.novel,
     addNovel: async (path: string) => (await request<{ novel: LibraryEntry }>("POST", "/api/library", { path })).data.novel,
@@ -600,8 +602,8 @@ export function createApi({ baseUrl = "", headers = {}, fetch = globalThis.fetch
       promote: (id: string, note: string, target: { to: "event" } | { to: "scene"; chapter: string }, { keep, migrate }: { keep: boolean; migrate?: boolean }) =>
         request<OperationResult & { id: string; file: string }>("POST", `/api/novels/${encodeURIComponent(id)}/notes/${encodeURIComponent(note)}/promote`, { ...target, keep, ...(migrate ? { migrate } : {}) }).then((r) => r.data),
     },
-    /** Move the novel to the newest format (D11), one commit; `migrated` false when it was already. */
-    migrate: async (id: string) => (await request<OperationResult & { migrated: boolean }>("POST", `/api/novels/${encodeURIComponent(id)}/migrate`)).data,
+    /** Move the book to format `to` (the newest by default: D11, D15), one commit; `migrated` false when it was already. */
+    migrate: async (id: string, to?: number) => (await request<OperationResult & { migrated: boolean }>("POST", `/api/novels/${encodeURIComponent(id)}/migrate`, to === undefined ? undefined : { to })).data,
   };
 }
 

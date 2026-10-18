@@ -103,7 +103,7 @@ describe("writer snapshots", () => {
   it("says so when there's no novel", () => {
     const r = run(main, "snapshots", tmp);
     expect(r.code).toBe(1);
-    expect(r.out).toContain("No novel here");
+    expect(r.out).toContain("No book here");
   });
 });
 
@@ -282,7 +282,7 @@ describe("server bundle", () => {
 });
 
 describe("writer migrate", () => {
-  it("moves the sample to format v2 in one commit, with the template's tools; it compiles the same and its own validator passes", () => {
+  it("moves the sample to the newest format (v3) in one commit, with the template's tools; it compiles the same and its own validator passes", () => {
     const novel = join(tmp, "migrate-me");
     cpSync(sample, novel, { recursive: true });
     asFormatV1(novel);
@@ -300,8 +300,8 @@ describe("writer migrate", () => {
 
     const r = spawnSync("node", [main, "migrate", novel], { encoding: "utf8", env: { ...env(), ...date } });
     expect(r.status, r.stdout + r.stderr).toBe(0);
-    expect(r.stdout).toMatch(/^Moved from format v1 to v2, in commit [0-9a-f]{7}: “Format v2: off-page events as files”\.\n/);
-    expect(git("log", "-1", "--format=%s")).toBe("Format v2: off-page events as files\n");
+    expect(r.stdout).toMatch(/^Moved from format v1 to v3, in commit [0-9a-f]{7}: “Format v3: off-page events as files, and the book's settings in book.yaml, naming its kind”\.\n/);
+    expect(git("log", "-1", "--format=%s")).toBe("Format v3: off-page events as files, and the book's settings in book.yaml, naming its kind\n");
     expect(git("status", "--porcelain")).toBe("");
     expect(git("show", "--name-status", "--format=", "HEAD").split("\n").filter(Boolean).sort()).toEqual([
       "A\t.github/gh-writer/compile.mjs",
@@ -313,7 +313,8 @@ describe("writer migrate", () => {
       "A\tbible/events/the-plans-are-stolen.md",
       "D\tbible/events.yaml",
       "M\t.github/gh-writer/validate.mjs",
-      "M\tnovel.yaml",
+      // novel.yaml becomes book.yaml: a rename, so its history follows.
+      "R096\tnovel.yaml\tbook.yaml",
     ].sort());
     expect(readFileSync(join(novel, ".github/gh-writer/validate.mjs")).equals(readFileSync(join(repo, "templates/novel/.github/gh-writer/validate.mjs")))).toBe(true);
     expect(run(join(novel, ".github/gh-writer/validate.mjs"), novel)).toMatchObject({ code: 0, out: expect.stringContaining("0 errors, 0 warnings") });

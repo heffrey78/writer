@@ -65,6 +65,8 @@ export function LibraryPage() {
         </ul>
       )}
 
+      <FromGhWriter books={library.data?.ghWriter ?? []} />
+
       <section ref={setMenus} aria-labelledby="shelf-heading" className="mt-8">
         <h2 id="shelf-heading" className="mb-4 text-sm font-medium tracking-[0.14em] text-muted uppercase">
           Works in progress
@@ -126,6 +128,41 @@ function Shelf({ children }: { children: ReactNode }) {
     >
       {children}
     </ul>
+  );
+}
+
+/** gh-writer's books that aren't on this shelf (#2): brought in as they are, their folders, not copies. */
+function FromGhWriter({ books }: { books: { path: string; title: string }[] }) {
+  const queryClient = useQueryClient();
+  const [said, setSaid] = useState<string>();
+  const bring = useMutation({
+    mutationFn: api.importGhWriter,
+    onSuccess: async ({ added, failed }) => {
+      await queryClient.invalidateQueries({ queryKey: keys.library });
+      const brought = `Brought in ${added.length === 1 ? `“${added[0]!.title}”` : `${added.length} books`} from gh-writer.`;
+      setSaid([brought, ...failed.map((f) => `${f.path} couldn't be: ${f.error}`)].join(" "));
+    },
+    onError: (e) => setSaid(`Couldn't bring them in: ${e instanceof Error ? e.message : String(e)}`),
+  });
+  if (!books.length && !said) return null;
+  const one = books.length === 1;
+  return (
+    <section aria-label="Books in gh-writer" className="mt-4 flex flex-wrap items-center gap-3 rounded-md border border-rule bg-raised px-3 py-2 text-sm">
+      {said ? (
+        <p role="status" className="flex-1">
+          {said}
+        </p>
+      ) : (
+        <>
+          <p className="flex-1">
+            gh-writer has {one ? `“${books[0]!.title}”` : `${books.length} books`} that {one ? "isn't" : "aren't"} on this shelf. Writer can open {one ? "it" : "them"} as {one ? "it is" : "they are"}, in the same {one ? "folder" : "folders"}.
+          </p>
+          <Button size="sm" disabled={bring.isPending} onClick={() => bring.mutate()}>
+            Bring {one ? "it" : "them"} in
+          </Button>
+        </>
+      )}
+    </section>
   );
 }
 
