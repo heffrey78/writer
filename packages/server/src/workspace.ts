@@ -91,7 +91,7 @@ export class NovelWorkspace {
         : new Syncer(root, sync, {
             ...(this.committer ? { committer: this.committer } : {}),
             exclusive: (fn) => this.exclusive(fn),
-            ...(github ? { auth: (url: string) => github.gitAuth(url), onAuthRefused: () => void github.recheck() } : {}),
+            ...(github ? { auth: (url: string) => github.gitAuth(url), onAuthRefused: () => void github.recheck(), signInRefused: (url: string) => github.refused(url) } : {}),
           });
     this.checkpoints = new Checkpoints(root, {
       // Checkpoints commit saved work even when background commits are off.

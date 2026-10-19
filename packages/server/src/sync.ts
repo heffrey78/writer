@@ -89,6 +89,8 @@ export interface SyncerDeps {
   auth?: GitAuthSource;
   /** The remote refused Writer's credentials: the connection should check whether they still hold. */
   onAuthRefused?: () => void;
+  /** Writer's sign-in for the remote's URL was refused earlier and forgotten: a refusal without credentials is that, too. */
+  signInRefused?: (url: string) => boolean;
 }
 
 /**
@@ -105,6 +107,7 @@ export class Syncer {
   #exclusive: NonNullable<SyncerDeps["exclusive"]>;
   #auth: SyncerDeps["auth"];
   #onAuthRefused: SyncerDeps["onAuthRefused"];
+  #signInRefused: SyncerDeps["signInRefused"];
   #intervalMs: number;
   #retryMs: number;
   #schedule: NonNullable<SyncerOptions["schedule"]>;
@@ -122,11 +125,12 @@ export class Syncer {
   #tagsMade = 0;
   #tagsPushed = -1;
 
-  constructor(root: string, { intervalMs = 300_000, retryMs = 15_000, schedule = realSchedule }: SyncerOptions = {}, { committer, exclusive, auth, onAuthRefused }: SyncerDeps = {}) {
+  constructor(root: string, { intervalMs = 300_000, retryMs = 15_000, schedule = realSchedule }: SyncerOptions = {}, { committer, exclusive, auth, onAuthRefused, signInRefused }: SyncerDeps = {}) {
     this.root = root;
     this.#committer = committer;
     this.#auth = auth;
     this.#onAuthRefused = onAuthRefused;
+    this.#signInRefused = signInRefused;
     this.#exclusive = exclusive ?? ((fn) => (committer ? committer.hold(fn) : fn()));
     this.#intervalMs = intervalMs;
     this.#retryMs = retryMs;
@@ -269,8 +273,8 @@ export class Syncer {
       return await this.#exchange(target, remote);
     } catch (e) {
       const failure = classifyGitError(e);
-      if (auth && failure.code === "AUTH") {
-        this.#onAuthRefused?.();
+      if (failure.code === "AUTH" && (auth || this.#signInRefused?.(url))) {
+        if (auth) this.#onAuthRefused?.();
         throw new GitFailure("AUTH", "GitHub didn't accept Writer's sign-in for this repository: it may have been revoked, or your account can't push to it. Connect to GitHub again, or check your access.", failure.detail);
       }
       throw e;

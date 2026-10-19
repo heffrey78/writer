@@ -199,6 +199,8 @@ export class GitHub {
   #fetch: typeof fetch;
   #account: GitHubAccount | undefined;
   #expired = false;
+  /** GitHub refused the token and it was forgotten: kept, unlike `#expired`, until the author connects again or signs out. */
+  #refused = false;
   #device: { deviceCode: string; interval: number; expiresAt: number } | undefined;
   /** The gh CLI's account, looked up at most once a minute. */
   #ghCache: { at: number; value: Promise<{ token: string; account: GitHubAccount } | undefined> } | undefined;
@@ -337,17 +339,30 @@ export class GitHub {
    * remotes, and signed-out use get none: git then uses the author's own setup, as it always has.
    */
   async gitAuth(url: string): Promise<GitAuth | undefined> {
-    let origin: string;
+    const origin = this.#origin(url);
+    if (!origin) return undefined;
+    const token = await this.token();
+    return token ? { origin, token } : undefined;
+  }
+
+  /**
+   * Whether GitHub refused Writer's sign-in for this URL and it was forgotten. A git refusal then is
+   * that, even when the request that found it out was another one (the issues, say) and git went
+   * without credentials.
+   */
+  refused(url: string): boolean {
+    return this.#refused && this.#origin(url) !== undefined;
+  }
+
+  /** The URL's origin when it is this GitHub's over HTTP(S), where Writer's sign-in applies. */
+  #origin(url: string): string | undefined {
     try {
       const u = new URL(url);
       if (u.protocol !== "https:" && u.protocol !== "http:") return undefined;
-      origin = u.origin;
+      return u.origin === new URL(this.webUrl).origin ? u.origin : undefined;
     } catch {
       return undefined;
     }
-    if (origin !== new URL(this.webUrl).origin) return undefined;
-    const token = await this.token();
-    return token ? { origin, token } : undefined;
   }
 
   /** Ask GitHub again whether the token is good (after git was refused with it): a refused one is forgotten. */
@@ -361,6 +376,7 @@ export class GitHub {
   async signOut(): Promise<void> {
     this.#device = undefined;
     this.#account = undefined;
+    this.#refused = false;
     await this.#store.delete();
   }
 
@@ -414,6 +430,7 @@ export class GitHub {
     await this.#store.set(token);
     this.#account = account;
     this.#expired = false;
+    this.#refused = false;
     return signedInStatus(account, Boolean(this.clientId));
   }
 
@@ -454,6 +471,7 @@ export class GitHub {
   async #forget(): Promise<void> {
     this.#account = undefined;
     this.#expired = true;
+    this.#refused = true;
     await this.#store.delete().catch(() => {});
   }
 

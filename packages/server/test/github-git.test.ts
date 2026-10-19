@@ -86,6 +86,25 @@ describe("git with Writer's GitHub connection", () => {
     }
   });
 
+  it("says to connect again when another request to GitHub found the sign-in refused first", async () => {
+    const github = await connection();
+    const novel = await (await openLibrary()).clone(`${fake.url}/ada/varn.git`, { auth: (u) => github.gitAuth(u) });
+    const syncer = new Syncer(novel.path, { intervalMs: 0 }, { auth: (u) => github.gitAuth(u), onAuthRefused: () => void github.recheck(), signInRefused: (u) => github.refused(u) });
+    try {
+      fake.revoke(TOKEN);
+      // The issues, say, asked first: the token is forgotten before the sync goes out without it.
+      await expect(github.api("/user")).rejects.toMatchObject({ code: "NO_SIGN_IN" });
+      gitIn(novel.path, "commit", "-q", "--allow-empty", "-m", "More");
+      expect(await syncer.sync()).toMatchObject({ state: "needs-sign-in", error: { code: "AUTH", message: expect.stringContaining("Connect to GitHub again") } });
+      // Until the author connects again or signs out.
+      await github.signOut();
+      expect(github.refused(`${fake.url}/ada/varn.git`)).toBe(false);
+    } finally {
+      await syncer.close();
+      fake.users.set(TOKEN, { login: "ada" });
+    }
+  });
+
   it("wins over a stale credential the author's git has stored for GitHub", async () => {
     const stale = fresh("gitconfig-stale");
     writeFileSync(stale, `${readFileSync(globalConfig, "utf8")}[credential]\n\thelper = "!f() { echo username=ada; echo password=stale; }; f"\n`);
