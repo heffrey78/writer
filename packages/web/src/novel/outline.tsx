@@ -1,4 +1,4 @@
-import { countWords, outerSections, pieceSections, type Book, type Piece } from "@writer/core";
+import { countWords, entryIds, outerSections, pieceSections, type Book, type Piece } from "@writer/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { GripVertical } from "lucide-react";
 import { Fragment, useEffect, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
@@ -61,6 +61,9 @@ export function OutlineTable({ novelId, novel, workspace }: { novelId: string; n
     if (id && move) void structure.move(id, move.index, move.to);
   };
 
+  // The kind's fields it shows as columns (a novel's point of view, characters and plotlines).
+  const columns = novel.kind.fields.filter((f) => f.outline?.column);
+  const span = 5 + columns.length;
   const groups = pieceSections(novel).map((c) => ({
     chapter: c,
     part: outerSections(novel).find((p) => p.id === c.parentId),
@@ -86,15 +89,11 @@ export function OutlineTable({ novelId, novel, workspace }: { novelId: string; n
               <th scope="col" className="w-28 py-2 pr-3 font-medium">
                 Status
               </th>
-              <th scope="col" className="w-28 py-2 pr-3 font-medium">
-                Point of view
-              </th>
-              <th scope="col" className="w-40 py-2 pr-3 font-medium">
-                Characters
-              </th>
-              <th scope="col" className="w-36 py-2 pr-3 font-medium">
-                Plotlines
-              </th>
+              {columns.map((f) => (
+                <th key={f.key} scope="col" className={cn("py-2 pr-3 font-medium", f.type.kind === "entity" ? "w-28" : "w-40")}>
+                  {f.label}
+                </th>
+              ))}
               <th scope="col" className="w-16 py-2 text-right font-medium">
                 Words
               </th>
@@ -105,13 +104,13 @@ export function OutlineTable({ novelId, novel, workspace }: { novelId: string; n
               <Fragment key={chapter.id}>
                 {part && part.id !== groups[i - 1]?.part?.id && (
                   <tr>
-                    <th scope="colgroup" colSpan={8} className="pt-5 pb-1 text-left text-xs font-semibold tracking-wide text-muted uppercase">
+                    <th scope="colgroup" colSpan={span} className="pt-5 pb-1 text-left text-xs font-semibold tracking-wide text-muted uppercase">
                       {part.title}
                     </th>
                   </tr>
                 )}
                 <tr>
-                  <th scope="colgroup" colSpan={8} className="pt-3 pb-1 text-left font-semibold">
+                  <th scope="colgroup" colSpan={span} className="pt-3 pb-1 text-left font-semibold">
                     <Link to={`/novels/${novelId}/chapter/${chapter.id}`} className="underline-offset-2 hover:underline">
                       {chapterTitle(novel, chapter)}
                     </Link>
@@ -160,9 +159,11 @@ export function OutlineTable({ novelId, novel, workspace }: { novelId: string; n
                     <td className="py-1 pr-3">
                       <StatusSelect scene={scene} onChange={(v) => void edit(scene, "status", v)} />
                     </td>
-                    <td className="py-2 pr-3">{name(scene.pov) ?? <span className="text-muted">—</span>}</td>
-                    <td className="py-2 pr-3">{scene.characters.map(name).filter(Boolean).join(", ") || <span className="text-muted">—</span>}</td>
-                    <td className="py-2 pr-3">{scene.plotlines.map((p) => name(p.id)).filter(Boolean).join(", ") || <span className="text-muted">—</span>}</td>
+                    {columns.map((f) => (
+                      <td key={f.key} className="py-2 pr-3">
+                        {entryIds(f, scene.fields[f.key]).map(name).filter(Boolean).join(", ") || <span className="text-muted">—</span>}
+                      </td>
+                    ))}
                     <td className="py-2 text-right tabular-nums">{number.format(countWords(scene.body))}</td>
                   </tr>
                 ))}

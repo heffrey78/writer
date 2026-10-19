@@ -4,8 +4,8 @@ import { useMemo } from "react";
 import { Link, useSearchParams } from "react-router";
 import { Button } from "../ui/button.tsx";
 import { cn } from "../ui/cn.ts";
-import { FilterSelect, STATUS_TONE } from "./corkboard.tsx";
-import { shows, type CorkboardFilter } from "./corkboard-order.ts";
+import { FieldFilters, STATUS_TONE } from "./corkboard.tsx";
+import { filterParams, filtersOf, shows, type CorkboardFilter } from "./corkboard-order.ts";
 import { StatusSelect, Synopsis, useSceneEdit } from "./outline.tsx";
 import type { Workspace } from "./workspace.ts";
 
@@ -118,15 +118,20 @@ export function OutlineTimeTable({ novelId, novel, workspace }: { novelId: strin
   );
 }
 
-/** Whether an event shows with the cards' filters: those about its people and plotlines; a point of view or status is a scene's. */
-const eventShows = (e: StoryEvent, f: CorkboardFilter) =>
-  !f.pov && !f.status && (!f.plotline || (e.plotlines ?? []).includes(f.plotline)) && (!f.character || (e.characters ?? []).includes(f.character));
+/**
+ * Whether an event shows with the cards' filters: those about its people, places and plotlines (by
+ * entry type); one field's filter (a point of view) or status is a scene's, and leaves events out.
+ */
+const eventShows = (novel: Book, e: StoryEvent, f: CorkboardFilter) => {
+  const held: Record<string, string[] | undefined> = { character: e.characters, location: e.locations, plotline: e.plotlines };
+  return !f["status"] && filtersOf(novel).every((d) => !f[d.param] || (!d.field && (held[d.entityType] ?? []).includes(f[d.param]!)));
+};
 
 export function OutlineTimeCards({ novelId, novel }: { novelId: string; novel: Book }) {
   const [params, setParams] = useSearchParams();
-  const filter: CorkboardFilter = Object.fromEntries(["pov", "plotline", "status", "character"].flatMap((k) => (params.get(k) ? [[k, params.get(k)!]] : [])));
+  const filter: CorkboardFilter = Object.fromEntries(filterParams(novel).flatMap((k) => (params.get(k) ? [[k, params.get(k)!]] : [])));
   const all = useMemo(() => inStoryTime(novel), [novel]);
-  const items = all.filter((i) => (i.kind === "scene" ? shows(i.scene, filter) : eventShows(i.event, filter)));
+  const items = all.filter((i) => (i.kind === "scene" ? shows(novel, i.scene, filter) : eventShows(novel, i.event, filter)));
   const filtered = Object.keys(filter).length > 0;
   const name = (id: string | undefined) => novel.entities.find((e) => e.id === id)?.name;
   const setFilter = (key: keyof CorkboardFilter, value: string) => {
@@ -135,16 +140,11 @@ export function OutlineTimeCards({ novelId, novel }: { novelId: string; novel: B
     else next.delete(key);
     setParams(next, { replace: true });
   };
-  const characters = novel.entities.filter((e) => e.type === "character").sort((a, b) => a.name.localeCompare(b.name));
-  const plotlines = novel.entities.filter((e) => e.type === "plotline").sort((a, b) => a.name.localeCompare(b.name));
   const scenes = items.filter((i) => i.kind === "scene").length;
   return (
     <div className="grid gap-4">
       <div role="group" aria-label="Filters" className="flex flex-wrap items-end gap-3">
-        <FilterSelect label="Point of view" value={filter.pov} onChange={(v) => setFilter("pov", v)} options={characters.map((c) => [c.id, c.name])} />
-        <FilterSelect label="Character" value={filter.character} onChange={(v) => setFilter("character", v)} options={characters.map((c) => [c.id, c.name])} />
-        <FilterSelect label="Plotline" value={filter.plotline} onChange={(v) => setFilter("plotline", v)} options={plotlines.map((p) => [p.id, p.name])} />
-        <FilterSelect label="Status" value={filter.status} onChange={(v) => setFilter("status", v)} options={novel.kind.statuses.map((s) => [s.key, s.key])} />
+        <FieldFilters novel={novel} filter={filter} setFilter={setFilter} />
         {filtered && (
           <Button size="sm" onClick={() => setParams({ order: "time" }, { replace: true })}>
             Clear filters

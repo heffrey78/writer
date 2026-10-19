@@ -62,6 +62,12 @@ export interface FieldDef {
     | { kind: "story-time"; durationKey: string };
   /** Whether mentioning an entry in a piece's prose adds it here, so the list keeps up with the text. */
   mentionAdds?: boolean;
+  /**
+   * How the outline shows it: as a column of its table, and as a filter of its cards. One entry's
+   * field filters by itself ("Point of view"); a list filters by its entry type, matching any field of
+   * that type ("Character": in it, or its point of view).
+   */
+  outline?: { column?: boolean; filter?: boolean };
 }
 
 /** A stage a piece moves through, in order: idea, outlined, drafted… */

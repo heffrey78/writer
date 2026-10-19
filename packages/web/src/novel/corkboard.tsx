@@ -4,7 +4,7 @@ import { useEffect, useId, useMemo, useRef, useState, type DragEvent, type Keybo
 import { Link, useSearchParams } from "react-router";
 import { Button } from "../ui/button.tsx";
 import { cn } from "../ui/cn.ts";
-import { visibleScenes, visibleStep, type CorkboardFilter } from "./corkboard-order.ts";
+import { filterParams, filtersOf, visibleScenes, visibleStep, type CorkboardFilter } from "./corkboard-order.ts";
 import { chapterTitle } from "./navigation.tsx";
 import { dropMove, useStructure } from "./structure.ts";
 import type { Workspace } from "./workspace.ts";
@@ -26,14 +26,14 @@ export const STATUS_TONE: Record<string, string> = {
 export function OutlineCards({ novelId, novel, workspace }: { novelId: string; novel: Book; workspace: Workspace }) {
   const structure = useStructure(novelId, novel, workspace);
   const [params, setParams] = useSearchParams();
-  const filter: CorkboardFilter = Object.fromEntries(["pov", "plotline", "status", "character"].flatMap((k) => (params.get(k) ? [[k, params.get(k)!]] : [])));
+  const filter: CorkboardFilter = Object.fromEntries(filterParams(novel).flatMap((k) => (params.get(k) ? [[k, params.get(k)!]] : [])));
   const visible = useMemo(() => visibleScenes(novel, filter), [novel, params]); // eslint-disable-line react-hooks/exhaustive-deps
   const dragging = useRef<string | undefined>(undefined);
   const [drop, setDrop] = useState<{ id: string; after: boolean }>();
   const name = (id: string | undefined) => novel.entities.find((e) => e.id === id)?.name;
   const filtered = Object.keys(filter).length > 0;
 
-  const setFilter = (key: keyof CorkboardFilter, value: string) => {
+  const setFilter = (key: string, value: string) => {
     const next = new URLSearchParams(params);
     if (value) next.set(key, value);
     else next.delete(key);
@@ -84,16 +84,11 @@ export function OutlineCards({ novelId, novel, workspace }: { novelId: string; n
   };
 
   const chapters = pieceSections(novel).map((c) => ({ chapter: c, scenes: visible.filter((s) => s.sectionId === c.id) })).filter((g) => g.scenes.length || !filtered);
-  const characters = novel.entities.filter((e) => e.type === "character").sort((a, b) => a.name.localeCompare(b.name));
-  const plotlines = novel.entities.filter((e) => e.type === "plotline").sort((a, b) => a.name.localeCompare(b.name));
 
   return (
     <div className="grid gap-4">
       <div role="group" aria-label="Filters" className="flex flex-wrap items-end gap-3">
-        <FilterSelect label="Point of view" value={filter.pov} onChange={(v) => setFilter("pov", v)} options={characters.map((c) => [c.id, c.name])} />
-        <FilterSelect label="Character" value={filter.character} onChange={(v) => setFilter("character", v)} options={characters.map((c) => [c.id, c.name])} />
-        <FilterSelect label="Plotline" value={filter.plotline} onChange={(v) => setFilter("plotline", v)} options={plotlines.map((p) => [p.id, p.name])} />
-        <FilterSelect label="Status" value={filter.status} onChange={(v) => setFilter("status", v)} options={novel.kind.statuses.map((s) => [s.key, s.key])} />
+        <FieldFilters novel={novel} filter={filter} setFilter={setFilter} />
         {filtered && (
           <Button size="sm" onClick={() => setParams({}, { replace: true })}>
             Clear filters
@@ -161,6 +156,19 @@ export function OutlineCards({ novelId, novel, workspace }: { novelId: string; n
         </section>
       ))}
     </div>
+  );
+}
+
+/** The cards' filters: one for each the kind's fields give (see filtersOf), then status. */
+export function FieldFilters({ novel, filter, setFilter }: { novel: Book; filter: CorkboardFilter; setFilter: (key: string, value: string) => void }) {
+  const entries = (type: string) => novel.entities.filter((e) => e.type === type).sort((a, b) => a.name.localeCompare(b.name));
+  return (
+    <>
+      {filtersOf(novel).map((d) => (
+        <FilterSelect key={d.param} label={d.label} value={filter[d.param]} onChange={(v) => setFilter(d.param, v)} options={entries(d.entityType).map((e) => [e.id, e.name])} />
+      ))}
+      <FilterSelect label="Status" value={filter["status"]} onChange={(v) => setFilter("status", v)} options={novel.kind.statuses.map((s) => [s.key, s.key])} />
+    </>
   );
 }
 

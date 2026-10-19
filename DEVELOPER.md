@@ -40,7 +40,7 @@ The novel itself is the source of truth: plain Markdown and YAML files ([format 
 | [`export`](packages/export) | DOCX (hand-written WordprocessingML), EPUB 3 and PDF (pdfkit, with Liberation Serif) from a compiled book; zipped with fflate. |
 | [`cli`](packages/cli) | `writer serve`, `validate`, `snapshots`, `compile`, `migrate` and `new-id`, and the entry points bundled into novel repositories. |
 | [`desktop`](packages/desktop) | The desktop app: a Tauri shell that runs the server bundle on its own Node and git, and opens a window on it. |
-| [`kinds`](packages/kinds) | The kinds of book the app ships, as data (D14, D15): the Novel's levels, ID prefixes, folders, built-in entry types, statuses and issue kinds. The app's entry points (the CLI and the bundles vendored into books, the editor's playground, the tests' setup) call `registerKinds()`; the rest of the code reads a book's kind from its model (`novel.kind`), or in the web app from `useBookKind()`, and never imports a kind. |
+| [`kinds`](packages/kinds) | The kinds of book the app ships, as data (D14, D15): the Novel's levels, ID prefixes, folders, built-in entry types, statuses, issue kinds and its scenes' fields (each field's type is how the schema, the validator, the Scene card, the outline, comparisons and mentions read it). The app's entry points (the CLI and the bundles vendored into books, the editor's playground, the tests' setup) call `registerKinds()`; the rest of the code reads a book's kind from its model (`novel.kind`), or in the web app from `useBookKind()`, and never imports a kind. |
 
 Other folders:
 

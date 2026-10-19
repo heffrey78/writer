@@ -25,9 +25,9 @@ export const novel: BookKind = {
     { key: "final", label: "Final", description: "Done", color: "GREEN" },
   ],
   fields: [
-    { key: "pov", label: "Point of view", type: { kind: "entity", entityType: "character" } },
+    { key: "pov", label: "Point of view", type: { kind: "entity", entityType: "character" }, outline: { column: true, filter: true } },
     { key: "locations", label: "Where", group: "Locations", type: { kind: "entities", entityType: "location" }, mentionAdds: true },
-    { key: "characters", label: "Characters", type: { kind: "entities", entityType: "character" }, mentionAdds: true },
+    { key: "characters", label: "Characters", type: { kind: "entities", entityType: "character" }, mentionAdds: true, outline: { column: true, filter: true } },
     { key: "when", label: "When", type: { kind: "story-time", durationKey: "duration" } },
     {
       key: "plotlines",
@@ -40,8 +40,9 @@ export const novel: BookKind = {
           { key: "beat", label: "Beat", kind: "text" },
         ],
       },
+      outline: { column: true, filter: true },
     },
-    { key: "entities", label: "Other entries", type: { kind: "own-entities" }, mentionAdds: true },
+    { key: "entities", label: "Also in it", type: { kind: "own-entities" }, mentionAdds: true },
     {
       key: "themes",
       label: "Themes",

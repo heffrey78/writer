@@ -1,4 +1,4 @@
-import { countWords, dayOneFor, pieceSections, readFrontMatter, sceneFacts, type Book, type FieldDef, type ItemProp, type YamlEdit } from "@writer/core";
+import { countWords, dayOneFor, itemText, pieceSections, readFrontMatter, sceneFacts, type Book, type FieldDef, type ItemProp, type YamlEdit } from "@writer/core";
 import { chapterTitle } from "@writer/core/diagrams";
 import { joinSceneFile } from "@writer/editor";
 import { ChevronLeft, ChevronRight, Pencil, Pin, Plus, X } from "lucide-react";
@@ -61,22 +61,6 @@ export function whenOf(fm: Record<string, unknown>, keys = { when: "when", durat
 /** A story-time field's keys. */
 const timeKeys = (f: FieldDef) => ({ when: f.key, duration: f.type.kind === "story-time" ? f.type.durationKey : "duration" });
 
-/** What an item of a list field carries, as its card shows it: " (major) “First crack”", " (faint)". */
-function carried(f: FieldDef, item: Record<string, unknown>): string {
-  if (f.type.kind !== "entities") return "";
-  return (f.type.item ?? [])
-    .filter((p) => p.onCard !== false)
-    .map((p) => {
-      const v = item[p.key];
-      if (p.kind === "choice") {
-        const value = typeof v === "string" ? v : p.default;
-        return value ? ` (${value})` : "";
-      }
-      if (p.kind === "scale") return v === undefined ? "" : ` (${p.labels[String(v)] ?? String(v)})`;
-      return str(v) && ` “${str(v)}”`;
-    })
-    .join("");
-}
 
 /**
  * Each detail a scene has, as a few words for its pinned line, by row key in the card's order:
@@ -342,7 +326,7 @@ export function SceneDetails({
             <span key={`${refId(r)}-${i}`}>
               {i > 0 && ", "}
               {link(refId(r))}
-              <span className="text-muted">{carried(f, item)}</span>
+              <span className="text-muted">{itemText(f, item)}</span>
             </span>
           );
         }),

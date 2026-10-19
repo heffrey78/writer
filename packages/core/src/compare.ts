@@ -4,6 +4,8 @@ import { gfmFromMarkdown } from "mdast-util-gfm";
 import { toString } from "mdast-util-to-string";
 import { gfm } from "micromark-extension-gfm";
 import { chapterTitle, describeRelationship } from "./diagrams.ts";
+import { entryIds, fieldName, itemsOf, itemText } from "./fields.ts";
+import type { FieldDef } from "./kinds.ts";
 import { pieceSections, sectionById, type Section, type Entity, type Book, type Relationship, type Piece, type StoryEvent } from "./model.ts";
 import type { StoryTime } from "./types.ts";
 import { diffParagraphs, diffSequences, type ParagraphDiff } from "./word-diff.ts";
@@ -267,24 +269,25 @@ function when(time: StoryTime | undefined): string | undefined {
 function sceneFields(novelA: Book, a: Piece | undefined, novelB: Book, b: Piece | undefined): FieldChange[] {
   // Added and removed scenes are listed as such; their fields aren't changes.
   if (!a || !b) return [];
-  const plotlines = (novel: Book, s: Piece) =>
-    s.plotlines.map((p) => `${nameOf(novel, p.id)} (${p.weight}${p.beat ? `: ${p.beat}` : ""})`).join(", ") || undefined;
-  const themes = (novel: Book, s: Piece) => s.themes.map((t) => nameOf(novel, t.id)).join(", ") || undefined;
+  // The kind's fields, as the piece's card reads them: names, and what each item carries.
+  const read = (novel: Book, s: Piece, f: FieldDef) =>
+    f.type.kind === "entities"
+      ? itemsOf(s.fields[f.key]).map((item) => `${nameOf(novel, entryIds(f, [item])[0])}${itemText(f, item)}`).join(", ") || undefined
+      : names(novel, entryIds(f, s.fields[f.key]));
   return [
     field("Title", a.title, b.title),
     field("Synopsis", a.synopsis, b.synopsis),
     field("Status", a.status, b.status),
-    field("Point of view", nameOf(novelA, a.pov), nameOf(novelB, b.pov)),
-    field("Characters", names(novelA, a.characters), names(novelB, b.characters)),
-    field("Locations", names(novelA, a.locations), names(novelB, b.locations)),
-    field("Also in it", names(novelA, a.entities), names(novelB, b.entities)),
-    field("Plotlines", plotlines(novelA, a), plotlines(novelB, b)),
-    field("Themes", themes(novelA, a), themes(novelB, b)),
-    field("When", when(a.when), when(b.when)),
-    field("Duration", a.duration, b.duration),
+    ...novelB.kind.fields.flatMap((f) =>
+      f.type.kind === "story-time"
+        ? [field(f.label, when(a.fields[f.key] as StoryTime | undefined), when(b.fields[f.key] as StoryTime | undefined)), field("Duration", str(a.fields[f.type.durationKey]), str(b.fields[f.type.durationKey]))]
+        : [field(fieldName(f), read(novelA, a, f), read(novelB, b, f))],
+    ),
     field("Tags", a.tags.join(", "), b.tags.join(", ")),
   ].filter((f): f is FieldChange => !!f);
 }
+
+const str = (v: unknown) => (typeof v === "string" ? v : undefined);
 
 function typeLabel(novel: Book, entity: Entity): string {
   return novel.entityTypes.find((t) => t.key === entity.type)?.label ?? entity.type;
