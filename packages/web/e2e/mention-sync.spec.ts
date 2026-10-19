@@ -1,15 +1,8 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Page } from "@playwright/test";
-import { axe, expect, selectionSettled, test } from "./fixtures.ts";
+import { axe, expect, palette, selectionSettled, test } from "./fixtures.ts";
 
 const STATION = "manuscript/01-return/01-arrival/01-the-station.md";
-
-async function palette(page: Page, query: string) {
-  await page.keyboard.press("ControlOrMeta+k");
-  await page.keyboard.type(query);
-  await page.keyboard.press("Enter");
-}
 
 test("a new mention lists its character or place in the scene; removing one sticks; unmarked names can be linked", async ({ page, app }) => {
   const dir = app.novelRepo("varn");

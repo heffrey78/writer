@@ -1,18 +1,10 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Page } from "@playwright/test";
-import { axe, caretAtEnd, expect, test } from "./fixtures.ts";
+import { axe, caretAtEnd, expect, palette, test } from "./fixtures.ts";
 
 /** Headings, lists and tables from the command palette, saved to the scene's file (D10, heffrey78/gh-writer#202). The palette runs its command a frame after it closes, so each step waits for the command's work before typing on. */
 
 const BRIDGE = "manuscript/01-return/01-arrival/02-the-bridge.md";
-
-async function palette(page: Page, query: string) {
-  await page.keyboard.press("ControlOrMeta+k");
-  await page.keyboard.type(query);
-  await page.keyboard.press("Enter");
-  await expect(page.getByRole("dialog", { name: "Command palette" })).toHaveCount(0);
-}
 
 test("a heading and a table from the palette, filled in by keyboard, with text and lists below, are written to the scene's Markdown", async ({ page, app }) => {
   const dir = app.novelRepo("varn");

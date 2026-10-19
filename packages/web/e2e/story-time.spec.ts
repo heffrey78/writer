@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Page } from "@playwright/test";
-import { axe, expect, openView, test, type App } from "./fixtures.ts";
+import { axe, expect, openView, palette, test, type App } from "./fixtures.ts";
 
 /** When Day 1 is (heffrey78/gh-writer#239): days of the story and dates on one timeline. */
 
@@ -15,12 +15,6 @@ async function openUndated(page: Page, app: App) {
   await page.goto(app.launchUrl);
   await expect(page.getByRole("textbox", { name: "Chapter text" })).toBeFocused();
   return { dir, yaml: () => readFileSync(yaml, "utf8") };
-}
-
-async function palette(page: Page, query: string) {
-  await page.keyboard.press("ControlOrMeta+k");
-  await page.keyboard.type(query);
-  await page.keyboard.press("Enter");
 }
 
 test("the Timeline says when Day 1 is: a date, the day of a dated scene, or none; until then the days are apart (heffrey78/gh-writer#241)", async ({ page, app }) => {

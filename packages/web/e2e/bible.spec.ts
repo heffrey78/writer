@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Page } from "@playwright/test";
-import { axe, expect, test, type App } from "./fixtures.ts";
+import { axe, expect, palette, test, type App } from "./fixtures.ts";
 
 const ADA = "char_7f3k2q";
 
@@ -15,12 +15,6 @@ async function open(page: Page, app: App) {
     read: (path: string) => readFileSync(join(dir, path), "utf8"),
     lastCommit: () => app.git(dir, "log", "-1", "--format=%s").trim(),
   };
-}
-
-async function palette(page: Page, query: string) {
-  await page.keyboard.press("ControlOrMeta+k");
-  await page.keyboard.type(query);
-  await page.keyboard.press("Enter");
 }
 
 test("adds a character, fills in the details and notes, all saved to its file", async ({ page, app }) => {

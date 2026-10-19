@@ -1,4 +1,4 @@
-import { expect, test, axe, type App } from "./fixtures.ts";
+import { axe, expect, palette, test, type App } from "./fixtures.ts";
 import type { Page } from "@playwright/test";
 
 /** Back and Forward through the app's pages (heffrey78/gh-writer#224). */
@@ -8,12 +8,6 @@ async function openNovel(page: Page, app: App) {
   await app.restart(dir);
   await page.goto(app.launchUrl);
   await expect(page.getByRole("textbox", { name: "Chapter text" })).toBeFocused();
-}
-
-async function palette(page: Page, query: string) {
-  await page.keyboard.press("ControlOrMeta+k");
-  await page.keyboard.type(query);
-  await page.keyboard.press("Enter");
 }
 
 test("Back and Forward by button and by Alt+Left/Right, but not in text", async ({ page, app }) => {

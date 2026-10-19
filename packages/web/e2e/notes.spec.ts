@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Page } from "@playwright/test";
-import { axe, caretAtEnd, expect, test, type App } from "./fixtures.ts";
+import { axe, caretAtEnd, expect, palette, test, type App } from "./fixtures.ts";
 
 /** The writer's notes (heffrey78/gh-writer#205). */
 
@@ -13,12 +13,6 @@ async function openNovel(page: Page, app: App) {
   await page.goto(app.launchUrl);
   await expect(page.getByRole("textbox", { name: "Chapter text" })).toBeFocused();
   return dir;
-}
-
-async function palette(page: Page, query: string) {
-  await page.keyboard.press("ControlOrMeta+k");
-  await page.keyboard.type(query);
-  await page.keyboard.press("Enter");
 }
 
 test("a note's page: its title, tags and prose edited in place, mentions included", async ({ page, app }) => {

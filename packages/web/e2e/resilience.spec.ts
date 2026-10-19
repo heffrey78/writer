@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Page } from "@playwright/test";
-import { caretAtEnd, expect, test, type App } from "./fixtures.ts";
+import { caretAtEnd, expect, palette, test, type App } from "./fixtures.ts";
 
 /**
  * heffrey78/gh-writer#2's promises, met the way an author would meet them: the real app on real servers, git only read
@@ -38,13 +38,6 @@ async function openNovel(page: Page, launchUrl: string) {
 async function typeAtEnd(page: Page, words: string) {
   await caretAtEnd(page, text(page));
   await page.keyboard.type(words);
-}
-
-async function palette(page: Page, query: string) {
-  await page.keyboard.press("ControlOrMeta+k");
-  await page.keyboard.type(query);
-  await page.keyboard.press("Enter");
-  await expect(page.getByRole("dialog", { name: "Command palette" })).toHaveCount(0);
 }
 
 test("the desktop app quitting: flushAll() has what was just typed on disk when it resolves", async ({ page, app }) => {

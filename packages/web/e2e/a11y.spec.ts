@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Page } from "@playwright/test";
-import { axe, caretAtEnd, expect, launch, test, type App } from "./fixtures.ts";
+import { axe, caretAtEnd, expect, launch, palette, test, type App } from "./fixtures.ts";
 
 /**
  * heffrey78/gh-writer#7's promises, walked the way a keyboard user would meet them: every flow mouse-free, focus always
@@ -50,14 +50,6 @@ function remoteAndOther(app: App) {
   const other = join(app.home, "other");
   app.git(app.home, "clone", "-q", remote, other);
   return { remote, other };
-}
-
-async function palette(page: Page, query: string) {
-  await page.keyboard.press("ControlOrMeta+k");
-  await expect(page.getByRole("dialog", { name: "Command palette" }).getByRole("combobox")).toBeFocused();
-  await page.keyboard.type(query);
-  await page.keyboard.press("Enter");
-  await expect(page.getByRole("dialog", { name: "Command palette" })).toHaveCount(0);
 }
 
 for (const [name, viewport] of [

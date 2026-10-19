@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Page } from "@playwright/test";
-import { axe, expect, test, type App } from "./fixtures.ts";
+import { axe, expect, palette, test, type App } from "./fixtures.ts";
 
 /** A scene's notes on the right sidebar (heffrey78/gh-writer#222). */
 
@@ -11,12 +11,6 @@ async function openNovel(page: Page, app: App) {
   await page.goto(app.launchUrl);
   await expect(page.getByRole("textbox", { name: "Chapter text" })).toBeFocused();
   return dir;
-}
-
-async function palette(page: Page, query: string) {
-  await page.keyboard.press("ControlOrMeta+k");
-  await page.keyboard.type(query);
-  await page.keyboard.press("Enter");
 }
 
 const sidebar = (page: Page) => page.getByRole("complementary", { name: "Right sidebar" });

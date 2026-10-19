@@ -259,3 +259,20 @@ export async function openView(page: Page, view: View) {
     await expect(page.getByRole("tab", { name: view, selected: true })).toBeVisible();
   } else await views.getByRole("link", { name: view }).click();
 }
+
+/**
+ * Run a command from the palette as a person does: type once it's open, and press Enter once the
+ * whole query is in it. Keys typed sooner go to the page behind, and Enter then runs whatever the
+ * rest matches (a run once typed only "ls" of "show the scene's details", and went to the library).
+ * Choosing a command closes the palette.
+ */
+export async function palette(page: Page, query: string) {
+  await page.keyboard.press("ControlOrMeta+k");
+  const dialog = page.getByRole("dialog", { name: "Command palette" });
+  const input = dialog.getByRole("combobox");
+  await expect(input).toBeFocused();
+  await page.keyboard.type(query);
+  await expect(input).toHaveValue(query);
+  await page.keyboard.press("Enter");
+  await expect(dialog).toHaveCount(0);
+}

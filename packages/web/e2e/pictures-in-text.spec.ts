@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Page } from "@playwright/test";
-import { axe, caretAtEnd, expect, test, type App } from "./fixtures.ts";
+import { axe, caretAtEnd, expect, palette, test, type App } from "./fixtures.ts";
 import { makePicture, pastePicture, pictureIn } from "./pictures.ts";
 
 /** Pictures between paragraphs (D10, heffrey78/gh-writer#203): added, changed and removed, checked in the scene's Markdown and images/ on disk. */
@@ -16,12 +16,6 @@ async function openChapter(page: Page, app: App) {
   const text = page.getByRole("textbox", { name: "Chapter text" });
   await expect(text).toBeFocused();
   return { dir, text, read: (path: string) => readFileSync(join(dir, path), "utf8"), exists: (path: string) => existsSync(join(dir, path)) };
-}
-
-async function palette(page: Page, query: string) {
-  await page.keyboard.press("ControlOrMeta+k");
-  await page.keyboard.type(query);
-  await page.keyboard.press("Enter");
 }
 
 test("chosen from the palette, resized, described and captioned; then changed by keyboard, and removed with its file", async ({ page, app }) => {

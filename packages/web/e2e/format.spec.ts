@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Page } from "@playwright/test";
-import { axe, expect, test, type App } from "./fixtures.ts";
+import { axe, expect, palette, test, type App } from "./fixtures.ts";
 
 /** Format 3 (D15): a novel moves to book.yaml only when the writer asks, and reads the same after. */
 
@@ -11,12 +11,6 @@ async function open(page: Page, app: App) {
   await page.goto(app.launchUrl);
   await expect(page.getByRole("textbox", { name: "Chapter text" })).toBeFocused();
   return dir;
-}
-
-async function palette(page: Page, query: string) {
-  await page.keyboard.press("ControlOrMeta+k");
-  await page.keyboard.type(query);
-  await page.keyboard.press("Enter");
 }
 
 test("moves a novel to the new format from the palette, once asked, in one commit; it reads the same after", async ({ page, app }) => {

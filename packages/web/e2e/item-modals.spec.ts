@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Page } from "@playwright/test";
-import { axe, caretAtEnd, expect, openView, test, type App } from "./fixtures.ts";
+import { axe, caretAtEnd, expect, openView, palette, test, type App } from "./fixtures.ts";
 
 /** Notes, off-page events and entries open as a modal over their gallery (heffrey78/gh-writer#233), their parts saved on leaving them (heffrey78/gh-writer#234). */
 
@@ -13,12 +13,6 @@ async function openNovel(page: Page, app: App) {
   await page.goto(app.launchUrl);
   await expect(page.getByRole("textbox", { name: "Chapter text" })).toBeFocused();
   return { dir, read: (path: string) => readFileSync(join(dir, path), "utf8"), files: (folder: string) => readdirSync(join(dir, folder)).sort() };
-}
-
-async function palette(page: Page, query: string) {
-  await page.keyboard.press("ControlOrMeta+k");
-  await page.keyboard.type(query);
-  await page.keyboard.press("Enter");
 }
 
 const views = (page: Page) => page.getByRole("navigation", { name: "Views" });

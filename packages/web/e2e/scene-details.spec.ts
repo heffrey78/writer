@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Locator, Page } from "@playwright/test";
-import { axe, expect, test, type App } from "./fixtures.ts";
+import { axe, expect, palette, test, type App } from "./fixtures.ts";
 
 const BETRAYAL = "manuscript/02-the-sale/01-night-crossing/01-the-betrayal.md";
 const STATION = "manuscript/01-return/01-arrival/01-the-station.md";
@@ -12,12 +12,6 @@ async function open(page: Page, app: App) {
   await page.goto(app.launchUrl);
   await expect(page.getByRole("textbox", { name: "Chapter text" })).toBeFocused();
   return { dir, read: (path: string) => readFileSync(join(dir, path), "utf8") };
-}
-
-async function palette(page: Page, query: string) {
-  await page.keyboard.press("ControlOrMeta+k");
-  await page.keyboard.type(query);
-  await page.keyboard.press("Enter");
 }
 
 async function pick(page: Page, picker: string | RegExp, search: string) {

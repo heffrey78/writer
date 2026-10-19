@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Page } from "@playwright/test";
-import { axe, expect, selectionSettled, test, type App } from "./fixtures.ts";
+import { axe, expect, palette, selectionSettled, test, type App } from "./fixtures.ts";
 
 const ARRIVAL = "manuscript/01-return/01-arrival";
 const OLD_DEBTS = "manuscript/01-return/02-old-debts";
@@ -21,12 +21,6 @@ async function open(page: Page, app: App) {
     has: (path: string) => existsSync(join(dir, path)),
     lastCommit: () => app.git(dir, "log", "-1", "--format=%s").trim(),
   };
-}
-
-async function palette(page: Page, query: string) {
-  await page.keyboard.press("ControlOrMeta+k");
-  await page.keyboard.type(query);
-  await page.keyboard.press("Enter");
 }
 
 test("shows parts, chapters and scenes with word counts, as an accessible tree", async ({ page, app }) => {
