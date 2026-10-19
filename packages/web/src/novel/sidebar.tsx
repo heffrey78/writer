@@ -1,4 +1,4 @@
-import type { Book } from "@writer/core";
+import type { Book, BookKind } from "@writer/core";
 import { BookOpen, CircleDot, Columns2, Goal, ListTree, Map as MapIcon, Network, PanelLeftClose, PanelLeftOpen, PenLine, StickyNote, type LucideIcon } from "lucide-react";
 import { Dialog } from "radix-ui";
 import { useEffect, useId, useState, type ReactNode } from "react";
@@ -6,6 +6,7 @@ import { NavLink, useLocation } from "react-router";
 import { create } from "zustand";
 import { plural } from "../bible/types.ts";
 import { useCommands } from "../commands.ts";
+import { moduleViews } from "../modules.tsx";
 import { cn } from "../ui/cn.ts";
 import { ManuscriptSidebar } from "./manuscript-tree.tsx";
 import type { Workspace } from "./workspace.ts";
@@ -44,8 +45,10 @@ interface Place {
   icon: LucideIcon;
 }
 
-/** The views by group; Issues only for a novel on GitHub. */
-function groups(onGitHub: boolean): { label: string; places: Place[] }[] {
+/** The views by group, the book's modules' after the base's in each; Issues only for a novel on GitHub. */
+export function groups(onGitHub: boolean, kind: BookKind): { label: string; places: Place[] }[] {
+  const views = moduleViews(kind);
+  const added = (group: string) => views.filter((v) => v.group === group).map(({ path, label, icon }) => ({ path, label, icon }));
   return [
     {
       label: "Plan",
@@ -56,11 +59,12 @@ function groups(onGitHub: boolean): { label: string; places: Place[] }[] {
         { path: "notes", label: "Notes", icon: StickyNote },
         { path: "progress", label: "Progress", icon: Goal },
         { path: "bible", label: "Story bible", icon: BookOpen },
+        ...added("Plan"),
       ],
     },
     {
       label: "Revise",
-      places: [{ path: "compare", label: "Compare", icon: Columns2 }, ...(onGitHub ? [{ path: "issues", label: "Issues", icon: CircleDot }] : [])],
+      places: [{ path: "compare", label: "Compare", icon: Columns2 }, ...(onGitHub ? [{ path: "issues", label: "Issues", icon: CircleDot }] : []), ...added("Revise")],
     },
   ];
 }
@@ -107,7 +111,7 @@ export function Sidebar({ novelId, novel, workspace, current, onGitHub }: { nove
   if (narrow)
     return (
       <>
-        <Strip novelId={novelId} onGitHub={onGitHub} toggle={() => setDrawer(true)} />
+        <Strip novelId={novelId} kind={novel.kind} onGitHub={onGitHub} toggle={() => setDrawer(true)} />
         <Dialog.Root open={drawer} onOpenChange={setDrawer}>
           <Dialog.Portal>
             <Dialog.Overlay className="fixed inset-0 z-30 bg-black/40" />
@@ -120,7 +124,7 @@ export function Sidebar({ novelId, novel, workspace, current, onGitHub }: { nove
       </>
     );
   return collapsed ? (
-    <Strip novelId={novelId} onGitHub={onGitHub} toggle={toggle} />
+    <Strip novelId={novelId} kind={novel.kind} onGitHub={onGitHub} toggle={toggle} />
   ) : (
     <Expanded novelId={novelId} novel={novel} workspace={workspace} current={current} onGitHub={onGitHub} toggle={toggle} />
   );
@@ -150,7 +154,7 @@ function Expanded({ novelId, novel, workspace, current, onGitHub, toggle }: { no
         </div>
       </section>
       <nav aria-label="Views" className="grid shrink-0 gap-3 border-t border-rule px-3 py-3 text-sm">
-        {groups(onGitHub).map((g) => (
+        {groups(onGitHub, novel.kind).map((g) => (
           <Group key={g.label} label={g.label}>
             {g.places.map((p) => (
               <li key={p.path}>
@@ -196,7 +200,7 @@ function Group({ label, children }: { label: string; children: ReactNode }) {
 }
 
 /** Collapsed: one icon per place, each named (for screen readers, and as a tooltip). */
-function Strip({ novelId, onGitHub, toggle }: { novelId: string; onGitHub: boolean; toggle: () => void }) {
+function Strip({ novelId, kind, onGitHub, toggle }: { novelId: string; kind: BookKind; onGitHub: boolean; toggle: () => void }) {
   const icon = (to: string, label: string, Icon: LucideIcon, end = false) => (
     <NavLink
       key={to}
@@ -214,7 +218,7 @@ function Strip({ novelId, onGitHub, toggle }: { novelId: string; onGitHub: boole
       <ToggleButton collapsed toggle={toggle} />
       <nav aria-label="Views" className="flex flex-col items-center gap-1">
         {icon(`/novels/${novelId}`, "Manuscript", PenLine, true)}
-        {groups(onGitHub).map((g) => (
+        {groups(onGitHub, kind).map((g) => (
           <div key={g.label} role="group" aria-label={g.label} className="flex flex-col items-center gap-1 border-t border-rule pt-1">
             {g.places.map((p) => icon(`/novels/${novelId}/${p.path}`, p.label, p.icon))}
           </div>

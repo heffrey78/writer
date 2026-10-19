@@ -1,5 +1,6 @@
 import type { EntityTypeDef } from "./ids.ts";
 import type { IssueKind } from "./issue-kinds.ts";
+import { withModules } from "./modules.ts";
 
 /*
  * Kinds of book (D14, D15): what makes a novel a novel, as data the base reads rather than code it
@@ -105,6 +106,8 @@ export interface BookKind {
   fields: readonly FieldDef[];
   /** What a book's issues are about: a label kind/<key> each. */
   issueKinds: readonly IssueKind[];
+  /** The modules its books use, by id (D14): each adds its fields after the kind's own, and its checks. */
+  modules?: readonly string[];
 }
 
 /** The kind of every book in format v2, which has no `kind`. */
@@ -112,9 +115,12 @@ export const V2_KIND = "novel";
 
 const registry = new Map<string, BookKind>();
 
-/** Make a kind of book known: done by the app's entry points, for each kind they ship. */
+/**
+ * Make a kind of book known: done by the app's entry points, for each kind they ship, after the
+ * modules it lists. It's known with what its modules add.
+ */
 export function registerKind(kind: BookKind): void {
-  registry.set(kind.key, kind);
+  registry.set(kind.key, withModules(kind));
 }
 
 /** A registered kind of book, or undefined for one this build doesn't ship. */

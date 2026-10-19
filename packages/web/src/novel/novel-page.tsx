@@ -7,6 +7,7 @@ import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from "rea
 import { Link, Navigate, Route, Routes, useLocation, useNavigate, useParams } from "react-router";
 import { api, keys } from "../api.ts";
 import { useCommands, type Command } from "../commands.ts";
+import { ModuleCommands, moduleRoutes } from "../modules.tsx";
 import { flushOnQuit } from "../desktop.ts";
 import { FileDown, History } from "lucide-react";
 import { DropdownMenu } from "radix-ui";
@@ -323,6 +324,7 @@ export function NovelPage() {
                 <Route path="issues" element={<GitHubOnly repo={repo} novelId={novelId}>{() => <IssuesPage novelId={novelId} novel={book} workspace={workspace} />}</GitHubOnly>} />
                 <Route path="issues/:number" element={<GitHubOnly repo={repo} novelId={novelId}>{() => <IssueRoute novelId={novelId} novel={book} workspace={workspace} />}</GitHubOnly>} />
                 <Route path="notes" element={<NotesPage novelId={novelId} novel={book} />} />
+                {moduleRoutes({ novelId, novel: book, workspace })}
                 <Route path="*" element={<Missing what="page" />} />
               </Routes>
             </ErrorBoundary>
@@ -332,6 +334,7 @@ export function NovelPage() {
         <AdoptConflicts novelId={novelId} novel={book} workspace={workspace} />
         {compiling && <CompileDialog novelId={novelId} novel={book} workspace={workspace} onClose={() => setCompiling(false)} />}
         <SaveConflicts novel={book} workspace={workspace} />
+        <ModuleCommands novelId={novelId} novel={book} workspace={workspace} />
         <NoticeBar />
         <NotesLeftDialog />
         {newFormat.dialog}

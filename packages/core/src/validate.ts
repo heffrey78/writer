@@ -1,6 +1,7 @@
 import { idPrefix, RECORD_PREFIXES } from "./ids.ts";
 import { loadBook } from "./load.ts";
 import { EVENT_FILES_FORMAT } from "./manifest.ts";
+import { moduleDiagnostics } from "./modules.ts";
 import { allRecords, levelLabel, mentions, pieceLevel, picturePath, pictures, sectionsAt, type Book, type Picture, type RecordRef } from "./model.ts";
 import type { FileSource } from "./source.ts";
 import { overlaps, storyTimeline, type TimelineItem } from "./time.ts";
@@ -251,6 +252,8 @@ export function validateBook(novel: Book): Diagnostic[] {
     }
   }
 
+  // The checks of the kind's modules.
+  out.push(...moduleDiagnostics(novel));
   return out;
 }
 

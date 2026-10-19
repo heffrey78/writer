@@ -4,7 +4,8 @@
   "type": "module",
   "description": "Plan and write a novel with GitHub: local-first writing app, story bible and diagrams.",
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "packages/modules/*"
   ],
   "engines": {
     "node": ">=22.18"

@@ -5,6 +5,7 @@ export { loadBook } from "./load.ts";
 export { entryIds, fieldName, itemsOf, itemText } from "./fields.ts";
 export { EVENT_FILES_FORMAT, MANIFEST, NOVEL_MANIFEST, readManifest, SCHEMA_VERSION, type Manifest } from "./manifest.ts";
 export { kindByKey, knownKind, levelOf, registerKind, startLevels, V2_KIND, type BookKind, type FieldDef, type ItemProp, type LevelDef, type StatusDef } from "./kinds.ts";
+export { defineModule, modulesOf, registerModule, withModules, type BookModule, type Finding, type ModuleCheck } from "./modules.ts";
 export { eventFile, migration, type Migration, type MigrationWrite } from "./migrate.ts";
 export { parseMarkdown, parseYaml } from "./parse.ts";
 export { checkSchema, schemaFor, SCHEMAS, type SchemaKind } from "./schemas.ts";

@@ -40,7 +40,7 @@ The novel itself is the source of truth: plain Markdown and YAML files ([format 
 | [`export`](packages/export) | DOCX (hand-written WordprocessingML), EPUB 3 and PDF (pdfkit, with Liberation Serif) from a compiled book; zipped with fflate. |
 | [`cli`](packages/cli) | `writer serve`, `validate`, `snapshots`, `compile`, `migrate` and `new-id`, and the entry points bundled into novel repositories. |
 | [`desktop`](packages/desktop) | The desktop app: a Tauri shell that runs the server bundle on its own Node and git, and opens a window on it. |
-| [`kinds`](packages/kinds) | The kinds of book the app ships, as data (D14, D15): the Novel's levels, ID prefixes, folders, built-in entry types, statuses, issue kinds and its scenes' fields (each field's type is how the schema, the validator, the Scene card, the outline, comparisons and mentions read it). The app's entry points (the CLI and the bundles vendored into books, the editor's playground, the tests' setup) call `registerKinds()`; the rest of the code reads a book's kind from its model (`novel.kind`), or in the web app from `useBookKind()`, and never imports a kind. |
+| [`kinds`](packages/kinds) | The kinds of book the app ships, as data (D14, D15): the Novel's levels, ID prefixes, folders, built-in entry types, statuses, issue kinds, its scenes' fields (each field's type is how the schema, the validator, the Scene card, the outline, comparisons and mentions read it) and the modules it uses. See *Kinds and modules*. |
 
 Other folders:
 
@@ -48,6 +48,26 @@ Other folders:
 - `examples/sample-novel`: *The Bridge at Varn*, the sample used by tests, screenshots and the playground.
 - `docs/format/v3.md`: the format spec.
 - `scripts/`: the bundler for vendored tools and the sample compile.
+
+## Kinds and modules
+
+A kind of book is data in `packages/kinds` (D14, D15). A module is a first-party feature that some kinds use and others don't, in `packages/modules/<name>` (`@writer/module-<name>`), with a core half and a web half (and later a server half) under subpath exports. A kind lists its modules by id, in `modules`.
+
+The base never imports a kind or a module: `packages/core/test/boundary.test.ts` fails if any file of the base packages does, except the app's entry points, which register what the app ships:
+
+- `registerKinds()` from `@writer/kinds` registers the modules' core halves, then the kinds. The CLI, the bundles vendored into books, the editor's playground and the tests' setup call it. A kind is registered with what its modules add (`withModules`), and `loadBook` completes a kind passed to it the same way.
+- The web app's `main.tsx` registers the modules' web halves (`registerWebModule`). The web app gets the book's kind, complete, with the book from the server.
+
+The rest of the code reads a book's kind from its model (`book.kind`), or in the web app from `useBookKind()`.
+
+A module contributes only through these extension points. Each was added when a module needed it (D14), so the list grows as modules move out of the base:
+
+| Extension point | Half | What it is |
+|---|---|---|
+| `fields` | core (`defineModule`) | Fields a piece's front matter holds, declared as a kind declares them (`FieldDef`), after the kind's own. They're in the schema and the validator's reference checks, on the piece's card, and in the outline, comparisons and mentions as their declaration says. A module can't declare a field its kind already has. |
+| `checks` | core | Validator checks: a code, its severity, and `find(book)`, which returns what it found (file, message, and a pointer or line). They run after the base's, in the app, on the CLI and in a book's GitHub Action. |
+| `views` | web (`WebModule`) | Pages of the book: a route under it (and below it, `path/*`), a label and an icon, listed in the sidebar's Plan or Revise group after the base's views, and in the palette under "Go to". |
+| `commands` | web | Palette commands while a book of a kind that uses the module is open. |
 
 ## Checks
 

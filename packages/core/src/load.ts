@@ -1,5 +1,6 @@
 import { reservedPrefixes, type EntityTypeDef } from "./ids.ts";
 import { kindByKey, knownKind, startLevels, V2_KIND, type BookKind, type LevelDef } from "./kinds.ts";
+import { withModules } from "./modules.ts";
 import { EVENT_FILES_FORMAT, MANIFEST, NOVEL_MANIFEST, readManifest, SCHEMA_VERSION } from "./manifest.ts";
 import type { Section, Entity, Book, PlotlineRef, Relationship, Piece, StoryEvent, ThemeRef } from "./model.ts";
 import { parseMarkdown, parseYaml } from "./parse.ts";
@@ -20,7 +21,7 @@ export async function loadBook(source: FileSource, kind?: BookKind): Promise<Boo
   const manifest = await readManifest(source);
   const file = manifest?.file ?? NOVEL_MANIFEST;
   const named = manifest?.kind === undefined ? undefined : knownKind(manifest.kind);
-  const bookKind = kind ?? named ?? kindByKey(V2_KIND);
+  const bookKind = withModules(kind ?? named ?? kindByKey(V2_KIND));
   const { content, codex, notes: notesFolder, events: eventsFolder } = bookKind.folders;
   // The front-matter keys of the kind's fields (story time's two).
   const fieldKeys = bookKind.fields.flatMap((f) => (f.type.kind === "story-time" ? [f.key, f.type.durationKey] : [f.key]));
