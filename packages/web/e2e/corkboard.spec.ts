@@ -42,6 +42,8 @@ test("shows scenes as cards by chapter, and filters them, keeping the filter in 
 test("moves a card past its visible neighbour with the keyboard, in the whole book", async ({ page, app }) => {
   const novel = await open(page, app);
   await page.getByRole("combobox", { name: "Point of view" }).selectOption({ label: "Ada Varn" });
+  // The board shows the filter before the key: a move on the board as it was would pass the hidden Flood.
+  await expect(card(page, "The Flood")).toHaveCount(0);
   await page.getByRole("button", { name: "Move “Mirela's Offer”" }).focus();
   await page.keyboard.press("Alt+ArrowLeft");
   // Before The Betrayal, the card it passed: the hidden Flood stays where it was.
@@ -54,6 +56,7 @@ test("a card dropped on a filtered board lands next to the card it was dropped o
   await page.setViewportSize({ width: 1280, height: 1600 });
   const novel = await open(page, app);
   await page.getByRole("combobox", { name: "Point of view" }).selectOption({ label: "Ada Varn" });
+  await expect(card(page, "The Flood")).toHaveCount(0);
   const betrayal = card(page, "The Betrayal");
   // Each drag is tried again until it lands, as in the outline and swimlanes: one as the board settles
   // (WebKit's slower to) can miss. Dropped there again, the card stays where it is.
