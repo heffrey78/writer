@@ -1,5 +1,6 @@
 import { DEFAULT_GAP, presentIn } from "./diagrams.ts";
-import type { Book, Relationship } from "./model.ts";
+import { entryIds } from "./fields.ts";
+import type { Book, Piece, Relationship } from "./model.ts";
 import { storyInstant, storyTimeline } from "./time.ts";
 
 const MINUTE = 60_000;
@@ -95,9 +96,11 @@ export function sceneFacts(novel: Book, sceneId: string): string[] {
     if ("scenes" in DEFAULT_GAP && away >= DEFAULT_GAP.scenes) facts.push(`${name(id)} is back after ${away} scenes away.`);
   }
 
-  // Plotlines beginning or ending here.
-  for (const { id } of scene.plotlines) {
-    const scenesWith = scenes.flatMap((s, i) => (s.plotlines.some((p) => p.id === id) ? [i] : []));
+  // Threads (plotlines) beginning or ending here.
+  const threads = novel.kind.fields.filter((f) => f.threads);
+  const threadsOf = (s: Piece) => threads.flatMap((f) => entryIds(f, s.fields[f.key]));
+  for (const id of threadsOf(scene)) {
+    const scenesWith = scenes.flatMap((s, i) => (threadsOf(s).includes(id) ? [i] : []));
     const begins = scenesWith[0] === at;
     const ends = scenesWith.at(-1) === at;
     if (begins && ends) facts.push(`${name(id)} begins and ends here.`);

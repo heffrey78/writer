@@ -14,6 +14,7 @@ import { GlobalCommands } from "./global-commands.tsx";
 import { CommandPalette } from "./palette.tsx";
 import { LibraryPage } from "./library/library-page.tsx";
 import { registerWebModule, type WebModule } from "./modules.tsx";
+import { plotlinesWeb } from "@writer/module-plotlines/web";
 import { NovelPage } from "./novel/novel-page.tsx";
 import { NotFound } from "./not-found.tsx";
 import { apply } from "./theme.ts";
@@ -24,7 +25,7 @@ apply();
 
 // The web halves of the modules the app ships (D14), from packages/modules: their core halves come
 // with the book's kind, from the server.
-const WEB_MODULES: readonly WebModule[] = [];
+const WEB_MODULES: readonly WebModule[] = [plotlinesWeb];
 for (const module of WEB_MODULES) registerWebModule(module);
 
 // The graph benchmark (heffrey78/gh-writer#68), loaded only when visited.

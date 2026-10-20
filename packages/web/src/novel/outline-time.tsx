@@ -1,4 +1,4 @@
-import { carrierOf, carryingField, countWords, proseText, storyTimeline, vocabulary, type Book, type Piece, type StoryEvent } from "@writer/core";
+import { carrierOf, carryingField, countWords, entryIds, proseText, storyTimeline, vocabulary, type Book, type Piece, type StoryEvent } from "@writer/core";
 import { when } from "@writer/core/diagrams";
 import { useMemo } from "react";
 import { Link, useSearchParams } from "react-router";
@@ -38,6 +38,8 @@ export function OutlineTimeTable({ novelId, novel, workspace }: { novelId: strin
   const items = useMemo(() => inStoryTime(novel), [novel]);
   const w = vocabulary(novel.kind);
   const carrying = carryingField(novel.kind);
+  // The threads its pieces follow (plotlines), for a kind with them.
+  const threading = novel.kind.fields.find((f) => f.threads);
   const edit = useSceneEdit(novelId, workspace);
   const name = (id: string | undefined) => novel.entities.find((e) => e.id === id)?.name;
   const names = (ids: string[] | undefined) => (ids ?? []).map(name).filter(Boolean).join(", ") || <span className="text-muted not-italic">—</span>;
@@ -69,9 +71,11 @@ export function OutlineTimeTable({ novelId, novel, workspace }: { novelId: strin
               <th scope="col" className="w-40 py-2 pr-3 font-medium">
                 Characters
               </th>
-              <th scope="col" className="w-36 py-2 pr-3 font-medium">
-                Plotlines
-              </th>
+              {threading && (
+                <th scope="col" className="w-36 py-2 pr-3 font-medium">
+                  {threading.label}
+                </th>
+              )}
               <th scope="col" className="w-16 py-2 text-right font-medium">
                 Words
               </th>
@@ -95,7 +99,7 @@ export function OutlineTimeTable({ novelId, novel, workspace }: { novelId: strin
                   </td>
                   {carrying && <td className="py-2 pr-3">{name(carrierOf(novel.kind, item.scene)) ?? <span className="text-muted">—</span>}</td>}
                   <td className="py-2 pr-3">{names(item.scene.characters)}</td>
-                  <td className="py-2 pr-3">{names(item.scene.plotlines.map((p) => p.id))}</td>
+                  {threading && <td className="py-2 pr-3">{names(entryIds(threading, item.scene.fields[threading.key]))}</td>}
                   <td className="py-2 text-right tabular-nums">{number.format(countWords(item.scene.body))}</td>
                 </tr>
               ) : (
@@ -108,9 +112,9 @@ export function OutlineTimeTable({ novelId, novel, workspace }: { novelId: strin
                   </td>
                   <td className="py-2 pr-3 text-muted">{noteLine(item.event)}</td>
                   <td className="py-2 pr-3 text-xs font-medium tracking-wide text-muted not-italic uppercase">Off the page</td>
-                  <td className="py-2 pr-3 text-muted not-italic">—</td>
+                  {carrying && <td className="py-2 pr-3 text-muted not-italic">—</td>}
                   <td className="py-2 pr-3">{names(item.event.characters)}</td>
-                  <td className="py-2 pr-3">{names(item.event.plotlines)}</td>
+                  {threading && <td className="py-2 pr-3">{names(eventList(item.event, threading.key))}</td>}
                   <td className="py-2 text-right text-muted not-italic">—</td>
                 </tr>
               ),
@@ -126,8 +130,15 @@ export function OutlineTimeTable({ novelId, novel, workspace }: { novelId: strin
  * Whether an event shows with the cards' filters: those about its people, places and plotlines (by
  * entry type); one field's filter (a point of view) or status is a scene's, and leaves events out.
  */
+/** An event's list of entries by the key a piece's field has for them ("plotlines"). */
+const eventList = (e: StoryEvent, key: string) => {
+  const v = (e as unknown as Record<string, unknown>)[key];
+  return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+};
+
 const eventShows = (novel: Book, e: StoryEvent, f: CorkboardFilter) => {
-  const held: Record<string, string[] | undefined> = { character: e.characters, location: e.locations, plotline: e.plotlines };
+  // An event's lists by the entry type of the piece's field of the same key.
+  const held: Record<string, string[] | undefined> = Object.fromEntries(novel.kind.fields.flatMap((x) => ("entityType" in x.type ? [[x.type.entityType, eventList(e, x.key)]] : [])));
   return !f["status"] && filtersOf(novel).every((d) => !f[d.param] || (!d.field && (held[d.entityType] ?? []).includes(f[d.param]!)));
 };
 

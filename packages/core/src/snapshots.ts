@@ -1,5 +1,6 @@
-import { DEFAULT_GAP, defaultLanes, gaps, graphAt, gridKey, itemTitle, jump, type GraphFilter, type LaneMode, lanesOf, presence, sceneColumns, sortRows, swimlanes, timeline, totals, when, type GraphEdge, type GraphNode, type Presence } from "./diagrams.ts";
+import { DEFAULT_GAP, defaultLanes, gaps, graphAt, gridKey, itemTitle, jump, type GraphFilter, type LaneMode, lanesOf, presence, sceneColumns, sortRows, timeline, totals, when, type GraphEdge, type GraphNode, type Presence } from "./diagrams.ts";
 import type { Book, Piece } from "./model.ts";
+import { moduleSnapshots } from "./modules.ts";
 import { seriesHex, type SeriesSlot } from "./palette.ts";
 
 /*
@@ -126,13 +127,15 @@ function node(n: GraphNode, c: { x: number; y: number }): string {
 
 // ——— Grids: plotline swimlanes and presence ———
 
-interface Dot {
+/** A dot in a grid cell: its radius and style, and a ring around it. */
+export interface Dot {
   r: number;
   style: "filled" | "hollow" | "dashed";
   ring?: boolean;
 }
 
-interface Grid {
+/** A grid of entries against one column per scene: its rows, its dots, its shaded cells. */
+export interface Grid {
   title: string;
   rows: { id: string; name: string; aside?: string }[];
   scenes: Piece[];
@@ -145,7 +148,7 @@ const ROW = 32;
 const HEADER = 170;
 
 /** Rows of entries against one column per scene, under chapter and part headers, with dots and shaded absences. */
-function gridSvg(novel: Book, g: Grid): string {
+export function gridSvg(novel: Book, g: Grid): string {
   const { chapters, parts } = sceneColumns(novel, g.scenes);
   const top = 40;
   const partH = parts.length ? 20 : 0;
@@ -192,27 +195,11 @@ function gridSvg(novel: Book, g: Grid): string {
 }
 
 /** Absences (or quiet plotlines) as shaded cells. */
-function shadedOf(list: { lane: string; from: string; to: string }[], scenes: Piece[]): Set<string> {
+export function shadedOf(list: { lane: string; from: string; to: string }[], scenes: Piece[]): Set<string> {
   const ids = scenes.map((s) => s.id);
   const out = new Set<string>();
   for (const g of list) for (const id of ids.slice(ids.indexOf(g.from), ids.indexOf(g.to) + 1)) out.add(gridKey(g.lane, id));
   return out;
-}
-
-/** The plotline swimlanes: a large dot for a major beat, a small one for a minor; shaded, a plotline gone quiet past the novel's threshold. */
-export function plotlinesSvg(novel: Book): string {
-  const s = swimlanes(novel);
-  const threshold = novel.config?.plotline_gap ?? DEFAULT_GAP;
-  return gridSvg(novel, {
-    title: "Plotlines by scene",
-    rows: s.lanes.map((l) => ({ id: l.id, name: l.name })),
-    scenes: s.scenes,
-    dot: (row, scene) => {
-      const m = s.marks.get(gridKey(row, scene));
-      return m && (m.weight === "major" ? { r: 7, style: "filled" } : { r: 5, style: "hollow" });
-    },
-    shaded: shadedOf(gaps(s, threshold), s.scenes),
-  });
 }
 
 const dotOf = (p: Presence): Dot =>
@@ -337,7 +324,9 @@ export function snapshots(novel: Book): Map<string, string> {
   const has = (type: string) => novel.entities.some((e) => e.type === type);
   const hasTimes = timeline(novel, defaultLanes(novel.kind)).items.length > 0;
   if (has("character")) files.set("diagrams/relationships.svg", relationshipSvg(novel, last?.id, last ? `Relationships at the end of the book (“${last.title}”)` : "Relationships"));
-  if (has("plotline") && novel.pieces.length) files.set("diagrams/plotlines.svg", plotlinesSvg(novel));
+  // The kind's modules' diagrams come after the relationships, before presence and the timeline.
+  const modules = moduleSnapshots(novel);
+  for (const m of modules) for (const [path, text] of m.files) files.set(path, text);
   if (has("character") && novel.pieces.length) files.set("diagrams/presence-characters.svg", presenceSvg(novel, "character", "Characters by scene"));
   if (has("theme") && novel.pieces.length) files.set("diagrams/presence-themes.svg", presenceSvg(novel, "theme", "Themes by scene"));
   if (hasTimes) files.set("diagrams/timeline.svg", timelineSvg(novel));
@@ -361,12 +350,7 @@ export function snapshots(novel: Book): Map<string, string> {
         ]
       : ["No characters yet."]),
     "",
-    "## Plotlines",
-    "",
-    ...(files.has("diagrams/plotlines.svg")
-      ? ["Each column is a scene, in reading order: a large dot is a major beat, a small one a minor beat. Shaded: a plotline gone quiet for longer than the novel's threshold.", "", "![Plotlines by scene](plotlines.svg)"]
-      : ["No plotlines yet."]),
-    "",
+    ...modules.flatMap((m) => m.readme),
     "## Presence",
     "",
     ...(files.has("diagrams/presence-characters.svg") || files.has("diagrams/presence-themes.svg")

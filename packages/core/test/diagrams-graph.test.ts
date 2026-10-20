@@ -35,10 +35,10 @@ describe("the relationship graph at a scene", () => {
 });
 
 describe("filtering the graph", () => {
-  it("by relationship type, by plotline, and by who is present in a range of scenes; filters combine", () => {
+  it("by relationship type, by a thread (a plotline), and by who is present in a range of scenes; filters combine", () => {
     expect(graphAt(novel, "sc_0d9wm4", { relationshipTypes: ["rivals"] }).edges.map((e) => e.label)).toEqual(["Rivals with"]);
     // Ben's Debt runs through five scenes; Mirela is in none of them.
-    const debt = graphAt(novel, "sc_0d9wm4", { plotline: "plot_gr1efa" });
+    const debt = graphAt(novel, "sc_0d9wm4", { thread: "plot_gr1efa" });
     expect(debt.nodes.map((n) => n.label)).toEqual(["Ada Varn", "Ben Varn", "Tomas Hale"]);
     // Only the first chapter: Ada and Ben.
     expect(graphAt(novel, "sc_5tat1n", { from: "sc_5tat1n", to: "sc_br1dg3" }).nodes.map((n) => n.label)).toEqual(["Ada Varn", "Ben Varn"]);

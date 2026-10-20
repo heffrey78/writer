@@ -1,12 +1,11 @@
-import { DEFAULT_GAP, gaps, swimlanes, when, type Gap } from "./diagrams.ts";
+import { when } from "./diagrams.ts";
 import { entriesOf } from "./fields.ts";
 import type { Book, Piece } from "./model.ts";
 import { storyInstant, type TimelineItem } from "./time.ts";
 
 /*
  * What a profile says that depends on the entry's type (heffrey78/gh-writer#161): a location's visitors and the story
- * time its scenes span; a plotline's beats in reading order, the scenes it skips, who's in it and
- * where, and where it goes quiet; a theme's strength scene by scene.
+ * time its scenes span; a theme's strength scene by scene. A plotline's is its module's.
  */
 
 /** Entries counted by how many scenes they're in, most first, then by name. */
@@ -16,7 +15,7 @@ export interface Tally {
   scenes: number;
 }
 
-function tally(novel: Book, ids: Iterable<string>[]): Tally[] {
+export function tally(novel: Book, ids: Iterable<string>[]): Tally[] {
   const counts = new Map<string, number>();
   for (const list of ids) for (const id of new Set(list)) counts.set(id, (counts.get(id) ?? 0) + 1);
   return [...counts]
@@ -52,36 +51,6 @@ export function locationProfile(novel: Book, id: string): LocationProfile {
   const scenes = novel.pieces.filter((s) => s.locations.includes(id));
   const span = storySpan(novel, scenes);
   return { visitors: tally(novel, scenes.map((s) => entriesOf(novel, s, "character"))), scenes, ...(span ? { span } : {}) };
-}
-
-export interface PlotlineProfile {
-  /** Its beats in reading order; `beat` is missing where the scene says nothing of what happens. */
-  beats: { scene: Piece; index: number; weight: "major" | "minor"; beat?: string }[];
-  /** Scenes between its first and last beat that it isn't in. */
-  skips: Piece[];
-  /** Who's in its scenes, and where they're set, by how often. */
-  who: Tally[];
-  where: Tally[];
-  /** Where it goes quiet for longer than the Story map's threshold. */
-  quiet: Gap[];
-}
-
-export function plotlineProfile(novel: Book, id: string): PlotlineProfile {
-  const scenes = novel.pieces;
-  const beats = scenes.flatMap((scene) =>
-    scene.plotlines.flatMap((p, index) => (p.id === id ? [{ scene, index, weight: p.weight, ...(p.beat ? { beat: p.beat } : {}) }] : [])),
-  );
-  const first = scenes.indexOf(beats[0]?.scene as Piece);
-  const last = scenes.indexOf(beats.at(-1)?.scene as Piece);
-  const skips = first < 0 ? [] : scenes.slice(first, last + 1).filter((s) => !s.plotlines.some((p) => p.id === id));
-  const lanes = swimlanes(novel);
-  return {
-    beats,
-    skips,
-    who: tally(novel, beats.map((b) => entriesOf(novel, b.scene, "character"))),
-    where: tally(novel, beats.map((b) => b.scene.locations)),
-    quiet: gaps({ ...lanes, lanes: lanes.lanes.filter((l) => l.id === id) }, DEFAULT_GAP),
-  };
 }
 
 export interface ThemeProfile {

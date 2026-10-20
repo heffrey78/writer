@@ -1,0 +1,16 @@
+{
+  "name": "@writer/module-plotlines",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Plotlines (D14, #28): the plotline entry type and a piece's plotlines (weight, beat), the swimlanes and their gaps, the beats on a plotline's profile and its diagram.",
+  "exports": {
+    "./core": "./src/core/index.ts",
+    "./web": "./src/web/index.tsx"
+  },
+  "dependencies": {
+    "@writer/core": "0.1.0",
+    "@writer/editor": "0.1.0",
+    "@writer/web": "0.1.0"
+  }
+}

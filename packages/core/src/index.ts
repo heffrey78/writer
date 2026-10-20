@@ -6,7 +6,7 @@ export { carrierOf, carryingField, entriesOf, entryIds, fieldName, itemsOf, item
 export { EVENT_FILES_FORMAT, MANIFEST, NOVEL_MANIFEST, readManifest, SCHEMA_VERSION, type Manifest } from "./manifest.ts";
 export { kindByKey, knownKind, levelOf, registerKind, startLevels, V2_KIND, type BookKind, type FieldDef, type ItemProp, type LevelDef, type Noun, type StatusDef } from "./kinds.ts";
 export { vocabulary, word, type Vocabulary, type Word } from "./vocabulary.ts";
-export { defineModule, modulesOf, registerModule, withModules, type BookModule, type Finding, type ModuleCheck } from "./modules.ts";
+export { defineModule, moduleSnapshots, modulesOf, registerModule, withModules, type BookModule, type Finding, type ModuleCheck, type ModuleSnapshots } from "./modules.ts";
 export { eventFile, migration, type Migration, type MigrationWrite } from "./migrate.ts";
 export { parseMarkdown, parseYaml } from "./parse.ts";
 export { checkSchema, schemaFor, SCHEMAS, type SchemaKind } from "./schemas.ts";
@@ -26,4 +26,4 @@ export { bookImages, compileBook, CompileError, flatBlocks, numberWords, presets
 export { readableSpan, sceneFacts } from "./facts.ts";
 export { LEGACY_COLOURS, nextSeriesSlot, relationshipStyle, SERIES, seriesHex, seriesSlot, type RelationshipLine, type SeriesColour, type SeriesSlot } from "./palette.ts";
 export { entryPresence, entryPresences, type EntryPresence, type PresenceMark } from "./entry-presence.ts";
-export { locationProfile, plotlineProfile, storySpan, themeProfile, type LocationProfile, type PlotlineProfile, type Tally, type ThemeProfile } from "./entry-profile.ts";
+export { locationProfile, storySpan, tally, themeProfile, type LocationProfile, type Tally, type ThemeProfile } from "./entry-profile.ts";

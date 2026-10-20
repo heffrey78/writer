@@ -8,16 +8,14 @@ import { ExportMenu } from "../diagrams/export-menu.tsx";
 import { useNewEvent } from "../events/new-event.tsx";
 import { DayOne } from "./day-one.tsx";
 import { useViewParams } from "../ui/view-params.ts";
-import { defaultLanes, itemId, itemTitle, jump, lanesOf, timeline, when, type LaneMode } from "@writer/core/diagrams";
+import { defaultLanes, itemId, itemTitle, jump, laneModes as modesOf, lanesOf, timeline, when, type LaneMode } from "@writer/core/diagrams";
 
 const SLOT = 152;
 const HEAD = 168;
 const LINKS = 88;
-/** The ways the lanes can run: by carrier (named by the kind's carrying field, "Point of view") for a kind with one. */
-export const laneModes = (novel: Book): [LaneMode, string][] => {
-  const carrying = carryingField(novel.kind);
-  return [...(carrying ? [["carrier", carrying.label] as [LaneMode, string]] : []), ["plotline", "Plotline"], ["location", "Location"]];
-};
+/** The ways the lanes can run, named: by carrier (its field's label, "Point of view"), by an entry type ("Location"). */
+export const laneModes = (novel: Book): [LaneMode, string][] =>
+  modesOf(novel.kind).map((m) => [m, m === "carrier" ? (carryingField(novel.kind)?.label ?? m) : (novel.entityTypes.find((t) => t.key === m)?.label ?? m)]);
 
 /**
  * The book in story time: scenes and off-page events in the order they happen, evenly spaced with

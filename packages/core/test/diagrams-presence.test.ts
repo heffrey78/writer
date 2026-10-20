@@ -1,5 +1,5 @@
 import { fileURLToPath } from "node:url";
-import { loadBook, mentions } from "../src/index.ts";
+import { itemsOf, loadBook, mentions } from "../src/index.ts";
 import { nodeSource } from "../src/node.ts";
 import { describe, expect, it } from "vitest";
 import { gaps, gridKey, presence, sceneList, sortRows, totals } from "../src/diagrams.ts";
@@ -13,7 +13,7 @@ describe("presence", () => {
       const m = presence(novel, type);
       for (const scene of novel.pieces) {
         const listed = new Set<string>(
-          field === "characters" ? [...(typeof scene.fields["pov"] === "string" ? [scene.fields["pov"]] : []), ...scene.characters] : field === "locations" || field === "entities" ? scene[field] : scene[field].map((x) => x.id),
+          field === "characters" ? [...(typeof scene.fields["pov"] === "string" ? [scene.fields["pov"]] : []), ...scene.characters] : field === "locations" || field === "entities" ? scene[field] : field === "themes" ? scene.themes.map((x) => x.id) : itemsOf(scene.fields["plotlines"]).map((x) => (typeof x === "string" ? x : (x as { id: string }).id)),
         );
         for (const row of m.rows) expect(m.marks.get(gridKey(row.id, scene.id))?.listed ?? false, `${type} ${row.name} in ${scene.title}`).toBe(listed.has(row.id));
       }

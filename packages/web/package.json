@@ -4,6 +4,9 @@
   "private": true,
   "type": "module",
   "description": "The Writer app: library, writing workspace and the rest of the UI, served by the local server.",
+  "exports": {
+    "./*": "./src/*"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",

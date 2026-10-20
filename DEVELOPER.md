@@ -65,17 +65,24 @@ A module contributes only through these extension points. Each was added when a 
 | Extension point | Half | What it is |
 |---|---|---|
 | `fields` | core (`defineModule`) | Fields a piece's front matter holds, declared as a kind declares them (`FieldDef`), after the kind's own unless the kind's `fieldOrder` places them. They're in the schema and the validator's reference checks, on the piece's card, and in the outline, comparisons and mentions as their declaration says. A module can't declare a field its kind already has. |
+| `entityTypes` | core | Entry types of the codex, after the kind's own unless the kind's `entityTypeOrder` places them (the plotline). |
 | `checks` | core | Validator checks: a code, its severity, and `find(book)`, which returns what it found (file, message, and a pointer or line). They run after the base's, in the app, on the CLI and in a book's GitHub Action. |
+| `snapshots` | core | Diagrams for the book's `diagrams/` folder, and a section of its README, after the relationships, in the order the kind lists its modules. The vendored snapshot writer and the app draw the same bytes. |
 | `views` | web (`WebModule`) | Pages of the book: a route under it (and below it, `path/*`), a label and an icon, listed in the sidebar's Plan or Revise group after the base's views, and in the palette under "Go to". |
 | `commands` | web | Palette commands while a book of a kind that uses the module is open. |
+| `storyMapTabs` | web | Tabs of the story map, before the base's, each at `/story-map/<key>` and under "Go to" (the swimlanes). |
+| `profileSections` | web | Sections of the profile of an entry of a type (a plotline's beats). |
 
-Features never ask for a module's field by name. A field says what it is to the rest of the app instead. `carries` marks the entry that carries a piece (the point of view): presence rings it, the timeline can run a lane for each, profiles count it, the drafting board mirrors it, all through `carrierOf(kind, piece)`. `role` says how an entry in it is in the piece ("set here"). `entriesOf(book, piece, type?)` gives every entry a piece's fields name. A kind without the module has none of it: no carrier, so no rings, no such lanes and no board field.
+A module's web half imports the web app's own parts through `@writer/web/<path>` (the web package exports its `src`); the web app's tsconfig checks module web halves, the root's their core halves.
+
+Features never ask for a module's field by name. A field says what it is to the rest of the app instead. `carries` marks the entry that carries a piece (the point of view): presence rings it, the timeline can run a lane for each, profiles count it, the drafting board mirrors it, all through `carrierOf(kind, piece)`. `role` says how an entry in it is in the piece ("set here"). `lanes` lets the timeline run a lane for each of its entries, named by its entry type ("Location"). `threads` makes its entries threads through the book: the graph can show only what's in one's scenes, and a piece's facts say where one begins or ends. `marks` says how an entry reads on its presence strip ("a major beat"). Presence reads what an item carries from the field's declared item properties: a choice (the first value the strongest), a scale, a text. `entriesOf(book, piece, type?)` gives every entry a piece's fields name. A kind without the module has none of it: no carrier, so no rings, no such lanes and no board field.
 
 The modules so far:
 
 | Module | Package | Adds |
 |---|---|---|
 | point-of-view (#27) | `@writer/module-point-of-view` | The `pov` field, which carries its piece, and the `W_POV_NOT_PRESENT` check. |
+| plotlines (#28) | `@writer/module-plotlines` | The plotline type and the `plotlines` field (weight, beat; lanes and a thread), the swimlanes as the story map's first tab with their gaps and the `plotline_gap` setting, the beats on a plotline's profile, and `diagrams/plotlines.svg`. |
 
 ## Checks
 

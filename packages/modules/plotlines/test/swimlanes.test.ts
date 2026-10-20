@@ -1,10 +1,21 @@
 import { fileURLToPath } from "node:url";
-import { loadBook } from "../src/index.ts";
-import { nodeSource } from "../src/node.ts";
+import { loadBook } from "@writer/core";
+import { gaps } from "@writer/core/diagrams";
+import { nodeSource } from "@writer/core/node";
 import { describe, expect, it } from "vitest";
-import { cellKey, gaps, swimlanes, zoomed } from "../src/diagrams.ts";
+import { cellKey, plotlinesOf, swimlanes } from "../src/core/index.ts";
 
-const novel = await loadBook(nodeSource(fileURLToPath(new URL("../../../examples/sample-novel/", import.meta.url))));
+const novel = await loadBook(nodeSource(fileURLToPath(new URL("../../../../examples/sample-novel/", import.meta.url))));
+
+describe("a scene's plotlines", () => {
+  it("read with a plain ID or no weight as a major beat", () => {
+    const betrayal = novel.pieces.find((s) => s.id === "sc_0d9wm4")!;
+    expect(plotlinesOf(betrayal)).toEqual([
+      { id: "plot_h315tz", weight: "major", beat: "The plans have been sold" },
+      { id: "plot_gr1efa", weight: "major", beat: "Ben confesses the debt" },
+    ]);
+  });
+});
 
 describe("swimlanes", () => {
   it("lays plotlines, by name, against every scene in reading order, grouped by chapter and part", () => {
@@ -20,12 +31,12 @@ describe("swimlanes", () => {
     expect(s.marks.get(cellKey("plot_h315tz", "sc_0d9wm4"))).toEqual({ weight: "major", beat: "The plans have been sold" });
     expect(s.marks.get(cellKey("plot_gr1efa", "sc_1edger"))).toEqual({ weight: "major" });
     expect(s.marks.has(cellKey("plot_gr1efa", "sc_5tat1n"))).toBe(false);
-    const total = novel.pieces.reduce((n, scene) => n + scene.plotlines.length, 0);
+    const total = novel.pieces.reduce((n, scene) => n + plotlinesOf(scene).length, 0);
     expect(s.marks.size).toBe(total);
   });
 });
 
-describe("gaps and zoom", () => {
+describe("gaps", () => {
   const book = swimlanes(novel);
   it("finds stretches longer than the threshold between beats, and after the last one to the end", () => {
     // The Sale: The Station, Span, Workshop, Betrayal, Offer, Rivet; quiet only for Ben's Ledger (1) and The Flood (1).
@@ -48,10 +59,4 @@ describe("gaps and zoom", () => {
     expect(early.find((g) => g.lane === "plot_h315tz")).toMatchObject({ from: "sc_1edger", to: "sc_1edger", scenes: 1, open: true });
   });
 
-  it("zooms to a part or a chapter", () => {
-    expect(zoomed(novel, novel.pieces, "pt_5a1e00").map((s) => s.title)).toEqual(["The Betrayal", "The Flood", "Mirela's Offer", "The Last Rivet"]);
-    expect(zoomed(novel, novel.pieces, "ch_arr1va").map((s) => s.title)).toEqual(["The Station", "Walking the Span"]);
-    expect(zoomed(novel, novel.pieces, undefined)).toHaveLength(8);
-    expect(zoomed(novel, novel.pieces, "ch_gone00")).toHaveLength(8);
-  });
 });

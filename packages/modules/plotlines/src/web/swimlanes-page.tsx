@@ -2,19 +2,19 @@ import { editYaml, outerSections, type Entity, type Book, type Piece } from "@wr
 import { useQueryClient } from "@tanstack/react-query";
 import { Popover } from "radix-ui";
 import { useId, useMemo, useState } from "react";
-import { api, keys } from "../api.ts";
-import { GapControls } from "../diagrams/gap-controls.tsx";
-import { amount, readGap, writeGap } from "../diagrams/gap-param.ts";
-import { readSize, SceneGrid, SizeSelect, type GridMark } from "../diagrams/scene-grid.tsx";
-import { ExportMenu } from "../diagrams/export-menu.tsx";
-import { plotlinesSvg } from "@writer/core/snapshots";
-import { useNotice } from "../novel/notice.tsx";
-import { plotlineEdits, type PlotlineChange } from "../novel/plotline-edits.ts";
-import { useSceneEdit } from "../novel/scene-edit.ts";
-import type { Workspace } from "../novel/workspace.ts";
-import { Button } from "../ui/button.tsx";
-import { useViewParams } from "../ui/view-params.ts";
-import { cellKey, DEFAULT_GAP, gaps, swimlanes, zoomed, type Gap, type GapThreshold, type Mark } from "@writer/core/diagrams";
+import { api, keys } from "@writer/web/api.ts";
+import { GapControls } from "@writer/web/diagrams/gap-controls.tsx";
+import { amount, readGap, writeGap } from "@writer/web/diagrams/gap-param.ts";
+import { readSize, SceneGrid, SizeSelect, type GridMark } from "@writer/web/diagrams/scene-grid.tsx";
+import { ExportMenu } from "@writer/web/diagrams/export-menu.tsx";
+import { useNotice } from "@writer/web/novel/notice.tsx";
+import { plotlineEdits, type PlotlineChange } from "./plotline-edits.ts";
+import { useSceneEdit } from "@writer/web/novel/scene-edit.ts";
+import type { Workspace } from "@writer/web/novel/workspace.ts";
+import { Button } from "@writer/web/ui/button.tsx";
+import { useViewParams } from "@writer/web/ui/view-params.ts";
+import { gaps, zoomed, type Gap, type GapThreshold } from "@writer/core/diagrams";
+import { cellKey, plotlineGap, plotlinesSvg, swimlanes, type Mark } from "../core/index.ts";
 
 const number = new Intl.NumberFormat();
 
@@ -34,7 +34,7 @@ export function SwimlanesPage({ novelId, novel, workspace }: { novelId: string; 
   const [params, setParams] = useViewParams();
   const zoom = params.get("zoom") ?? undefined;
   const size = readSize(params.get("size"));
-  const saved = novel.config?.plotline_gap ?? DEFAULT_GAP;
+  const saved = plotlineGap(novel);
   const threshold = readGap(params.get("gap")) ?? saved;
   // Gaps are found in the whole book (a quiet stretch can cross the zoom's edge); the grid shows the zoom.
   const whole = useMemo(() => swimlanes(novel), [novel]);

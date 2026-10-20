@@ -1,4 +1,4 @@
-import { backlinks, pieceSections, vocabulary, type Book } from "@writer/core";
+import { backlinks, pieceSections, roleOf, vocabulary, type Book } from "@writer/core";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 import { api } from "../api.ts";
@@ -51,11 +51,11 @@ export function GraphPage({ novelId, novel }: { novelId: string; novel: Book }) 
   const filter: GraphFilter = {
     ...(list(params.get("types")) ? { types: list(params.get("types"))! } : {}),
     ...(list(params.get("rel")) ? { relationshipTypes: list(params.get("rel"))! } : {}),
-    ...(params.get("plot") ? { plotline: params.get("plot")! } : {}),
+    ...(params.get("thread") ? { thread: params.get("thread")! } : {}),
     ...(params.get("from") ? { from: params.get("from")! } : {}),
     ...(params.get("to") ? { to: params.get("to")! } : {}),
   };
-  const filterKey = ["types", "rel", "plot", "from", "to"].map((k) => params.get(k) ?? "").join("|");
+  const filterKey = ["types", "rel", "thread", "from", "to"].map((k) => params.get(k) ?? "").join("|");
   const view = useMemo(() => graphAt(novel, scene?.id, filter), [novel, scene?.id, filterKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const filtered = filterKey !== "||||";
 
@@ -75,7 +75,10 @@ export function GraphPage({ novelId, novel }: { novelId: string; novel: Book }) 
   const save = (positions: Record<string, { x: number; y: number }>) =>
     void api.saveLayout(novelId, RELATIONSHIP_GRAPH, positions).catch((e: unknown) => show({ message: `Couldn't save where you put that: ${e instanceof Error ? e.message : String(e)}` }));
 
-  const plotlines = novel.entities.filter((e) => e.type === "plotline").sort((a, b) => a.name.localeCompare(b.name));
+  // A thread to follow (a plotline), for a kind whose pieces have them.
+  const threading = novel.kind.fields.find((f) => f.threads && "entityType" in f.type);
+  const threadType = threading && "entityType" in threading.type ? threading.type.entityType : undefined;
+  const threads = novel.entities.filter((e) => threadType !== undefined && e.type === threadType).sort((a, b) => a.name.localeCompare(b.name));
   const sceneList = useMemo(() => sceneItems(novel), [novel]);
   const shownList = selected ? view.list.filter((r) => view.edges.some((e) => e.id === r.id && (e.source === selected.id || e.target === selected.id))) : view.list;
   // Play: the slider steps through the book on its own, until the end or until the author does anything.
@@ -217,26 +220,28 @@ export function GraphPage({ novelId, novel }: { novelId: string; novel: Book }) 
               ))}
             </fieldset>
             <div className="grid gap-3">
-              <div className="grid gap-1">
-                <label htmlFor={`${id}-plot`} className="text-xs font-semibold text-muted">
-                  In scenes of the plotline
-                </label>
-                <select id={`${id}-plot`} value={filter.plotline ?? ""} onChange={(e) => set({ plot: e.target.value || undefined })} className="h-8 rounded-md border border-rule bg-raised px-2">
-                  <option value="">Any</option>
-                  {plotlines.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {threading && (
+                <div className="grid gap-1">
+                  <label htmlFor={`${id}-thread`} className="text-xs font-semibold text-muted">
+                    In {vocabulary(novel.kind).piece.many} of the {roleOf(threading)}
+                  </label>
+                  <select id={`${id}-thread`} value={filter.thread ?? ""} onChange={(e) => set({ thread: e.target.value || undefined })} className="h-8 rounded-md border border-rule bg-raised px-2">
+                    <option value="">Any</option>
+                    {threads.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div className="flex flex-wrap gap-2">
                 <Picker label="Present from" items={sceneList} value={filter.from} onChange={(v) => set({ from: v })} placeholder="The start" allowNone className="w-56" />
                 <Picker label="to" items={sceneList} value={filter.to} onChange={(v) => set({ to: v })} placeholder="The end" allowNone className="w-56" />
               </div>
             </div>
             {filtered && (
-              <Button size="sm" onClick={() => set({ types: undefined, rel: undefined, plot: undefined, from: undefined, to: undefined })}>
+              <Button size="sm" onClick={() => set({ types: undefined, rel: undefined, thread: undefined, from: undefined, to: undefined })}>
                 Clear filters
               </Button>
             )}

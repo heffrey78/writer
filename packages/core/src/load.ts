@@ -2,7 +2,7 @@ import { reservedPrefixes, type EntityTypeDef } from "./ids.ts";
 import { kindByKey, knownKind, startLevels, V2_KIND, type BookKind, type LevelDef } from "./kinds.ts";
 import { withModules } from "./modules.ts";
 import { EVENT_FILES_FORMAT, MANIFEST, NOVEL_MANIFEST, readManifest, SCHEMA_VERSION } from "./manifest.ts";
-import type { Section, Entity, Book, PlotlineRef, Relationship, Piece, StoryEvent, ThemeRef } from "./model.ts";
+import type { Section, Entity, Book, Relationship, Piece, StoryEvent, ThemeRef } from "./model.ts";
 import { parseMarkdown, parseYaml } from "./parse.ts";
 import { checkSchema, type SchemaKind } from "./schemas.ts";
 import { joinPath, type FileSource } from "./source.ts";
@@ -230,11 +230,6 @@ export async function loadBook(source: FileSource, kind?: BookKind): Promise<Boo
       characters: strList(d["characters"]),
       locations: strList(d["locations"]),
       entities: strList(d["entities"]),
-      plotlines: refList(d["plotlines"]).map((r): PlotlineRef => ({
-        id: r.id,
-        weight: r.obj?.["weight"] === "minor" ? "minor" : "major",
-        beat: str(r.obj?.["beat"]),
-      })),
       themes: refList(d["themes"]).map((r): ThemeRef => ({
         id: r.id,
         strength: typeof r.obj?.["strength"] === "number" ? r.obj["strength"] : undefined,

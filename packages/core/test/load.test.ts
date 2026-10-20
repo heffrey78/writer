@@ -36,9 +36,10 @@ describe("loading the sample novel", () => {
 
   it("normalises scene references", () => {
     const betrayal = novel.pieces.find((s) => s.id === "sc_0d9wm4")!;
-    expect(betrayal.plotlines).toEqual([
-      { id: "plot_h315tz", weight: "major", beat: "The plans have been sold" },
-      { id: "plot_gr1efa", weight: "major", beat: "Ben confesses the debt" },
+    // A module's field's value as written: its module reads it (plotlines: plotlinesOf).
+    expect(betrayal.fields["plotlines"]).toEqual([
+      { id: "plot_h315tz", beat: "The plans have been sold" },
+      { id: "plot_gr1efa", beat: "Ben confesses the debt" },
     ]);
     expect(betrayal.when).toEqual({ day: 3, time: "18:30" });
     expect(betrayal.body.startsWith("The wind came off the river")).toBe(true);

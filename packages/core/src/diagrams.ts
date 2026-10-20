@@ -1,5 +1,5 @@
 import { relationshipStyle, type SeriesSlot } from "./palette.ts";
-import { carrierOf, carryingField, countWords, entriesOf, mentions, relationshipsAt, storyTimeline, levelLabel, sectionById, sectionsAt, type Section, type Entity, type Book, type BookKind, type Relationship, type Piece, type StoryInstant, type TimelineItem } from "./index.ts";
+import { carrierOf, carryingField, countWords, entriesOf, entryIds, itemsOf, mentions, relationshipsAt, storyTimeline, levelLabel, sectionById, sectionsAt, type Section, type Entity, type Book, type BookKind, type FieldDef, type ItemProp, type Relationship, type Piece, type StoryInstant, type TimelineItem } from "./index.ts";
 
 /*
  * The data behind every diagram: the relationship graph, the plotline swimlanes, the presence matrix
@@ -90,8 +90,8 @@ export interface GraphFilter {
   types?: string[];
   /** Relationship types shown as edges (default: all). */
   relationshipTypes?: string[];
-  /** Only entities present in a scene that advances this plotline. */
-  plotline?: string;
+  /** Only entities present in a scene that names this entry: a thread, such as a plotline. */
+  thread?: string;
   /** Only entities present in a scene from `from` to `to` (inclusive, reading order); either end may be open. */
   from?: string;
   to?: string;
@@ -102,15 +102,15 @@ export function presentIn(book: Book, scene: Piece): Set<string> {
   return new Set([...entriesOf(book, scene), ...mentions(scene.body).map((m) => m.id)]);
 }
 
-/** The entities the scene filters (plotline, range) allow, or undefined when neither is set. */
+/** The entities the scene filters (thread, range) allow, or undefined when neither is set. */
 function presentInFiltered(novel: Book, f: GraphFilter): Set<string> | undefined {
-  if (!f.plotline && !f.from && !f.to) return undefined;
+  if (!f.thread && !f.from && !f.to) return undefined;
   const pos = (id: string | undefined, fallback: number) => (id ? Math.max(0, novel.pieces.findIndex((s) => s.id === id)) : fallback);
   const [lo, hi] = [pos(f.from, 0), pos(f.to, novel.pieces.length - 1)].sort((a, b) => a - b);
   const out = new Set<string>();
   novel.pieces.forEach((scene, i) => {
     if (i < lo! || i > hi!) return;
-    if (f.plotline && !scene.plotlines.some((p) => p.id === f.plotline)) return;
+    if (f.thread && !entriesOf(novel, scene).includes(f.thread)) return;
     for (const id of presentIn(novel, scene)) out.add(id);
   });
   return out;
@@ -178,40 +178,7 @@ export function layout(ids: string[], saved: Record<string, { x: number; y: numb
   return out;
 }
 
-// ——— Plotline swimlanes ———
-
-export interface Mark {
-  weight: "major" | "minor";
-  beat?: string;
-}
-
-export interface Swimlanes {
-  /** Plotlines, by name: an order that edits never shuffle. */
-  lanes: Entity[];
-  /** Scenes in reading order. */
-  scenes: Piece[];
-  /** Column groups over the scenes: chapters, and (when the book has them) parts. */
-  chapters: { chapter: Section; title: string; span: number }[];
-  parts: { part: Section; span: number }[];
-  /** How a scene advances a plotline, by `${plotline}|${scene}`; absent: it doesn't. */
-  marks: Map<string, Mark>;
-  /** Each scene's words, counted once (gaps in words read them on every threshold). */
-  words: number[];
-}
-
-export const cellKey = gridKey;
-
-/** The book as plotline lanes against scene columns, from the scenes' plotlines. */
-export function swimlanes(novel: Book, scenes: Piece[] = novel.pieces): Swimlanes {
-  const marks = new Map<string, Mark>();
-  for (const scene of scenes) for (const p of scene.plotlines) marks.set(cellKey(p.id, scene.id), { weight: p.weight, ...(p.beat ? { beat: p.beat } : {}) });
-  const lanes = novel.entities.filter((e) => e.type === "plotline").sort((a, b) => a.name.localeCompare(b.name));
-
-  const { chapters, parts } = sceneColumns(novel, scenes);
-  return { lanes, scenes, chapters, parts, marks, words: scenes.map((scene) => countWords(scene.body)) };
-}
-
-/** How long a plotline may go unmentioned before it counts as a gap: in scenes, or in words. */
+/** How long an entry may go unmentioned (a plotline quiet, a character absent) before it counts as a gap: in scenes, or in words. */
 export type GapThreshold = { scenes: number } | { words: number };
 
 export const DEFAULT_GAP: GapThreshold = { scenes: 3 };
@@ -235,7 +202,7 @@ export function gaps(s: { lanes: { id: string }[]; scenes: Piece[]; marks: Map<s
   const { words } = s;
   const out: Gap[] = [];
   for (const lane of s.lanes) {
-    const beats = s.scenes.flatMap((scene, i) => (s.marks.has(cellKey(lane.id, scene.id)) ? [i] : []));
+    const beats = s.scenes.flatMap((scene, i) => (s.marks.has(gridKey(lane.id, scene.id)) ? [i] : []));
     if (!beats.length) continue;
     const stretches = beats.map((b, k) => [b + 1, (beats[k + 1] ?? s.scenes.length) - 1, beats[k + 1] === undefined] as const);
     for (const [first, last, open] of stretches) {
@@ -281,9 +248,12 @@ export interface Presence {
   carries: boolean;
   /** Named in the prose (a mention). */
   mentioned: boolean;
-  /** A theme's strength (1–3), or a plotline's weight. */
+  /** What its item carries, by its field's declared item properties: a scale's value (a theme's strength, 1–3), a choice's (a plotline's weight). */
   strength?: number;
-  weight?: "major" | "minor";
+  weight?: string;
+  /** Whether that's the strongest: a choice's first value (a major beat), a scale's top (strength 3). */
+  strongest?: boolean;
+  /** Its item's first text property: a plotline's beat, a theme's note. */
   note?: string;
 }
 
@@ -312,14 +282,34 @@ export function presence(novel: Book, type: string, scenes: Piece[] = novel.piec
     const named = new Set(mentions(scene.body).map((m) => m.id));
     const listed = new Map<string, Omit<Presence, "listed" | "carries" | "mentioned">>(entriesOf(novel, scene, type).map((id) => [id, {}]));
     const carrier = carrierOf(novel.kind, scene);
-    if (type === "theme") for (const t of scene.themes) listed.set(t.id, { ...(t.strength !== undefined ? { strength: t.strength } : {}), ...(t.note ? { note: t.note } : {}) });
-    if (type === "plotline") for (const p of scene.plotlines) listed.set(p.id, { weight: p.weight, ...(p.beat ? { note: p.beat } : {}) });
+    for (const f of novel.kind.fields) {
+      if (f.type.kind !== "entities" || f.type.entityType !== type || !f.type.item?.length) continue;
+      for (const item of itemsOf(scene.fields[f.key])) {
+        const [id] = entryIds(f, [item]);
+        if (id) listed.set(id, carried(f.type.item, item));
+      }
+    }
     for (const id of new Set([...listed.keys(), ...named])) {
       if (!ids.has(id)) continue;
       marks.set(gridKey(id, scene.id), { ...listed.get(id), listed: listed.has(id), carries: carrier === id, mentioned: named.has(id) });
     }
   }
   return { type, rows, scenes, marks, words: scenes.map((s) => countWords(s.body)), ...sceneColumns(novel, scenes) };
+}
+
+/** What an item of a list field carries, for presence: its choice (weight), its scale (strength) and its first text (note). */
+function carried(props: readonly ItemProp[], item: unknown): Omit<Presence, "listed" | "carries" | "mentioned"> {
+  const o = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
+  const out: Omit<Presence, "listed" | "carries" | "mentioned"> = {};
+  for (const p of props) {
+    const v = o[p.key];
+    if (p.kind === "choice" && out.weight === undefined) {
+      const weight = typeof v === "string" ? v : p.default;
+      if (weight !== undefined) Object.assign(out, { weight, strongest: weight === p.values[0] });
+    } else if (p.kind === "scale" && out.strength === undefined && typeof v === "number") Object.assign(out, { strength: v, strongest: v === p.max });
+    else if (p.kind === "text" && out.note === undefined && typeof v === "string" && v) out.note = v;
+  }
+  return out;
 }
 
 /** How many scenes each entry is in (listed or mentioned). */
@@ -349,11 +339,20 @@ export function sortRows(m: PresenceMatrix, order: RowOrder): Entity[] {
 
 // ——— Timeline ———
 
-/** How the timeline's lanes run: by the entry that carries each piece (its point of view), by plotline, or by location. */
-export type LaneMode = "carrier" | "plotline" | "location";
+/**
+ * How the timeline's lanes run: by the entry that carries each piece (its point of view), "carrier";
+ * or by the entries of a field the kind runs lanes by, named by its entry type ("location", "plotline").
+ */
+export type LaneMode = string;
 
-/** The timeline's lanes when none are chosen: by carrier, for a kind whose pieces have one; else by location. */
-export const defaultLanes = (kind: BookKind): LaneMode => (carryingField(kind) ? "carrier" : "location");
+/** The fields the timeline can run lanes by. */
+export const laneFields = (kind: BookKind): FieldDef[] => kind.fields.filter((f) => f.lanes && "entityType" in f.type);
+
+/** The ways the timeline's lanes can run, in order: by carrier (for a kind with one), then by each lanes field's entry type. */
+export const laneModes = (kind: BookKind): LaneMode[] => [...(carryingField(kind) ? ["carrier"] : []), ...laneFields(kind).map((f) => ("entityType" in f.type ? f.type.entityType : f.key))];
+
+/** The timeline's lanes when none are chosen: its first way. */
+export const defaultLanes = (kind: BookKind): LaneMode => laneModes(kind)[0] ?? "carrier";
 
 export interface Lane {
   id: string;
@@ -363,10 +362,15 @@ export interface Lane {
 export const itemId = (i: TimelineItem) => (i.kind === "scene" ? i.scene.id : i.event.id);
 export const itemTitle = (i: TimelineItem) => (i.kind === "scene" ? i.scene.title : i.event.title);
 
-/** The lanes an item runs in: its carrier (point of view), plotlines or locations; none of them, the "none" lane. Events have no carrier: "off page". */
+/**
+ * The lanes an item runs in: its carrier (point of view), or the entries its lanes field names
+ * (an event's list of the same key); none of them, the "none" lane. Events have no carrier: "off page".
+ */
 export function lanesOf(book: Book, i: TimelineItem, mode: LaneMode): string[] {
   if (mode === "carrier") return i.kind === "scene" ? [carrierOf(book.kind, i.scene) ?? NONE] : [OFF_PAGE];
-  const ids = mode === "plotline" ? (i.kind === "scene" ? i.scene.plotlines.map((p) => p.id) : (i.event.plotlines ?? [])) : i.kind === "scene" ? i.scene.locations : (i.event.locations ?? []);
+  const f = laneFields(book.kind).find((x) => "entityType" in x.type && x.type.entityType === mode);
+  const listed = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
+  const ids = !f ? [] : i.kind === "scene" ? entryIds(f, i.scene.fields[f.key]) : listed((i.event as unknown as Record<string, unknown>)[f.key]);
   return ids.length ? ids : [NONE];
 }
 
@@ -428,6 +432,6 @@ export function timeline(novel: Book, mode: LaneMode): Timeline {
   for (const i of t.items) for (const l of lanesOf(novel, i, mode)) if (!seen.includes(l)) seen.push(l);
   const special = [NONE, OFF_PAGE];
   const ordered = [...seen.filter((l) => !special.includes(l)), ...special.filter((l) => seen.includes(l))];
-  const name = (id: string) => (id === NONE ? (mode === "carrier" ? `No ${carryingField(novel.kind)?.label.toLowerCase() ?? "one"}` : mode === "plotline" ? "No plotline" : "No location") : id === OFF_PAGE ? "Off page" : (novel.entities.find((e) => e.id === id)?.name ?? id));
+  const name = (id: string) => (id === NONE ? `No ${(mode === "carrier" ? carryingField(novel.kind)?.label : novel.entityTypes.find((t) => t.key === mode)?.label)?.toLowerCase() ?? "one"}` : id === OFF_PAGE ? "Off page" : (novel.entities.find((e) => e.id === id)?.name ?? id));
   return { items: t.items, storyRank, flashbacks, undated: t.undatedScenes, undatedEvents: t.undatedEvents, lanes: ordered.map((id) => ({ id, name: name(id) })) };
 }

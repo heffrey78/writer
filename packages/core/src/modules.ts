@@ -1,3 +1,4 @@
+import type { EntityTypeDef } from "./ids.ts";
 import type { BookKind, FieldDef } from "./kinds.ts";
 import type { Book } from "./model.ts";
 import type { Diagnostic, Severity } from "./types.ts";
@@ -26,7 +27,17 @@ export interface BookModule {
   label: string;
   /** Fields it adds to a piece, after the kind's own (declared as a kind declares them). */
   fields?: readonly FieldDef[];
+  /** Entry types it adds to the codex, after the kind's own: the plotline. */
+  entityTypes?: readonly EntityTypeDef[];
   checks?: readonly ModuleCheck[];
+  /** Its diagrams for the book's diagrams/ folder, and its section of their README. */
+  snapshots?: (book: Book) => ModuleSnapshots;
+}
+
+/** A module's diagram snapshots: files by path from the book's root, and the lines of its README section. */
+export interface ModuleSnapshots {
+  files: readonly (readonly [string, string])[];
+  readme: readonly string[];
 }
 
 /** A module's core half, typed. */
@@ -67,13 +78,29 @@ export function withModules(kind: BookKind): BookKind {
         fields.push(f);
       }
     }
-    const order = kind.fieldOrder ?? [];
-    const at = (f: FieldDef) => (order.includes(f.key) ? order.indexOf(f.key) : order.length);
-    full = { ...kind, fields: fields.map((f, i) => ({ f, i })).sort((a, b) => at(a.f) - at(b.f) || a.i - b.i).map(({ f }) => f) };
+    const entityTypes = [...kind.entityTypes];
+    for (const module of modulesOf(kind)) {
+      for (const t of module.entityTypes ?? []) {
+        if (entityTypes.some((u) => u.key === t.key || u.prefix === t.prefix)) throw new Error(`The module “${module.id}” declares the entry type “${t.key}”, whose key or prefix the ${kind.label} kind or another of its modules already has`);
+        entityTypes.push(t);
+      }
+    }
+    full = { ...kind, fields: ordered(fields, kind.fieldOrder), entityTypes: ordered(entityTypes, kind.entityTypeOrder) };
     withModulesOf.set(kind, full);
     complete.add(full);
   }
   return full;
+}
+
+/** Things with keys in the order a kind names (`order`), those it doesn't name after, each kept where it was. */
+function ordered<T extends { key: string }>(items: T[], order: readonly string[] = []): T[] {
+  const at = (x: T) => (order.includes(x.key) ? order.indexOf(x.key) : order.length);
+  return items.map((x, i) => ({ x, i })).sort((a, b) => at(a.x) - at(b.x) || a.i - b.i).map(({ x }) => x);
+}
+
+/** The diagram snapshots of the book's modules, in the order its kind lists them. */
+export function moduleSnapshots(book: Book): ModuleSnapshots[] {
+  return modulesOf(book.kind).flatMap((m) => (m.snapshots ? [m.snapshots(book)] : []));
 }
 
 /** Every check of the book's modules, run on it. */

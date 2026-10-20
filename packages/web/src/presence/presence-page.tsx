@@ -6,7 +6,7 @@ import { gridKey } from "@writer/core/diagrams";
 import { readSize, SceneGrid, SizeSelect, type GridMark } from "../diagrams/scene-grid.tsx";
 import { ExportMenu } from "../diagrams/export-menu.tsx";
 import { presenceSvg } from "@writer/core/snapshots";
-import { entryEdits, type EntryChange } from "../novel/plotline-edits.ts";
+import { entryEdits, type EntryChange } from "../novel/entry-edits.ts";
 import { useSceneEdit } from "../novel/scene-edit.ts";
 import type { Workspace } from "../novel/workspace.ts";
 import { Button } from "../ui/button.tsx";

@@ -10,7 +10,7 @@ import { pictureAlt, shapeForType } from "./pictures.ts";
 import { NewTypeDialog } from "./new-entry.tsx";
 import { RelationshipTypes } from "./relationship-types.tsx";
 import { markWords } from "./strip.tsx";
-import { useWords } from "../novel/kind.ts";
+import { useBookKind, useWords } from "../novel/kind.ts";
 import { entriesByType, matches, plural } from "./types.ts";
 import { PAGE } from "../ui/page.ts";
 import { cn } from "../ui/cn.ts";
@@ -150,7 +150,7 @@ function EntryCard({ novelId, entity, presence }: { novelId: string; entity: Ent
   const count = presence?.count ?? 0;
   const n = presence?.scenes.length ?? 0;
   const w = useWords();
-  const words = markWords(entity.type, w);
+  const words = markWords(useBookKind(), entity.type, w);
   const facts = [
     ...Object.entries(entity.fields)
       .slice(0, 2)

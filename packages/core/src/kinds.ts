@@ -46,7 +46,7 @@ export interface LevelDef extends Noun {
  * plotline's weight and beat, a theme's strength.
  */
 export type ItemProp = { key: string; label: string; onCard?: boolean } & (
-  /** One of some words: `default` is what an item without it means (a plotline is "major"). */
+  /** One of some words, the strongest first: `default` is what an item without it means (a plotline is "major"). */
   | { kind: "choice"; values: readonly string[]; default?: string }
   /** A whole number from `min` to `max`: `labels` say what each means on the card, `options` how the choice lists it. */
   | { kind: "scale"; min: number; max: number; labels: Readonly<Record<string, string>>; options: Readonly<Record<string, string>> }
@@ -83,6 +83,18 @@ export interface FieldDef {
   carries?: boolean;
   /** How an entry in it is in the piece, said after the piece's title: "point of view", "set here". Default its label, in lower case. */
   role?: string;
+  /** Whether the timeline can run a lane for each of its entries (by location, by plotline): the choice is named by its entry type. */
+  lanes?: boolean;
+  /**
+   * Whether its entries are threads through the book, as plotlines are: the graph can show only
+   * what's in the scenes of one, and a piece's facts say where one begins or ends.
+   */
+  threads?: boolean;
+  /**
+   * How an entry in it reads on its presence strip: where it carries the piece (its strongest, "a
+   * major beat") and where it's only in it ("a minor beat"). Default: the carrier's role, and "in the scene".
+   */
+  marks?: { carries?: string; present?: string };
   /**
    * How the outline shows it: as a column of its table, and as a filter of its cards. One entry's
    * field filters by itself ("Point of view"); a list filters by its entry type, matching any field of
@@ -135,6 +147,8 @@ export interface BookKind extends Noun {
    * kind's own (the Novel's point of view comes first on the card). Fields it doesn't name follow.
    */
   fieldOrder?: readonly string[];
+  /** The order of its entry types with its modules', by key, as `fieldOrder` orders fields. */
+  entityTypeOrder?: readonly string[];
 }
 
 /** The kind of every book in format v2, which has no `kind`. */

@@ -60,12 +60,6 @@ export interface Section {
   file: string;
 }
 
-export interface PlotlineRef {
-  id: string;
-  weight: "major" | "minor";
-  beat?: string;
-}
-
 export interface ThemeRef {
   id: string;
   strength?: number;
@@ -81,7 +75,6 @@ export interface Piece {
   locations: string[];
   /** Entries of custom types (not characters, locations, plotlines or themes) in the scene. */
   entities: string[];
-  plotlines: PlotlineRef[];
   themes: ThemeRef[];
   when?: StoryTime;
   duration?: string;

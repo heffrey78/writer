@@ -1,4 +1,4 @@
-import { entryPresence, vocabulary, type Entity, type EntryPresence, type Book, type PresenceMark, type Vocabulary } from "@writer/core";
+import { carryingField, entryPresence, roleOf, vocabulary, type BookKind, type Entity, type EntryPresence, type Book, type PresenceMark, type Vocabulary } from "@writer/core";
 import { useMemo, type CSSProperties, type ReactNode } from "react";
 import { Link } from "react-router";
 import { cn } from "../ui/cn.ts";
@@ -10,13 +10,15 @@ import { ProfileSection } from "./profile.tsx";
  * over the same columns, so both are laid out by StripRow.
  */
 
-/** What each mark means for an entry of a type, as read aloud and in the legend. */
-export function markWords(type: string, w: Vocabulary): Record<Exclude<PresenceMark, "absent">, string | undefined> {
-  if (type === "character") return { carries: "point of view", present: `in the ${w.piece.one}`, mentioned: "mentioned" };
-  if (type === "plotline") return { carries: "a major beat", present: "a minor beat", mentioned: "mentioned" };
-  if (type === "theme") return { carries: "strongly", present: "present", mentioned: "mentioned" };
-  if (type === "location") return { carries: undefined, present: "set here", mentioned: "mentioned" };
-  return { carries: undefined, present: `in the ${w.piece.one}`, mentioned: "mentioned" };
+/**
+ * What each mark means for an entry of a type, as read aloud and in the legend: as its field's marks
+ * say ("a major beat", "set here"), or the carrier's role where it carries the piece ("point of view").
+ */
+export function markWords(kind: BookKind, type: string, w: Vocabulary): Record<Exclude<PresenceMark, "absent">, string | undefined> {
+  const field = kind.fields.find((f) => "entityType" in f.type && f.type.entityType === type && f.marks);
+  const carrying = carryingField(kind);
+  const carrier = carrying && "entityType" in carrying.type && carrying.type.entityType === type ? roleOf(carrying) : undefined;
+  return { carries: field?.marks?.carries ?? carrier, present: field?.marks?.present ?? `in the ${w.piece.one}`, mentioned: "mentioned" };
 }
 
 const CELL: Record<PresenceMark, string> = {
@@ -82,7 +84,7 @@ export function InTheStory({ novelId, novel, entity, compact }: { novelId: strin
   const presence = useMemo(() => entryPresence(novel, entity.id), [novel, entity.id]);
   if (!presence) return null;
   const w = vocabulary(novel.kind);
-  const words = markWords(entity.type, w);
+  const words = markWords(novel.kind, entity.type, w);
   const said = (mark: PresenceMark) => (mark === "absent" ? "not there" : words[mark] ?? words.present);
   const n = presence.scenes.length;
 
