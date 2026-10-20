@@ -1,4 +1,4 @@
-import { editYaml, outerSections, type Entity, type Book, type Piece } from "@writer/core";
+import { editYaml, outerSections, vocabulary, type Entity, type Book, type Piece } from "@writer/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { Popover } from "radix-ui";
 import { useId, useMemo, useState } from "react";
@@ -32,6 +32,7 @@ function cellLabel(scene: string, plotline: string, mark: Mark | undefined, gap?
  */
 export function SwimlanesPage({ novelId, novel, workspace }: { novelId: string; novel: Book; workspace: Workspace }) {
   const [params, setParams] = useViewParams();
+  const w = vocabulary(novel.kind);
   const zoom = params.get("zoom") ?? undefined;
   const size = readSize(params.get("size"));
   const saved = plotlineGap(novel);
@@ -63,7 +64,7 @@ export function SwimlanesPage({ novelId, novel, workspace }: { novelId: string; 
       }
       await queryClient.invalidateQueries({ queryKey: keys.novel(novelId) });
       setParams({ gap: undefined });
-      show({ message: `Gaps are now ${amount(threshold)} for this novel.` });
+      show({ message: `Gaps are now ${amount(threshold, w.piece)} for this ${w.book.one}.` });
     } catch (e) {
       show({ message: `Couldn't save it: ${e instanceof Error ? e.message : String(e)}` });
     }
@@ -138,7 +139,7 @@ export function SwimlanesPage({ novelId, novel, workspace }: { novelId: string; 
       </div>
       <p className="text-sm text-muted">
         Each column is a scene, in reading order. <span className="inline-block size-3 rounded-full bg-accent align-middle" aria-hidden /> a major beat,{" "}
-        <span className="inline-block size-2 rounded-full border border-accent bg-accent-soft align-middle" aria-hidden /> a minor one; shaded, a plotline gone quiet for more than {amount(threshold)}.
+        <span className="inline-block size-2 rounded-full border border-accent bg-accent-soft align-middle" aria-hidden /> a minor one; shaded, a plotline gone quiet for more than {amount(threshold, w.piece)}.
       </p>
       <SceneGrid
         novelId={novelId}
@@ -177,7 +178,7 @@ export function SwimlanesPage({ novelId, novel, workspace }: { novelId: string; 
             })}
           </ul>
         ) : (
-          <p className="text-muted">No plotline goes quiet for more than {amount(threshold)}.</p>
+          <p className="text-muted">No plotline goes quiet for more than {amount(threshold, w.piece)}.</p>
         )}
       </section>
       {editingLane && editingScene && editing && (

@@ -1,4 +1,4 @@
-import { DEFAULT_GAP, defaultLanes, gaps, graphAt, gridKey, itemTitle, jump, type GraphFilter, type LaneMode, lanesOf, presence, sceneColumns, sortRows, timeline, totals, when, type GraphEdge, type GraphNode, type Presence } from "./diagrams.ts";
+import { defaultLanes, graphAt, gridKey, itemTitle, jump, type GraphFilter, type LaneMode, lanesOf, sceneColumns, timeline, when, type GraphEdge, type GraphNode } from "./diagrams.ts";
 import type { Book, Piece } from "./model.ts";
 import { moduleSnapshots } from "./modules.ts";
 import { seriesHex, type SeriesSlot } from "./palette.ts";
@@ -125,7 +125,7 @@ function node(n: GraphNode, c: { x: number; y: number }): string {
   );
 }
 
-// ——— Grids: plotline swimlanes and presence ———
+// ——— Grids: entries against pieces (the modules' swimlanes and presence) ———
 
 /** A dot in a grid cell: its radius and style, and a ring around it. */
 export interface Dot {
@@ -200,26 +200,6 @@ export function shadedOf(list: { lane: string; from: string; to: string }[], sce
   const out = new Set<string>();
   for (const g of list) for (const id of ids.slice(ids.indexOf(g.from), ids.indexOf(g.to) + 1)) out.add(gridKey(g.lane, id));
   return out;
-}
-
-const dotOf = (p: Presence): Dot =>
-  !p.listed ? { r: 5, style: "dashed" } : p.strength !== undefined ? { r: 3 + p.strength * 1.6, style: "filled" } : { r: 6, style: "filled", ...(p.carries ? { ring: true } : {}) };
-
-/** Presence of a type's entries across the scenes, by first appearance: filled where listed, ringed for the point of view, dashed where only mentioned. */
-export function presenceSvg(novel: Book, type: string, title: string): string {
-  const m = presence(novel, type);
-  const count = totals(m);
-  const rows = sortRows(m, "first");
-  return gridSvg(novel, {
-    title,
-    rows: rows.map((r) => ({ id: r.id, name: r.name, aside: String(count.get(r.id) ?? 0) })),
-    scenes: m.scenes,
-    dot: (row, scene) => {
-      const p = m.marks.get(gridKey(row, scene));
-      return p && dotOf(p);
-    },
-    shaded: shadedOf(gaps({ lanes: rows, scenes: m.scenes, marks: m.marks, words: m.words }, DEFAULT_GAP), m.scenes),
-  });
 }
 
 // ——— The timeline ———
@@ -324,11 +304,9 @@ export function snapshots(novel: Book): Map<string, string> {
   const has = (type: string) => novel.entities.some((e) => e.type === type);
   const hasTimes = timeline(novel, defaultLanes(novel.kind)).items.length > 0;
   if (has("character")) files.set("diagrams/relationships.svg", relationshipSvg(novel, last?.id, last ? `Relationships at the end of the book (“${last.title}”)` : "Relationships"));
-  // The kind's modules' diagrams come after the relationships, before presence and the timeline.
+  // The kind's modules' diagrams come after the relationships, before the timeline.
   const modules = moduleSnapshots(novel);
   for (const m of modules) for (const [path, text] of m.files) files.set(path, text);
-  if (has("character") && novel.pieces.length) files.set("diagrams/presence-characters.svg", presenceSvg(novel, "character", "Characters by scene"));
-  if (has("theme") && novel.pieces.length) files.set("diagrams/presence-themes.svg", presenceSvg(novel, "theme", "Themes by scene"));
   if (hasTimes) files.set("diagrams/timeline.svg", timelineSvg(novel));
   const fence = (s: string) => "```mermaid\n" + s + "```\n";
   const md = [
@@ -351,17 +329,6 @@ export function snapshots(novel: Book): Map<string, string> {
       : ["No characters yet."]),
     "",
     ...modules.flatMap((m) => m.readme),
-    "## Presence",
-    "",
-    ...(files.has("diagrams/presence-characters.svg") || files.has("diagrams/presence-themes.svg")
-      ? [
-          "Filled where the scene lists them (ringed: its point of view; for themes, larger for a stronger one), dashed where the prose only mentions them. The number by each name is how many scenes it's in; shaded, an absence of more than three scenes.",
-          "",
-          ...(files.has("diagrams/presence-characters.svg") ? ["![Characters by scene](presence-characters.svg)", ""] : []),
-          ...(files.has("diagrams/presence-themes.svg") ? ["![Themes by scene](presence-themes.svg)"] : []),
-        ]
-      : ["Nothing to show yet: it needs characters or themes, and scenes."]),
-    "",
     "## Timeline",
     "",
     ...(hasTimes ? ["When things happen in the story, next to where they come in the book.", "", fence(timelineMermaid(novel)), "![The book in story time, and in reading order](timeline.svg)"] : ["No scene or event has a time yet."]),

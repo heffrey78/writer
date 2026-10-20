@@ -1,9 +1,10 @@
+import type { Word } from "@writer/core";
 import type { GapThreshold } from "@writer/core/diagrams";
 
 const number = new Intl.NumberFormat();
 
-/** A threshold in words: "3 scenes", "5,000 words". */
-export const amount = (t: GapThreshold) => ("scenes" in t ? `${t.scenes} scene${t.scenes === 1 ? "" : "s"}` : `${number.format(t.words)} words`);
+/** A threshold in words, counting the kind's pieces (`piece`): "3 scenes", "5,000 words". */
+export const amount = (t: GapThreshold, piece: Word) => ("scenes" in t ? piece.count(t.scenes) : `${number.format(t.words)} words`);
 
 /** The threshold in the address: "3" scenes, or "5000w" words. */
 export const readGap = (v: string | null): GapThreshold | undefined => {

@@ -95,6 +95,8 @@ export interface FieldDef {
    * major beat") and where it's only in it ("a minor beat"). Default: the carrier's role, and "in the scene".
    */
   marks?: { carries?: string; present?: string };
+  /** Whether the book's diagram snapshots show where its entries are, piece by piece, as the characters' and themes' are. */
+  snapshot?: boolean;
   /**
    * How the outline shows it: as a column of its table, and as a filter of its cards. One entry's
    * field filters by itself ("Point of view"); a list filters by its entry type, matching any field of

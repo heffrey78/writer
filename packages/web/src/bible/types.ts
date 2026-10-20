@@ -2,7 +2,7 @@ import type { Entity, Book } from "@writer/core";
 import type { MentionEntity } from "@writer/editor";
 
 /** A type's name for a list of its entries: "Characters". */
-export const plural = (label: string) => (/(s|x|ch|sh)$/i.test(label) ? `${label}es` : /[^aeiou]y$/i.test(label) ? `${label.slice(0, -1)}ies` : `${label}s`);
+export { plural } from "@writer/core";
 
 export const typeOf = (novel: Book, entity: Entity) => novel.entityTypes.find((t) => t.key === entity.type);
 

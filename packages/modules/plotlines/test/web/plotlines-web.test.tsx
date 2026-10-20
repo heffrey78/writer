@@ -18,8 +18,9 @@ const plain: BookKind = { ...novelKind, key: "plain", modules: ["point-of-view"]
 
 describe("plotlines on screen", () => {
   it("are the story map's first tab and a lane choice for the Novel, and neither without the module", async () => {
-    expect(storyMapTabs(kindByKey("novel")).map((t) => t.label)).toEqual(["Plotlines", "Presence", "Timeline"]);
-    expect(storyMapTabs(withModules(plain)).map((t) => t.label)).toEqual(["Presence", "Timeline"]);
+    // Only plotlines' web half is registered here: presence's tab is its own module's to test.
+    expect(storyMapTabs(kindByKey("novel")).map((t) => t.label)).toEqual(["Plotlines", "Timeline"]);
+    expect(storyMapTabs(withModules(plain)).map((t) => t.label)).toEqual(["Timeline"]);
     expect(laneModes(await loadBook(nodeSource(sample))).map(([, label]) => label)).toEqual(["Point of view", "Location", "Plotline"]);
     expect(laneModes(await loadBook(nodeSource(sample), plain)).map(([, label]) => label)).toEqual(["Point of view", "Location"]);
   });

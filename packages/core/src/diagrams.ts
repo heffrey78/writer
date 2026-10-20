@@ -2,9 +2,10 @@ import { relationshipStyle, type SeriesSlot } from "./palette.ts";
 import { carrierOf, carryingField, countWords, entriesOf, entryIds, itemsOf, mentions, relationshipsAt, storyTimeline, levelLabel, sectionById, sectionsAt, type Section, type Entity, type Book, type BookKind, type FieldDef, type ItemProp, type Relationship, type Piece, type StoryInstant, type TimelineItem } from "./index.ts";
 
 /*
- * The data behind every diagram: the relationship graph, the plotline swimlanes, the presence matrix
- * and the timeline. The app draws them and the snapshots (Mermaid, SVG) are written from them, so a
- * diagram on github.com always shows what the app does.
+ * The data behind the diagrams: the relationship graph, how each entry is in each piece (which an
+ * entry's strip and the presence module's matrix both read), gaps, and the timeline. The app draws
+ * them and the snapshots (Mermaid, SVG) are written from them, so a diagram on github.com always
+ * shows what the app does.
  */
 
 /** A section's title, or its level and number for one without ("Chapter 3"). */
@@ -228,19 +229,6 @@ export function zoomed(novel: Book, scenes: Piece[], zoom: string | undefined): 
 
 // ——— Presence ———
 
-/** The scene field each built-in entity type is listed in. */
-export const LISTS: Record<string, "characters" | "locations" | "themes" | "plotlines"> = {
-  character: "characters",
-  location: "locations",
-  theme: "themes",
-  plotline: "plotlines",
-};
-
-/** The scene field an entity type is listed in: its own for the built-in four, `entities` for custom types. */
-export function sceneList(type: string): "characters" | "locations" | "themes" | "plotlines" | "entities" {
-  return LISTS[type] ?? "entities";
-}
-
 export interface Presence {
   /** In the scene's metadata: any field of its that names the entry (a character's: its characters, or its point of view). */
   listed: boolean;
@@ -310,31 +298,6 @@ function carried(props: readonly ItemProp[], item: unknown): Omit<Presence, "lis
     else if (p.kind === "text" && out.note === undefined && typeof v === "string" && v) out.note = v;
   }
   return out;
-}
-
-/** How many scenes each entry is in (listed or mentioned). */
-export function totals(m: PresenceMatrix): Map<string, number> {
-  const out = new Map(m.rows.map((r) => [r.id, 0]));
-  for (const key of m.marks.keys()) {
-    const row = key.slice(0, key.indexOf("|"));
-    out.set(row, (out.get(row) ?? 0) + 1);
-  }
-  return out;
-}
-
-export type RowOrder = "first" | "total" | "name";
-
-/** Rows by first appearance (never-seen last), by how many scenes they're in (most first), or by name. */
-export function sortRows(m: PresenceMatrix, order: RowOrder): Entity[] {
-  const first = new Map<string, number>();
-  m.scenes.forEach((scene, i) => {
-    for (const r of m.rows) if (!first.has(r.id) && m.marks.has(gridKey(r.id, scene.id))) first.set(r.id, i);
-  });
-  const count = totals(m);
-  const byName = (a: Entity, b: Entity) => a.name.localeCompare(b.name);
-  if (order === "name") return [...m.rows].sort(byName);
-  if (order === "total") return [...m.rows].sort((a, b) => (count.get(b.id) ?? 0) - (count.get(a.id) ?? 0) || byName(a, b));
-  return [...m.rows].sort((a, b) => (first.get(a.id) ?? Infinity) - (first.get(b.id) ?? Infinity) || byName(a, b));
 }
 
 // ——— Timeline ———

@@ -31,13 +31,14 @@ export const novel: BookKind = {
   ],
   fields: [
     { key: "locations", label: "Where", group: "Locations", role: "set here", type: { kind: "entities", entityType: "location" }, mentionAdds: true, lanes: true, marks: { present: "set here" } },
-    { key: "characters", label: "Characters", role: "present", type: { kind: "entities", entityType: "character" }, mentionAdds: true, outline: { column: true, filter: true } },
+    { key: "characters", label: "Characters", role: "present", type: { kind: "entities", entityType: "character" }, mentionAdds: true, outline: { column: true, filter: true }, snapshot: true },
     { key: "when", label: "When", type: { kind: "story-time", durationKey: "duration" } },
     { key: "entities", label: "Also in it", role: "present", type: { kind: "own-entities" }, mentionAdds: true },
     {
       key: "themes",
       label: "Themes",
       role: "theme",
+      snapshot: true,
       marks: { carries: "strongly", present: "present" },
       type: {
         kind: "entities",
@@ -51,7 +52,7 @@ export const novel: BookKind = {
   ],
   // Its modules' fields and types where they've always been: point of view first on the card,
   // plotlines after when, the plotline type after locations.
-  modules: ["point-of-view", "plotlines"],
+  modules: ["point-of-view", "plotlines", "presence"],
   fieldOrder: ["pov", "locations", "characters", "when", "plotlines", "entities", "themes"],
   entityTypeOrder: ["character", "location", "plotline", "theme"],
   issueKinds: [

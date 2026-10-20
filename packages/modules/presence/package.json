@@ -1,0 +1,15 @@
+{
+  "name": "@writer/module-presence",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Presence (D14, #29): entries against pieces, for each entry type the kind's fields list, as the story map's matrix and as diagram snapshots.",
+  "exports": {
+    "./core": "./src/core/index.ts",
+    "./web": "./src/web/index.tsx"
+  },
+  "dependencies": {
+    "@writer/core": "0.1.0",
+    "@writer/web": "0.1.0"
+  }
+}

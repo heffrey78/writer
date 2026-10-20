@@ -5,7 +5,7 @@ export { kindOf, loadBook } from "./load.ts";
 export { carrierOf, carryingField, entriesOf, entryIds, fieldName, itemsOf, itemText, roleOf } from "./fields.ts";
 export { EVENT_FILES_FORMAT, MANIFEST, NOVEL_MANIFEST, readManifest, SCHEMA_VERSION, type Manifest } from "./manifest.ts";
 export { kindByKey, knownKind, levelOf, registerKind, startLevels, V2_KIND, type BookKind, type FieldDef, type ItemProp, type LevelDef, type Noun, type StatusDef } from "./kinds.ts";
-export { vocabulary, word, type Vocabulary, type Word } from "./vocabulary.ts";
+export { plural, vocabulary, word, type Vocabulary, type Word } from "./vocabulary.ts";
 export { defineModule, moduleSnapshots, modulesOf, registerModule, withModules, type BookModule, type Finding, type ModuleCheck, type ModuleSnapshots } from "./modules.ts";
 export { eventFile, migration, type Migration, type MigrationWrite } from "./migrate.ts";
 export { parseMarkdown, parseYaml } from "./parse.ts";

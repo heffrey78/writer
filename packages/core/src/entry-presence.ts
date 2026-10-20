@@ -49,7 +49,7 @@ function fromMatrix(novel: Book, matrix: PresenceMatrix, id: string): EntryPrese
     const p = matrix.marks.get(gridKey(id, scene.id));
     const mark: PresenceMark = !p
       ? "absent"
-      : p.carries || p.weight === "major" || p.strength === 3
+      : p.carries || p.strongest
         ? "carries"
         : p.listed
           ? "present"

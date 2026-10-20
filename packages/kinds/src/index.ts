@@ -1,6 +1,7 @@
 import { registerKind, registerModule, type BookKind, type BookModule } from "@writer/core";
 import { plotlines } from "@writer/module-plotlines/core";
 import { pointOfView } from "@writer/module-point-of-view/core";
+import { presenceModule } from "@writer/module-presence/core";
 import { novel } from "./novel.ts";
 
 export { novel };
@@ -9,7 +10,7 @@ export { novel };
 export const KINDS: readonly BookKind[] = [novel];
 
 /** The core halves of the modules the shipped kinds use (D14), from packages/modules. */
-export const MODULES: readonly BookModule[] = [pointOfView, plotlines];
+export const MODULES: readonly BookModule[] = [pointOfView, plotlines, presenceModule];
 
 /**
  * Make the shipped modules and kinds known to the base, the modules first: each of the app's entry

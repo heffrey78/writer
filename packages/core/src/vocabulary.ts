@@ -53,6 +53,9 @@ export function word(noun: Noun): Word {
   return { One: noun.label, Many: noun.plural, one, many, a: `${article} ${one}`, A: `${article === "an" ? "An" : "A"} ${one}`, short: noun.short ? inSentence(noun.short) : one, Short: noun.short ?? noun.label, count: (n) => `${n} ${n === 1 ? one : many}` };
 }
 
+/** A name in the plural, for a list of what it names: "Characters", "Witnesses", "Diaries". */
+export const plural = (label: string) => (/(s|x|ch|sh)$/i.test(label) ? `${label}es` : /[^aeiou]y$/i.test(label) ? `${label.slice(0, -1)}ies` : `${label}s`);
+
 const cache = new WeakMap<BookKind, Vocabulary>();
 
 /** The kind's words. */

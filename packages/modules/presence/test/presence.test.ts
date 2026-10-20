@@ -1,19 +1,21 @@
 import { fileURLToPath } from "node:url";
-import { itemsOf, loadBook, mentions } from "../src/index.ts";
-import { nodeSource } from "../src/node.ts";
+import { itemsOf, loadBook, mentions } from "@writer/core";
+import { nodeSource } from "@writer/core/node";
 import { describe, expect, it } from "vitest";
-import { gaps, gridKey, presence, sceneList, sortRows, totals } from "../src/diagrams.ts";
+import { gaps, gridKey, presence } from "@writer/core/diagrams";
+import { listFieldOf, presenceTypes, sortRows, totals } from "../src/core/index.ts";
 
-const novel = await loadBook(nodeSource(fileURLToPath(new URL("../../../examples/sample-novel/", import.meta.url))));
+const novel = await loadBook(nodeSource(fileURLToPath(new URL("../../../../examples/sample-novel/", import.meta.url))));
 
 describe("presence", () => {
-  it("matches the scenes' metadata exactly, for every type with a list", () => {
+  it("matches the scenes' metadata exactly, for every type the kind's fields list", () => {
+    expect(presenceTypes(novel).map((t) => t.key)).toEqual(["character", "location", "plotline", "theme", "artifact"]);
     for (const [type, field] of [["character", "characters"], ["location", "locations"], ["theme", "themes"], ["plotline", "plotlines"], ["artifact", "entities"]] as const) {
-      expect(sceneList(type)).toBe(field);
+      expect(listFieldOf(novel, type)?.key).toBe(field);
       const m = presence(novel, type);
       for (const scene of novel.pieces) {
         const listed = new Set<string>(
-          field === "characters" ? [...(typeof scene.fields["pov"] === "string" ? [scene.fields["pov"]] : []), ...scene.characters] : field === "locations" || field === "entities" ? scene[field] : field === "themes" ? scene.themes.map((x) => x.id) : itemsOf(scene.fields["plotlines"]).map((x) => (typeof x === "string" ? x : (x as { id: string }).id)),
+          field === "characters" ? [...(typeof scene.fields["pov"] === "string" ? [scene.fields["pov"]] : []), ...scene.characters] : field === "locations" || field === "entities" ? scene[field] : field === "themes" ? scene.themes.map((x) => x.id) : itemsOf(scene.fields["plotlines"]).map((x: unknown) => (typeof x === "string" ? x : (x as { id: string }).id)),
         );
         for (const row of m.rows) expect(m.marks.get(gridKey(row.id, scene.id))?.listed ?? false, `${type} ${row.name} in ${scene.title}`).toBe(listed.has(row.id));
       }
