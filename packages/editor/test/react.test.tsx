@@ -82,3 +82,24 @@ describe("SceneEditor", () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 });
+
+describe("autofocus", () => {
+  test("a new editor takes the focus, unless a dialog opened meanwhile has it", () => {
+    mount("One.\n", { autofocus: true });
+    act(() => void vi.runAllTimers());
+    expect(editor.isFocused).toBe(true);
+    cleanup();
+
+    // The palette, opened while the scene was still loading: what's typed in it stays there.
+    const dialog = document.body.appendChild(document.createElement("div"));
+    dialog.setAttribute("role", "dialog");
+    const input = dialog.appendChild(document.createElement("input"));
+    input.focus();
+    mount("One.\n", { autofocus: true });
+    act(() => void vi.runAllTimers());
+    expect(document.activeElement).toBe(input);
+    expect(editor.isFocused).toBe(false);
+    dialog.remove();
+  });
+});
+

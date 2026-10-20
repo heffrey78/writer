@@ -92,6 +92,18 @@ function useMentionInfoExtension(callbacks: MentionCallbacks | undefined) {
  */
 const movingAround = [TrailingParagraphExtension, Gapcursor, Dropcursor.configure({ color: false, width: 3, class: "ghw-dropcursor" })];
 
+/**
+ * TipTap focuses a new editor a moment after mounting it (in a timeout). A dialog opened meanwhile
+ * keeps the focus, such as the palette opened while a scene was still loading: what's typed in it
+ * mustn't land in the text. This timeout, set as the editor mounts, runs just before TipTap's.
+ */
+function keepDialogFocus({ editor }: { editor: Editor }) {
+  setTimeout(() => {
+    const dialog = document.activeElement?.closest('[role="dialog"], [role="alertdialog"]');
+    if (dialog && !editor.isDestroyed && !dialog.contains(editor.view.dom)) editor.options.autofocus = false;
+  });
+}
+
 /** Pictures dropped, pasted or changed (Enter or a double-click on one), handed to the latest `pictures` prop. */
 function usePicturesExtension(callbacks: PictureCallbacks | undefined) {
   const latest = useRef(callbacks);
@@ -215,6 +227,7 @@ export function SceneEditor({
       attributes: { role: "textbox", "aria-multiline": "true", "aria-label": label, class: "ghw-prose" },
     },
     autofocus,
+    onMount: keepDialogFocus,
     onBeforeCreate: ({ editor }) => setInitialMarkdown(editor, known.current),
     onUpdate: ({ editor }) => {
       if (pending.current) clearTimeout(pending.current.timer);
@@ -365,6 +378,7 @@ export function ChapterEditor({
       attributes: { role: "textbox", "aria-multiline": "true", "aria-label": label, class: "ghw-prose ghw-chapter" },
     },
     autofocus,
+    onMount: keepDialogFocus,
     onBeforeCreate: ({ editor }) => {
       editor.options.content = parseChapter(scenes, editor.schema) as unknown as Content;
     },
