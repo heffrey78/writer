@@ -1,4 +1,4 @@
-import { pieceSections, vocabulary, type Book } from "@writer/core";
+import { pieceLevel, pieceSections, vocabulary, type Book } from "@writer/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { useId, useState } from "react";
 import { api, keys } from "../api.ts";
@@ -68,7 +68,7 @@ export function CompileDialog({ novelId, novel, workspace, onClose }: { novelId:
   };
 
   return (
-    <Modal title="Compile the manuscript" onClose={onClose}>
+    <Modal title={`Compile the ${vocabulary(novel.kind).content.one}`} onClose={onClose}>
       <form
         className="grid gap-4 text-sm"
         onSubmit={(e) => {
@@ -96,7 +96,7 @@ export function CompileDialog({ novelId, novel, workspace, onClose }: { novelId:
             <input type="radio" name="range" checked={whole} onChange={() => setWhole(true)} /> The whole book
           </label>
           <label className="flex items-center gap-2">
-            <input type="radio" name="range" checked={!whole} onChange={() => setWhole(false)} /> Some chapters
+            <input type="radio" name="range" checked={!whole} onChange={() => setWhole(false)} /> Some {vocabulary(novel.kind).level(pieceLevel(novel)).many}
           </label>
           {!whole && (
             <div className="flex flex-wrap items-center gap-2 pl-6">
@@ -233,7 +233,7 @@ function CoverRow({ novelId, novel }: { novelId: string; novel: Book }) {
         open={removing}
         onOpenChange={setRemoving}
         title="Remove the book's cover?"
-        description="E-books and PDFs go out without one, and the shelf shows a generated cover again. Its file is deleted from images/; the novel's history keeps it."
+        description={`E-books and PDFs go out without one, and the shelf shows a generated cover again. Its file is deleted from images/; the ${vocabulary(novel.kind).book.one}'s history keeps it.`}
         action="Remove"
         danger
         onConfirm={() => void api.removeCover(novelId).then(shown, (e: unknown) => flow.setProblem(e instanceof Error ? e.message : String(e)))}

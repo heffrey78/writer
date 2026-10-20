@@ -1,5 +1,5 @@
 import { imageUrl } from "@writer/client";
-import { notesOfScene, proseText, readFrontMatter, type Note, type Book, type Piece } from "@writer/core";
+import { notesOfScene, proseText, readFrontMatter, vocabulary, type Note, type Book, type Piece } from "@writer/core";
 import { joinSceneFile } from "@writer/editor";
 import { SceneEditor, type SpellService } from "@writer/editor/react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -31,6 +31,7 @@ export function SceneNotes({ novelId, novel, workspace, scene, spell }: { novelI
   const queryClient = useQueryClient();
   const show = useNotice((n) => n.show);
   const headingId = useId();
+  const w = vocabulary(novel.kind);
   const notes = useMemo(() => notesOfScene(novel, scene.id), [novel, scene.id]);
   const [expanded, setExpanded] = useState<string>();
   const [justMade, setJustMade] = useState<string>();
@@ -52,10 +53,10 @@ export function SceneNotes({ novelId, novel, workspace, scene, spell }: { novelI
     return [...off.filter((n) => !n.scenes.length), ...off.filter((n) => n.scenes.length)].map((n) => ({
       value: n.id,
       label: n.title,
-      group: n.scenes.length ? "On other scenes" : "On no scene",
+      group: n.scenes.length ? `On other ${w.piece.many}` : `On no ${w.piece.one}`,
       keywords: [...n.tags, ...n.scenes.map(sceneTitle)],
     }));
-  }, [novel, scene.id]);
+  }, [novel, scene.id, w]);
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: keys.novel(novelId) });
   const addExisting = async (id: string) => {
@@ -99,7 +100,7 @@ export function SceneNotes({ novelId, novel, workspace, scene, spell }: { novelI
         <h2 id={headingId} className="flex-1 text-xs font-semibold tracking-wide text-muted uppercase">
           Notes on “{scene.title}”
         </h2>
-        <Button size="sm" variant="ghost" onClick={() => setAdding(true)} aria-label="New note on this scene" title="New note on this scene">
+        <Button size="sm" variant="ghost" onClick={() => setAdding(true)} aria-label={`New note on this ${w.piece.one}`} title={`New note on this ${w.piece.one}`}>
           <Plus className="size-4" aria-hidden /> Note
         </Button>
       </div>
@@ -146,7 +147,7 @@ export function SceneNotes({ novelId, novel, workspace, scene, spell }: { novelI
           ))}
         </ul>
       ) : (
-        !adding && <p className="text-muted">No notes on this scene yet. + Note makes one, kept beside the text while you write{others.length > 0 && ", or add one already written below"}.</p>
+        !adding && <p className="text-muted">No notes on this {w.piece.one} yet. + Note makes one, kept beside the text while you write{others.length > 0 && ", or add one already written below"}.</p>
       )}
       {/* After the scene's own notes: bringing in another is the less usual thing to do. */}
       {others.length > 0 && <Picker label="Add a note already written" items={others} value={undefined} onChange={(v) => v && void addExisting(v)} placeholder="Choose a note…" className="border-t border-rule pt-3" />}

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
-import { loadBook, memorySource, type BookKind } from "@writer/core";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { loadBook, memorySource, type Book, type BookKind } from "@writer/core";
 import { novel } from "@writer/kinds";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
@@ -9,6 +9,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import { allCommands, useCommandRegistry } from "../src/commands.ts";
 import { BiblePage } from "../src/bible/bible-page.tsx";
 import { BookKindContext } from "../src/novel/kind.ts";
+import { PromoteNoteDialog } from "../src/notes/promote.tsx";
+import { CompileDialog } from "../src/novel/compile.tsx";
 import { OutlineCards } from "../src/novel/corkboard.tsx";
 import { ManuscriptTree } from "../src/novel/manuscript-tree.tsx";
 import { OutlineTable } from "../src/novel/outline.tsx";
@@ -103,5 +105,26 @@ describe("a kind's words on screen", () => {
     page(<OutlineTable novelId="lib_1" novel={b} workspace={{} as Workspace} />);
     expect(screen.getByRole("columnheader", { name: "Day" })).toBeTruthy();
     expect(screen.getByRole("table").querySelector("caption")!.textContent!.trim()).toBe("Every day in reading order, by month");
+  });
+
+  it("name the pieces and sections a note becomes, and what's compiled", async () => {
+    const b = await book(diary);
+    const page = (children: ReactNode) =>
+      render(
+        <QueryClientProvider client={new QueryClient()}>
+          <BookKindContext.Provider value={b.kind}>
+            <MemoryRouter>{children}</MemoryRouter>
+          </BookKindContext.Provider>
+        </QueryClientProvider>,
+      );
+    const note = { id: "nt_000001", title: "A thought", file: "notes/a-thought.md", scenes: [], pinned: [], tags: [], body: "" } as unknown as Book["notes"][number];
+    page(<PromoteNoteDialog novelId="lib_1" novel={b} note={note} flush={async () => {}} open onOpenChange={() => {}} />);
+    fireEvent.click(screen.getByRole("radio", { name: "A day at the end of a month, the note as its synopsis" }));
+    expect(screen.getByRole("combobox", { name: "Month" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Write the day" })).toBeTruthy();
+    cleanup();
+    page(<CompileDialog novelId="lib_1" novel={b} workspace={{} as Workspace} onClose={() => {}} />);
+    expect(screen.getByRole("dialog", { name: "Compile the pages" })).toBeTruthy();
+    expect(screen.getByRole("radio", { name: "Some months" })).toBeTruthy();
   });
 });

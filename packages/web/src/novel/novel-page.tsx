@@ -281,10 +281,14 @@ export function NovelPage() {
 
   const book = novel.data.novel;
   if (unreadable(book)) {
+    // Its top bar is the same as a readable book's, and says the kind's words: a kind this copy
+    // doesn't know reads as a novel.
     return (
-      <Shell heading={heading} actions={actions} title={book.config?.title ?? "Untitled"}>
-        <TooNew kind={book.diagnostics.some((d) => d.code === "E_UNKNOWN_KIND")} />
-      </Shell>
+      <BookKindContext.Provider value={book.kind}>
+        <Shell heading={heading} actions={actions} title={book.config?.title ?? "Untitled"}>
+          <TooNew kind={book.diagnostics.some((d) => d.code === "E_UNKNOWN_KIND")} />
+        </Shell>
+      </BookKindContext.Provider>
     );
   }
   return (

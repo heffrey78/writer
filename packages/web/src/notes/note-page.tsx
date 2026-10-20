@@ -1,5 +1,5 @@
 import { imageUrl } from "@writer/client";
-import { pieceSections, readFrontMatter, type Book, type Note } from "@writer/core";
+import { pieceSections, readFrontMatter, vocabulary, type Book, type Note } from "@writer/core";
 import { joinSceneFile } from "@writer/editor";
 import { SceneEditor, type SpellService } from "@writer/editor/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -50,13 +50,14 @@ export function NotePage({
   const fm = useMemo(() => (file ? (readFrontMatter(joinSceneFile(file)) ?? {}) : {}), [file?.frontMatter]); // eslint-disable-line react-hooks/exhaustive-deps
   const tags = Array.isArray(fm.tags) ? (fm.tags as unknown[]).filter((t): t is string => typeof t === "string") : note.tags;
   const mentions = useMemo(() => mentionEntities(novel), [novel]);
+  const w = vocabulary(novel.kind);
   const proseId = useId();
   const place = useInPlace();
   const [promoting, setPromoting] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => void workspace.open([note.file]), [workspace, note.file]);
-  useCommands(() => [{ id: "note.promote", title: `Make “${note.title}” an event or a scene`, group: "Notes", keywords: ["promote", "event", "scene"], run: () => setPromoting(true) }], [note.title]);
+  useCommands(() => [{ id: "note.promote", title: `Make “${note.title}” an event or ${w.piece.a}`, group: "Notes", keywords: ["promote", "event", w.piece.one], run: () => setPromoting(true) }], [note.title, w]);
 
   // A note just made: the caret goes into its prose, ready to write (heffrey78/gh-writer#222).
   const { state } = useLocation() as { state: { focusProse?: boolean } | null };
@@ -95,7 +96,7 @@ export function NotePage({
       await workspace.fileChanged({ type: "change", path: note.file, hash: null });
       await refresh();
     } catch (e) {
-      show({ message: `Couldn't change its scenes: ${e instanceof Error ? e.message : String(e)}` });
+      show({ message: `Couldn't change its ${w.piece.many}: ${e instanceof Error ? e.message : String(e)}` });
     }
   };
   const remove = useMutation({
@@ -156,16 +157,16 @@ export function NotePage({
         )}
         {place.editing === "scenes" ? (
           <EditorFrame place={place}>
-            <Group label="Scenes">
+            <Group label={w.piece.Many}>
               <Chips items={note.scenes.map((id) => ({ id, label: sceneTitle(id), remove: () => void setScenes(note.scenes.filter((x) => x !== id)) }))} />
               <Picker
-                label="Add to scenes"
+                label={`Add to ${w.piece.many}`}
                 items={pieceSections(novel).flatMap((c) =>
                   c.childIds.filter((id) => !note.scenes.includes(id)).map((id) => ({ value: id, label: sceneTitle(id), group: chapterTitle(novel, c) })),
                 )}
                 value={undefined}
                 onChange={(v) => v && void setScenes([...note.scenes, v])}
-                placeholder="Add a scene…"
+                placeholder={`Add ${w.piece.a}…`}
               />
             </Group>
             <EditorButtons onCancel={() => place.done()} hint="Each change is saved as it's made · Esc returns" />
@@ -182,16 +183,16 @@ export function NotePage({
                 {note.pinned.includes(id) && <span className="text-muted"> (pinned)</span>}
               </span>
             ))}
-            <PencilButton place={place} part="scenes" label="scenes" />
+            <PencilButton place={place} part="scenes" label={w.piece.many} />
           </div>
         ) : (
           <AddButton place={place} part="scenes">
-            Put it on a scene
+            Put it on {w.piece.a}
           </AddButton>
         )}
         {(becameScene || becameEvent) && (
           <p className="text-sm">
-            Became {becameScene ? "the scene" : "the off-page event"}{" "}
+            Became {becameScene ? `the ${w.piece.one}` : "the off-page event"}{" "}
             <Link
               to={becameScene ? `/novels/${novelId}/scene/${becameScene.id}` : `/novels/${novelId}/event/${becameEvent!.id}`}
               className="text-accent underline decoration-accent/35 underline-offset-[3px] hover:decoration-accent"
@@ -228,7 +229,7 @@ export function NotePage({
       </section>
 
       {promoting && <PromoteNoteDialog novelId={novelId} novel={novel} note={note} flush={() => workspace.autosave.flush()} open onOpenChange={setPromoting} />}
-      <Confirm open={deleting} onOpenChange={setDeleting} title={`Delete “${note.title}”?`} description="The note goes from the novel. It stays in the history." action="Delete" danger onConfirm={() => remove.mutate()} />
+      <Confirm open={deleting} onOpenChange={setDeleting} title={`Delete “${note.title}”?`} description={`The note goes from the ${w.book.one}. It stays in the history.`} action="Delete" danger onConfirm={() => remove.mutate()} />
       {remove.isError && <ErrorAlert title="Couldn't delete it">{remove.error.message}</ErrorAlert>}
     </div>
   );

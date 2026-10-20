@@ -1,4 +1,4 @@
-import { addDays, countWords, pieceSections, unbalanced, type Book, type WritingDay } from "@writer/core";
+import { addDays, countWords, pieceLevel, pieceSections, unbalanced, vocabulary, type Book, type WritingDay } from "@writer/core";
 import { chapterTitle } from "@writer/core/diagrams";
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { cn } from "../ui/cn.ts";
@@ -361,6 +361,8 @@ function BookLength({ series, target }: { series: { day: string; words: number }
 
 function ChapterLengths({ novel }: { novel: Book }) {
   const [ref, width] = useWidth<HTMLDivElement>();
+  const w = vocabulary(novel.kind);
+  const section = w.level(pieceLevel(novel));
   const chapters = useMemo(
     () =>
       pieceSections(novel).map((c) => {
@@ -395,25 +397,25 @@ function ChapterLengths({ novel }: { novel: Book }) {
   const segment = (id: string | undefined) => segments.find((g) => g.id === id);
   const list = (items: { title: string; words: number }[]) => items.map((i) => `${i.title} (${number.format(i.words)})`).join(", ");
   const notes = [
-    byChapter.long.length && `Long chapters: ${list(byChapter.long)}.`,
-    byChapter.short.length && `Short chapters: ${list(byChapter.short)}.`,
-    byScene.long.length && `Long scenes: ${list(byScene.long)}.`,
-    byScene.short.length && `Short scenes: ${list(byScene.short)}.`,
+    byChapter.long.length && `Long ${section.many}: ${list(byChapter.long)}.`,
+    byChapter.short.length && `Short ${section.many}: ${list(byChapter.short)}.`,
+    byScene.long.length && `Long ${w.piece.many}: ${list(byScene.long)}.`,
+    byScene.short.length && `Short ${w.piece.many}: ${list(byScene.short)}.`,
   ].filter(Boolean) as string[];
 
   return (
     <Card
-      title="Chapters and their scenes"
-      caption={`Each bar is a chapter, divided into its scenes. A chapter's median is ${number.format(Math.round(byChapter.median))} words, a scene's ${number.format(Math.round(byScene.median))}.`}
+      title={`${section.Many} and their ${w.piece.many}`}
+      caption={`Each bar is ${section.a}, divided into its ${w.piece.many}. ${section.A}'s median is ${number.format(Math.round(byChapter.median))} words, ${w.piece.a}'s ${number.format(Math.round(byScene.median))}.`}
       table={
         <table className="w-full text-left text-sm">
           <thead className="text-xs text-muted">
             <tr>
               <th scope="col" className="py-1 pr-3 font-medium">
-                Chapter
+                {section.One}
               </th>
               <th scope="col" className="py-1 pr-3 font-medium">
-                Scene
+                {w.piece.One}
               </th>
               <th scope="col" className="py-1 text-right font-medium">
                 Words
@@ -435,7 +437,7 @@ function ChapterLengths({ novel }: { novel: Book }) {
       }
     >
       <p className="text-sm" role="note">
-        {notes.length ? notes.join(" ") : "No chapter or scene stands out as much longer or shorter than the rest."} <span className="text-muted">(Long: over half again the median; short: under half of it.)</span>
+        {notes.length ? notes.join(" ") : `No ${section.one} or ${w.piece.one} stands out as much longer or shorter than the rest.`} <span className="text-muted">(Long: over half again the median; short: under half of it.)</span>
       </p>
       <div ref={ref} className="relative">
         <svg
@@ -443,7 +445,7 @@ function ChapterLengths({ novel }: { novel: Book }) {
           height={height}
           role="img"
           tabIndex={0}
-          aria-label="Each chapter's length, divided into its scenes. Arrow keys read the scenes."
+          aria-label={`Each ${section.one}'s length, divided into its ${w.piece.many}. Arrow keys read the ${w.piece.many}.`}
           className="rounded outline-none focus-visible:outline-2 focus-visible:outline-accent"
           onKeyDown={reading.onKeyDown}
           onBlur={reading.onBlur}

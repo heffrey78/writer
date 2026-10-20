@@ -1,4 +1,4 @@
-import { projection, streak, type Book } from "@writer/core";
+import { projection, streak, vocabulary, type Book } from "@writer/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useId, useState, type FormEvent, type ReactNode } from "react";
 import { api, keys } from "../api.ts";
@@ -30,8 +30,9 @@ export function useStats(novelId: string) {
 
 export function ProgressPage({ novelId, novel }: { novelId: string; novel: Book }) {
   const stats = useStats(novelId);
-  if (stats.isError) return <Page><ErrorAlert title="Couldn't read the novel's history">{stats.error.message}</ErrorAlert></Page>;
-  if (!stats.data) return <Page><p className="text-sm text-muted">Reading the novel's history…</p></Page>;
+  const w = vocabulary(novel.kind);
+  if (stats.isError) return <Page><ErrorAlert title={`Couldn't read the ${w.book.one}'s history`}>{stats.error.message}</ErrorAlert></Page>;
+  if (!stats.data) return <Page><p className="text-sm text-muted">Reading the {w.book.one}'s history…</p></Page>;
   const { days, words, target, pending } = stats.data;
   const today = localToday();
   const p = projection(days, words, today, target ?? undefined);

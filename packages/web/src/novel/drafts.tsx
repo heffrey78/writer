@@ -16,6 +16,7 @@ import { useCurrentScene } from "./current.ts";
 import { useNotice } from "./notice.tsx";
 import { reload, stayIfThere, undoAdoption, useAdoption, useSwitchVersion, useVersions } from "./versions.tsx";
 import type { Workspace } from "./workspace.ts";
+import { useWords } from "./kind.ts";
 
 /*
  * Drafts (heffrey78/gh-writer#136): the book's history in one place. A version is a separate take on the book (the
@@ -33,6 +34,7 @@ export const useDrafts = create<{ open: boolean; set: (open: boolean) => void }>
 
 /** The header's button: the version open, which opens Drafts. */
 export function DraftsButton({ novelId, workspace }: { novelId: string; workspace: Workspace }) {
+  const w = useWords();
   const { open, set } = useDrafts();
   const versions = useVersions(novelId);
   const current = versions.data?.find((v) => v.current);
@@ -53,7 +55,7 @@ export function DraftsButton({ novelId, workspace }: { novelId: string; workspac
         >
           <Dialog.Title className="text-lg font-semibold">Drafts</Dialog.Title>
           <Dialog.Description className="text-sm text-muted">
-            A version is a separate take on the book, with its own text and story bible. A checkpoint is a moment in a version you can come back to. Whatever you do here can be undone.
+            A version is a separate take on the book, with its own text and {w.codex.one}. A checkpoint is a moment in a version you can come back to. Whatever you do here can be undone.
           </Dialog.Description>
           <Panel novelId={novelId} workspace={workspace} close={() => set(false)} />
         </Dialog.Content>
@@ -409,6 +411,7 @@ function CheckpointItem({
   restore: (sceneId: string | undefined, title: string) => void;
 }) {
   const scene = useCurrentScene((s) => s.scene);
+  const w = useWords();
   // From another version: restoring brings that version's text into the open one, and says so.
   const elsewhere = owner && open && owner.id !== open.id ? ` This checkpoint is from “${owner.name}”: its text comes into “${open.name}”, the version open now.` : "";
   return (
@@ -419,21 +422,21 @@ function CheckpointItem({
           Compare with now
         </Button>
         <Confirm
-          title={`Restore the manuscript from “${c.name}”?`}
-          description={`Every scene and bible entry goes back to how it was then.${elsewhere} What you have now is kept in an automatic checkpoint, so you can undo this.`}
-          action="Restore manuscript"
-          onConfirm={() => restore(undefined, "the manuscript")}
+          title={`Restore the ${w.content.one} from “${c.name}”?`}
+          description={`Every ${w.piece.one} and ${w.codex.short} ${w.entity.one} goes back to how it was then.${elsewhere} What you have now is kept in an automatic checkpoint, so you can undo this.`}
+          action={`Restore ${w.content.one}`}
+          onConfirm={() => restore(undefined, `the ${w.content.one}`)}
           trigger={
-            <Button size="sm" disabled={busy} aria-label={`Restore the manuscript from “${c.name}”`}>
-              Restore manuscript
+            <Button size="sm" disabled={busy} aria-label={`Restore the ${w.content.one} from “${c.name}”`}>
+              Restore {w.content.one}
             </Button>
           }
         />
         {scene && (
           <Confirm
             title={`Restore “${scene.title}” from “${c.name}”?`}
-            description={`Only this scene goes back to how it was then; it stays where it is in the manuscript.${elsewhere} What you have now is kept in an automatic checkpoint, so you can undo this.`}
-            action="Restore scene"
+            description={`Only this ${w.piece.one} goes back to how it was then; it stays where it is in the ${w.content.one}.${elsewhere} What you have now is kept in an automatic checkpoint, so you can undo this.`}
+            action={`Restore ${w.piece.one}`}
             onConfirm={() => restore(scene.id, `“${scene.title}”`)}
             trigger={
               <Button size="sm" disabled={busy} aria-label={`Restore “${scene.title}” from “${c.name}”`}>

@@ -11,6 +11,7 @@ import { useNotice } from "./notice.tsx";
 import { useVersions } from "./versions.tsx";
 import type { Workspace } from "./workspace.ts";
 import { PAGE } from "../ui/page.ts";
+import { useBookKind, useWords } from "./kind.ts";
 
 /** Bringing a scene across: from which version, and which side of the comparison that is. */
 interface Bring {
@@ -53,6 +54,7 @@ function defaults(versions: Version[] | undefined, checkpoints: Checkpoint[] | u
 }
 
 export function ComparePage({ novelId, workspace }: { novelId: string; workspace: Workspace }) {
+  const w = useWords();
   const [params, setParams] = useSearchParams();
   const versions = useVersions(novelId);
   const checkpoints = useQuery({ queryKey: keys.checkpoints(novelId), queryFn: () => api.checkpoints(novelId) });
@@ -90,7 +92,7 @@ export function ComparePage({ novelId, workspace }: { novelId: string; workspace
         ...(result.commit ? { action: { label: "Undo", run: () => void api.restoreCheckpoint(novelId, result.undo.id).then(refresh) } } : {}),
       });
     },
-    onError: (e) => show({ message: `Couldn't bring the scene across: ${e.message}` }),
+    onError: (e) => show({ message: `Couldn't bring the ${w.piece.one} across: ${e.message}` }),
   });
   const bringFrom: Bring | undefined = (() => {
     const fromOther = isOpen(to) ? otherVersion(from) : undefined;
@@ -170,10 +172,11 @@ function Result({
   toLabel: string;
   bring: Bring | undefined;
 }) {
+  const w = useWords();
   const nothing = !c.counts.added && !c.counts.removed && !c.counts.changed && !c.counts.moved && c.chapters.every((ch) => ch.status === "unchanged") && !c.entries.length && !c.relationships.length && !c.events.length;
   const chapters = onlyChanges ? c.chapters.filter((ch) => ch.status !== "unchanged" || ch.moved) : c.chapters;
   const counts = [
-    c.counts.changed && `${c.counts.changed} scene${c.counts.changed === 1 ? "" : "s"} changed`,
+    c.counts.changed && `${w.piece.count(c.counts.changed)} changed`,
     c.counts.added && `${c.counts.added} added`,
     c.counts.removed && `${c.counts.removed} removed`,
     c.counts.moved && `${c.counts.moved} moved`,
@@ -194,7 +197,7 @@ function Result({
       {chapters.length > 0 && (
         <section aria-labelledby="compare-manuscript" className="grid gap-3">
           <h2 id="compare-manuscript" className="text-lg font-semibold">
-            Manuscript
+            {w.content.One}
           </h2>
           {chapters.map((ch) => (
             <ChapterBlock key={ch.id} novelId={novelId} chapter={ch} from={from} to={to} onlyChanges={onlyChanges} bring={bring} />
@@ -205,10 +208,10 @@ function Result({
       {(c.entries.length > 0 || c.relationships.length > 0 || c.events.length > 0) && (
         <section aria-labelledby="compare-bible" className="grid gap-3 text-sm">
           <h2 id="compare-bible" className="text-lg font-semibold">
-            Story bible
+            {w.codex.One}
           </h2>
           {c.entries.length > 0 && (
-            <ul aria-label="Entries" className="grid gap-2">
+            <ul aria-label={w.entity.Many} className="grid gap-2">
               {c.entries.map((e) => (
                 <li key={e.id} className="rounded-md border border-rule p-3">
                   <p className="font-medium">
@@ -269,8 +272,9 @@ function Status({ status, moved }: { status: ChangeStatus; moved?: boolean }) {
 function ChapterBlock({ novelId, chapter: ch, from, to, onlyChanges, bring }: { novelId: string; chapter: ChapterComparison; from: string; to: string; onlyChanges: boolean; bring: Bring | undefined }) {
   const scenes = onlyChanges ? ch.scenes.filter((s) => s.status !== "unchanged" || s.moved) : ch.scenes;
   const delta = ch.words.after - ch.words.before;
+  const section = useWords().level(useBookKind().levels.at(-1)?.key ?? "");
   return (
-    <section aria-label={`Chapter: ${ch.title}`} className="grid gap-2 rounded-md border border-rule p-3">
+    <section aria-label={`${section.One}: ${ch.title}`} className="grid gap-2 rounded-md border border-rule p-3">
       <h3 className="flex flex-wrap items-center gap-2 font-semibold">
         {ch.title} <Status status={ch.status} moved={ch.moved} />
         <span className="text-sm font-normal text-muted">{delta ? `${signed(delta)} words` : ""}</span>

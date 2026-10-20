@@ -7,6 +7,7 @@ import { useConnect } from "../github/connect.tsx";
 import { useIdentityDialog } from "../identity.tsx";
 import { Button } from "../ui/button.tsx";
 import { cn } from "../ui/cn.ts";
+import { useWords } from "./kind.ts";
 
 function describe(s: SyncStatus): { label: string; icon: LucideIcon; tone: "ok" | "muted" | "warn" | "danger" } {
   switch (s.state) {
@@ -36,7 +37,7 @@ function describe(s: SyncStatus): { label: string; icon: LucideIcon; tone: "ok" 
 const TONES = { ok: "text-ok", muted: "text-muted", warn: "text-warn", danger: "text-danger" } as const;
 
 /** What a state means for the author, in a sentence. */
-function explain(s: SyncStatus): string {
+function explain(s: SyncStatus, book: string): string {
   switch (s.state) {
     case "synced":
       return "Everything is on GitHub, and this copy has everything from it.";
@@ -51,7 +52,7 @@ function explain(s: SyncStatus): string {
     case "conflict":
       return "The same passage changed here and on GitHub. Choose what to keep; until then, both versions are safe.";
     case "local":
-      return "This novel has no GitHub remote, so it's saved on this computer only.";
+      return `This ${book} has no GitHub remote, so it's saved on this computer only.`;
     case "off":
       return "Syncing is turned off.";
     default:
@@ -74,6 +75,7 @@ export function SyncBadge({
   /** Put a local-only novel on GitHub. */
   onPublish?: () => void;
 }) {
+  const w = useWords();
   const headingId = useId();
   if (!status) return null;
   const { label, icon: Icon, tone } = describe(status);
@@ -93,8 +95,8 @@ export function SyncBadge({
             <h2 id={headingId} className="font-semibold">
               Sync
             </h2>
-            <p className="mt-1 text-muted">{explain(status)}</p>
-            {status.error && status.state !== "conflict" && status.error.message !== explain(status) && <p className="mt-1">{status.error.message}</p>}
+            <p className="mt-1 text-muted">{explain(status, w.book.one)}</p>
+            {status.error && status.state !== "conflict" && status.error.message !== explain(status, w.book.one) && <p className="mt-1">{status.error.message}</p>}
           </div>
           <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-muted">
             {status.lastSync !== undefined && (

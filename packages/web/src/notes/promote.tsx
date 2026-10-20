@@ -1,4 +1,4 @@
-import { pieceSections, type Book, type Note } from "@writer/core";
+import { pieceLevel, pieceSections, vocabulary, type Book, type Note } from "@writer/core";
 import { chapterTitle } from "@writer/core/diagrams";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog } from "radix-ui";
@@ -18,6 +18,8 @@ export function PromoteNoteDialog({ novelId, novel, note, flush, open, onOpenCha
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const id = useId();
+  const w = vocabulary(novel.kind);
+  const section = w.level(pieceLevel(novel));
   const [to, setTo] = useState<"event" | "scene">("event");
   const [chapter, setChapter] = useState(pieceSections(novel).at(-1)?.id ?? "");
   const [keep, setKeep] = useState(true);
@@ -55,12 +57,12 @@ export function PromoteNoteDialog({ novelId, novel, note, flush, open, onOpenCha
               </label>
               <label className="flex items-center gap-2">
                 <input type="radio" name={`${id}-to`} checked={to === "scene"} onChange={() => setTo("scene")} />
-                A scene at the end of a chapter, the note as its synopsis
+                {w.piece.A} at the end of {section.a}, the note as its synopsis
               </label>
             </fieldset>
             {to === "scene" && (
               <label className="grid gap-1.5 font-medium">
-                Chapter
+                {section.One}
                 <select value={chapter} onChange={(e) => setChapter(e.target.value)} className="h-9 rounded-md border border-rule bg-raised px-2 font-normal">
                   {pieceSections(novel).map((c) => (
                     <option key={c.id} value={c.id}>
@@ -88,7 +90,7 @@ export function PromoteNoteDialog({ novelId, novel, note, flush, open, onOpenCha
                 <Button>Cancel</Button>
               </Dialog.Close>
               <Button type="submit" variant="primary" disabled={promote.isPending || (to === "scene" && !chapter)}>
-                {to === "event" ? "Make the event" : "Write the scene"}
+                {to === "event" ? "Make the event" : `Write the ${w.piece.one}`}
               </Button>
             </div>
           </form>

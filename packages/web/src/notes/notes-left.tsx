@@ -2,6 +2,7 @@ import type { Note } from "@writer/core";
 import { AlertDialog } from "radix-ui";
 import { create } from "zustand";
 import { Button } from "../ui/button.tsx";
+import { useWords } from "../novel/kind.ts";
 
 type Choice = "keep" | "delete";
 
@@ -31,6 +32,7 @@ export const useNotesLeft = create<{ question: Question | null; ask: (what: stri
 
 /** The question, when there is one: keep the notes unattached, delete them too, or don't delete. */
 export function NotesLeftDialog() {
+  const w = useWords();
   const question = useNotesLeft((s) => s.question);
   return (
     <AlertDialog.Root open={question !== null} onOpenChange={(o) => !o && question?.answer(null)}>
@@ -39,7 +41,7 @@ export function NotesLeftDialog() {
         <AlertDialog.Content className="fixed top-1/2 left-1/2 z-[60] grid w-[min(30rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 gap-3 rounded-lg border border-rule bg-raised p-5 text-ink shadow-xl">
           <AlertDialog.Title className="text-base font-semibold">Delete {question?.what}, and its notes?</AlertDialog.Title>
           <AlertDialog.Description className="text-sm text-muted">
-            {question?.notes.length === 1 ? "This note is" : "These notes are"} only on what's being deleted. Keep {question?.notes.length === 1 ? "it" : "them"} as notes on no scene, or delete {question?.notes.length === 1 ? "it" : "them"} too?
+            {question?.notes.length === 1 ? "This note is" : "These notes are"} only on what's being deleted. Keep {question?.notes.length === 1 ? "it" : "them"} as notes on no {w.piece.one}, or delete {question?.notes.length === 1 ? "it" : "them"} too?
           </AlertDialog.Description>
           <ul className="grid gap-1 text-sm">
             {question?.notes.map((n) => (
