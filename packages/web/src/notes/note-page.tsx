@@ -1,5 +1,5 @@
 import { imageUrl } from "@writer/client";
-import { pieceSections, readFrontMatter, vocabulary, type Book, type Note } from "@writer/core";
+import { pieceSections, plural, readFrontMatter, vocabulary, word, type Book, type Note } from "@writer/core";
 import { joinSceneFile } from "@writer/editor";
 import { SceneEditor, type SpellService } from "@writer/editor/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -15,6 +15,7 @@ import { Chips, Group } from "../novel/scene-details.tsx";
 import { Picker } from "../ui/picker.tsx";
 import { mentionEntities } from "../bible/types.ts";
 import { useCommands } from "../commands.ts";
+import { moduleRecordType, moduleRecordTypes } from "../modules.tsx";
 import { useNotice } from "../novel/notice.tsx";
 import type { Workspace } from "../novel/workspace.ts";
 import { ErrorAlert } from "../ui/alert.tsx";
@@ -24,7 +25,8 @@ import { PromoteNoteDialog } from "./promote.tsx";
 
 /**
  * A writer's note (heffrey78/gh-writer#205): its title, tags and prose, each edited in place, and what it became if it
- * was promoted. Make it an event or Write it as a scene turns it into story; Delete takes it away.
+ * was promoted. Making it a scene (or what the kind's modules make of a note, an event) turns it into
+ * story; Delete takes it away.
  * The prose and tags save to its file as they're made; a new title moves the file.
  */
 export function NotePage({
@@ -57,7 +59,10 @@ export function NotePage({
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => void workspace.open([note.file]), [workspace, note.file]);
-  useCommands(() => [{ id: "note.promote", title: `Make “${note.title}” an event or ${w.piece.a}`, group: "Notes", keywords: ["promote", "event", w.piece.one], run: () => setPromoting(true) }], [note.title, w]);
+  // What it can become: what the kind's modules make of a note ("an event"), or a piece.
+  const into = moduleRecordTypes(novel.kind).flatMap((t) => (t.fromNote ? [word({ label: t.def.noun.short ?? t.def.noun.label, plural: plural(t.def.noun.short ?? t.def.noun.label) })] : []));
+  const becomes = [...into.map((x) => x.a), w.piece.a].join(" or ");
+  useCommands(() => [{ id: "note.promote", title: `Make “${note.title}” ${becomes}`, group: "Notes", keywords: ["promote", ...into.map((x) => x.one), w.piece.one], run: () => setPromoting(true) }], [note.title, w, becomes]);
 
   // A note just made: the caret goes into its prose, ready to write (heffrey78/gh-writer#222).
   const { state } = useLocation() as { state: { focusProse?: boolean } | null };
@@ -108,7 +113,8 @@ export function NotePage({
   });
 
   const becameScene = note.became ? novel.allPieces.find((s) => s.id === note.became) : undefined;
-  const becameEvent = note.became ? novel.events.find((e) => e.id === note.became) : undefined;
+  const becameRecord = note.became ? novel.moduleRecords.find((r) => r.id === note.became) : undefined;
+  const becameType = becameRecord && moduleRecordType(novel.kind, becameRecord.type);
   const Heading = embedded && !embedded.modal ? "h2" : "h1";
   return (
     <div className={embedded ? "grid gap-4" : "mx-auto grid w-full max-w-[calc(var(--ghw-prose-measure)+3rem)] gap-5 px-6 py-6"}>
@@ -116,7 +122,7 @@ export function NotePage({
         <div className="flex flex-wrap items-center gap-2 pr-8">
           <p className="flex-1 text-sm text-muted">Note{note.created && ` · ${realDay(note.created)}`}</p>
           <Button variant="ghost" size="sm" onClick={() => setPromoting(true)}>
-            <ArrowUpRight className="size-4" aria-hidden /> Make it an event or a scene
+            <ArrowUpRight className="size-4" aria-hidden /> Make it {becomes}
           </Button>
           <Button variant="ghost" size="sm" onClick={() => setDeleting(true)} disabled={remove.isPending}>
             <Trash2 className="size-4" aria-hidden /> Delete
@@ -190,14 +196,14 @@ export function NotePage({
             Put it on {w.piece.a}
           </AddButton>
         )}
-        {(becameScene || becameEvent) && (
+        {(becameScene || (becameRecord && becameType)) && (
           <p className="text-sm">
-            Became {becameScene ? `the ${w.piece.one}` : "the off-page event"}{" "}
+            Became {becameScene ? `the ${w.piece.one}` : `the ${word(becameType!.def.noun).one}`}{" "}
             <Link
-              to={becameScene ? `/novels/${novelId}/scene/${becameScene.id}` : `/novels/${novelId}/event/${becameEvent!.id}`}
+              to={becameScene ? `/novels/${novelId}/scene/${becameScene.id}` : `/novels/${novelId}/${becameType!.type}/${becameRecord!.id}`}
               className="text-accent underline decoration-accent/35 underline-offset-[3px] hover:decoration-accent"
             >
-              “{becameScene?.title ?? becameEvent!.title}”
+              “{becameScene?.title ?? becameRecord!.title}”
             </Link>
             .
           </p>
@@ -228,7 +234,7 @@ export function NotePage({
         )}
       </section>
 
-      {promoting && <PromoteNoteDialog novelId={novelId} novel={novel} note={note} flush={() => workspace.autosave.flush()} open onOpenChange={setPromoting} />}
+      {promoting && <PromoteNoteDialog novelId={novelId} novel={novel} workspace={workspace} note={note} flush={() => workspace.autosave.flush()} open onOpenChange={setPromoting} />}
       <Confirm open={deleting} onOpenChange={setDeleting} title={`Delete “${note.title}”?`} description={`The note goes from the ${w.book.one}. It stays in the history.`} action="Delete" danger onConfirm={() => remove.mutate()} />
       {remove.isError && <ErrorAlert title="Couldn't delete it">{remove.error.message}</ErrorAlert>}
     </div>

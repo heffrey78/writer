@@ -1,6 +1,6 @@
 import type { Reference } from "@writer/client";
 import { imageUrl } from "@writer/client";
-import { readFrontMatter, storyClock, type Book, type StoryEvent, type YamlEdit } from "@writer/core";
+import { readFrontMatter, word, type Book, type YamlEdit } from "@writer/core";
 import { joinSceneFile } from "@writer/editor";
 import { SceneEditor, type SpellService } from "@writer/editor/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -9,27 +9,36 @@ import { AlertDialog } from "radix-ui";
 import { useEffect, useId, useMemo, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router";
 import { useStore } from "zustand";
-import { api, keys } from "../api.ts";
-import { AddButton, EditorButtons, EditorFrame, Lead, PencilButton, ProfileSection, TextEditor, useInPlace, type InPlace } from "../bible/profile.tsx";
-import { mentionEntities } from "../bible/types.ts";
-import { useNotice } from "../novel/notice.tsx";
-import { Chips, Group, StoryTimeFields, whenOf } from "../novel/scene-details.tsx";
-import type { Workspace } from "../novel/workspace.ts";
-import { ErrorAlert } from "../ui/alert.tsx";
-import { Button } from "../ui/button.tsx";
-import { cn } from "../ui/cn.ts";
-import { Picker } from "../ui/picker.tsx";
-import { useCommands } from "../commands.ts";
-import { NotesAbout } from "../notes/notes-about.tsx";
+import { keys } from "@writer/web/api.ts";
+import { AddButton, EditorButtons, EditorFrame, Lead, PencilButton, ProfileSection, TextEditor, useInPlace, type InPlace } from "@writer/web/bible/profile.tsx";
+import { referenceText } from "@writer/web/bible/references.ts";
+import { mentionEntities } from "@writer/web/bible/types.ts";
+import { useNotice } from "@writer/web/novel/notice.tsx";
+import { Chips, Group, StoryTimeFields, whenOf } from "@writer/web/novel/scene-details.tsx";
+import type { Workspace } from "@writer/web/novel/workspace.ts";
+import { ErrorAlert } from "@writer/web/ui/alert.tsx";
+import { Button } from "@writer/web/ui/button.tsx";
+import { cn } from "@writer/web/ui/cn.ts";
+import { Picker } from "@writer/web/ui/picker.tsx";
+import { useCommands } from "@writer/web/commands.ts";
+import { NotesAbout } from "@writer/web/notes/notes-about.tsx";
+import { around, eventFields, type StoryEvent } from "../core/index.ts";
+import { events } from "./client.ts";
 import { useFormatMove } from "./format-move.tsx";
 import { WriteAsSceneDialog } from "./write-as-scene.tsx";
 
-/** Who, where and which plotlines: the lists an event names, with their entry types. */
+/** Who, where and which plotlines: the lists an event names, as its rows say them. Those the kind has, with their entry types. */
 const LISTS = [
-  { key: "characters", label: "Who", group: "Characters", type: "character" },
-  { key: "locations", label: "Where", group: "Locations", type: "location" },
-  { key: "plotlines", label: "Plotlines", group: "Plotlines", type: "plotline" },
+  { key: "characters", label: "Who", group: "Characters" },
+  { key: "locations", label: "Where", group: "Locations" },
+  { key: "plotlines", label: "Plotlines", group: "Plotlines" },
 ] as const;
+
+const listsOf = (novel: Book) =>
+  LISTS.flatMap((l) => {
+    const f = eventFields(novel.kind).find((x) => x.key === l.key);
+    return f && "entityType" in f.type ? [{ ...l, type: f.type.entityType }] : [];
+  });
 
 /**
  * An off-page event as a profile (heffrey78/gh-writer#165), in the design of an entry's (heffrey78/gh-writer#148): its title, when and how
@@ -85,7 +94,7 @@ export function EventPage({
     void workspace.editFrontMatter(event.file, edits).catch((e: unknown) => show({ message: `Couldn't change the event: ${e instanceof Error ? e.message : String(e)}` }));
   const rename = async (title: string) => {
     const b = await base();
-    const { file: path } = await api.bible.updateEvent(novelId, event.id, { title }, b ? { base: b } : {});
+    const { file: path } = await events.update(novelId, event.id, { title }, b ? { base: b } : {});
     await workspace.open([path]);
     await refresh();
   };
@@ -96,7 +105,7 @@ export function EventPage({
   const remove = useMutation({
     mutationFn: async (confirm: boolean) => {
       const b = await base();
-      return api.bible.deleteEvent(novelId, event.id, { confirm, ...(b ? { base: b } : {}) });
+      return events.delete(novelId, event.id, { confirm, ...(b ? { base: b } : {}) });
     },
     onSuccess: async (result) => {
       if (!result.ok) return setReferences(result.references);
@@ -115,9 +124,8 @@ export function EventPage({
       {name(id)}
     </Link>
   );
-  // Its time and the scenes around it, where the book keeps story time.
-  const clock = storyClock(novel);
-  const { before, after } = useMemo(() => clock?.around(novel, event.id) ?? {}, [clock, novel, event.id]);
+  // Its time and the scenes around it in story time.
+  const { before, after } = useMemo(() => around(novel, event.id), [novel, event.id]);
   const sceneLink = (id: string, title: string) => (
     <Link to={`/novels/${novelId}/scene/${id}`} className="text-accent underline decoration-accent/35 underline-offset-[3px] hover:decoration-accent">
       “{title}”
@@ -162,7 +170,7 @@ export function EventPage({
         )}
       </div>
 
-      {!clock ? null : place.editing === "when" ? (
+      {place.editing === "when" ? (
         <EditorFrame place={place}>
           <StoryTimeFields when={when} duration={typeof fm.duration === "string" ? fm.duration : ""} edit={edit} novel={novel} />
           <EditorButtons onCancel={() => place.done()} hint="Each change is saved as it's made · Esc returns" />
@@ -184,7 +192,7 @@ export function EventPage({
       )}
 
       <dl aria-label="Who, where and plotlines" className="grid gap-0.5">
-        {LISTS.map(({ key, label, group, type }) => {
+        {listsOf(novel).map(({ key, label, group, type }) => {
           const chosen = list(key);
           return (
             <Row key={key} label={label} compact={tab}>
@@ -200,7 +208,7 @@ export function EventPage({
                         .map((e) => ({ value: e.id, label: e.name, keywords: e.aliases }))}
                       value={undefined}
                       onChange={(v) => v && edit([chosen.length ? { path: [key, chosen.length], value: v } : { path: [key], value: [v] }])}
-                      placeholder={`Add ${type === "location" ? "a location" : type === "character" ? "a character" : "a plotline"}…`}
+                      placeholder={`Add ${word({ label: novel.entityTypes.find((t) => t.key === type)?.label ?? type, plural: type }).a}…`}
                     />
                   </Group>
                   <EditorButtons onCancel={() => place.done()} hint="Each change is saved as it's made · Esc returns" />
@@ -245,26 +253,22 @@ export function EventPage({
         )}
       </section>
 
-      {(clock || dramatized) && (
-        <ProfileSection title={clock ? "In story time" : "In the book"}>
-          {clock && (
-            <p className="text-sm">
-              {!time.when ? (
-                "Not placed in story time: give it a time to see it among the scenes."
-              ) : before || after ? (
-                <>
-                  {before && <>After {sceneLink(before.id, before.title)}</>}
-                  {before && after && ", "}
-                  {after && <>{before ? "before" : "Before"} {sceneLink(after.id, after.title)}</>}.
-                </>
-              ) : (
-                "No scene is placed near it in story time."
-              )}
-            </p>
+      <ProfileSection title="In story time">
+        <p className="text-sm">
+          {!time.when ? (
+            "Not placed in story time: give it a time to see it among the scenes."
+          ) : before || after ? (
+            <>
+              {before && <>After {sceneLink(before.id, before.title)}</>}
+              {before && after && ", "}
+              {after && <>{before ? "before" : "Before"} {sceneLink(after.id, after.title)}</>}.
+            </>
+          ) : (
+            "No scene is placed near it in story time."
           )}
-          {dramatized && <p className="text-sm">Written as the scene {sceneLink(dramatized.id, dramatized.title)}.</p>}
-        </ProfileSection>
-      )}
+        </p>
+        {dramatized && <p className="text-sm">Written as the scene {sceneLink(dramatized.id, dramatized.title)}.</p>}
+      </ProfileSection>
 
       <NotesAbout novelId={novelId} novel={novel} id={event.id} />
 
@@ -284,7 +288,7 @@ export function EventPage({
             <AlertDialog.Description className="text-sm text-muted">These mentions will point at an event that no longer exists, and the validator will list them until they're changed:</AlertDialog.Description>
             <ul className="grid gap-1 text-sm">
               {references?.map((r) => (
-                <li key={`${r.kind}:${r.id}`}>{r.kind === "scene" ? `Scene “${r.title}”` : r.kind === "entity" ? `Entry “${r.title}”` : r.kind === "event" ? `Event “${r.title}”` : r.kind === "note" ? `Note “${r.title}”` : r.id}</li>
+                <li key={`${r.kind}:${r.id}`}>{referenceText(novel, r)}</li>
               ))}
             </ul>
             <div className="flex justify-end gap-2">

@@ -41,10 +41,10 @@ describe("story time", () => {
       "bible/events/backstory.md": "---\nid: evt_back99\ntitle: Backstory\nwhen:\n  at: 1999-10-16\n---\n",
       "bible/events/before.md": "---\nid: evt_bef0re\ntitle: Before\nwhen:\n  day: -100\n---\n",
     });
-    const order = (t: ReturnType<typeof storyTimeline>) => t.items.map((i) => (i.kind === "scene" ? i.scene.title : i.event.title));
+    const order = (t: ReturnType<typeof storyTimeline>) => t.items.map((i) => (i.kind === "scene" ? i.scene.title : i.record.title));
     const apart = storyTimeline(await loadBook(memorySource(files(""))));
     expect(order(apart)).toEqual(["Backstory", "Opening", "Before"]);
-    expect(apartInTime(apart).map((i) => (i.kind === "event" ? i.event.title : ""))).toEqual(["Before"]);
+    expect(apartInTime(apart).map((i) => (i.kind === "record" ? i.record.title : ""))).toEqual(["Before"]);
     const together = storyTimeline(await loadBook(memorySource(files("calendar:\n  start: 2026-10-10\n"))));
     expect(order(together)).toEqual(["Backstory", "Before", "Opening"]);
     expect(storyInstant({ day: -100 }, undefined, "2026-10-10")?.start).toBe(Date.UTC(2026, 6, 1));
@@ -54,7 +54,7 @@ describe("story time", () => {
   it("orders the sample's scenes and events by story time: the flashback first", async () => {
     const novel = await loadBook(nodeSource(SAMPLE));
     const t = storyTimeline(novel);
-    const titles = t.items.map((i) => (i.kind === "scene" ? i.scene.title : `[${i.event.title}]`));
+    const titles = t.items.map((i) => (i.kind === "scene" ? i.scene.title : `[${i.record.title}]`));
     expect(titles).toEqual([
       "[The flood of '09]",
       "The Flood",

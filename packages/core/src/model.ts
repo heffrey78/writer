@@ -3,7 +3,6 @@ import type { BookKind } from "./kinds.ts";
 import type {
   CompileFile,
   Diagnostic,
-  EventRecord,
   NovelFile,
   RelationshipRecord,
   RelationshipTypeFile,
@@ -32,7 +31,8 @@ export interface Book {
   allPieces: Piece[];
   entities: Entity[];
   relationships: Relationship[];
-  events: StoryEvent[];
+  /** The records its kind's modules keep in the codex (an off-page event), in the order their types and files are found. */
+  moduleRecords: ModuleRecord[];
   /** The writer's notes (notes/, D12), not story facts. */
   notes: Note[];
   layouts: Record<string, { nodes: Record<string, { x: number; y: number }> }>;
@@ -114,16 +114,23 @@ export interface Relationship extends RelationshipRecord {
   index: number;
 }
 
-/** An off-page event: a file of its own in bible/events/ (format v2), or an item of bible/events.yaml (v1). */
-export interface StoryEvent extends Omit<EventRecord, "note"> {
-  /** The scene that dramatizes it. */
-  scene?: string;
-  /** Its note: Markdown prose with mentions (in bible/events.yaml, the one-line `note`). */
+/**
+ * A record a module keeps (D14): a file of its own in its type's folder of the codex, such as an
+ * off-page event in bible/events/, or an item of format v1's list of them (bible/events.yaml).
+ */
+export interface ModuleRecord {
+  /** Its type's key (RecordTypeDef): "event". */
+  type: string;
+  id: string;
+  title: string;
+  /** Its front matter but its id and title, by key, as the file has it: its type's fields and links. */
+  fields: Record<string, unknown>;
+  /** Markdown prose with mentions (an item of a v1 list: its one-line note). */
   body: string;
   bodyLine: number;
   file: string;
-  /** Index within bible/events.yaml, for diagnostics; undefined for an event file. */
-  index?: number;
+  /** Where it is in a v1 list, for diagnostics ("/events/0"); undefined for a file of its own. */
+  pointer?: string;
 }
 
 /** A writer's note: notes/<slug>.md (D12). */
@@ -144,7 +151,8 @@ export interface Note {
   file: string;
 }
 
-export type RecordKind = "book" | "section" | "piece" | "entity" | "relationship" | "event" | "note";
+/** What a record is: the base's kinds of record, or a module's record type's key ("event"). */
+export type RecordKind = "book" | "section" | "piece" | "entity" | "relationship" | "note" | (string & {});
 
 export interface RecordRef {
   kind: RecordKind;
@@ -166,7 +174,7 @@ export function allRecords(novel: Book): RecordRef[] {
   for (const s of novel.allPieces) out.push({ kind: "piece", id: s.id, file: s.file });
   for (const e of novel.entities) out.push({ kind: "entity", id: e.id, file: e.file, type: e.type });
   for (const r of novel.relationships) out.push({ kind: "relationship", id: r.id, file: r.file });
-  for (const e of novel.events) out.push({ kind: "event", id: e.id, file: e.file });
+  for (const r of novel.moduleRecords) out.push({ kind: r.type, id: r.id, file: r.file });
   for (const n of novel.notes) out.push({ kind: "note", id: n.id, file: n.file });
   return out;
 }

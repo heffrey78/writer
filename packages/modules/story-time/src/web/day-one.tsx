@@ -1,4 +1,4 @@
-import type { Book } from "@writer/core";
+import { plural, vocabulary, word, type Book } from "@writer/core";
 import type { OperationResult } from "@writer/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useId, useMemo, useState } from "react";
@@ -8,9 +8,16 @@ import { storyDate } from "@writer/web/format.ts";
 import { useNotice } from "@writer/web/novel/notice.tsx";
 import { Button } from "@writer/web/ui/button.tsx";
 import { Picker } from "@writer/web/ui/picker.tsx";
-import { apartInTime, dayOneFor, storyTimeline, timeOf } from "../core/index.ts";
+import { apartInTime, dayOneFor, storyTimeline, timedTypes, timeOf } from "../core/index.ts";
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** What's placed in story time, as "scene or event" (one) and "scenes and events" (many): the pieces, and other modules' records. */
+function things(novel: Book): { one: string; many: string } {
+  const piece = vocabulary(novel.kind).piece;
+  const shorts = timedTypes(novel.kind).map((t) => t.noun.short ?? t.noun.label);
+  return { one: [piece.one, ...shorts.map((s) => word({ label: s, plural: plural(s) }).one)].join(" or "), many: [piece.many, ...shorts.map((s) => word({ label: s, plural: plural(s) }).many)].join(" and ") };
+}
 
 /** 2026-10-10 as "10 Oct 2026", as story time shows dates. */
 export const readDate = storyDate;
@@ -54,7 +61,7 @@ export function DayOne({ novelId, novel }: { novelId: string; novel: Book }) {
       )}
       {!start && apart.length > 0 && (
         <p className="rounded-md border border-warn/40 bg-warn-soft px-3 py-2">
-          {apart.length === 1 ? "1 scene or event is on a day of the story" : `${apart.length} scenes and events are on days of the story`}, not a date: until Day 1 has one, {apart.length === 1 ? "it can't" : "they can't"} be placed among the dated ones, and {apart.length === 1 ? "comes" : "come"} after them.
+          {apart.length === 1 ? `1 ${things(novel).one} is on a day of the story` : `${apart.length} ${things(novel).many} are on days of the story`}, not a date: until Day 1 has one, {apart.length === 1 ? "it can't" : "they can't"} be placed among the dated ones, and {apart.length === 1 ? "comes" : "come"} after them.
         </p>
       )}
     </section>

@@ -1,5 +1,5 @@
 import { carrierOf, carryingField, entryIds, type Book, type BookKind, type FieldDef } from "@writer/core";
-import { storyTimeline, timeOf, type StoryInstant, type TimelineItem } from "./time.ts";
+import { recordWords, storyTimeline, timeOf, type StoryInstant, type TimelineItem } from "./time.ts";
 
 /*
  * The timeline's data (D14, #30): the book's items in story time, in lanes, with the jumps between
@@ -26,23 +26,24 @@ export interface Lane {
   name: string;
 }
 
-export const itemId = (i: TimelineItem) => (i.kind === "scene" ? i.scene.id : i.event.id);
-export const itemTitle = (i: TimelineItem) => (i.kind === "scene" ? i.scene.title : i.event.title);
+export const itemId = (i: TimelineItem) => (i.kind === "scene" ? i.scene.id : i.record.id);
+export const itemTitle = (i: TimelineItem) => (i.kind === "scene" ? i.scene.title : i.record.title);
 
 /**
- * The lanes an item runs in: its carrier (point of view), or the entries its lanes field names
- * (an event's list of the same key); none of them, the "none" lane. Events have no carrier: "off page".
+ * The lanes an item runs in: its carrier (point of view), or the entries its lanes field names (a
+ * record's field of the same key, as an event's locations); none of them, the "none" lane. A record has
+ * no carrier: its own lane, named for what's said of it among pieces ("off page").
  */
 export function lanesOf(book: Book, i: TimelineItem, mode: LaneMode): string[] {
-  if (mode === "carrier") return i.kind === "scene" ? [carrierOf(book.kind, i.scene) ?? NONE] : [OFF_PAGE];
+  if (mode === "carrier") return i.kind === "scene" ? [carrierOf(book.kind, i.scene) ?? NONE] : [asideLane(book, i)];
   const f = laneFields(book.kind).find((x) => "entityType" in x.type && x.type.entityType === mode);
-  const listed = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
-  const ids = !f ? [] : i.kind === "scene" ? entryIds(f, i.scene.fields[f.key]) : listed((i.event as unknown as Record<string, unknown>)[f.key]);
+  const ids = !f ? [] : entryIds(f, i.kind === "scene" ? i.scene.fields[f.key] : i.record.fields[f.key]);
   return ids.length ? ids : [NONE];
 }
 
 export const NONE = "(none)";
-export const OFF_PAGE = "(off page)";
+/** A record's lane by carrier: "(off page)". */
+const asideLane = (book: Book, i: TimelineItem & { kind: "record" }) => `(${recordWords(book, i.record).aside})`;
 
 const DAY = 86_400_000;
 const plural = (n: number, unit: string) => `${n} ${unit}${n === 1 ? "" : "s"}`;
@@ -63,7 +64,7 @@ export function jump(from: StoryInstant, to: StoryInstant): string {
 
 /** When, in words: a date (and time), or "Day 3, 18:30" (with its date when the calendar gives one). */
 export function when(i: TimelineItem): string {
-  const w = i.kind === "scene" ? timeOf(i.scene).when : i.event.when;
+  const w = i.kind === "scene" ? timeOf(i.scene).when : i.when;
   const date = new Date(i.at.start);
   const day = date.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
   const time = date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" });
@@ -78,7 +79,7 @@ export interface Timeline {
   /** Scenes read after a scene that happens later: early in story time, late in the book. */
   flashbacks: Set<string>;
   undated: ReturnType<typeof storyTimeline>["undatedScenes"];
-  undatedEvents: ReturnType<typeof storyTimeline>["undatedEvents"];
+  undatedRecords: ReturnType<typeof storyTimeline>["undatedRecords"];
   lanes: Lane[];
 }
 
@@ -97,8 +98,15 @@ export function timeline(novel: Book, mode: LaneMode): Timeline {
   }
   const seen: string[] = [];
   for (const i of t.items) for (const l of lanesOf(novel, i, mode)) if (!seen.includes(l)) seen.push(l);
-  const special = [NONE, OFF_PAGE];
+  const asides = [...new Set(t.items.flatMap((i) => (i.kind === "record" ? [asideLane(novel, i)] : [])))];
+  const special = [NONE, ...asides];
   const ordered = [...seen.filter((l) => !special.includes(l)), ...special.filter((l) => seen.includes(l))];
-  const name = (id: string) => (id === NONE ? `No ${(mode === "carrier" ? carryingField(novel.kind)?.label : novel.entityTypes.find((t) => t.key === mode)?.label)?.toLowerCase() ?? "one"}` : id === OFF_PAGE ? "Off page" : (novel.entities.find((e) => e.id === id)?.name ?? id));
-  return { items: t.items, storyRank, flashbacks, undated: t.undatedScenes, undatedEvents: t.undatedEvents, lanes: ordered.map((id) => ({ id, name: name(id) })) };
+  const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+  const name = (id: string) =>
+    id === NONE
+      ? `No ${(mode === "carrier" ? carryingField(novel.kind)?.label : novel.entityTypes.find((t) => t.key === mode)?.label)?.toLowerCase() ?? "one"}`
+      : asides.includes(id)
+        ? capital(id.slice(1, -1))
+        : (novel.entities.find((e) => e.id === id)?.name ?? id);
+  return { items: t.items, storyRank, flashbacks, undated: t.undatedScenes, undatedRecords: t.undatedRecords, lanes: ordered.map((id) => ({ id, name: name(id) })) };
 }

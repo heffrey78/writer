@@ -1,9 +1,8 @@
-import { entryPresences, proseText, storyClock, vocabulary, type Entity, type EntryPresence, type Book, type Vocabulary } from "@writer/core";
-import { useNewEvent } from "../events/new-event.tsx";
-import { whenOf } from "../novel/scene-details.tsx";
+import { entryPresences, vocabulary, word, type Entity, type EntryPresence, type Book, type Vocabulary } from "@writer/core";
 import { Plus, Search } from "lucide-react";
-import { useEffect, useId, useMemo, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useId, useMemo, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
+import { moduleRecordTypes } from "../modules.tsx";
 import { Button } from "../ui/button.tsx";
 import { Picture, usePictureUrl } from "./picture.tsx";
 import { pictureAlt, shapeForType } from "./pictures.ts";
@@ -27,7 +26,8 @@ const MARK = { carries: "bg-accent", present: "bg-accent/40", mentioned: "bg-acc
 /**
  * The story bible (heffrey78/gh-writer#162): every entry as a card, grouped by type, with its picture (heffrey78/gh-writer#168), its summary, a fact or two, a
  * small strip of the scenes it's in and how many; searchable by name or other name and sorted by
- * first appearance, name or most scenes. An entry or an event opens in a modal over it (`over`, heffrey78/gh-writer#236, heffrey78/gh-writer#237).
+ * first appearance, name or most scenes. The kind's modules add their records' sections after the
+ * entries (off-page events). An entry or a record opens in a modal over it (`over`, heffrey78/gh-writer#236, heffrey78/gh-writer#237).
  */
 export function BiblePage({ novelId, novel, over }: { novelId: string; novel: Book; over?: ReactNode }) {
   const w = vocabulary(novel.kind);
@@ -59,6 +59,7 @@ export function BiblePage({ novelId, novel, over }: { novelId: string; novel: Bo
     setParams(next, { replace: true });
   };
   const found = groups.reduce((n, g) => n + g.shown.length, 0);
+  const records = moduleRecordTypes(novel.kind);
   // Arriving at a group (the book pane's Off the page links to #off-the-page): scrolled to it.
   const { hash } = useLocation();
   useEffect(() => {
@@ -104,7 +105,7 @@ export function BiblePage({ novelId, novel, over }: { novelId: string; novel: Bo
       </div>
       {query && (
         <p role="status" className="text-sm text-muted">
-          {w.entity.count(found)} match “{query}” (and the off-page events below that do)
+          {w.entity.count(found)} match “{query}”{records.length > 0 && ` (and the ${records.map((t) => word(t.def.noun).many).join(" and ")} below that do)`}
         </p>
       )}
       {groups.map(({ type, entries, shown }) =>
@@ -132,7 +133,9 @@ export function BiblePage({ novelId, novel, over }: { novelId: string; novel: Bo
           </section>
         ),
       )}
-      <EventCards novelId={novelId} novel={novel} query={query} sort={sort} />
+      {records.map((t) => (
+        <Fragment key={t.type}>{t.gallery({ novelId, novel, query, sort })}</Fragment>
+      ))}
       {!query && <RelationshipTypes novelId={novelId} novel={novel} />}
       <NewTypeDialog novelId={novelId} novel={novel} open={addingType} onOpenChange={setAddingType} />
       {over}
@@ -197,59 +200,6 @@ function EntryCard({ novelId, entity, presence }: { novelId: string; entity: Ent
         <span className="text-xs whitespace-nowrap text-muted">{count === 0 ? "Not in the story yet" : w.piece.count(count)}</span>
       </span>
     </Link>
-  );
-}
-
-/**
- * Off-page events (heffrey78/gh-writer#223): the story's facts that aren't shown, as a group of cards after the entries,
- * found by title or note. Story-time order where the book keeps story time (else as the files have
- * them), but by title for the Name sort.
- */
-function EventCards({ novelId, novel, query, sort }: { novelId: string; novel: Book; query: string; sort: Sort }) {
-  const add = useNewEvent((s) => s.set);
-  const clock = storyClock(novel);
-  const all = useMemo(() => clock?.events(novel) ?? novel.events, [novel, clock]);
-  const q = query.trim().toLowerCase();
-  const shown = all.filter((e) => !q || e.title.toLowerCase().includes(q) || proseText(e.body).toLowerCase().includes(q));
-  if (sort === "name") shown.sort((a, b) => a.title.localeCompare(b.title));
-  if (q && !shown.length) return null;
-  const names = (ids: string[] | undefined) => (ids ?? []).map((id) => novel.entities.find((e) => e.id === id)?.name ?? id);
-  return (
-    <section id="off-the-page" aria-labelledby="type-events" className="grid scroll-mt-4 gap-2">
-      <div className="flex items-center justify-between gap-2">
-        <h2 id="type-events" className="font-semibold">
-          Off the page <span className="text-sm font-normal text-muted">{all.length}</span>
-        </h2>
-        <Button size="sm" variant="ghost" onClick={() => add(true)} aria-label="New off-page event">
-          <Plus className="size-4" aria-hidden /> New
-        </Button>
-      </div>
-      {shown.length ? (
-        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {shown.map((e) => {
-            const time = whenOf({ when: e.when, duration: e.duration });
-            const who = [...names(e.characters), ...names(e.locations)];
-            const note = proseText(e.body).replace(/\s+/g, " ").trim();
-            return (
-              <li key={e.id} className="grid">
-                <Link
-                  to={`/novels/${novelId}/event/${e.id}`}
-                  state={{ fromGallery: true }}
-                  className="grid content-start gap-1.5 rounded-lg border border-dashed border-muted bg-raised px-4 py-3 hover:border-accent focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
-                >
-                  {clock && <span className="text-xs text-muted">{[time.when || "No time", time.duration].filter(Boolean).join(" · ")}</span>}
-                  <span className="font-semibold">{e.title}</span>
-                  {note && <span className="line-clamp-2 font-prose leading-snug italic">{note}</span>}
-                  {who.length > 0 && <span className="text-[13px] text-muted">{who.join(", ")}</span>}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      ) : (
-        <p className="text-sm text-muted">No off-page events yet: backstory, and what happens between {vocabulary(novel.kind).piece.many}.</p>
-      )}
-    </section>
   );
 }
 

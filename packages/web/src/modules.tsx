@@ -1,8 +1,10 @@
-import type { Book, BookKind, Entity } from "@writer/core";
+import { recordTypesOf, type Book, type BookKind, type Entity, type ModuleRecord, type Note, type RecordTypeDef } from "@writer/core";
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { Route, useNavigate } from "react-router";
+import { create } from "zustand";
 import { useCommands, type Command } from "./commands.ts";
+import type { SpellService } from "@writer/editor/react";
 import type { Workspace } from "./novel/workspace.ts";
 
 /*
@@ -54,10 +56,40 @@ export interface ProfileSection {
   render(view: BookView & { entity: Entity }): ReactNode;
 }
 
+/** A module's record as its page shows it: on its own, in a modal over the codex's gallery, or in the right sidebar's Entry tab. */
+export interface RecordPageView extends BookView {
+  record: ModuleRecord;
+  spell?: { service: SpellService; onAddWord: (w: string) => void } | undefined;
+  /** In a modal or the Entry tab: its title is a level-2 heading with this ID (a modal's own top heading, in one). */
+  embedded?: { headingId: string; modal?: boolean };
+  /** The whole page, or the Entry tab's, which leaves out deleting it and links to the page. */
+  size?: "page" | "tab";
+}
+
+/**
+ * How the app shows a module's records (an off-page event): its page at /<key>/<id>, over the codex's
+ * gallery; its section of the gallery, after the entries; what a mention of one shows; making one
+ * from its title, and from a note.
+ */
+export interface WebRecordType {
+  /** Its record type's key, as the module's core half declares it: "event". */
+  type: string;
+  page(view: RecordPageView): ReactNode;
+  /** Its section of the codex's gallery, found by the gallery's search, in its order ("name", or by first appearance). */
+  gallery(view: { novelId: string; novel: Book; query: string; sort: string }): ReactNode;
+  /** What a mention card says of one, under its title: `open` opens it in the Entry tab. */
+  card(view: { novelId: string; novel: Book; record: ModuleRecord; open: () => void }): ReactNode;
+  /** Making one from its title, in its modal: what the title field suggests, a line said under it, and the new one's ID. */
+  create: { placeholder: string; hint?(view: BookView): ReactNode; make(view: BookView, title: string): Promise<string> };
+  /** Making one of a note (heffrey78/gh-writer#205): the choice ("An off-page event, the note as its note"), its button, a line under them, and the new one's ID. */
+  fromNote?: { label: string; action: string; hint?(view: BookView): ReactNode; make(view: BookView, note: Note, keep: boolean): Promise<string> };
+}
+
 export interface WebModule {
   /** The module's id, as its kind lists it. */
   id: string;
   views?: readonly ModuleView[];
+  records?: readonly WebRecordType[];
   storyMapTabs?: readonly StoryMapTab[];
   profileSections?: readonly ProfileSection[];
   outlineOrders?: readonly OutlineOrder[];
@@ -92,6 +124,22 @@ export const moduleOutlineOrders = (kind: BookKind): OutlineOrder[] => webModule
 
 /** What the book's modules offer once a day of the story has become a date. */
 export const moduleDayToDate = (kind: BookKind): DayToDate[] => webModulesOf(kind).flatMap((m) => (m.dayToDate ? [m.dayToDate] : []));
+
+/** The book's modules' records as the app shows them, each with its type's declaration (its words), in the order its kind lists them. */
+export const moduleRecordTypes = (kind: BookKind): (WebRecordType & { def: RecordTypeDef })[] =>
+  webModulesOf(kind).flatMap((m) => (m.records ?? []).flatMap((r) => {
+    const def = recordTypesOf(kind).find((t) => t.key === r.type);
+    return def ? [{ ...r, def }] : [];
+  }));
+
+/** How the app shows one of the book's modules' records, by its type's key. */
+export const moduleRecordType = (kind: BookKind, type: string) => moduleRecordTypes(kind).find((t) => t.type === type);
+
+/**
+ * A new record of a module's type asked for (the codex's gallery, the Timeline, the palette): it
+ * opens in its modal over the codex, from its title (heffrey78/gh-writer#236).
+ */
+export const useNewRecord = create<{ type: string | null; ask: (type: string | null) => void }>((set) => ({ type: null, ask: (type) => set({ type }) }));
 
 /** Routes for the book's modules' views, to go among the book's own. */
 export function moduleRoutes(view: BookView) {

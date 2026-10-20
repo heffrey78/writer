@@ -1,0 +1,19 @@
+{
+  "name": "@writer/module-off-page-events",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Off-page events (D14, #33): backstory and what happens between pieces, a file each in the codex, placed in story time; their pages, gallery and modals, writing one as a piece, a note made into one, and format v1's events.yaml with its move to files.",
+  "exports": {
+    "./core": "./src/core/index.ts",
+    "./server": "./src/server/index.ts",
+    "./web": "./src/web/index.tsx"
+  },
+  "dependencies": {
+    "@writer/client": "0.1.0",
+    "@writer/core": "0.1.0",
+    "@writer/module-story-time": "0.1.0",
+    "@writer/server": "0.1.0",
+    "@writer/web": "0.1.0"
+  }
+}

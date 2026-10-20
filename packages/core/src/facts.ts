@@ -24,10 +24,7 @@ export function sceneFacts(novel: Book, sceneId: string): string[] {
   else if (at === 0) facts.push("The book's first scene.");
   else if (at === scenes.length - 1) facts.push("The book's last scene.");
 
-  // Off-page events it was written from, and kept (heffrey78/gh-writer#165).
-  for (const e of novel.events) if (e.scene === sceneId) facts.push(`Dramatizes the off-page event “${e.title}”.`);
-
-  // What the kind's modules say: how it sits in story time.
+  // What the kind's modules say: the off-page event it dramatizes, how it sits in story time.
   facts.push(...moduleFacts(novel, scene));
 
   // Characters: first seen here, or back after a long absence.

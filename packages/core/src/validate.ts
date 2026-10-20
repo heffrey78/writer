@@ -1,7 +1,7 @@
 import { idPrefix, RECORD_PREFIXES } from "./ids.ts";
+import type { FieldDef } from "./kinds.ts";
 import { loadBook } from "./load.ts";
-import { EVENT_FILES_FORMAT } from "./manifest.ts";
-import { moduleDiagnostics } from "./modules.ts";
+import { moduleDiagnostics, recordTypesOf } from "./modules.ts";
 import { allRecords, levelLabel, mentions, pieceLevel, picturePath, pictures, sectionsAt, type Book, type Picture, type RecordRef } from "./model.ts";
 import type { FileSource } from "./source.ts";
 import type { Diagnostic, Severity } from "./types.ts";
@@ -33,7 +33,6 @@ export const RULES: Readonly<Record<string, Severity>> = {
   W_LAYOUT_UNKNOWN: "warning",
   W_MISSING_IMAGE: "warning",
   W_IMAGE_OUTSIDE: "warning",
-  W_EVENTS_YAML: "warning",
   W_NOTE_PIN: "warning",
 };
 
@@ -52,9 +51,6 @@ export async function validate(source: FileSource): Promise<ValidationResult> {
   return { novel, diagnostics, errors, warnings: diagnostics.length - errors };
 }
 
-/** What a mention in prose may name: any bible entry, or an off-page event (format v2). */
-const MENTIONABLE = ["*entity", "event"];
-
 /** Cross-reference checks and advisory warnings on a loaded novel. */
 export function validateBook(novel: Book): Diagnostic[] {
   if (unreadable(novel)) return [];
@@ -68,8 +64,11 @@ export function validateBook(novel: Book): Diagnostic[] {
   const typeByKey = new Map(novel.entityTypes.map((t) => [t.key, t]));
   // The book's own prefix, its levels' and its pieces' are its kind's; the rest every book shares.
   const { kind } = novel;
+  const recordTypes = recordTypesOf(kind);
   const recordPrefix = (r: RecordRef) =>
-    r.kind === "book" ? kind.prefix : r.kind === "piece" ? kind.piece.prefix : r.kind === "section" ? kind.levels.find((l) => l.key === r.level)?.prefix : RECORD_PREFIXES[r.kind as keyof typeof RECORD_PREFIXES];
+    r.kind === "book" ? kind.prefix : r.kind === "piece" ? kind.piece.prefix : r.kind === "section" ? kind.levels.find((l) => l.key === r.level)?.prefix : (RECORD_PREFIXES[r.kind as keyof typeof RECORD_PREFIXES] ?? recordTypes.find((t) => t.key === r.kind)?.prefix);
+  /** What a mention in prose may name: any entry, or a module's record that may be mentioned (an off-page event). */
+  const MENTIONABLE = ["*entity", ...recordTypes.filter((t) => t.mentionable).map((t) => t.key)];
   /** What a record is, in the kind's words: "scene", "chapter", "novel", an entry's type, "event". */
   const describe = (r: RecordRef) =>
     r.kind === "entity" ? r.type! : r.kind === "piece" ? kind.piece.key : r.kind === "section" ? r.level! : r.kind === "book" ? kind.key : r.kind;
@@ -112,21 +111,28 @@ export function validateBook(novel: Book): Diagnostic[] {
     push("warning", "W_IMAGE_OUTSIDE", file, `The picture “${p.alt || p.src}” isn't in the novel's images folder: use /images/<name> (from the repository's root, as github.com reads it)`, { line: bodyLine + p.line - 1 });
   }
 
-  // Pieces: each declared field's entries are of its type. The own-entities field holds the book's
-  // own types only: the kind's have their own fields.
-  for (const s of novel.allPieces) {
-    for (const f of novel.kind.fields) {
+  /**
+   * Each declared field's entries are of its type, a piece's or a module record's. The own-entities
+   * field holds the book's own types only: the kind's have their own fields.
+   */
+  function fieldRefs(fields: readonly FieldDef[], values: Record<string, unknown>, file: string, at = "") {
+    for (const f of fields) {
       const t = f.type;
-      const value = s.fields[f.key];
-      if (t.kind === "entity") ref(typeof value === "string" ? value : undefined, [t.entityType], s.file, `/${f.key}`, f.key);
+      const value = values[f.key];
+      if (t.kind === "entity") ref(typeof value === "string" ? value : undefined, [t.entityType], file, `${at}/${f.key}`, f.key);
       else if (t.kind === "entities" || t.kind === "own-entities") {
         const allowed = t.kind === "entities" ? [t.entityType] : ["*custom"];
         (Array.isArray(value) ? value : []).forEach((item: unknown, i) => {
           const id = typeof item === "string" ? item : item && typeof item === "object" ? (item as { id?: unknown }).id : undefined;
-          if (typeof id === "string") ref(id, allowed, s.file, `/${f.key}/${i}`, f.key);
+          if (typeof id === "string") ref(id, allowed, file, `${at}/${f.key}/${i}`, f.key);
         });
       }
     }
+  }
+
+  // Pieces.
+  for (const s of novel.allPieces) {
+    fieldRefs(novel.kind.fields, s.fields, s.file);
     for (const m of mentions(s.body)) ref(m.id, MENTIONABLE, s.file, "", `Mention "${m.text}"`, s.bodyLine + m.line - 1);
     for (const p of pictures(s.body)) outsideImages(p, s.file, s.bodyLine);
     for (const line of hardWrappedLines(s.body)) {
@@ -140,20 +146,20 @@ export function validateBook(novel: Book): Diagnostic[] {
     for (const p of pictures(e.body)) outsideImages(p, e.file, e.bodyLine);
   }
 
-  // Events: items of bible/events.yaml (v1), or files of their own with a note in prose (v2).
-  for (const ev of novel.events) {
-    const p = ev.index === undefined ? "" : `/events/${ev.index}`;
-    ev.characters?.forEach((id, i) => ref(id, ["character"], ev.file, `${p}/characters/${i}`, "characters"));
-    ev.locations?.forEach((id, i) => ref(id, ["location"], ev.file, `${p}/locations/${i}`, "locations"));
-    ev.plotlines?.forEach((id, i) => ref(id, ["plotline"], ev.file, `${p}/plotlines/${i}`, "plotlines"));
-    ref(ev.scene, ["scene"], ev.file, `${p}/scene`, "scene");
-    if (ev.index !== undefined) continue;
-    for (const m of mentions(ev.body)) ref(m.id, MENTIONABLE, ev.file, "", `Mention "${m.text}"`, ev.bodyLine + m.line - 1);
-    for (const pic of pictures(ev.body)) outsideImages(pic, ev.file, ev.bodyLine);
+  // The modules' records: files of their own with prose, or items of a v1 list (an event in bible/events.yaml).
+  for (const r of novel.moduleRecords) {
+    const type = recordTypes.find((t) => t.key === r.type);
+    if (!type) continue;
+    const at = r.pointer ?? "";
+    fieldRefs(type.fields(kind), r.fields, r.file, at);
+    for (const key of type.pieceLinks ?? []) ref(typeof r.fields[key] === "string" ? r.fields[key] : undefined, [kind.piece.key], r.file, `${at}/${key}`, key);
+    if (r.pointer !== undefined) continue;
+    for (const m of mentions(r.body)) ref(m.id, MENTIONABLE, r.file, "", `Mention "${m.text}"`, r.bodyLine + m.line - 1);
+    for (const pic of pictures(r.body)) outsideImages(pic, r.file, r.bodyLine);
   }
-  // Notes (D12): their mentions, and what they became.
+  // Notes (D12): their mentions, and what they became: a piece, or a module's record.
   for (const n of novel.notes) {
-    ref(n.became, ["event", "scene"], n.file, "/became", "became");
+    ref(n.became, [...recordTypes.map((t) => t.key), "scene"], n.file, "/became", "became");
     n.scenes.forEach((id, i) => ref(id, ["scene"], n.file, `/scenes/${i}`, "scenes"));
     n.pinned.forEach((id, i) => {
       ref(id, ["scene"], n.file, `/pinned/${i}`, "pinned");
@@ -161,10 +167,6 @@ export function validateBook(novel: Book): Diagnostic[] {
     });
     for (const m of mentions(n.body)) ref(m.id, MENTIONABLE, n.file, "", `Mention "${m.text}"`, n.bodyLine + m.line - 1);
     for (const pic of pictures(n.body)) outsideImages(pic, n.file, n.bodyLine);
-  }
-  if ((novel.config?.schema_version ?? 1) >= EVENT_FILES_FORMAT) {
-    const leftover = novel.events.find((e) => e.index !== undefined);
-    if (leftover) push("warning", "W_EVENTS_YAML", leftover.file, "Events in bible/events.yaml are format v1's: run writer migrate to give each its own file in bible/events/");
   }
 
   // Relationship types.
@@ -263,7 +265,7 @@ async function missingImages(novel: Book, source: FileSource): Promise<Diagnosti
     ...novel.entities.flatMap((e) => (e.image ? [{ path: e.image, file: e.file, pointer: "/image", what: `${e.name}'s picture` }] : [])),
     ...novel.allPieces.flatMap((s) => inProse(s.body, s.file, s.bodyLine)),
     ...novel.entities.flatMap((e) => inProse(e.body, e.file, e.bodyLine)),
-    ...novel.events.flatMap((e) => (e.index === undefined ? inProse(e.body, e.file, e.bodyLine) : [])),
+    ...novel.moduleRecords.flatMap((r) => (r.pointer === undefined ? inProse(r.body, r.file, r.bodyLine) : [])),
     ...novel.notes.flatMap((n) => inProse(n.body, n.file, n.bodyLine)),
   ];
   const out: Diagnostic[] = [];

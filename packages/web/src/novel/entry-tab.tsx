@@ -1,10 +1,10 @@
 import { vocabulary, type Book } from "@writer/core";
 import type { SpellService } from "@writer/editor/react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useEffect, useId, useRef } from "react";
+import { Fragment, useEffect, useId, useRef } from "react";
 import { create } from "zustand";
 import { EntryPage } from "../bible/entry-page.tsx";
-import { EventPage } from "../events/event-page.tsx";
+import { moduleRecordType } from "../modules.tsx";
 import { typeOf } from "../bible/types.ts";
 import { useRightSidebar } from "./right-sidebar.tsx";
 import type { Workspace } from "./workspace.ts";
@@ -69,8 +69,10 @@ export function EntryTab({
   const headingId = useId();
   const ref = useRef<HTMLElement>(null);
   const entity = id ? novel.entities.find((e) => e.id === id) : undefined;
-  // An off-page event opens here too (heffrey78/gh-writer#165). Notes don't: a scene's are on the Notes tab (heffrey78/gh-writer#222).
-  const event = id && !entity ? novel.events.find((e) => e.id === id) : undefined;
+  // A module's record opens here too, as an off-page event does (heffrey78/gh-writer#165). Notes don't: a scene's are on
+  // the Notes tab (heffrey78/gh-writer#222).
+  const record = id && !entity ? novel.moduleRecords.find((r) => r.id === id) : undefined;
+  const recordType = record && moduleRecordType(novel.kind, record.type);
 
   // To the profile as it opens; or, with its name ready to edit, the profile has put the focus there.
   useEffect(() => {
@@ -97,7 +99,7 @@ export function EntryTab({
         <button type="button" disabled={at >= history.length - 1} onClick={() => step(1)} aria-label={`Next ${w.entity.one}`} title={`Next ${w.entity.one}`} className="rounded p-1 text-muted hover:bg-paper hover:text-ink disabled:opacity-40">
           <ChevronRight className="size-4" aria-hidden />
         </button>
-        <span className="flex-1 text-xs text-muted">{event ? "Off the page" : (type?.label ?? w.entity.One)}</span>
+        <span className="flex-1 text-xs text-muted">{recordType ? recordType.def.group : (type?.label ?? w.entity.One)}</span>
       </div>
       {entity ? (
         <EntryPage
@@ -111,8 +113,8 @@ export function EntryTab({
           size="tab"
           {...(editing ? { startEditing: "name" as const } : {})}
         />
-      ) : event ? (
-        <EventPage key={`${event.id}:${opened}`} novelId={novelId} novel={novel} event={event} workspace={workspace} spell={spell} embedded={{ headingId }} size="tab" />
+      ) : record && recordType ? (
+        <Fragment key={`${record.id}:${opened}`}>{recordType.page({ novelId, novel, workspace, record, spell, embedded: { headingId }, size: "tab" })}</Fragment>
       ) : (
         <p id={headingId}>This {w.entity.one} no longer exists.</p>
       )}

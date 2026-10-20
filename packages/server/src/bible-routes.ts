@@ -31,16 +31,11 @@ export async function body(c: Context): Promise<Record<string, unknown>> {
  * POST  /:id/bible/relationships/:rel/change   { at, type?, note? } → { id, commit }
  * POST  /:id/bible/relationships/:rel/end      { at }
  * POST  /:id/bible/relationships/:rel/delete
- * POST  /:id/bible/events                      { title, when?, duration?, characters?, locations?, plotlines?, scene?, note?, migrate? } → 201 { id, file, commit }
- * PATCH /:id/bible/events/:event               { changes, base?, migrate? } (null removes a field; note replaces the prose) → { file, commit }
- * POST  /:id/bible/events/:event/delete        { base?, confirm?, migrate? }
- *       (each: a novel in format v1 is 409 NEEDS_MIGRATION { from, to } unless migrate, which moves it to v2 in the same commit)
- * POST  /:id/bible/events/:event/scene         { chapter, keep, migrate? } → 201 { scene, file }: written as a scene at the chapter's end; kept (naming it) or removed
  * POST  /:id/notes                              { title, tags?, scenes?, note? } → 201 { id, file }: a writer's note (D12)
  * PATCH /:id/notes/:note                       { changes: { title?, tags?, scenes?, note? }, base? } → { file }
  * POST  /:id/notes/:note/pin                   { scene, pinned }: pinned to the top of the scene's notes (its other unpinned), or not
  * POST  /:id/notes/:note/delete                { base? }
- * POST  /:id/notes/:note/promote               { to: "event" | "scene", chapter?, keep, migrate? } → 201 { id, file }: what it became
+ * POST  /:id/notes/:note/promote               { chapter, keep } → 201 { id, file }: the scene it became (what a module makes of one is the module's route)
  * POST  /:id/migrate                           { to? } → { migrated, commit }: the book in format `to` (the newest by default), one commit (D11, D15)
  * POST  /:id/bible/entity-types                { key, prefix, label, folder?, color? }
  * PATCH /:id/bible/entity-types/:key           { label?, color? }
@@ -80,22 +75,6 @@ export function bibleRoutes(routes: Hono<Env>): void {
     const { at } = await body(c);
     return operation(c, () => bible(c).endRelationship(c.req.param("rel"), String(at ?? "")));
   });
-  routes.post("/:id/bible/events", async (c) => {
-    const { migrate, ...fields } = await body(c);
-    return operation(c, () => bible(c).createEvent(fields as never, migrate === true), 201);
-  });
-  routes.patch("/:id/bible/events/:event", async (c) => {
-    const { changes, base, migrate } = await body(c);
-    return operation(c, () => bible(c).updateEvent(c.req.param("event"), (changes ?? {}) as never, { ...(typeof base === "string" ? { base } : {}), migrate: migrate === true }));
-  });
-  routes.post("/:id/bible/events/:event/delete", async (c) => {
-    const { base, confirm, migrate } = await body(c);
-    return operation(c, () => bible(c).deleteEvent(c.req.param("event"), { ...(typeof base === "string" ? { base } : {}), confirm: confirm === true, migrate: migrate === true }));
-  });
-  routes.post("/:id/bible/events/:event/scene", async (c) => {
-    const { chapter, keep, migrate } = await body(c);
-    return operation(c, () => bible(c).writeAsScene(c.req.param("event"), { chapter: String(chapter ?? ""), keep: keep === true, migrate: migrate === true }, c.var.ws.manuscript), 201);
-  });
   routes.post("/:id/notes", async (c) => operation(c, async () => bible(c).createNote((await body(c)) as never), 201));
   routes.patch("/:id/notes/:note", async (c) => {
     const { changes, base } = await body(c);
@@ -110,9 +89,8 @@ export function bibleRoutes(routes: Hono<Env>): void {
     return operation(c, () => bible(c).deleteNote(c.req.param("note"), typeof base === "string" ? { base } : {}));
   });
   routes.post("/:id/notes/:note/promote", async (c) => {
-    const { to, chapter, keep, migrate } = await body(c);
-    const target = to === "scene" ? { to: "scene" as const, chapter: String(chapter ?? "") } : { to: "event" as const };
-    return operation(c, () => bible(c).promoteNote(c.req.param("note"), target, { keep: keep === true, migrate: migrate === true }, c.var.ws.manuscript), 201);
+    const { chapter, keep } = await body(c);
+    return operation(c, () => bible(c).promoteNote(c.req.param("note"), String(chapter ?? ""), { keep: keep === true }, c.var.ws.manuscript), 201);
   });
   routes.post("/:id/migrate", async (c) => {
     const { to } = await body(c);

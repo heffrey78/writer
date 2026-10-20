@@ -16,7 +16,7 @@ export const novel: BookKind = {
     codex: { label: "Story bible", plural: "Story bibles", short: "Bible" },
     entity: { label: "Entry", plural: "Entries", article: "an" },
   },
-  folders: { content: "manuscript", codex: "bible", notes: "notes", events: "events" },
+  folders: { content: "manuscript", codex: "bible", notes: "notes" },
   entityTypes: [
     { key: "character", prefix: "char", folder: "characters", label: "Character", color: "1f77b4", builtin: true, is: "person" },
     { key: "location", prefix: "loc", folder: "locations", label: "Location", color: "2ca02c", builtin: true, is: "place" },
@@ -50,8 +50,9 @@ export const novel: BookKind = {
     },
   ],
   // Its modules' fields and types where they've always been: point of view first on the card, when
-  // after the characters and plotlines after it, the plotline type after locations.
-  modules: ["point-of-view", "plotlines", "presence", "story-time"],
+  // after the characters and plotlines after it, the plotline type after locations. Off-page events
+  // come before story time, so the event a scene dramatizes is said before how it sits in time.
+  modules: ["point-of-view", "plotlines", "presence", "off-page-events", "story-time"],
   fieldOrder: ["pov", "locations", "characters", "when", "plotlines", "entities", "themes"],
   entityTypeOrder: ["character", "location", "plotline", "theme"],
   issueKinds: [

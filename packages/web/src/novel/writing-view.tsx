@@ -1,5 +1,5 @@
-import { pieceLevel, pieceSections, readAnchor, readFrontMatter, type Section, type Book, type Piece } from "@writer/core";
-import { countWords, vocabulary } from "@writer/core";
+import { pieceLevel, pieceSections, readAnchor, readFrontMatter, recordType, type Section, type Book, type Piece } from "@writer/core";
+import { countWords, vocabulary, word } from "@writer/core";
 import {
   appContextMenu,
   caretBlock,
@@ -172,6 +172,9 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
   const current = useCurrentScene((s) => s.scene);
   const sidebar = useRightSidebar();
   const entryShown = useEntryPanel((s) => s.history[s.at]);
+  // What the Entry tab is called while it shows a module's record: "Event".
+  const shownRecord = entryShown === undefined ? undefined : novel.moduleRecords.find((r) => r.id === entryShown);
+  const recordShown = shownRecord && recordType(novel.kind, shownRecord.type);
   const focusMode = useWritingModes((m) => m.focus);
   useCommands(
     () => [
@@ -478,7 +481,7 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
         !focusMode && (
           <RightSidebar
             toText={toText}
-            labels={{ scene: w.piece.One, entry: entryShown && novel.events.some((e) => e.id === entryShown) ? "Event" : w.entity.One }}
+            labels={{ scene: w.piece.One, entry: recordShown ? word(recordShown.noun).Short : w.entity.One }}
             content={{
               scene: detailsScene ? (
                 <SceneDetails

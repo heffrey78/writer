@@ -1,4 +1,4 @@
-import { carryingField, entryPresence, roleOf, vocabulary, type BookKind, type Entity, type EntryPresence, type Book, type PresenceMark, type Vocabulary } from "@writer/core";
+import { carryingField, entryPresence, recordTypesOf, roleOf, vocabulary, type BookKind, type Entity, type EntryPresence, type Book, type PresenceMark, type Vocabulary } from "@writer/core";
 import { useMemo, type CSSProperties, type ReactNode } from "react";
 import { Link } from "react-router";
 import { cn } from "../ui/cn.ts";
@@ -145,20 +145,24 @@ export function InTheStory({ novelId, novel, entity, compact }: { novelId: strin
             {presence.longestAbsence.scenes === 1 ? ` (“${presence.longestAbsence.from.title}”)` : `, “${presence.longestAbsence.from.title}” to “${presence.longestAbsence.to.title}”`}.
           </li>
         )}
-        {presence.events.length > 0 && (
-          <li>
-            Off the page:{" "}
-            {presence.events.map((e, i) => (
-              <span key={e.id}>
-                {i > 0 && ", "}
-                <Link to={`/novels/${novelId}/event/${e.id}`} className="text-accent underline decoration-accent/35 underline-offset-[3px] hover:decoration-accent">
-                  {e.title}
-                </Link>
-              </span>
-            ))}
-            .
-          </li>
-        )}
+        {/* The modules' records it's part of, by their type's group: "Off the page: The flood of '09." */}
+        {recordTypesOf(novel.kind).map((t) => {
+          const records = presence.records.filter((r) => r.type === t.key);
+          return records.length > 0 && (
+            <li key={t.key}>
+              {t.group}:{" "}
+              {records.map((r, i) => (
+                <span key={r.id}>
+                  {i > 0 && ", "}
+                  <Link to={`/novels/${novelId}/${t.key}/${r.id}`} className="text-accent underline decoration-accent/35 underline-offset-[3px] hover:decoration-accent">
+                    {r.title}
+                  </Link>
+                </span>
+              ))}
+              .
+            </li>
+          );
+        })}
       </ul>
     </ProfileSection>
   );

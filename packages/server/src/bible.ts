@@ -4,9 +4,7 @@ import {
   backlinks,
   editFrontMatter,
   editYaml,
-  EVENT_FILES_FORMAT,
-  eventFile,
-  mentions,
+  mentionsOf,
   proseText,
   indexById,
   loadBook,
@@ -23,7 +21,6 @@ import {
   type Relationship,
   type SeriesSlot,
   type YamlEdit,
-  storyTimeField,
 } from "@writer/core";
 import { nodeSource } from "@writer/core/node";
 import { parse, stringify } from "yaml";
@@ -49,20 +46,6 @@ export interface RelationshipFields {
   type?: string;
   since?: string | null;
   until?: string | null;
-  note?: string | null;
-}
-
-/** An off-page story event's fields (null removes one on update). */
-export interface EventFields {
-  title?: string;
-  when?: { at: string } | { day: number; time?: string } | null;
-  duration?: string | null;
-  characters?: string[] | null;
-  locations?: string[] | null;
-  plotlines?: string[] | null;
-  /** The scene that dramatizes it. */
-  scene?: string | null;
-  /** Its note: the prose of its file. */
   note?: string | null;
 }
 
@@ -178,7 +161,7 @@ export class BibleOperations {
   }
 
   /**
-   * Remove an entity's file. If anything refers to it (scenes, prose, relationships, events), it's
+   * Remove an entity's file. If anything refers to it (scenes, prose, relationships, modules' records), it's
    * refused with every reference unless `confirm`; references are then left for the validator to report.
    */
   deleteEntity(id: string, base: string, confirm = false): Promise<OperationResult> {
@@ -189,7 +172,7 @@ export class BibleOperations {
       const references = [
         ...links.scenes.map((s) => ({ kind: "scene", id: s.scene.id, title: s.scene.title, via: s.via })),
         ...links.relationships.map((r) => ({ kind: "relationship", id: r.id, type: r.type, other: r.from === id ? r.to : r.from })),
-        ...links.events.map((e) => ({ kind: "event", id: e.id, title: e.title })),
+        ...links.records.map((r) => ({ kind: r.type, id: r.id, title: r.title })),
         ...mentionsOf(novel, id).filter((r) => r.kind === "note"),
       ];
       if (references.length && !confirm) {
@@ -333,86 +316,6 @@ export class BibleOperations {
     });
   }
 
-  /**
-   * Add an off-page event: a file of its own, bible/events/<slug>.md, its note as the prose (D11). A novel
-   * in format v1 is moved to v2 in the same commit when `migrate`, and refused with NEEDS_MIGRATION otherwise.
-   */
-  createEvent(fields: EventFields, migrate = false): Promise<OperationResult & { id: string; file: string }> {
-    return this.#eventChange(migrate, async (novel) => {
-      const title = required(fields.title, "title");
-      this.#checkEvent(novel, fields);
-      const id = uniqueId(RECORD_PREFIXES.event, new Set(indexById(novel).keys()));
-      const { note, ...front } = clean({ ...fields, title });
-      const file = this.#eventFileName(novel, title);
-      return { writes: [{ path: file, content: eventFile({ id, ...front }, note), base: null }], message: `${codex(novel)}: add event “${title}”`, extra: { id, file } };
-    });
-  }
-
-  /**
-   * Change an event's fields (null removes one; `note` replaces its prose). A new title moves its file to
-   * match. `base`, when given, is the hash of the file the change was made from. Migrates as createEvent does.
-   */
-  updateEvent(id: string, changes: EventFields, { base, migrate = false }: { base?: string; migrate?: boolean } = {}): Promise<OperationResult & { file: string }> {
-    return this.#eventChange(migrate, async (novel, read, migrated) => {
-      const event = this.#findEvent(novel, id);
-      if (changes.title !== undefined) required(changes.title, "title");
-      this.#checkEvent(novel, changes);
-      const { note, ...fields } = changes;
-      const tidy = Object.entries(fields).map(([key, v]) => (v === null || v === "" || (Array.isArray(v) && !v.length) ? { path: [key], remove: true as const } : { path: [key], value: v }));
-      const text = (await read(event.file)) ?? "";
-      if (base !== undefined && !migrated.has(event.file) && hashText(text) !== base) throw new OperationError("STALE", `“${event.title}” changed since it was read.`, { path: event.file });
-      let content = editFrontMatter(text, tidy);
-      if (note !== undefined) content = withProse(content, note ?? "");
-      const check = migrated.has(event.file) ? {} : { base: hashText(text) };
-      const title = changes.title?.trim() || event.title;
-      const renamed = changes.title && changes.title.trim() !== event.title ? this.#eventFileName(novel, title, event.file) : event.file;
-      const writes: FileWrite[] = renamed === event.file ? [{ path: event.file, content, ...check }] : [{ path: event.file, content: null, ...check }, { path: renamed, content, base: null }];
-      const message = renamed === event.file ? `${codex(novel)}: edit event “${title}”` : `${codex(novel)}: rename event “${event.title}” to “${title}”`;
-      return { writes, message, extra: { file: renamed } };
-    });
-  }
-
-  /**
-   * Remove an event's file. If prose mentions it (scenes, entries, other events), it's refused with every
-   * mention unless `confirm`; they're then left for the validator to report. Migrates as createEvent does.
-   */
-  deleteEvent(id: string, { base, confirm = false, migrate = false }: { base?: string; confirm?: boolean; migrate?: boolean } = {}): Promise<OperationResult> {
-    return this.#eventChange(migrate, async (novel, read, migrated) => {
-      const event = this.#findEvent(novel, id);
-      const references = mentionsOf(novel, id);
-      if (references.length && !confirm) {
-        throw new OperationError("REFERENCED", `“${event.title}” is mentioned in ${references.length} place${references.length === 1 ? "" : "s"}.`, { references });
-      }
-      const text = (await read(event.file)) ?? "";
-      if (base !== undefined && !migrated.has(event.file) && hashText(text) !== base) throw new OperationError("STALE", `“${event.title}” changed since it was read.`, { path: event.file });
-      return { writes: [{ path: event.file, content: null, ...(migrated.has(event.file) ? {} : { base: hashText(text) }) }], message: `${codex(novel)}: remove event “${event.title}”`, extra: {} };
-    });
-  }
-
-  /**
-   * Write an off-page event as a scene (heffrey78/gh-writer#165): a new scene at the end of `chapter` with the event's
-   * title, time, duration, characters, locations and plotlines, and its note as the synopsis. The event
-   * is kept, its `scene` naming the new one, or removed: refused (REFERENCED) while prose mentions it.
-   * One commit; migrates as createEvent does.
-   */
-  writeAsScene(id: string, { chapter, keep, migrate = false }: { chapter: string; keep: boolean; migrate?: boolean }, manuscript: ManuscriptOperations): Promise<OperationResult & { scene: string; file: string }> {
-    return this.#eventChange(migrate, async (novel, read) => {
-      const event = this.#findEvent(novel, id);
-      if (!keep) {
-        const references = mentionsOf(novel, id);
-        if (references.length) throw new OperationError("REFERENCED", `“${event.title}” is mentioned in ${references.length} place${references.length === 1 ? "" : "s"}, so it's kept.`, { references });
-      }
-      const synopsis = proseText(event.body).replace(/\s+/g, " ").trim();
-      // Its time goes to the kind's story-time field, where it has one.
-      const time = storyTimeField(novel.kind);
-      const front = clean({ synopsis, characters: event.characters, locations: event.locations, plotlines: event.plotlines, ...(time ? { [time.key]: event.when, [time.type.durationKey]: event.duration } : {}) });
-      const scene = await manuscript.sceneWrites(novel, chapter, { title: event.title, front });
-      const text = (await read(event.file)) ?? "";
-      const writes: FileWrite[] = [...scene.writes, keep ? { path: event.file, content: editFrontMatter(text, [{ path: ["scene"], value: scene.id }]) } : { path: event.file, content: null }];
-      return { writes, message: `${vocabulary(novel.kind).content.One}: write “${event.title}” as ${vocabulary(novel.kind).piece.a}${keep ? "" : ", removing the event"}`, extra: { scene: scene.id, file: scene.file } };
-    });
-  }
-
   /** Add a writer's note (D12): notes/<slug>.md, dated today, with `note` as its prose. */
   createNote(fields: NoteFields): Promise<OperationResult & { id: string; file: string }> {
     return this.#run(async (novel) => {
@@ -435,7 +338,7 @@ export class BibleOperations {
   /** Change a note's title (its file moves to match), tags or prose (`note`). `base`: the file's hash as read. */
   updateNote(id: string, changes: NoteFields, { base }: { base?: string } = {}): Promise<OperationResult & { file: string }> {
     return this.#run(async (novel) => {
-      const note = this.#findNote(novel, id);
+      const note = this.findNote(novel, id);
       if (changes.title !== undefined) required(changes.title, "title");
       const text = await this.#read(note.file);
       if (base !== undefined && hashText(text) !== base) throw new OperationError("STALE", `“${note.title}” changed since it was read.`, { path: note.file });
@@ -464,7 +367,7 @@ export class BibleOperations {
    */
   pinNote(id: string, scene: string, pinned: boolean): Promise<OperationResult> {
     return this.#run(async (novel) => {
-      const note = this.#findNote(novel, id);
+      const note = this.findNote(novel, id);
       this.#checkScenes(novel, [scene]);
       const writes: FileWrite[] = [];
       const edit = async (n: Book["notes"][number], scenes: string[], pins: string[]) => {
@@ -485,7 +388,7 @@ export class BibleOperations {
 
   deleteNote(id: string, { base }: { base?: string } = {}): Promise<OperationResult> {
     return this.#run(async (novel) => {
-      const note = this.#findNote(novel, id);
+      const note = this.findNote(novel, id);
       const text = await this.#read(note.file);
       if (base !== undefined && hashText(text) !== base) throw new OperationError("STALE", `“${note.title}” changed since it was read.`, { path: note.file });
       return transaction(this.root, [{ path: note.file, content: null, base: hashText(text) }], `Notes: remove “${note.title}”`);
@@ -493,38 +396,26 @@ export class BibleOperations {
   }
 
   /**
-   * Promote a note (heffrey78/gh-writer#205): to an off-page event (its title, and its prose as the event's note), or to a
-   * scene at the end of `chapter` (its title, and its prose as the synopsis). The note is kept, `became`
-   * naming what it became, or removed; one commit. To an event in a novel in format v1, migrates as createEvent does.
+   * Promote a note to a scene (heffrey78/gh-writer#205): a new one at the end of `chapter`, its title the note's and its
+   * prose the synopsis. The note is kept, `became` naming the scene, or removed; one commit. What a
+   * module makes of a note (an off-page event) is its own, with noteBecame.
    */
-  promoteNote(
-    id: string,
-    to: { to: "event" } | { to: "scene"; chapter: string },
-    { keep, migrate = false }: { keep: boolean; migrate?: boolean },
-    manuscript: ManuscriptOperations,
-  ): Promise<OperationResult & { id: string; file: string }> {
-    const noteWrite = async (novel: Book, read: (path: string) => Promise<string | undefined>, made: string): Promise<FileWrite> => {
-      const note = this.#findNote(novel, id);
-      const text = (await read(note.file)) ?? "";
-      return keep ? { path: note.file, content: editFrontMatter(text, [{ path: ["became"], value: made }]), base: hashText(text) } : { path: note.file, content: null, base: hashText(text) };
-    };
-    if (to.to === "event") {
-      return this.#eventChange(migrate, async (novel, read) => {
-        const note = this.#findNote(novel, id);
-        const made = uniqueId(RECORD_PREFIXES.event, new Set(indexById(novel).keys()));
-        const file = this.#eventFileName(novel, note.title);
-        const writes = [{ path: file, content: eventFile({ id: made, title: note.title }, note.body), base: null }, await noteWrite(novel, read, made)];
-        return { writes, message: `Notes: promote “${note.title}” to an off-page event${keep ? "" : ", removing the note"}`, extra: { id: made, file } };
-      });
-    }
+  promoteNote(id: string, chapter: string, { keep }: { keep: boolean }, manuscript: ManuscriptOperations): Promise<OperationResult & { id: string; file: string }> {
     return this.#run(async (novel) => {
-      const note = this.#findNote(novel, id);
+      const note = this.findNote(novel, id);
       const synopsis = proseText(note.body).replace(/\s+/g, " ").trim();
-      const scene = await manuscript.sceneWrites(novel, to.chapter, { title: note.title, front: synopsis ? { synopsis } : {} });
-      const writes = [...scene.writes, await noteWrite(novel, (path) => this.#read(path), scene.id)];
+      const scene = await manuscript.sceneWrites(novel, chapter, { title: note.title, front: synopsis ? { synopsis } : {} });
+      const writes = [...scene.writes, await this.noteBecame(novel, (path) => this.#read(path), id, scene.id, keep)];
       const message = `Notes: write “${note.title}” as ${vocabulary(novel.kind).piece.a}${keep ? "" : ", removing the note"}`;
       return { ...(await transaction(this.root, writes, message)), id: scene.id, file: scene.file };
     });
+  }
+
+  /** What becomes of a note made into something (`made`, its ID): kept, `became` naming it, or removed. */
+  async noteBecame(novel: Book, read: (path: string) => Promise<string | undefined>, id: string, made: string, keep: boolean): Promise<FileWrite> {
+    const note = this.findNote(novel, id);
+    const text = (await read(note.file)) ?? "";
+    return keep ? { path: note.file, content: editFrontMatter(text, [{ path: ["became"], value: made }]), base: hashText(text) } : { path: note.file, content: null, base: hashText(text) };
   }
 
   /** Move the book to format `to` (the newest by default: D11, D15), on its own, in one commit. */
@@ -537,24 +428,26 @@ export class BibleOperations {
   }
 
   /**
-   * An event change, made on the novel as format v2 has it. A v1 novel is migrated first, in the same
-   * commit, if `migrate`; otherwise it's NEEDS_MIGRATION, for the app to ask the writer. `fn` reads files
-   * as they'll be after the migration, and is told which paths the migration writes (no base to check).
+   * A change of a module's (D14), one commit: `fn` gives the writes and their message from the book as
+   * it is. With `format`, it's made on the book as that format has it: a novel in an older one is
+   * migrated first, in the same commit, if `migrate`; otherwise it's NEEDS_MIGRATION (`needs` says why),
+   * for the app to ask the writer. `fn` reads files as they'll be after the migration, and is told
+   * which paths the migration writes (no base to check).
    */
-  #eventChange<T extends object>(
-    migrate: boolean,
+  change<T extends object>(
     fn: (novel: Book, read: (path: string) => Promise<string | undefined>, migrated: ReadonlySet<string>) => Promise<{ writes: FileWrite[]; message: string; extra: T }>,
+    { format, migrate = false, needs = "" }: { format?: number; migrate?: boolean; needs?: string } = {},
   ): Promise<OperationResult & T> {
     return this.#exclusive(async () => {
-      // An event change needs events as files (format 2), and no more: the book doesn't move to book.yaml for it.
-      const { migration, writes: moved } = await migrationWrites(this.root, undefined, EVENT_FILES_FORMAT);
+      // As far as `format`, and no more: the book doesn't move to book.yaml for it.
+      const { migration, writes: moved } = format === undefined ? { migration: { status: "current" as const }, writes: [] } : await migrationWrites(this.root, undefined, format);
       if (migration.status === "refused") throw new OperationError("BAD_REQUEST", migration.reason);
       if (migration.status === "migrate" && !migrate) {
-        throw new OperationError("NEEDS_MIGRATION", `Off-page events are kept differently in format v${migration.to}: the novel must move to it first.`, { from: migration.from, to: migration.to });
+        throw new OperationError("NEEDS_MIGRATION", needs, { from: migration.from, to: migration.to });
       }
       const source = overlay(nodeSource(this.root), moved);
       const { writes, message, extra } = await fn(await loadBook(source), (path) => source.read(path), new Set(moved.map((w) => w.path)));
-      // A file the change writes again (an event file the migration made) is written once, as the change has it.
+      // A file the change writes again (one the migration made) is written once, as the change has it.
       const again = new Set(writes.map((w) => w.path));
       const all = [...moved.filter((w) => !again.has(w.path)), ...writes];
       const result = await transaction(this.root, all, migration.status === "migrate" ? `${migration.message}; ${message}` : message);
@@ -568,7 +461,7 @@ export class BibleOperations {
     return [...new Set(ids)];
   }
 
-  #findNote(novel: Book, id: string) {
+  findNote(novel: Book, id: string) {
     const note = novel.notes.find((n) => n.id === id);
     if (!note) throw new OperationError("NOT_FOUND", `No note “${id}”.`);
     return note;
@@ -581,10 +474,10 @@ export class BibleOperations {
     return `${folder}/${uniqueFileName(slugify(title), ".md", taken)}`;
   }
 
-  /** bible/events/<slug>.md for a title, unused by any other event (`own` is the event's file now, free to keep). */
-  #eventFileName(novel: Book, title: string, own?: string): string {
-    const folder = `${novel.kind.folders.codex}/${novel.kind.folders.events}`;
-    const taken = new Set(novel.events.filter((e) => e.file !== own && e.file.startsWith(`${folder}/`)).map((e) => e.file.slice(folder.length + 1)));
+  /** A module's record file for a title, in its type's folder of the codex, unused by any other of the type (`own` is the record's file now, free to keep). */
+  recordFileName(novel: Book, type: { key: string; folder: string }, title: string, own?: string): string {
+    const folder = `${novel.kind.folders.codex}/${type.folder}`;
+    const taken = new Set(novel.moduleRecords.filter((r) => r.type === type.key && r.file !== own && r.file.startsWith(`${folder}/`)).map((r) => r.file.slice(folder.length + 1)));
     return `${folder}/${uniqueFileName(slugify(title), ".md", taken)}`;
   }
 
@@ -717,30 +610,6 @@ export class BibleOperations {
     this.#checkSpan(novel, r.since ?? undefined, r.until ?? undefined, "A relationship must start before it ends.");
   }
 
-  #findEvent(novel: Book, id: string) {
-    const event = novel.events.find((e) => e.id === id);
-    if (!event) throw new OperationError("NOT_FOUND", `No event “${id}”.`);
-    return event;
-  }
-
-  /** A time, a duration and entries of the right types, where given. */
-  #checkEvent(novel: Book, f: EventFields): void {
-    const w = f.when;
-    if (w) {
-      const ok = "at" in w ? /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2})?)?$/.test(w.at) : Number.isInteger(w.day) && (w.time === undefined || /^([01]\d|2[0-3]):[0-5]\d$/.test(w.time));
-      if (!ok) throw new OperationError("BAD_REQUEST", "A time is a date (YYYY-MM-DD, optionally THH:MM) or a day of the story with an optional HH:MM.");
-    }
-    if (f.duration && !/^P(?!$)(\d+Y)?(\d+M)?(\d+W)?(\d+D)?(T(?=\d)(\d+H)?(\d+M)?(\d+(\.\d+)?S)?)?$/.test(f.duration)) {
-      throw new OperationError("BAD_REQUEST", "A duration is ISO 8601, like PT45M or P2D.");
-    }
-    if (f.scene && !novel.allPieces.some((sc) => sc.id === f.scene)) throw new OperationError("BAD_REQUEST", `No ${vocabulary(novel.kind).piece.one} “${f.scene}”.`);
-    for (const [key, type] of [["characters", "character"], ["locations", "location"], ["plotlines", "plotline"]] as const) {
-      for (const id of f[key] ?? []) {
-        if (!novel.entities.some((e) => e.id === id && e.type === type)) throw new OperationError("BAD_REQUEST", `No ${type} “${id}”.`);
-      }
-    }
-  }
-
   /** `first` must come strictly before `second` in reading order, where both are given. */
   #checkSpan(novel: Book, first: string | null | undefined, second: string | null | undefined, message: string): void {
     if (!first || !second) return;
@@ -786,7 +655,7 @@ function checkFocus(focus: [number, number]): [number, number] {
   return [Math.round(focus[0] * 1000) / 1000, Math.round(focus[1] * 1000) / 1000];
 }
 
-function required(value: string | undefined, field: string): string {
+export function required(value: string | undefined, field: string): string {
   if (typeof value !== "string" || !value.trim()) throw new OperationError("BAD_REQUEST", `A ${field} is required.`);
   return value.trim();
 }
@@ -797,26 +666,15 @@ function localDateTime(d: Date): string {
   return `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}T${two(d.getHours())}:${two(d.getMinutes())}:${two(d.getSeconds())}`;
 }
 
-/** The prose that mentions a record: scenes, entries, other events and notes, for a delete to list. */
-function mentionsOf(novel: Book, id: string) {
-  const mentioned = (body: string) => mentions(body).some((m) => m.id === id);
-  return [
-    ...novel.allPieces.filter((s) => mentioned(s.body)).map((s) => ({ kind: "scene", id: s.id, title: s.title, via: ["mention"] })),
-    ...novel.entities.filter((e) => e.id !== id && mentioned(e.body)).map((e) => ({ kind: "entity", id: e.id, title: e.name })),
-    ...novel.events.filter((e) => e.id !== id && mentioned(e.body)).map((e) => ({ kind: "event", id: e.id, title: e.title })),
-    ...novel.notes.filter((n) => mentioned(n.body)).map((n) => ({ kind: "note", id: n.id, title: n.title })),
-  ];
-}
-
 /** A Markdown file with its prose replaced, and its front matter kept byte for byte. */
-function withProse(text: string, prose: string): string {
+export function withProse(text: string, prose: string): string {
   const m = /^(\uFEFF?---[ \t]*\r?\n[\s\S]*?^---[ \t]*(?:\r?\n|$))/m.exec(text);
   const front = m && m.index === 0 ? m[1]! : "";
   return `${front}${front.endsWith("\n") || !front ? "" : "\n"}${prose.trim() ? `\n${prose.trim()}\n` : ""}`;
 }
 
 /** Fields with undefined, null and empty values left out. */
-function clean(fields: object): Record<string, unknown> {
+export function clean(fields: object): Record<string, unknown> {
   return Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined && v !== null && v !== "" && !(Array.isArray(v) && !v.length)));
 }
 

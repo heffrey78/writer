@@ -128,11 +128,9 @@ export interface BookKind extends Noun {
   folders: {
     /** The sections and pieces. */
     content: string;
-    /** The entries, relationships and events. */
+    /** The entries and relationships, and the records its modules keep (off-page events). */
     codex: string;
     notes: string;
-    /** Under the codex folder: off-page events. */
-    events: string;
   };
   /** The entry types every book of the kind has; a book may add its own. */
   entityTypes: readonly EntityTypeDef[];
@@ -142,7 +140,7 @@ export interface BookKind extends Noun {
   fields: readonly FieldDef[];
   /** What a book's issues are about: a label kind/<key> each. */
   issueKinds: readonly IssueKind[];
-  /** The modules its books use, by id (D14): each adds its fields after the kind's own, and its checks. */
+  /** The modules its books use, by id (D14): each adds its fields after the kind's own, its checks and its records. */
   modules?: readonly string[];
   /**
    * The order of its fields with its modules', by key, where a module's shouldn't simply follow the

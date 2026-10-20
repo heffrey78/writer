@@ -1,9 +1,8 @@
 import { reservedPrefixes, type EntityTypeDef } from "./ids.ts";
 import { kindByKey, knownKind, startLevels, V2_KIND, type BookKind, type LevelDef } from "./kinds.ts";
-import { storyTimeValue } from "./fields.ts";
-import { withModules } from "./modules.ts";
+import { recordTypesOf, withModules } from "./modules.ts";
 import { EVENT_FILES_FORMAT, MANIFEST, NOVEL_MANIFEST, readManifest, SCHEMA_VERSION } from "./manifest.ts";
-import type { Section, Entity, Book, Relationship, Piece, StoryEvent, ThemeRef } from "./model.ts";
+import type { Section, Entity, Book, ModuleRecord, Relationship, Piece, ThemeRef } from "./model.ts";
 import { parseMarkdown, parseYaml } from "./parse.ts";
 import { checkSchema, type SchemaKind } from "./schemas.ts";
 import { joinPath, type FileSource } from "./source.ts";
@@ -32,7 +31,8 @@ export async function loadBook(source: FileSource, kind?: BookKind): Promise<Boo
   const file = manifest?.file ?? NOVEL_MANIFEST;
   const named = manifest?.kind === undefined ? undefined : knownKind(manifest.kind);
   const bookKind = withModules(kind ?? named ?? kindByKey(V2_KIND));
-  const { content, codex, notes: notesFolder, events: eventsFolder } = bookKind.folders;
+  const { content, codex, notes: notesFolder } = bookKind.folders;
+  const recordTypes = recordTypesOf(bookKind);
   // The front-matter keys of the kind's fields (story time's two).
   const fieldKeys = bookKind.fields.flatMap((f) => (f.type.kind === "story-time" ? [f.key, f.type.durationKey] : [f.key]));
   const order = `${content}/_order.yaml`;
@@ -49,7 +49,7 @@ export async function loadBook(source: FileSource, kind?: BookKind): Promise<Boo
     allPieces: [],
     entities: [],
     relationships: [],
-    events: [],
+    moduleRecords: [],
     notes: [],
     layouts: {},
     diagnostics,
@@ -66,7 +66,7 @@ export async function loadBook(source: FileSource, kind?: BookKind): Promise<Boo
     return isObject(parsed.data) ? parsed.data : {};
   }
 
-  async function markdownFile(path: string, kind: SchemaKind) {
+  async function markdownFile(path: string, kind: SchemaKind | string) {
     const parsed = parseMarkdown((await source.read(path)) ?? "", path);
     diagnostics.push(...parsed.diagnostics);
     if (parsed.diagnostics.length) return undefined;
@@ -250,11 +250,7 @@ export async function loadBook(source: FileSource, kind?: BookKind): Promise<Boo
   async function loadBible() {
     for (const entry of await source.list(codex)) {
       const path = joinPath(codex, entry.name);
-      if (!entry.dir) continue;
-      if (entry.name === eventsFolder) {
-        for (const f of await source.list(path)) if (!f.dir && f.name.endsWith(".md")) await loadEvent(joinPath(path, f.name));
-        continue;
-      }
+      if (!entry.dir || recordTypes.some((t) => t.folder === entry.name)) continue;
       const type = novel.entityTypes.find((t) => t.folder === entry.name);
       const files = (await source.list(path)).filter((f) => !f.dir && f.name.endsWith(".md"));
       if (!type) {
@@ -277,48 +273,31 @@ export async function loadBook(source: FileSource, kind?: BookKind): Promise<Boo
       novel.relationships.push(rel);
     });
 
-    const eventsYaml = `${codex}/events.yaml`;
-    const events = await yamlFile(eventsYaml, "events");
-    objList(events?.["events"]).forEach((e, index) => {
-      const id = str(e["id"]);
-      if (!id) return;
-      const ev: StoryEvent = {
-        id,
-        title: str(e["title"]) ?? "",
-        when: storyTimeValue(e["when"]),
-        duration: str(e["duration"]),
-        characters: strList(e["characters"]),
-        locations: strList(e["locations"]),
-        plotlines: strList(e["plotlines"]),
-        body: str(e["note"]) ?? "",
-        bodyLine: 0,
-        file: eventsYaml,
-        index,
-      };
-      novel.events.push(ev);
-    });
+    // The records the kind's modules keep (D14): a file each in their type's folder, then any in a
+    // list of them, as format v1 kept off-page events.
+    for (const t of recordTypes) {
+      const folder = `${codex}/${t.folder}`;
+      for (const f of await source.list(folder)) if (!f.dir && f.name.endsWith(".md")) await loadRecord(t.key, joinPath(folder, f.name));
+      if (!t.list) continue;
+      const list = `${codex}/${t.list.file}`;
+      const data = await yamlFile(list, `${t.key}-list`);
+      objList(data?.[t.list.key]).forEach((item, index) => {
+        const id = str(item["id"]);
+        if (!id) return;
+        const body = t.list!.body;
+        const fields = Object.fromEntries(Object.entries(item).filter(([k]) => k !== "id" && k !== "title" && k !== body));
+        novel.moduleRecords.push({ type: t.key, id, title: str(item["title"]) ?? "", fields, body: str(item[body]) ?? "", bodyLine: 0, file: list, pointer: `/${t.list!.key}/${index}` });
+      });
+    }
   }
 
-  /** An event file (format v2): front matter, and its note as prose. */
-  async function loadEvent(file: string) {
-    const md = await markdownFile(file, "event");
+  /** A module's record: front matter, and prose. */
+  async function loadRecord(type: string, file: string) {
+    const md = await markdownFile(file, type);
     if (!md || !str(md.data["id"])) return;
-    const d = md.data;
-    const ev: StoryEvent = {
-      id: str(d["id"])!,
-      title: str(d["title"]) ?? "",
-      when: storyTimeValue(d["when"]),
-      duration: str(d["duration"]),
-      characters: strList(d["characters"]),
-      locations: strList(d["locations"]),
-      plotlines: strList(d["plotlines"]),
-      body: md.body,
-      bodyLine: md.bodyLine,
-      file,
-    };
-    const scene = str(d["scene"]);
-    if (scene) ev.scene = scene;
-    novel.events.push(ev);
+    const fields = Object.fromEntries(Object.entries(md.data).filter(([k]) => k !== "id" && k !== "title"));
+    const record: ModuleRecord = { type, id: str(md.data["id"])!, title: str(md.data["title"]) ?? "", fields, body: md.body, bodyLine: md.bodyLine, file };
+    novel.moduleRecords.push(record);
   }
 
   /** The writer's notes (D12): notes/*.md. */
@@ -411,7 +390,7 @@ function entityTypes(raw: unknown, diagnostics: Diagnostic[], kind: BookKind, fi
     const clash =
       types.find((x) => x.key === key) ? `key "${key}"` :
       reserved.has(prefix) || types.find((x) => x.prefix === prefix) ? `prefix "${prefix}"` :
-      folder === kind.folders.events || types.find((x) => x.folder === folder) ? `folder "${folder}"` : undefined;
+      recordTypesOf(kind).some((r) => r.folder === folder) || types.find((x) => x.folder === folder) ? `folder "${folder}"` : undefined;
     if (clash) {
       diagnostics.push({ ...error("E_ENTITY_TYPE", file, `Entity type ${clash} is reserved or already used`), pointer: `/entity_types/${i}` });
       return;

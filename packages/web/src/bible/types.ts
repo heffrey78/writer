@@ -1,4 +1,4 @@
-import type { Entity, Book } from "@writer/core";
+import { recordTypesOf, type Entity, type Book } from "@writer/core";
 import type { MentionEntity } from "@writer/editor";
 
 /** A type's name for a list of its entries: "Characters". */
@@ -20,10 +20,10 @@ export const matches = (entity: Entity, query: string) => {
   return !q || [entity.name, ...entity.aliases].some((n) => n.toLowerCase().includes(q));
 };
 
-/** What @ suggestions call off-page events, grouped after the bible's entries. */
-export const OFF_THE_PAGE = "Off the page";
-
-/** Every entry, for @ suggestions: by type in the bible's order, then by name; then the off-page events (heffrey78/gh-writer#165). */
+/**
+ * Every entry, for @ suggestions: by type in the bible's order, then by name; then the modules'
+ * records prose may mention, by their type's group ("Off the page": off-page events, heffrey78/gh-writer#165).
+ */
 export function mentionEntities(novel: Book): MentionEntity[] {
   return [
     ...novel.entityTypes.flatMap((t) =>
@@ -32,6 +32,13 @@ export function mentionEntities(novel: Book): MentionEntity[] {
         .sort((a, b) => a.name.localeCompare(b.name))
         .map((e) => ({ id: e.id, name: e.name, aliases: e.aliases, type: t.label })),
     ),
-    ...[...novel.events].sort((a, b) => a.title.localeCompare(b.title)).map((e) => ({ id: e.id, name: e.title, aliases: [], type: OFF_THE_PAGE })),
+    ...recordTypesOf(novel.kind)
+      .filter((t) => t.mentionable)
+      .flatMap((t) =>
+        novel.moduleRecords
+          .filter((r) => r.type === t.key)
+          .sort((a, b) => a.title.localeCompare(b.title))
+          .map((r) => ({ id: r.id, name: r.title, aliases: [], type: t.group })),
+      ),
   ];
 }

@@ -1,5 +1,6 @@
-import { vocabulary, type Book } from "@writer/core";
+import { vocabulary, word, type Book } from "@writer/core";
 import { draw } from "@writer/core/snapshots";
+import { recordWords, timedTypes } from "./time.ts";
 import { defaultLanes, itemTitle, jump, lanesOf, timeline, when, type LaneMode } from "./timeline.ts";
 
 /* The timeline's snapshots (D14, #30): in Mermaid, which github.com draws, and as SVG, drawn as the app draws it. */
@@ -20,7 +21,7 @@ export function timelineMermaid(novel: Book): string {
     const what =
       item.kind === "scene"
         ? `${item.scene.title} (${ordinal(novel.pieces.indexOf(item.scene) + 1)} in the book${t.flashbacks.has(item.scene.id) ? ", a flashback" : ""})`
-        : `${item.event.title} (off page)`;
+        : `${item.record.title} (${recordWords(novel, item.record).aside})`;
     const at = when(item);
     if (at === period) events.push(what);
     else {
@@ -41,7 +42,7 @@ const LANE_H = 54;
 export function timelineSvg(novel: Book, mode: LaneMode = defaultLanes(novel.kind)): string {
   const t = timeline(novel, mode);
   const title = "The book in story time, and in reading order";
-  if (!t.items.length) return svg(420, 60, title, `<text x="20" y="36" ${FONT} font-size="13" fill="${C.muted}">No ${vocabulary(novel.kind).piece.one} or event has a time yet.</text>\n`);
+  if (!t.items.length) return svg(420, 60, title, `<text x="20" y="36" ${FONT} font-size="13" fill="${C.muted}">${esc(nothingTimed(novel))}</text>\n`);
   const head = 150;
   const top = 44;
   const axisH = 50;
@@ -74,10 +75,10 @@ export function timelineSvg(novel: Book, mode: LaneMode = defaultLanes(novel.kin
       if (!lanesOf(novel, item, mode).includes(lane.id)) return;
       const x = head + i * SLOT + 6;
       const flashback = item.kind === "scene" && t.flashbacks.has(item.scene.id);
-      const event = item.kind === "event";
+      const event = item.kind === "record";
       b += `<rect x="${x}" y="${y + 7}" width="${SLOT - 12}" height="40" rx="6" fill="${event ? C.paper : C.paper}" stroke="${flashback ? C.warn : event ? C.muted : C.rule}" stroke-width="${flashback ? 2 : 1}"${event ? ` stroke-dasharray="4 3"` : ""}/>\n`;
       b += `<text x="${x + 8}" y="${y + 24}" ${FONT} font-size="11.5" font-weight="600"${event ? ` font-style="italic"` : ""} fill="${C.ink}">${esc(cut(itemTitle(item), 19))}</text>\n`;
-      const sub = item.kind === "scene" ? (flashback ? `${ordinal(novel.pieces.indexOf(item.scene) + 1)} · flashback` : `${ordinal(novel.pieces.indexOf(item.scene) + 1)} in the book`) : "off page";
+      const sub = item.kind === "scene" ? (flashback ? `${ordinal(novel.pieces.indexOf(item.scene) + 1)} · flashback` : `${ordinal(novel.pieces.indexOf(item.scene) + 1)} in the book`) : recordWords(novel, item.record).aside;
       b += `<text x="${x + 8}" y="${y + 39}" ${FONT} font-size="10" fill="${flashback ? C.warn : C.muted}">${esc(sub)}</text>\n`;
     });
   });
@@ -94,10 +95,15 @@ export function timelineSvg(novel: Book, mode: LaneMode = defaultLanes(novel.kin
 
 const fence = (s: string) => "```mermaid\n" + s + "```\n";
 
+/** "No scene or event has a time yet.": the pieces, and what else the book places in story time. */
+export function nothingTimed(book: Book): string {
+  const others = timedTypes(book.kind).map((t) => word(t.noun).short);
+  return `No ${[vocabulary(book.kind).piece.one, ...others].join(" or ")} has a time yet.`;
+}
+
 /** The timeline's diagram for the book's diagrams/ folder, and its section of their README. */
 export function timelineSnapshots(book: Book) {
   const hasTimes = timeline(book, defaultLanes(book.kind)).items.length > 0;
-  const w = vocabulary(book.kind);
   return {
     files: hasTimes ? ([["diagrams/timeline.svg", timelineSvg(book)]] as const) : [],
     readme: [
@@ -105,7 +111,7 @@ export function timelineSnapshots(book: Book) {
       "",
       ...(hasTimes
         ? ["When things happen in the story, next to where they come in the book.", "", fence(timelineMermaid(book)), "![The book in story time, and in reading order](timeline.svg)"]
-        : [`No ${w.piece.one} or event has a time yet.`]),
+        : [nothingTimed(book)]),
       "",
     ],
   };

@@ -1,14 +1,14 @@
 import type { BookKind } from "./kinds.ts";
+import { recordTypesOf } from "./modules.ts";
 
 /** Lowercase Crockford base32: digits and letters without i, l, o, u. */
 export const ID_ALPHABET = "0123456789abcdefghjkmnpqrstvwxyz";
 export const ID_LENGTH = 6;
 export const ID_PATTERN = /^([a-z]{2,8})_([0-9a-hjkmnp-tv-z]{6})$/;
 
-/** Prefixes of the records every kind of book has; the book's own, its sections' and pieces' are its kind's. */
+/** Prefixes of the records every kind of book has; the book's own, its sections' and pieces' are its kind's, and its modules' records' theirs. */
 export const RECORD_PREFIXES = {
   relationship: "rel",
-  event: "evt",
   note: "note",
 } as const;
 
@@ -23,13 +23,14 @@ export interface EntityTypeDef {
   is?: "person" | "place";
 }
 
-/** Prefixes a book's own entry types may not use: its kind's and every kind's records'. */
+/** Prefixes a book's own entry types may not use: its kind's, its modules' records' and every kind's records'. */
 export function reservedPrefixes(kind: BookKind): ReadonlySet<string> {
   return new Set([
     kind.prefix,
     ...kind.levels.map((l) => l.prefix),
     kind.piece.prefix,
     ...Object.values(RECORD_PREFIXES),
+    ...recordTypesOf(kind).map((t) => t.prefix),
     ...kind.entityTypes.map((t) => t.prefix),
   ]);
 }

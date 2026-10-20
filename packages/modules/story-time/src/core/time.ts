@@ -1,9 +1,10 @@
-import { entriesOf, storyTimeValue, type Book, type Piece, type StoryEvent, type StoryTime } from "@writer/core";
+import { entriesOf, recordEntries, recordType, recordTypesOf, storyTimeValue, word, type Book, type BookKind, type FieldDef, type ModuleRecord, type Piece, type RecordTypeDef, type StoryTime, type Word } from "@writer/core";
 
 /*
- * Story time (D14, #30): when each piece and off-page event happens, a day of the story or a date,
- * and how long it lasts; the book's items in that order; and who would have to be in two places at
- * once. A piece's time is the module's `when` field, with its duration; an event's is its own.
+ * Story time (D14, #30): when each piece happens, a day of the story or a date, and how long it lasts,
+ * and when the records other modules keep do (an off-page event); the book's items in that order; and
+ * who would have to be in two places at once. A piece's time is the module's `when` field, with its
+ * duration; a record's is its type's story-time field.
  */
 
 const MINUTE = 60_000;
@@ -90,37 +91,63 @@ export function pieceInstant(book: Book, piece: Piece): StoryInstant | undefined
   return storyInstant(when, duration, book.config?.calendar?.start);
 }
 
-export type TimelineItem = { kind: "scene"; scene: Piece; at: StoryInstant } | { kind: "event"; event: StoryEvent; at: StoryInstant };
+type StoryTimeFieldDef = FieldDef & { type: { kind: "story-time"; durationKey: string } };
+const timeField = (kind: BookKind, type: RecordTypeDef) => type.fields(kind).find((f): f is StoryTimeFieldDef => f.type.kind === "story-time");
+
+/** The record types of the kind's modules that happen in story time, those with a story-time field: an off-page event. */
+export const timedTypes = (kind: BookKind): RecordTypeDef[] => recordTypesOf(kind).filter((t) => timeField(kind, t));
+
+/** When a module's record happens, and for how long: its type's story-time field. */
+export function recordTime(book: Book, record: ModuleRecord): { when?: StoryTime; duration?: string } {
+  const type = recordType(book.kind, record.type);
+  const f = type && timeField(book.kind, type);
+  if (!f) return {};
+  const when = storyTimeValue(record.fields[f.key]);
+  const duration = record.fields[f.type.durationKey];
+  return { ...(when ? { when } : {}), ...(typeof duration === "string" && duration ? { duration } : {}) };
+}
+
+/** What a module's record is called, in the forms sentences need, and after its title among pieces ("off page"). */
+export function recordWords(book: Book, record: ModuleRecord): Word & { aside: string } {
+  const type = recordType(book.kind, record.type);
+  return { ...word(type?.noun ?? { label: record.type, plural: record.type }), aside: type?.aside ?? record.type };
+}
+
+/** A scene, or a module's record with its time as written (`when`). */
+export type TimelineItem = { kind: "scene"; scene: Piece; at: StoryInstant } | { kind: "record"; record: ModuleRecord; when: StoryTime; at: StoryInstant };
 
 export interface StoryTimeline {
-  /** Scenes and events with a time, in story-time order: dated first, then relative days; reading order breaks ties. */
+  /** Scenes and the modules' records (off-page events) with a time, in story-time order: dated first, then relative days; reading order breaks ties. */
   items: TimelineItem[];
   /** Scenes in reading order that have no time. */
   undatedScenes: Piece[];
-  undatedEvents: StoryEvent[];
+  undatedRecords: ModuleRecord[];
 }
 
-const itemId = (i: TimelineItem) => (i.kind === "scene" ? i.scene.id : i.event.id);
+const itemId = (i: TimelineItem) => (i.kind === "scene" ? i.scene.id : i.record.id);
 
-/** The book's scenes and off-page events in story-time order. */
+/** The book's scenes, and the records its modules keep in story time (off-page events), in story-time order. */
 export function storyTimeline(novel: Book): StoryTimeline {
   const start = novel.config?.calendar?.start;
   const items: TimelineItem[] = [];
   const undatedScenes: Piece[] = [];
-  const undatedEvents: StoryEvent[] = [];
+  const undatedRecords: ModuleRecord[] = [];
   for (const scene of novel.pieces) {
     const at = pieceInstant(novel, scene);
     if (at) items.push({ kind: "scene", scene, at });
     else undatedScenes.push(scene);
   }
-  for (const event of novel.events) {
-    const at = storyInstant(event.when, event.duration, start);
-    if (at) items.push({ kind: "event", event, at });
-    else undatedEvents.push(event);
+  const timed = new Set(timedTypes(novel.kind).map((t) => t.key));
+  for (const record of novel.moduleRecords) {
+    if (!timed.has(record.type)) continue;
+    const { when, duration } = recordTime(novel, record);
+    const at = storyInstant(when, duration, start);
+    if (at && when) items.push({ kind: "record", record, when, at });
+    else undatedRecords.push(record);
   }
   const reading = (i: TimelineItem) => (i.kind === "scene" ? i.scene.position : Infinity);
   items.sort((a, b) => Number(b.at.dated) - Number(a.at.dated) || a.at.start - b.at.start || reading(a) - reading(b) || itemId(a).localeCompare(itemId(b)));
-  return { items, undatedScenes, undatedEvents };
+  return { items, undatedScenes, undatedRecords };
 }
 
 /** The entry types whose entries are people, or places (`is` on the type): who can't be in two places at once, and where. */
@@ -128,12 +155,11 @@ export const typesThatAre = (book: Book, is: "person" | "place") => book.entityT
 
 /**
  * Who is where in an item: the people a piece's fields name (its point of view too) and the places,
- * by their types; an event's characters and locations.
+ * by their types; a record's (an event's), from its type's fields the same way.
  */
 export function cast(book: Book, i: TimelineItem): { characters: Set<string>; locations: Set<string> } {
-  const of = (is: "person" | "place") => (i.kind === "scene" ? new Set(typesThatAre(book, is).flatMap((t) => entriesOf(book, i.scene, t))) : new Set<string>());
-  if (i.kind === "scene") return { characters: of("person"), locations: of("place") };
-  return { characters: new Set(i.event.characters ?? []), locations: new Set(i.event.locations ?? []) };
+  const of = (is: "person" | "place") => new Set(typesThatAre(book, is).flatMap((t) => (i.kind === "scene" ? entriesOf(book, i.scene, t) : recordEntries(book, i.record, t))));
+  return { characters: of("person"), locations: of("place") };
 }
 
 export interface Overlap {
@@ -170,7 +196,7 @@ export function overlaps(book: Book, timeline: StoryTimeline): Overlap[] {
 }
 
 /**
- * The scenes either side of a scene or event in story time: the last one before it and the first after
+ * The scenes either side of a scene or a record (an event) in story time: the last one before it and the first after
  * it, on its own scale (dates, or relative days without a calendar). None for something undated.
  */
 export function sceneNeighbours(timeline: StoryTimeline, id: string): { before?: Piece; after?: Piece } {

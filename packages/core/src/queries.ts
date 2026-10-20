@@ -1,5 +1,6 @@
 import { entryIds } from "./fields.ts";
-import { mentions, pieceById, type Note, type Book, type Relationship, type Piece, type StoryEvent } from "./model.ts";
+import { mentions, pieceById, type Note, type Book, type ModuleRecord, type Relationship, type Piece } from "./model.ts";
+import { recordType } from "./modules.ts";
 
 /** How a scene refers to an entity: by a field of its kind, by key ("pov", "characters"), or a mention in its prose. */
 export type SceneLink = string;
@@ -9,11 +10,11 @@ export interface Backlinks {
   scenes: { scene: Piece; via: SceneLink[] }[];
   /** Relationships it takes part in, from either end. */
   relationships: Relationship[];
-  /** Off-page events it's part of. */
-  events: StoryEvent[];
+  /** The modules' records that name it in their fields: off-page events it's part of. */
+  records: ModuleRecord[];
 }
 
-/** Everywhere an entity is referred to: scene front matter, mentions in prose, relationships, events. */
+/** Everywhere an entity is referred to: scene front matter, mentions in prose, relationships, the modules' records. */
 export function backlinks(novel: Book, id: string): Backlinks {
   const ordered = [...novel.pieces, ...novel.allPieces.filter((s) => s.position < 0)];
   const scenes: Backlinks["scenes"] = [];
@@ -25,8 +26,28 @@ export function backlinks(novel: Book, id: string): Backlinks {
   return {
     scenes,
     relationships: novel.relationships.filter((r) => r.from === id || r.to === id),
-    events: novel.events.filter((e) => [...(e.characters ?? []), ...(e.locations ?? []), ...(e.plotlines ?? [])].includes(id)),
+    records: novel.moduleRecords.filter((r) => (recordType(novel.kind, r.type)?.fields(novel.kind) ?? []).some((f) => entryIds(f, r.fields[f.key]).includes(id))),
   };
+}
+
+/** Prose that mentions a record, by what it is: a piece, an entry, a module's record (by its type's key, "event"), a note. */
+export interface MentionedIn {
+  kind: string;
+  id: string;
+  title: string;
+  /** A piece's: how it refers to the record ("mention"). */
+  via?: string[];
+}
+
+/** The prose that mentions a record (pieces, entries, modules' records, notes), for a delete to list. A record's own prose doesn't count. */
+export function mentionsOf(novel: Book, id: string): MentionedIn[] {
+  const mentioned = (body: string) => mentions(body).some((m) => m.id === id);
+  return [
+    ...novel.allPieces.filter((s) => mentioned(s.body)).map((s) => ({ kind: "scene", id: s.id, title: s.title, via: ["mention"] })),
+    ...novel.entities.filter((e) => e.id !== id && mentioned(e.body)).map((e) => ({ kind: "entity", id: e.id, title: e.name })),
+    ...novel.moduleRecords.filter((r) => r.id !== id && mentioned(r.body)).map((r) => ({ kind: r.type, id: r.id, title: r.title })),
+    ...novel.notes.filter((n) => mentioned(n.body)).map((n) => ({ kind: "note", id: n.id, title: n.title })),
+  ];
 }
 
 export interface RelationshipSpan {

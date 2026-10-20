@@ -1,5 +1,5 @@
 import type { Book, Piece } from "@writer/core";
-import { pieceInstant, storyTimeline } from "./time.ts";
+import { pieceInstant, recordWords, storyTimeline } from "./time.ts";
 
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
@@ -23,7 +23,7 @@ export function readableSpan(ms: number): string {
 
 /**
  * What story time says about a piece, among its facts (heffrey78/gh-writer#154): how it sits against
- * the piece before, and an off-page event right before or after it.
+ * the piece before, and another module's record (an off-page event) right before or after it.
  */
 export function timeFacts(novel: Book, scene: Piece): string[] {
   const scenes = novel.pieces;
@@ -45,20 +45,22 @@ export function timeFacts(novel: Book, scene: Piece): string[] {
     else facts.push(`${readableSpan(here.start - latest.end)} after “${latest.title}”.`);
   }
 
-  // An off-page event right before or after it in story time, with no scene between (heffrey78/gh-writer#165).
+  // An off-page event right before or after it in story time, with no scene between, unless it's the
+  // one this piece dramatizes (heffrey78/gh-writer#165).
   const items = storyTimeline(novel).items;
   const i = items.findIndex((x) => x.kind === "scene" && x.scene.id === scene.id);
   const neighbour = (j: number) => {
     const x = items[j];
-    return x?.kind === "event" && x.at.dated === here.dated && x.event.scene !== scene.id ? { title: x.event.title, ...x.at } : undefined;
+    if (x?.kind !== "record" || x.at.dated !== here.dated || Object.values(x.record.fields).includes(scene.id)) return undefined;
+    return { title: x.record.title, what: recordWords(novel, x.record), ...x.at };
   };
   const before = neighbour(i - 1);
   const after = neighbour(i + 1);
   if (before) {
-    if (here.start < before.end) facts.push(`During the off-page event “${before.title}”.`);
-    else if (here.start === before.end) facts.push(`Straight after the off-page event “${before.title}”.`);
-    else facts.push(`${readableSpan(here.start - before.end)} after the off-page event “${before.title}”.`);
+    if (here.start < before.end) facts.push(`During the ${before.what.one} “${before.title}”.`);
+    else if (here.start === before.end) facts.push(`Straight after the ${before.what.one} “${before.title}”.`);
+    else facts.push(`${readableSpan(here.start - before.end)} after the ${before.what.one} “${before.title}”.`);
   }
-  if (after) facts.push(after.start <= here.end ? `The off-page event “${after.title}” begins during it.` : `${readableSpan(after.start - here.end)} before the off-page event “${after.title}”.`);
+  if (after) facts.push(after.start <= here.end ? `The ${after.what.one} “${after.title}” begins during it.` : `${readableSpan(after.start - here.end)} before the ${after.what.one} “${after.title}”.`);
   return facts;
 }

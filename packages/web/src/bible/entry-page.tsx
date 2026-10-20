@@ -1,4 +1,5 @@
 import type { EntityFields, Reference } from "@writer/client";
+import { referenceText } from "./references.ts";
 import { entityOfLabel, roleOf, vocabulary, type Entity, type Book, type Relationship } from "@writer/core";
 import { useGitHubRepo } from "../github/repo.ts";
 import { EntryIssues } from "../issues/entry-issues.tsx";
@@ -309,7 +310,7 @@ export function EntryPage({
             <ul className="grid gap-1 text-sm">
               {references?.map((r) => (
                 <li key={`${r.kind}:${r.id}`}>
-                  {r.kind === "scene" ? `${vocabulary(novel.kind).piece.One} “${r.title}” (${r.via.map((v) => via(v)).join(", ")})` : r.kind === "event" ? `Event “${r.title}”` : r.kind === "entity" ? `${vocabulary(novel.kind).entity.One} “${r.title}”` : r.kind === "note" ? `Note “${r.title}”` : `Relationship: ${r.type} ${novel.entities.find((e) => e.id === r.other)?.name ?? r.other}`}
+                  {referenceText(novel, r, via)}
                 </li>
               ))}
             </ul>

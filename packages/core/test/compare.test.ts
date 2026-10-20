@@ -31,7 +31,7 @@ describe("compareNovels", () => {
     const c = compareNovels(await novel(), await novel());
     expect(c.counts).toEqual({ added: 0, removed: 0, changed: 0, moved: 0 });
     expect(c.chapters.every((ch) => ch.status === "unchanged")).toBe(true);
-    expect([c.entries, c.relationships, c.events]).toEqual([[], [], []]);
+    expect([c.entries, c.relationships, c.records]).toEqual([[], [], []]);
     expect(c.words.before).toBe(c.words.after);
   });
 

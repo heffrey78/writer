@@ -1,5 +1,6 @@
 import type { BookKind, FieldDef } from "./kinds.ts";
-import type { Book, Piece } from "./model.ts";
+import type { Book, ModuleRecord, Piece } from "./model.ts";
+import { recordType } from "./modules.ts";
 import type { StoryTime } from "./types.ts";
 
 /*
@@ -57,12 +58,21 @@ export function carrierOf(kind: BookKind, piece: Piece): string | undefined {
  * or of any.
  */
 export function entriesOf(book: Book, piece: Piece, type?: string): string[] {
+  return entriesIn(book, book.kind.fields, piece.fields, type);
+}
+
+/** The entries a module's record names in its type's fields (an off-page event's people and places), as entriesOf reads a piece's. */
+export function recordEntries(book: Book, record: ModuleRecord, type?: string): string[] {
+  return entriesIn(book, recordType(book.kind, record.type)?.fields(book.kind) ?? [], record.fields, type);
+}
+
+function entriesIn(book: Book, fields: readonly FieldDef[], values: Record<string, unknown>, type: string | undefined): string[] {
   const out = new Set<string>();
   const typeOf = (id: string) => book.entities.find((e) => e.id === id)?.type ?? book.entityTypes.find((t) => id.startsWith(`${t.prefix}_`))?.key;
-  for (const f of book.kind.fields) {
+  for (const f of fields) {
     const t = f.type;
     if (type !== undefined && "entityType" in t && t.entityType !== type) continue;
-    for (const id of entryIds(f, piece.fields[f.key])) if (type === undefined || "entityType" in t || typeOf(id) === type) out.add(id);
+    for (const id of entryIds(f, values[f.key])) if (type === undefined || "entityType" in t || typeOf(id) === type) out.add(id);
   }
   return [...out];
 }

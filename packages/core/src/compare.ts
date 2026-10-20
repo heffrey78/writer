@@ -6,7 +6,8 @@ import { gfm } from "micromark-extension-gfm";
 import { chapterTitle, describeRelationship } from "./diagrams.ts";
 import { entryIds, fieldName, itemsOf, itemText } from "./fields.ts";
 import type { FieldDef } from "./kinds.ts";
-import { pieceSections, sectionById, type Section, type Entity, type Book, type Relationship, type Piece, type StoryEvent } from "./model.ts";
+import { pieceSections, sectionById, type Section, type Entity, type Book, type ModuleRecord, type Relationship, type Piece } from "./model.ts";
+import { recordTypesOf } from "./modules.ts";
 import type { StoryTime } from "./types.ts";
 import { diffParagraphs, diffSequences, type ParagraphDiff } from "./word-diff.ts";
 import { countWords } from "./words.ts";
@@ -75,7 +76,10 @@ export interface RelationshipComparison {
   after?: string;
 }
 
-export interface EventComparison {
+/** A module's record that changed: an off-page event. */
+export interface RecordComparison {
+  /** Its type's key: "event". */
+  type: string;
   id: string;
   title: string;
   status: Exclude<ChangeStatus, "unchanged">;
@@ -91,7 +95,8 @@ export interface Comparison {
   /** Only what changed. */
   entries: EntryComparison[];
   relationships: RelationshipComparison[];
-  events: EventComparison[];
+  /** The modules' records, by type in the order the kind lists its modules. */
+  records: RecordComparison[];
 }
 
 /** What changed from `before` to `after`. */
@@ -164,7 +169,7 @@ export function compareNovels(before: Book, after: Book): Comparison {
     chapters,
     entries: compareEntries(before, after),
     relationships: compareRelationships(before, after),
-    events: compareEvents(before, after),
+    records: compareRecords(before, after),
   };
 }
 
@@ -333,24 +338,29 @@ function compareRelationships(before: Book, after: Book): RelationshipComparison
   return out;
 }
 
-function compareEvents(before: Book, after: Book): EventComparison[] {
-  const a = new Map(before.events.map((e) => [e.id, e]));
-  const out: EventComparison[] = [];
-  const eventFields = (x: StoryEvent, y: StoryEvent) =>
-    [
-      field("Title", x.title, y.title),
-      field("When", when(x.when), when(y.when)),
-      field("Duration", x.duration, y.duration),
-      field("Characters", names(before, x.characters), names(after, y.characters)),
-      field("Locations", names(before, x.locations), names(after, y.locations)),
-      field("Plotlines", names(before, x.plotlines), names(after, y.plotlines)),
-      field("Note", x.body, y.body),
-    ].filter((f): f is FieldChange => !!f);
-  for (const y of after.events) {
-    const x = a.get(y.id);
-    const fields = x ? eventFields(x, y) : [];
-    if (!x || fields.length) out.push({ id: y.id, title: y.title, status: x ? "changed" : "added", fields });
+/** The modules' records that changed: their title, their type's fields as a piece's are read, and their prose. */
+function compareRecords(before: Book, after: Book): RecordComparison[] {
+  const out: RecordComparison[] = [];
+  for (const type of recordTypesOf(after.kind)) {
+    const fields = type.fields(after.kind);
+    const of = (book: Book) => book.moduleRecords.filter((r) => r.type === type.key);
+    const a = new Map(of(before).map((r) => [r.id, r]));
+    const changes = (x: ModuleRecord, y: ModuleRecord) =>
+      [
+        field("Title", x.title, y.title),
+        ...fields.flatMap((f) =>
+          f.type.kind === "story-time"
+            ? [field(f.label, when(x.fields[f.key] as StoryTime | undefined), when(y.fields[f.key] as StoryTime | undefined)), field("Duration", str(x.fields[f.type.durationKey]), str(y.fields[f.type.durationKey]))]
+            : [field(fieldName(f), names(before, entryIds(f, x.fields[f.key])), names(after, entryIds(f, y.fields[f.key])))],
+        ),
+        field("Note", x.body, y.body),
+      ].filter((f): f is FieldChange => !!f);
+    for (const y of of(after)) {
+      const x = a.get(y.id);
+      const changed = x ? changes(x, y) : [];
+      if (!x || changed.length) out.push({ type: type.key, id: y.id, title: y.title, status: x ? "changed" : "added", fields: changed });
+    }
+    for (const x of of(before)) if (!of(after).some((r) => r.id === x.id)) out.push({ type: type.key, id: x.id, title: x.title, status: "removed", fields: [] });
   }
-  for (const x of before.events) if (!after.events.some((e) => e.id === x.id)) out.push({ id: x.id, title: x.title, status: "removed", fields: [] });
   return out;
 }

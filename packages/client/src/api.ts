@@ -21,7 +21,7 @@ export interface WritingStats {
   pending: { added: number; removed: number };
 }
 
-export type { ChapterComparison, ChangeStatus, Comparison, DiffPart, EntryComparison, EventComparison, FieldChange, ParagraphDiff, RelationshipComparison, SceneComparison } from "@writer/core/compare";
+export type { ChapterComparison, ChangeStatus, Comparison, DiffPart, EntryComparison, FieldChange, ParagraphDiff, RecordComparison, RelationshipComparison, SceneComparison } from "@writer/core/compare";
 
 /** The GitHub connection, as the server describes it (never with the token). */
 /** A name and email git signs commits with. */
@@ -253,20 +253,6 @@ export interface EntityFields {
   tags?: string[];
 }
 
-/** An off-page event's fields (null removes one on update). */
-export interface EventFields {
-  title?: string;
-  when?: { at: string } | { day: number; time?: string } | null;
-  duration?: string | null;
-  characters?: string[] | null;
-  locations?: string[] | null;
-  plotlines?: string[] | null;
-  /** The scene that dramatizes it. */
-  scene?: string | null;
-  /** Its note: the prose of its file. */
-  note?: string | null;
-}
-
 /** A writer's note's fields (null removes one); `note` is its prose. */
 export interface NoteFields {
   title?: string;
@@ -274,15 +260,6 @@ export interface NoteFields {
   /** The scenes it belongs to (heffrey78/gh-writer#222). */
   scenes?: string[] | null;
   note?: string | null;
-}
-
-/**
- * How an event change goes: `base`, the hash of the event's file it was made from; `migrate`, to move a
- * novel in format v1 to v2 in the same commit (without it, that's refused with NEEDS_MIGRATION).
- */
-export interface EventChangeOptions {
-  base?: string;
-  migrate?: boolean;
 }
 
 export interface RelationshipFields {
@@ -298,9 +275,10 @@ export interface RelationshipFields {
 export type Reference =
   | { kind: "scene"; id: string; title: string; via: string[] }
   | { kind: "relationship"; id: string; type: string; other: string }
-  | { kind: "event"; id: string; title: string }
   | { kind: "entity"; id: string; title: string }
-  | { kind: "note"; id: string; title: string };
+  | { kind: "note"; id: string; title: string }
+  /** A module's record, by its type's key: an off-page event, "event". */
+  | { kind: string & {}; id: string; title: string };
 
 /** A scene, chapter or part that was deleted and can be brought back. */
 export interface DeletedItem {
@@ -552,9 +530,12 @@ export function createApi({ baseUrl = "", headers = {}, fetch = globalThis.fetch
     /** Set novel.yaml's targets (null removes one): one commit. */
     setTarget: async (id: string, target: { words?: number | null; date?: string | null; daily?: number | null }) =>
       (await request<OperationResult>("PUT", `/api/novels/${encodeURIComponent(id)}/target`, target)).data,
-    /** A module's route under a book (D14): /api/novels/:id/<module>/<path>, such as story-time's PUT calendar. */
-    module: async <T>(id: string, module: string, method: string, path: string, body?: unknown) =>
-      (await request<T>(method, `/api/novels/${encodeURIComponent(id)}/${encodeURIComponent(module)}/${path}`, body)).data,
+    /**
+     * A module's route under a book (D14): /api/novels/:id/<module>/<path>, such as story-time's PUT
+     * calendar. A refusal with the code `passing` (409) is answered, its `code` saying so, not thrown.
+     */
+    module: async <T>(id: string, module: string, method: string, path: string, body?: unknown, { passing }: { passing?: string } = {}) =>
+      (await request<T>(method, `/api/novels/${encodeURIComponent(id)}/${encodeURIComponent(module)}/${path}`, body, passing === undefined ? {} : { passing })).data,
     /** The writing history: days with words added and removed and the book's length, the words now, and the target. */
     stats: async (id: string) => (await request<WritingStats>("GET", `/api/novels/${encodeURIComponent(id)}/stats`)).data,
     /** What changed between two states of the novel: each "now", "version:<id>" or "checkpoint:<id>". */
@@ -599,9 +580,9 @@ export function createApi({ baseUrl = "", headers = {}, fetch = globalThis.fetch
       pin: (id: string, note: string, scene: string, pinned: boolean) =>
         request<OperationResult>("POST", `/api/novels/${encodeURIComponent(id)}/notes/${encodeURIComponent(note)}/pin`, { scene, pinned }).then((r) => r.data),
       delete: (id: string, note: string, base?: string) => request<OperationResult>("POST", `/api/novels/${encodeURIComponent(id)}/notes/${encodeURIComponent(note)}/delete`, base ? { base } : {}).then((r) => r.data),
-      /** To an off-page event, or a scene at the end of `chapter`; the note kept (naming it) or removed. */
-      promote: (id: string, note: string, target: { to: "event" } | { to: "scene"; chapter: string }, { keep, migrate }: { keep: boolean; migrate?: boolean }) =>
-        request<OperationResult & { id: string; file: string }>("POST", `/api/novels/${encodeURIComponent(id)}/notes/${encodeURIComponent(note)}/promote`, { ...target, keep, ...(migrate ? { migrate } : {}) }).then((r) => r.data),
+      /** To a scene at the end of `chapter`; the note kept (naming it) or removed. What a module makes of a note is its route's. */
+      promote: (id: string, note: string, chapter: string, { keep }: { keep: boolean }) =>
+        request<OperationResult & { id: string; file: string }>("POST", `/api/novels/${encodeURIComponent(id)}/notes/${encodeURIComponent(note)}/promote`, { chapter, keep }).then((r) => r.data),
     },
     /** Move the book to format `to` (the newest by default: D11, D15), one commit; `migrated` false when it was already. */
     migrate: async (id: string, to?: number) => (await request<OperationResult & { migrated: boolean }>("POST", `/api/novels/${encodeURIComponent(id)}/migrate`, to === undefined ? undefined : { to })).data,
@@ -817,27 +798,6 @@ function bibleApi(root: (novelId: string) => string, request: Request, upload: <
       call<OperationResult & { id: string }>("POST", novelId, `/relationships/${encodeURIComponent(id)}/change`, { at, ...changes }),
     endRelationship: (novelId: string, id: string, at: string) => call<OperationResult>("POST", novelId, `/relationships/${encodeURIComponent(id)}/end`, { at }),
     deleteRelationship: (novelId: string, id: string) => call<OperationResult>("POST", novelId, `/relationships/${encodeURIComponent(id)}/delete`),
-    /** Off-page story events, each a file in bible/events/ (D11), one commit each. */
-    createEvent: (novelId: string, fields: EventFields & { title: string }, { migrate }: EventChangeOptions = {}) =>
-      call<OperationResult & { id: string; file: string }>("POST", novelId, "/events", { ...fields, ...(migrate ? { migrate } : {}) }),
-    updateEvent: (novelId: string, id: string, changes: EventFields, options: EventChangeOptions = {}) =>
-      call<OperationResult & { file: string }>("PATCH", novelId, `/events/${encodeURIComponent(id)}`, { changes, ...options }),
-    /**
-     * Write an event as a scene at the end of `chapter`: its details filled in, its note the synopsis. The
-     * event is kept (naming the scene) or removed; removing one that prose mentions is refused (REFERENCED).
-     */
-    writeAsScene: (novelId: string, id: string, { chapter, keep, migrate }: { chapter: string; keep: boolean; migrate?: boolean }) =>
-      call<OperationResult & { scene: string; file: string }>("POST", novelId, `/events/${encodeURIComponent(id)}/scene`, { chapter, keep, ...(migrate ? { migrate } : {}) }),
-    /** Refused (not thrown) when prose mentions it: the mentions come back; pass confirm to delete anyway. */
-    deleteEvent: async (novelId: string, id: string, { confirm = false, ...options }: EventChangeOptions & { confirm?: boolean } = {}): Promise<DeleteResult> => {
-      const { status, data } = await request<OperationResult & { references?: Reference[] }>(
-        "POST",
-        `${root(novelId)}/events/${encodeURIComponent(id)}/delete`,
-        { confirm, ...options },
-        { passing: "REFERENCED" },
-      );
-      return status === 409 ? { ok: false, references: data.references ?? [] } : { ok: true, ...data };
-    },
     createEntityType: (novelId: string, fields: { key: string; prefix: string; label: string; folder?: string; color?: string }) =>
       call<OperationResult>("POST", novelId, "/entity-types", fields),
     updateEntityType: (novelId: string, key: string, changes: { label?: string; color?: string | null }) =>

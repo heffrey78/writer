@@ -261,149 +261,21 @@ describe("through the server", () => {
   });
 });
 
-describe("events", () => {
-  const FLOOD = "bible/events/the-flood-of-09.md";
-  const LEAVING = "bible/events/ada-leaves-for-the-polytechnic.md";
+describe("a novel in format v1", () => {
+  beforeEach(() => {
+    asFormatV1(dir);
+    gitIn(dir, "add", "-A");
+    gitIn(dir, "commit", "-qm", "Format v1");
+  });
 
-  it("adds an event as a file of its own, its note as prose, as one commit", async () => {
-    const { id, file } = await bible.createEvent({ title: "Ben meets Mirela", when: { day: 2, time: "22:00" }, duration: "PT1H", characters: [BEN, "char_m1re1a"], locations: ["loc_br1dg3"], note: "At the [toll house](#loc_br1dg3)." });
-    expect(id).toMatch(/^evt_[0-9a-hjkmnp-tv-z]{6}$/);
-    expect(file).toBe("bible/events/ben-meets-mirela.md");
-    expect(read(file)).toBe(`---\nid: ${id}\ntitle: Ben meets Mirela\nwhen:\n  day: 2\n  time: "22:00"\nduration: PT1H\ncharacters:\n  - ${BEN}\n  - char_m1re1a\nlocations:\n  - loc_br1dg3\n---\n\nAt the [toll house](#loc_br1dg3).\n`);
-    expect(lastCommit()).toBe("Bible: add event “Ben meets Mirela”");
-    expect(changedInLastCommit()).toEqual([`A\t${file}`]);
+  it("migrates on its own, from POST /migrate: as far as it's asked, else to the newest", async () => {
+    expect(await bible.migrate(2)).toMatchObject({ migrated: true });
+    expect(lastCommit()).toBe("Format v2: off-page events as files");
+    expect(await bible.migrate(2)).toEqual({ commit: null, files: [], migrated: false });
+    expect(await bible.migrate()).toMatchObject({ migrated: true });
+    expect(lastCommit()).toBe("Format v3: the book's settings in book.yaml, naming its kind");
+    expect(await bible.migrate()).toEqual({ commit: null, files: [], migrated: false });
     clean();
-    expect((await valid()).events.find((e) => e.id === id)?.body).toBe("\nAt the [toll house](#loc_br1dg3).\n");
-  });
-
-  it("edits an event's fields in its front matter, and its note as the prose, checked against the file it was read from", async () => {
-    const before = read(LEAVING);
-    await bible.updateEvent("evt_1eave5", { when: { at: "2012-09-03" }, scene: "sc_5tat1n", note: "By the night train." }, { base: hashText(before) });
-    expect(read(LEAVING)).toBe(before.replace("at: 2012-09-01", "at: 2012-09-03").replace(/---\n$/, "scene: sc_5tat1n\n---\n\nBy the night train.\n"));
-    expect(lastCommit()).toBe("Bible: edit event “Ada leaves for the polytechnic”");
-    await bible.updateEvent("evt_1eave5", { note: null, scene: null });
-    expect(read(LEAVING)).toBe(before.replace("at: 2012-09-01", "at: 2012-09-03"));
-    await expect(bible.updateEvent("evt_1eave5", { duration: "P1D" }, { base: hashText(before) })).rejects.toMatchObject({ code: "STALE", details: { path: LEAVING } });
-    clean();
-    await valid();
-  });
-
-  it("a new title moves the file to match", async () => {
-    const before = read(FLOOD);
-    const { file } = await bible.updateEvent("evt_9ab3kd", { title: "The great flood" });
-    expect(file).toBe("bible/events/the-great-flood.md");
-    expect(existsSync(join(dir, FLOOD))).toBe(false);
-    expect(read(file)).toBe(before.replace("title: The flood of '09", "title: The great flood"));
-    expect(lastCommit()).toBe("Bible: rename event “The flood of '09” to “The great flood”");
-    expect(gitIn(dir, "show", "--no-renames", "--name-status", "--format=", "HEAD").trim().split("\n").sort()).toEqual([`A\t${file}`, `D\t${FLOOD}`]);
-    clean();
-    await valid();
-  });
-
-  it("removes an event; one that prose mentions only once confirmed", async () => {
-    await bible.deleteEvent("evt_1eave5");
-    expect(existsSync(join(dir, LEAVING))).toBe(false);
-    expect(lastCommit()).toBe("Bible: remove event “Ada leaves for the polytechnic”");
-
-    const scene = "manuscript/01-return/01-arrival/01-the-station.md";
-    writeFileSync(join(dir, scene), `${read(scene).trimEnd()}\n\nShe thought of [the flood](#evt_9ab3kd).\n`);
-    writeFileSync(join(dir, "bible/characters/ada.md"), `${read("bible/characters/ada.md").trimEnd()}\n\nShe was eleven at [the flood](#evt_9ab3kd).\n`);
-    gitIn(dir, "commit", "-qam", "Mentions");
-    await expect(bible.deleteEvent("evt_9ab3kd")).rejects.toMatchObject({
-      code: "REFERENCED",
-      details: {
-        references: [
-          { kind: "scene", id: "sc_5tat1n", title: "The Station", via: ["mention"] },
-          { kind: "entity", id: ADA, title: "Ada Varn" },
-          { kind: "note", id: "note_w1fben", title: "What if Ben never sold the plans?" },
-        ],
-      },
-    });
-    expect(existsSync(join(dir, FLOOD))).toBe(true);
-    await bible.deleteEvent("evt_9ab3kd", { confirm: true });
-    expect(existsSync(join(dir, FLOOD))).toBe(false);
-    clean();
-  });
-
-  it("writes an event as a scene at a chapter's end, keeping the event (naming the scene) or removing it, in one commit", async () => {
-    const manuscript = new ManuscriptOperations(dir, (fn) => fn());
-    const { scene, file } = await bible.writeAsScene("evt_p1an5t", { chapter: "ch_01dde6", keep: true }, manuscript);
-    expect(file).toMatch(/^manuscript\/01-return\/02-[a-z-]+\/0\d-the-plans-are-stolen\.md$/);
-    expect(read(file)).toBe(`---\nid: ${scene}\ntitle: The plans are stolen\nsynopsis: Off page. Ben uses Tomas's key.\nstatus: idea\ncharacters:\n  - char_b3n0vs\nlocations:\n  - loc_w0rk5p\nplotlines:\n  - plot_h315tz\n  - plot_gr1efa\nwhen:\n  day: -5\n---\n`);
-    expect(read("bible/events/the-plans-are-stolen.md")).toContain(`\nscene: ${scene}\n---\n`);
-    expect(lastCommit()).toBe("Manuscript: write “The plans are stolen” as a scene");
-    clean();
-    const novel = await valid();
-    expect(novel.sections.find((c) => c.id === "ch_01dde6")?.childIds.at(-1)).toBe(scene);
-
-    await bible.writeAsScene("evt_1eave5", { chapter: "ch_01dde6", keep: false }, manuscript);
-    expect(existsSync(join(dir, LEAVING))).toBe(false);
-    expect(lastCommit()).toBe("Manuscript: write “Ada leaves for the polytechnic” as a scene, removing the event");
-    clean();
-    await valid();
-  });
-
-  it("won't remove an event the prose mentions when writing it as a scene", async () => {
-    const scene = "manuscript/01-return/01-arrival/01-the-station.md";
-    writeFileSync(join(dir, scene), `${read(scene).trimEnd()}\n\nShe thought of [the flood](#evt_9ab3kd).\n`);
-    gitIn(dir, "commit", "-qam", "Mention");
-    const head = gitIn(dir, "rev-parse", "HEAD");
-    await expect(bible.writeAsScene("evt_9ab3kd", { chapter: "ch_01dde6", keep: false }, new ManuscriptOperations(dir, (fn) => fn()))).rejects.toMatchObject({ code: "REFERENCED" });
-    expect(gitIn(dir, "rev-parse", "HEAD")).toBe(head);
-  });
-
-  describe("in a novel in format v1", () => {
-    beforeEach(() => {
-      asFormatV1(dir);
-      gitIn(dir, "add", "-A");
-      gitIn(dir, "commit", "-qm", "Format v1");
-    });
-
-    it("refuses an event change with NEEDS_MIGRATION, writing nothing", async () => {
-      const head = gitIn(dir, "rev-parse", "HEAD");
-      await expect(bible.createEvent({ title: "Storm" })).rejects.toMatchObject({ code: "NEEDS_MIGRATION", details: { from: 1, to: 2 } });
-      await expect(bible.updateEvent("evt_1eave5", { duration: "P1D" })).rejects.toMatchObject({ code: "NEEDS_MIGRATION" });
-      await expect(bible.deleteEvent("evt_1eave5")).rejects.toMatchObject({ code: "NEEDS_MIGRATION" });
-      expect(gitIn(dir, "rev-parse", "HEAD")).toBe(head);
-      clean();
-    });
-
-    it("with migrate, moves the novel to v2 and makes the change, in one commit", async () => {
-      const { file } = await bible.updateEvent("evt_1eave5", { duration: "P1D", note: "By the night train." }, { migrate: true });
-      expect(file).toBe(LEAVING);
-      expect(lastCommit()).toBe("Format v2: off-page events as files; Bible: edit event “Ada leaves for the polytechnic”");
-      expect(changedInLastCommit()).toEqual([
-        `A\t${LEAVING}`,
-        `A\t${FLOOD}`,
-        "A\tbible/events/the-plans-are-stolen.md",
-        "D\tbible/events.yaml",
-        "M\tnovel.yaml",
-      ].sort());
-      expect(read(LEAVING)).toBe("---\nid: evt_1eave5\ntitle: Ada leaves for the polytechnic\nwhen:\n  at: 2012-09-01\ncharacters:\n  - char_7f3k2q\nlocations:\n  - loc_5tat10\nduration: P1D\n---\n\nBy the night train.\n");
-      clean();
-      const novel = await valid();
-      expect(novel.config?.schema_version).toBe(2);
-      expect(validateBook(novel)).toEqual([]);
-    });
-
-    it("migrates on its own, from POST /migrate: as far as it's asked, else to the newest", async () => {
-      expect(await bible.migrate(2)).toMatchObject({ migrated: true });
-      expect(lastCommit()).toBe("Format v2: off-page events as files");
-      expect(await bible.migrate(2)).toEqual({ commit: null, files: [], migrated: false });
-      expect(await bible.migrate()).toMatchObject({ migrated: true });
-      expect(lastCommit()).toBe("Format v3: the book's settings in book.yaml, naming its kind");
-      expect(await bible.migrate()).toEqual({ commit: null, files: [], migrated: false });
-      clean();
-    });
-  });
-
-  it("refuses an event without a title, with a bad time or duration, or naming the wrong kind of entry", async () => {
-    await expect(bible.createEvent({ title: " " })).rejects.toMatchObject({ code: "BAD_REQUEST" });
-    await expect(bible.createEvent({ title: "X", when: { day: 2, time: "25:00" } })).rejects.toMatchObject({ code: "BAD_REQUEST" });
-    await expect(bible.createEvent({ title: "X", when: { at: "yesterday" } })).rejects.toMatchObject({ code: "BAD_REQUEST" });
-    await expect(bible.createEvent({ title: "X", duration: "an hour" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
-    await expect(bible.createEvent({ title: "X", characters: ["loc_br1dg3"] })).rejects.toMatchObject({ code: "BAD_REQUEST" });
-    await expect(bible.updateEvent("evt_zzzzzz", { title: "Y" })).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 });
 
@@ -438,18 +310,8 @@ describe("notes (D12)", () => {
     clean();
   });
 
-  it("promotes a note to an off-page event, keeping it (became names the event)", async () => {
-    const { id, file } = await bible.promoteNote("note_w1fben", { to: "event" }, { keep: true }, new ManuscriptOperations(dir, (fn) => fn()));
-    expect(file).toBe("bible/events/what-if-ben-never-sold-the-plans.md");
-    expect(read(file)).toBe(`---\nid: ${id}\ntitle: What if Ben never sold the plans?\n---\n\nThen [Ada](#char_7f3k2q) has no reason to come home, and the bridge stands. Unless the debt goes back to [the flood](#evt_9ab3kd).\n`);
-    expect(read(IDEA)).toContain(`\nbecame: ${id}\n---\n`);
-    expect(lastCommit()).toBe("Notes: promote “What if Ben never sold the plans?” to an off-page event");
-    clean();
-    await valid();
-  });
-
   it("writes a note as a scene, removing the note", async () => {
-    const { id, file } = await bible.promoteNote("note_w1fben", { to: "scene", chapter: "ch_h01d50" }, { keep: false }, new ManuscriptOperations(dir, (fn) => fn()));
+    const { id, file } = await bible.promoteNote("note_w1fben", "ch_h01d50", { keep: false }, new ManuscriptOperations(dir, (fn) => fn()));
     expect(read(file)).toBe(`---\nid: ${id}\ntitle: What if Ben never sold the plans?\nsynopsis: Then Ada has no reason to come home, and the bridge stands. Unless the debt goes back to the flood.\nstatus: idea\n---\n`);
     expect(existsSync(join(dir, IDEA))).toBe(false);
     expect(lastCommit()).toBe("Notes: write “What if Ben never sold the plans?” as a scene, removing the note");

@@ -16,7 +16,7 @@ export { diagramRoutes, LAYOUTS, readPositions, saveLayout, withPositions, type 
 export { BoardError, BoardStore, type BoardConflict, type BoardDeps, type BoardErrorCode, type BoardProject, type BoardStatus, type BoardSummary } from "./board.ts";
 export { body, operation, type Env } from "./bible-routes.ts";
 export { moduleRoutes, registerServerModule, type ServerModule } from "./modules.ts";
-export { BibleOperations, type EventFields, type EntityFields, type NoteFields, type EntityTypeFields, type RelationshipFields, type RelationshipTypeFields } from "./bible.ts";
+export { BibleOperations, clean, required, withProse, type EntityFields, type NoteFields, type EntityTypeFields, type RelationshipFields, type RelationshipTypeFields } from "./bible.ts";
 export { ManuscriptOperations, type DeletedItem } from "./manuscript.ts";
 export { OperationError, transaction, type FileWrite, type OperationErrorCode, type OperationResult } from "./operations.ts";
 export { commitMessage, type FileChange } from "./commit-message.ts";

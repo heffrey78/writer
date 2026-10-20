@@ -8,7 +8,7 @@ import type { NovelWorkspace } from "./workspace.ts";
 
 /*
  * Comparing two states of the novel (heffrey78/gh-writer#17):
- * GET /:id/compare?from=&to=                    { comparison }: chapters and scenes, bible, relationships, events
+ * GET /:id/compare?from=&to=                    { comparison }: chapters and scenes, bible, relationships, the modules' records
  * GET /:id/compare/scene/:sceneId?from=&to=     { paragraphs }: the scene's text, word by word where reworded
  * Each side is "now" (what's saved), "version:<id>" (a version as last committed) or "checkpoint:<id>".
  * Refusals: 400 BAD_REQUEST (a side missing or malformed), 404 NOT_FOUND (no such version or checkpoint).

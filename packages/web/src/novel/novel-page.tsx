@@ -7,7 +7,7 @@ import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from "rea
 import { Link, Navigate, Route, Routes, useLocation, useNavigate, useParams } from "react-router";
 import { api, keys } from "../api.ts";
 import { useCommands, type Command } from "../commands.ts";
-import { ModuleCommands, moduleRoutes } from "../modules.tsx";
+import { ModuleCommands, moduleRecordTypes, moduleRoutes, useNewRecord } from "../modules.tsx";
 import { flushOnQuit } from "../desktop.ts";
 import { FileDown, History } from "lucide-react";
 import { DropdownMenu } from "radix-ui";
@@ -15,13 +15,12 @@ import { MENU_ITEM, Shell } from "../layout.tsx";
 import { ErrorAlert } from "../ui/alert.tsx";
 import { ErrorBoundary } from "../ui/error-boundary.tsx";
 import { BiblePage } from "../bible/bible-page.tsx";
-import { useNewEvent } from "../events/new-event.tsx";
 import { useNewNote } from "../notes/new-note.tsx";
 import { NotesPage } from "../notes/notes-page.tsx";
 import { NotesLeftDialog } from "../notes/notes-left.tsx";
-import { useNewFormat } from "../events/format-move.tsx";
+import { useNewFormat } from "./new-format.tsx";
 import { BookKindContext, useWords } from "./kind.ts";
-import { EntryOver, EventOver, NoteOver } from "./item-modals.tsx";
+import { EntryOver, NoteOver, RecordOver } from "./item-modals.tsx";
 import { cn } from "../ui/cn.ts";
 import { DraftsButton, useDrafts } from "./drafts.tsx";
 import { CompileDialog } from "./compile.tsx";
@@ -69,7 +68,7 @@ export function NovelPage() {
   const [entries, setEntries] = useState<QuickEntries>();
   const [resolving, setResolving] = useState(false);
   const [compiling, setCompiling] = useState(false);
-  const newEvent = useNewEvent((s) => s.open);
+  const newRecord = useNewRecord((s) => s.type);
   const newNote = useNewNote((s) => s.open);
   // Focus mode is for writing: elsewhere (the Outline, say) the chrome stays, or there'd be no way
   // out, since only the editor turns it off. Back in a chapter or scene, it's on again.
@@ -155,19 +154,19 @@ export function NovelPage() {
 
   const navigate = useNavigate();
   latest.current.navigate = (to) => void navigate(to);
-  /** A new note, event or entry, in its modal over its gallery (heffrey78/gh-writer#233): closed, back to the gallery if it was opened there. */
+  /** A new note, entry or module's record (an event), in its modal over its gallery (heffrey78/gh-writer#233): closed, back to the gallery if it was opened there. */
   const openNew = (path: string, gallery: string) => void navigate(`/novels/${novelId}/${path}`, { state: { fromGallery: pathname === `/novels/${novelId}/${gallery}` } });
-  // New note and New off-page event, asked for from the palette, a gallery or the Timeline.
+  // A new note, or a module's record (New off-page event), asked for from the palette, a gallery or the Timeline.
   useEffect(() => {
     if (!newNote) return;
     useNewNote.getState().set(false);
     openNew("note/new", "notes");
   }, [newNote]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (!newEvent) return;
-    useNewEvent.getState().set(false);
-    openNew("event/new", "bible");
-  }, [newEvent]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!newRecord) return;
+    useNewRecord.getState().ask(null);
+    openNew(`${newRecord}/new`, "bible");
+  }, [newRecord]); // eslint-disable-line react-hooks/exhaustive-deps
   // GitHub work tracking shows only for a novel on GitHub (heffrey78/gh-writer#8).
   const repo = useGitHubRepo(novelId);
   const model = novel.data?.novel;
@@ -203,7 +202,6 @@ export function NovelPage() {
       { id: "novel.notes", title: "Notes", group: "Go to", keywords: ["ideas", "brainstorm", "cards"], run: () => void navigate(`/novels/${novelId}/notes`) },
       { id: "novel.newNote", title: "New note", group: "Notes", keywords: ["idea", "brainstorm", "what if"], run: () => useNewNote.getState().set(true) },
       ...(model?.notes ?? []).map((n) => ({ id: `novel.note.${n.id}`, title: `Note: ${n.title}`, group: "Go to", keywords: n.tags, run: () => void navigate(`/novels/${novelId}/note/${n.id}`) })),
-      { id: "novel.newEvent", title: "New off-page event", group: w?.codex.One ?? "Story bible", keywords: ["event", "backstory", "timeline"], run: () => useNewEvent.getState().set(true) },
       ...(model?.entityTypes ?? []).map((t) => ({ id: `novel.newEntry.${t.key}`, title: `New ${t.label.toLowerCase()}`, group: w?.codex.One ?? "Story bible", run: () => openNew(`bible/new?type=${encodeURIComponent(t.key)}`, "bible") })),
       ...(model?.entities ?? []).map((e) => ({
         id: `novel.entry.${e.id}`,
@@ -212,7 +210,6 @@ export function NovelPage() {
         keywords: e.aliases,
         run: () => void navigate(`/novels/${novelId}/bible/${e.id}`),
       })),
-      ...(model?.events ?? []).map((e) => ({ id: `novel.event.${e.id}`, title: `Off the page: ${e.title}`, group: "Go to", keywords: ["event"], run: () => void navigate(`/novels/${novelId}/event/${e.id}`) })),
       ...(model ? pieceSections(model) : []).flatMap((c): Command[] => [
         { id: `novel.chapter.${c.id}`, title: `${w!.level(c.level).One}: ${chapterTitle(model!, c)}`, group: "Go to", run: () => void navigate(`/novels/${novelId}/chapter/${c.id}`) },
         ...c.childIds.flatMap((id): Command[] => {
@@ -289,6 +286,7 @@ export function NovelPage() {
       </BookKindContext.Provider>
     );
   }
+  const sameView = viewOf(["bible", ...moduleRecordTypes(book.kind).map((t) => t.type)]);
   return (
     <BookKindContext.Provider value={book.kind}>
       <Shell wide heading={heading} actions={actions} menu={menu} chrome={!focus} title={book.config?.title ?? "Untitled"}>
@@ -320,9 +318,11 @@ export function NovelPage() {
                 <Route path="outline" element={<OutlinePage novelId={novelId} novel={book} workspace={workspace} />} />
                 <Route path="outline/:view" element={<OutlinePage novelId={novelId} novel={book} workspace={workspace} />} />
                 <Route path="bible" element={<BiblePage novelId={novelId} novel={book} />} />
-                {/* An entry or an event opens over the Story bible, a note over Notes (heffrey78/gh-writer#233): the gallery stays as it was underneath. */}
+                {/* An entry or a module's record (an event) opens over the Story bible, a note over Notes (heffrey78/gh-writer#233): the gallery stays as it was underneath. */}
                 <Route path="bible/:entityId" element={<BiblePage novelId={novelId} novel={book} over={<EntryOver novelId={novelId} novel={book} workspace={workspace} spell={spell} />} />} />
-                <Route path="event/:eventId" element={<BiblePage novelId={novelId} novel={book} over={<EventOver novelId={novelId} novel={book} workspace={workspace} spell={spell} />} />} />
+                {moduleRecordTypes(book.kind).map((t) => (
+                  <Route key={t.type} path={`${t.type}/:recordId`} element={<BiblePage novelId={novelId} novel={book} over={<RecordOver type={t} novelId={novelId} novel={book} workspace={workspace} spell={spell} />} />} />
+                ))}
                 <Route path="note/:noteId" element={<NotesPage novelId={novelId} novel={book} over={<NoteOver novelId={novelId} novel={book} workspace={workspace} spell={spell} />} />} />
                 <Route path="progress" element={<ProgressPage novelId={novelId} novel={book} />} />
                 <Route path="compare" element={<ComparePage novelId={novelId} workspace={workspace} />} />
@@ -348,8 +348,14 @@ export function NovelPage() {
   );
 }
 
-/** A view's address: an item in its modal is its gallery's view, which stays as it was underneath (heffrey78/gh-writer#233). */
-const sameView = (pathname: string) => pathname.replace(/\/note\/[^/]+$/, "/notes").replace(/\/(bible|event)\/[^/]+$/, "/bible");
+/**
+ * A view's address: an item in its modal is its gallery's view, which stays as it was underneath
+ * (heffrey78/gh-writer#233). `over` are the addresses whose items open over the codex: its entries', and its modules' records'.
+ */
+const viewOf = (over: string[]) => {
+  const codex = new RegExp(`/(${over.join("|")})/[^/]+$`);
+  return (pathname: string) => pathname.replace(/\/note\/[^/]+$/, "/notes").replace(codex, "/bible");
+};
 
 type RouteProps = { novelId: string; novel: Book; workspace: Workspace; spell: ReturnType<typeof useSpell>; entries?: QuickEntries | undefined };
 

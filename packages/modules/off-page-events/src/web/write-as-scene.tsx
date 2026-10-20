@@ -1,12 +1,14 @@
-import { mentions, pieceSections, type Book, type StoryEvent } from "@writer/core";
+import { mentions, pieceSections, type Book } from "@writer/core";
 import { chapterTitle } from "@writer/core/diagrams";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog } from "radix-ui";
 import { useId, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router";
-import { api, keys } from "../api.ts";
-import { ErrorAlert } from "../ui/alert.tsx";
-import { Button } from "../ui/button.tsx";
+import { keys } from "@writer/web/api.ts";
+import { ErrorAlert } from "@writer/web/ui/alert.tsx";
+import { Button } from "@writer/web/ui/button.tsx";
+import type { StoryEvent } from "../core/index.ts";
+import { events } from "./client.ts";
 import { FORMAT_MOVE, needsFormatMove } from "./format-move.tsx";
 
 /**
@@ -18,11 +20,11 @@ export function WriteAsSceneDialog({ novelId, novel, event, open, onOpenChange }
   const queryClient = useQueryClient();
   const id = useId();
   const [chapter, setChapter] = useState(pieceSections(novel).at(-1)?.id ?? "");
-  const mentioned = [...novel.allPieces, ...novel.entities, ...novel.events].some((r) => mentions(r.body).some((m) => m.id === event.id));
+  const mentioned = [...novel.allPieces, ...novel.entities, ...novel.moduleRecords].some((r) => mentions(r.body).some((m) => m.id === event.id));
   const [keep, setKeep] = useState(true);
   const moving = needsFormatMove(novel);
   const write = useMutation({
-    mutationFn: () => api.bible.writeAsScene(novelId, event.id, { chapter, keep: keep || mentioned, migrate: moving }),
+    mutationFn: () => events.writeAsScene(novelId, event.id, { chapter, keep: keep || mentioned, migrate: moving }),
     onSuccess: async ({ scene }) => {
       await queryClient.invalidateQueries({ queryKey: keys.novel(novelId) });
       onOpenChange(false);

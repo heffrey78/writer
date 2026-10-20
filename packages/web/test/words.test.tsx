@@ -118,7 +118,7 @@ describe("a kind's words on screen", () => {
         </QueryClientProvider>,
       );
     const note = { id: "nt_000001", title: "A thought", file: "notes/a-thought.md", scenes: [], pinned: [], tags: [], body: "" } as unknown as Book["notes"][number];
-    page(<PromoteNoteDialog novelId="lib_1" novel={b} note={note} flush={async () => {}} open onOpenChange={() => {}} />);
+    page(<PromoteNoteDialog novelId="lib_1" novel={b} workspace={{} as Workspace} note={note} flush={async () => {}} open onOpenChange={() => {}} />);
     fireEvent.click(screen.getByRole("radio", { name: "A day at the end of a month, the note as its synopsis" }));
     expect(screen.getByRole("combobox", { name: "Month" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Write the day" })).toBeTruthy();

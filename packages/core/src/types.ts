@@ -113,21 +113,6 @@ export interface RelationshipsFile {
   relationships: RelationshipRecord[];
 }
 
-export interface EventRecord {
-  id: string;
-  title: string;
-  when?: StoryTime;
-  duration?: string;
-  characters?: string[];
-  locations?: string[];
-  plotlines?: string[];
-  note?: string;
-}
-
-export interface EventsFile {
-  events: EventRecord[];
-}
-
 export interface LayoutsFile {
   layouts: Record<string, { nodes: Record<string, { x: number; y: number }> }>;
 }

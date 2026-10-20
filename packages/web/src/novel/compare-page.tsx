@@ -1,7 +1,8 @@
 import type { ChapterComparison, ChangeStatus, Checkpoint, Comparison, FieldChange, ParagraphDiff, SceneComparison, Version } from "@writer/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeftRight, ChevronRight } from "lucide-react";
-import { useId, useState } from "react";
+import { recordTypesOf } from "@writer/core";
+import { Fragment, useId, useState } from "react";
 import { useSearchParams } from "react-router";
 import { api, keys } from "../api.ts";
 import { ErrorAlert } from "../ui/alert.tsx";
@@ -173,7 +174,8 @@ function Result({
   bring: Bring | undefined;
 }) {
   const w = useWords();
-  const nothing = !c.counts.added && !c.counts.removed && !c.counts.changed && !c.counts.moved && c.chapters.every((ch) => ch.status === "unchanged") && !c.entries.length && !c.relationships.length && !c.events.length;
+  const kind = useBookKind();
+  const nothing = !c.counts.added && !c.counts.removed && !c.counts.changed && !c.counts.moved && c.chapters.every((ch) => ch.status === "unchanged") && !c.entries.length && !c.relationships.length && !c.records.length;
   const chapters = onlyChanges ? c.chapters.filter((ch) => ch.status !== "unchanged" || ch.moved) : c.chapters;
   const counts = [
     c.counts.changed && `${w.piece.count(c.counts.changed)} changed`,
@@ -205,7 +207,7 @@ function Result({
         </section>
       )}
 
-      {(c.entries.length > 0 || c.relationships.length > 0 || c.events.length > 0) && (
+      {(c.entries.length > 0 || c.relationships.length > 0 || c.records.length > 0) && (
         <section aria-labelledby="compare-bible" className="grid gap-3 text-sm">
           <h2 id="compare-bible" className="text-lg font-semibold">
             {w.codex.One}
@@ -234,19 +236,25 @@ function Result({
               </ul>
             </>
           )}
-          {c.events.length > 0 && (
-            <>
-              <h3 className="font-semibold">Off-page events</h3>
-              <ul className="grid gap-2">
-                {c.events.map((e) => (
-                  <li key={e.id}>
-                    <span className="font-medium">{e.title}</span> <Status status={e.status} />
-                    <Fields fields={e.fields} />
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
+          {/* The modules' records, by type: "Off-page events". */}
+          {recordTypesOf(kind).map((t) => {
+            const records = c.records.filter((r) => r.type === t.key);
+            return (
+              records.length > 0 && (
+                <Fragment key={t.key}>
+                  <h3 className="font-semibold">{t.noun.plural}</h3>
+                  <ul className="grid gap-2">
+                    {records.map((e) => (
+                      <li key={e.id}>
+                        <span className="font-medium">{e.title}</span> <Status status={e.status} />
+                        <Fields fields={e.fields} />
+                      </li>
+                    ))}
+                  </ul>
+                </Fragment>
+              )
+            );
+          })}
         </section>
       )}
     </>

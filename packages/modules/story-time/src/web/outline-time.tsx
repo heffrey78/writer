@@ -1,4 +1,4 @@
-import { carrierOf, carryingField, countWords, entryIds, proseText, vocabulary, type Book, type Piece, type StoryEvent } from "@writer/core";
+import { carrierOf, carryingField, countWords, entryIds, proseText, vocabulary, word, type Book, type ModuleRecord, type Piece } from "@writer/core";
 import { useMemo } from "react";
 import { Link, useSearchParams } from "react-router";
 import { FieldFilters, STATUS_TONE } from "@writer/web/novel/corkboard.tsx";
@@ -7,29 +7,33 @@ import { StatusSelect, Synopsis, useSceneEdit } from "@writer/web/novel/outline.
 import type { Workspace } from "@writer/web/novel/workspace.ts";
 import { Button } from "@writer/web/ui/button.tsx";
 import { cn } from "@writer/web/ui/cn.ts";
-import { storyTimeline, when } from "../core/index.ts";
+import { storyTimeline, timedTypes, when } from "../core/index.ts";
 
 /*
- * The outline in story time (heffrey78/gh-writer#165): the scenes in the order things happen, with the off-page events
- * placed among them, drawn so they're never taken for scenes (dashed cards, italic rows, "Off the
- * page"). Dated items first, then relative days; then the undated scenes in reading order, and the
- * undated events. Nothing moves here: it's reading order that's rearranged.
+ * The outline in story time (heffrey78/gh-writer#165): the scenes in the order things happen, with the records other
+ * modules keep in story time (off-page events) placed among them, drawn so they're never taken for
+ * scenes (dashed cards, italic rows, "Off the page"). Dated items first, then relative days; then the
+ * undated scenes in reading order, and the undated records. Nothing moves here: it's reading order
+ * that's rearranged.
  */
 
-type Item = { kind: "scene"; scene: Piece; when?: string } | { kind: "event"; event: StoryEvent; when?: string };
+type Item = { kind: "scene"; scene: Piece; when?: string } | { kind: "record"; record: ModuleRecord; when?: string };
 
-/** Every scene and event, in story-time order. */
+/** Every scene and record, in story-time order. */
 function inStoryTime(novel: Book): Item[] {
   const t = storyTimeline(novel);
   return [
-    ...t.items.map((i): Item => (i.kind === "scene" ? { kind: "scene", scene: i.scene, when: when(i) } : { kind: "event", event: i.event, when: when(i) })),
+    ...t.items.map((i): Item => (i.kind === "scene" ? { kind: "scene", scene: i.scene, when: when(i) } : { kind: "record", record: i.record, when: when(i) })),
     ...t.undatedScenes.map((scene): Item => ({ kind: "scene", scene })),
-    ...t.undatedEvents.map((event): Item => ({ kind: "event", event })),
+    ...t.undatedRecords.map((record): Item => ({ kind: "record", record })),
   ];
 }
 
-/** An event's note, as a line of plain text. */
-const noteLine = (e: StoryEvent) => proseText(e.body).replace(/\s+/g, " ").trim();
+/** A record's note, as a line of plain text. */
+const noteLine = (r: ModuleRecord) => proseText(r.body).replace(/\s+/g, " ").trim();
+
+/** What a record's in, in the story: its type's group ("Off the page"). */
+const groupOf = (novel: Book, r: ModuleRecord) => timedTypes(novel.kind).find((t) => t.key === r.type)?.group ?? r.type;
 
 const NOT_MOVED = "In story time, nothing is moved: switch to reading order to rearrange the book.";
 const number = new Intl.NumberFormat();
@@ -48,7 +52,7 @@ export function OutlineTimeTable({ novelId, novel, workspace }: { novelId: strin
       <p className="text-sm text-muted">{NOT_MOVED}</p>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[56rem] border-collapse text-sm">
-          <caption className="sr-only">Every {w.piece.one} and off-page event in story-time order</caption>
+          <caption className="sr-only">Every {[w.piece.one, ...timedTypes(novel.kind).map((t) => word(t.noun).one)].join(" and ")} in story-time order</caption>
           <thead>
             <tr className="border-b border-rule text-left text-xs text-muted">
               <th scope="col" className="w-36 py-2 pr-3 font-medium">
@@ -103,18 +107,18 @@ export function OutlineTimeTable({ novelId, novel, workspace }: { novelId: strin
                   <td className="py-2 text-right tabular-nums">{number.format(countWords(item.scene.body))}</td>
                 </tr>
               ) : (
-                <tr key={item.event.id} className="border-b border-dashed border-rule bg-paper align-top italic">
+                <tr key={item.record.id} className="border-b border-dashed border-rule bg-paper align-top italic">
                   <td className="py-2 pr-3 text-muted">{item.when ?? "No time"}</td>
                   <td className="py-2 pr-3">
-                    <Link to={`/novels/${novelId}/event/${item.event.id}`} className="underline-offset-2 hover:underline">
-                      {item.event.title}
+                    <Link to={`/novels/${novelId}/${item.record.type}/${item.record.id}`} className="underline-offset-2 hover:underline">
+                      {item.record.title}
                     </Link>
                   </td>
-                  <td className="py-2 pr-3 text-muted">{noteLine(item.event)}</td>
-                  <td className="py-2 pr-3 text-xs font-medium tracking-wide text-muted not-italic uppercase">Off the page</td>
+                  <td className="py-2 pr-3 text-muted">{noteLine(item.record)}</td>
+                  <td className="py-2 pr-3 text-xs font-medium tracking-wide text-muted not-italic uppercase">{groupOf(novel, item.record)}</td>
                   {carrying && <td className="py-2 pr-3 text-muted not-italic">—</td>}
-                  <td className="py-2 pr-3">{names(item.event.characters)}</td>
-                  {threading && <td className="py-2 pr-3">{names(eventList(item.event, threading.key))}</td>}
+                  <td className="py-2 pr-3">{names(recordList(item.record, "characters"))}</td>
+                  {threading && <td className="py-2 pr-3">{names(recordList(item.record, threading.key))}</td>}
                   <td className="py-2 text-right text-muted not-italic">—</td>
                 </tr>
               ),
@@ -126,19 +130,20 @@ export function OutlineTimeTable({ novelId, novel, workspace }: { novelId: strin
   );
 }
 
-/**
- * Whether an event shows with the cards' filters: those about its people, places and plotlines (by
- * entry type); one field's filter (a point of view) or status is a scene's, and leaves events out.
- */
-/** An event's list of entries by the key a piece's field has for them ("plotlines"). */
-const eventList = (e: StoryEvent, key: string) => {
-  const v = (e as unknown as Record<string, unknown>)[key];
+/** A record's list of entries by the key a piece's field has for them ("plotlines"). */
+const recordList = (r: ModuleRecord, key: string) => {
+  const v = r.fields[key];
   return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
 };
 
-const eventShows = (novel: Book, e: StoryEvent, f: CorkboardFilter) => {
-  // An event's lists by the entry type of the piece's field of the same key.
-  const held: Record<string, string[] | undefined> = Object.fromEntries(novel.kind.fields.flatMap((x) => ("entityType" in x.type ? [[x.type.entityType, eventList(e, x.key)]] : [])));
+/**
+ * Whether a record (an event) shows with the cards' filters: those about its people, places and
+ * plotlines (by entry type); one field's filter (a point of view) or status is a scene's, and leaves
+ * records out.
+ */
+const recordShows = (novel: Book, r: ModuleRecord, f: CorkboardFilter) => {
+  // A record's lists by the entry type of the piece's field of the same key.
+  const held: Record<string, string[] | undefined> = Object.fromEntries(novel.kind.fields.flatMap((x) => ("entityType" in x.type ? [[x.type.entityType, recordList(r, x.key)]] : [])));
   return !f["status"] && filtersOf(novel).every((d) => !f[d.param] || (!d.field && (held[d.entityType] ?? []).includes(f[d.param]!)));
 };
 
@@ -146,7 +151,7 @@ export function OutlineTimeCards({ novelId, novel }: { novelId: string; novel: B
   const [params, setParams] = useSearchParams();
   const filter: CorkboardFilter = Object.fromEntries(filterParams(novel).flatMap((k) => (params.get(k) ? [[k, params.get(k)!]] : [])));
   const all = useMemo(() => inStoryTime(novel), [novel]);
-  const items = all.filter((i) => (i.kind === "scene" ? shows(novel, i.scene, filter) : eventShows(novel, i.event, filter)));
+  const items = all.filter((i) => (i.kind === "scene" ? shows(novel, i.scene, filter) : recordShows(novel, i.record, filter)));
   const filtered = Object.keys(filter).length > 0;
   const name = (id: string | undefined) => novel.entities.find((e) => e.id === id)?.name;
   const setFilter = (key: keyof CorkboardFilter, value: string) => {
@@ -168,7 +173,8 @@ export function OutlineTimeCards({ novelId, novel }: { novelId: string; novel: B
         )}
       </div>
       <p role="status" className="text-sm text-muted">
-        {filtered ? `${scenes} of ${w.piece.count(novel.pieces.length)} match` : w.piece.count(novel.pieces.length)}, and {items.length - scenes} off-page {items.length - scenes === 1 ? "event" : "events"}. {NOT_MOVED}
+        {filtered ? `${scenes} of ${w.piece.count(novel.pieces.length)} match` : w.piece.count(novel.pieces.length)}
+        {timedTypes(novel.kind).map((t) => `, and ${word(t.noun).count(items.filter((i) => i.kind === "record" && i.record.type === t.key).length)}`)}. {NOT_MOVED}
       </p>
       <ol aria-label="In story time" className="grid grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-3">
         {items.map((item) =>
@@ -185,14 +191,14 @@ export function OutlineTimeCards({ novelId, novel }: { novelId: string; novel: B
               </p>
             </li>
           ) : (
-            <li key={item.event.id} aria-label={`${item.event.title}, off the page`} className="grid content-start gap-1.5 rounded-md border border-dashed border-muted bg-paper p-3 text-sm italic">
+            <li key={item.record.id} aria-label={`${item.record.title}, ${groupOf(novel, item.record).toLowerCase()}`} className="grid content-start gap-1.5 rounded-md border border-dashed border-muted bg-paper p-3 text-sm italic">
               <span className="text-xs text-muted not-italic">
-                {item.when ?? "No time"} · <span className="font-medium tracking-wide uppercase">Off the page</span>
+                {item.when ?? "No time"} · <span className="font-medium tracking-wide uppercase">{groupOf(novel, item.record)}</span>
               </span>
-              <Link to={`/novels/${novelId}/event/${item.event.id}`} className="font-semibold underline-offset-2 hover:underline">
-                {item.event.title}
+              <Link to={`/novels/${novelId}/${item.record.type}/${item.record.id}`} className="font-semibold underline-offset-2 hover:underline">
+                {item.record.title}
               </Link>
-              {noteLine(item.event) && <p className="text-muted">{noteLine(item.event)}</p>}
+              {noteLine(item.record) && <p className="text-muted">{noteLine(item.record)}</p>}
             </li>
           ),
         )}

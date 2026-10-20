@@ -21,7 +21,8 @@ describe("story time", () => {
     expect(timeOf(book.pieces.find((p) => p.id === "sc_f100d0")!)).toEqual({ when: { at: "2009-11-02T23:00" }, duration: "PT2H" });
     expect(storyTimeline(book).items.length).toBeGreaterThan(0);
     expect(sceneFacts(book, "sc_f100d0").join(" ")).toMatch(/A flashback/);
-    expect(storyClock(book)?.events(book).length).toBe(book.events.length);
+    // The off-page events, another module's records, are placed among the scenes.
+    expect(storyTimeline(book).items.filter((i) => i.kind === "record").length).toBe(book.moduleRecords.length);
     expect(locationProfile(book, "loc_br1dg3").span).toBeDefined();
     const files = snapshots(book);
     expect([...files.keys()]).toContain("diagrams/timeline.svg");

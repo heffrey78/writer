@@ -8,12 +8,11 @@ import chapter from "../schemas/chapter.schema.json" with { type: "json" };
 import scene from "../schemas/scene.schema.json" with { type: "json" };
 import entity from "../schemas/entity.schema.json" with { type: "json" };
 import relationships from "../schemas/relationships.schema.json" with { type: "json" };
-import events from "../schemas/events.schema.json" with { type: "json" };
-import event from "../schemas/event.schema.json" with { type: "json" };
 import note from "../schemas/note.schema.json" with { type: "json" };
 import layouts from "../schemas/layouts.schema.json" with { type: "json" };
 import compile from "../schemas/compile.schema.json" with { type: "json" };
 import { kindByKey, startLevels, V2_KIND, type BookKind, type LevelDef } from "./kinds.ts";
+import { recordTypesOf } from "./modules.ts";
 import type { Diagnostic } from "./types.ts";
 
 export const SCHEMAS = {
@@ -24,8 +23,6 @@ export const SCHEMAS = {
   scene,
   entity,
   relationships,
-  events,
-  event,
   note,
   layouts,
   compile,
@@ -35,11 +32,15 @@ export type SchemaKind = keyof typeof SCHEMAS;
 
 /**
  * A schema as books of `bookKind` have it. The committed schemas are a novel's; a scene's statuses
- * are its kind's.
+ * are its kind's. A module's record type has its own (`<key>`, and `<key>-list` for a v1 list of them).
  */
 export function schemaFor(name: SchemaKind | string, bookKind: BookKind): object {
   const level = bookKind.levels.find((l) => l.key === name);
   if (level) return sectionSchema(bookKind, level);
+  for (const t of recordTypesOf(bookKind)) {
+    if (name === t.key) return t.schema;
+    if (t.list && name === `${t.key}-list`) return t.list.schema;
+  }
   if (name === "manuscript-order") return orderSchema(bookKind);
   if (name === "book") return bookSchema();
   if (name === "scene") return pieceSchema(bookKind);
@@ -123,8 +124,13 @@ function orderSchema(kind: BookKind): object {
   };
 }
 
-/** The schemas a book of `bookKind` has: one for each of its kind's levels in place of a novel's part and chapter. */
-const schemaNames = (bookKind: BookKind) => [...(Object.keys(SCHEMAS) as string[]).filter((n) => n !== "part" && n !== "chapter"), "book", ...bookKind.levels.map((l) => l.key)];
+/** The schemas a book of `bookKind` has: one for each of its kind's levels in place of a novel's part and chapter, and its modules' records'. */
+const schemaNames = (bookKind: BookKind) => [
+  ...(Object.keys(SCHEMAS) as string[]).filter((n) => n !== "part" && n !== "chapter"),
+  "book",
+  ...bookKind.levels.map((l) => l.key),
+  ...recordTypesOf(bookKind).flatMap((t) => (t.list ? [t.key, `${t.key}-list`] : [t.key])),
+];
 
 /** The compiled schemas, for each kind of book: one Ajv each, since the schemas share their $ids. */
 const compiled = new Map<string, Map<string, ValidateFunction>>();

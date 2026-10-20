@@ -35,7 +35,7 @@ describe("entryPresence", () => {
     const ada = entryPresence(novel, "char_7f3k2q")!;
     expect(ada).toMatchObject({ count: 8, carries: 7, first: { title: "The Station" }, last: { title: "The Last Rivet" } });
     expect(ada.longestAbsence).toBeUndefined();
-    expect(ada.events.map((e) => e.title).sort()).toEqual(["Ada leaves for the polytechnic", "The flood of '09"]);
+    expect(ada.records.map((e) => e.title).sort()).toEqual(["Ada leaves for the polytechnic", "The flood of '09"]);
     const workshop = entryPresence(novel, "loc_w0rk5p")!;
     expect(workshop.longestAbsence).toMatchObject({ scenes: 3, from: { title: "Ben's Ledger" }, to: { title: "The Flood" } });
     expect(workshop.chapters.map((c) => [c.title, c.span])).toEqual([["Arrival", 2], ["Old Debts", 2], ["Night Crossing", 2], ["Varn Holds", 2]]);

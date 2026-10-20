@@ -1,5 +1,5 @@
 import { gridKey, presence, sceneColumns, type PresenceMatrix } from "./diagrams.ts";
-import type { Book, Piece, StoryEvent } from "./model.ts";
+import type { Book, ModuleRecord, Piece } from "./model.ts";
 import { backlinks } from "./queries.ts";
 
 /**
@@ -21,8 +21,8 @@ export interface EntryPresence {
   last?: Piece;
   /** The longest run of scenes without it between two it's in. */
   longestAbsence?: { scenes: number; from: Piece; to: Piece };
-  /** Off-page events it's part of. */
-  events: StoryEvent[];
+  /** The modules' records it's part of: off-page events. */
+  records: ModuleRecord[];
 }
 
 /**
@@ -73,6 +73,6 @@ function fromMatrix(novel: Book, matrix: PresenceMatrix, id: string): EntryPrese
     ...(first ? { first } : {}),
     ...(last ? { last } : {}),
     ...(longestAbsence ? { longestAbsence } : {}),
-    events: backlinks(novel, id).events,
+    records: backlinks(novel, id).records,
   };
 }

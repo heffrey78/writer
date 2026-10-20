@@ -5,39 +5,43 @@ import { Dialog } from "radix-ui";
 import { useId, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router";
 import { api, keys } from "../api.ts";
-import { FORMAT_MOVE, needsFormatMove } from "../events/format-move.tsx";
+import { moduleRecordTypes } from "../modules.tsx";
+import type { Workspace } from "../novel/workspace.ts";
 import { ErrorAlert } from "../ui/alert.tsx";
 import { Button } from "../ui/button.tsx";
 
 /**
- * Turn a note into story (heffrey78/gh-writer#205): an off-page event (its prose the event's note) or a scene at the end of
- * a chapter (its prose the synopsis), keeping the note (naming what it became) or removing it. What it
- * became opens.
+ * Turn a note into story (heffrey78/gh-writer#205): what the kind's modules make of one (an off-page event, its prose
+ * the event's note) or a scene at the end of a chapter (its prose the synopsis), keeping the note
+ * (naming what it became) or removing it. What it became opens.
  */
-export function PromoteNoteDialog({ novelId, novel, note, flush, open, onOpenChange }: { novelId: string; novel: Book; note: Note; flush: () => Promise<void>; open: boolean; onOpenChange: (o: boolean) => void }) {
+export function PromoteNoteDialog({ novelId, novel, workspace, note, flush, open, onOpenChange }: { novelId: string; novel: Book; workspace: Workspace; note: Note; flush: () => Promise<void>; open: boolean; onOpenChange: (o: boolean) => void }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const id = useId();
   const w = vocabulary(novel.kind);
   const section = w.level(pieceLevel(novel));
-  const [to, setTo] = useState<"event" | "scene">("event");
+  const view = { novelId, novel, workspace };
+  // What it can become: each of the modules' records that a note can be made into, then a piece.
+  const targets = moduleRecordTypes(novel.kind).flatMap((t) => (t.fromNote ? [{ type: t.type, ...t.fromNote }] : []));
+  const [to, setTo] = useState<string>(targets[0]?.type ?? "scene");
+  const target = targets.find((t) => t.type === to);
   const [chapter, setChapter] = useState(pieceSections(novel).at(-1)?.id ?? "");
   const [keep, setKeep] = useState(true);
-  const moving = to === "event" && needsFormatMove(novel);
   const promote = useMutation({
     mutationFn: async () => {
       await flush();
-      return api.notes.promote(novelId, note.id, to === "scene" ? { to, chapter } : { to }, { keep, migrate: moving });
+      return target ? { id: await target.make(view, note, keep) } : api.notes.promote(novelId, note.id, chapter, { keep });
     },
     onSuccess: async ({ id: made }) => {
       await queryClient.invalidateQueries({ queryKey: keys.novel(novelId) });
       onOpenChange(false);
-      void navigate(to === "scene" ? `/novels/${novelId}/scene/${made}` : `/novels/${novelId}/event/${made}`);
+      void navigate(`/novels/${novelId}/${target ? target.type : "scene"}/${made}`);
     },
   });
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    if (to === "event" || chapter) promote.mutate();
+    if (target || chapter) promote.mutate();
   };
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -51,10 +55,12 @@ export function PromoteNoteDialog({ novelId, novel, note, flush, open, onOpenCha
           <form onSubmit={submit} className="grid gap-3 text-sm">
             <fieldset className="grid gap-1.5">
               <legend className="mb-1 font-medium">It becomes</legend>
-              <label className="flex items-center gap-2">
-                <input type="radio" name={`${id}-to`} checked={to === "event"} onChange={() => setTo("event")} />
-                An off-page event, the note as its note
-              </label>
+              {targets.map((t) => (
+                <label key={t.type} className="flex items-center gap-2">
+                  <input type="radio" name={`${id}-to`} checked={to === t.type} onChange={() => setTo(t.type)} />
+                  {t.label}
+                </label>
+              ))}
               <label className="flex items-center gap-2">
                 <input type="radio" name={`${id}-to`} checked={to === "scene"} onChange={() => setTo("scene")} />
                 {w.piece.A} at the end of {section.a}, the note as its synopsis
@@ -83,14 +89,14 @@ export function PromoteNoteDialog({ novelId, novel, note, flush, open, onOpenCha
                 Remove it
               </label>
             </fieldset>
-            {moving && <p className="text-muted">{FORMAT_MOVE}</p>}
+            {target?.hint?.(view)}
             {promote.isError && <ErrorAlert title="Couldn't make it part of the story">{promote.error.message}</ErrorAlert>}
             <div className="flex justify-end gap-2">
               <Dialog.Close asChild>
                 <Button>Cancel</Button>
               </Dialog.Close>
               <Button type="submit" variant="primary" disabled={promote.isPending || (to === "scene" && !chapter)}>
-                {to === "event" ? "Make the event" : `Write the ${w.piece.one}`}
+                {target ? target.action : `Write the ${w.piece.one}`}
               </Button>
             </div>
           </form>

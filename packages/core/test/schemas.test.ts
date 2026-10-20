@@ -21,7 +21,6 @@ describe("schemas", () => {
     ["scene", { id: "sc_0d9wm4", title: "x", when: { at: "2024-03-01T18:30" } }],
     ["entity", { id: "char_7f3k2q", name: "Ada", fields: { age: 34, alive: true } }],
     ["relationships", { relationships: [{ id: "rel_q2m9xa", from: "char_7f3k2q", to: "char_b3n0vs", type: "sibling" }] }],
-    ["events", { events: [{ id: "evt_9ab3kd", title: "Flood", when: { at: "2009-11-02" }, duration: "P3D" }] }],
     ["layouts", { layouts: { "relationship-graph": { nodes: { char_7f3k2q: { x: 1, y: 2 } } } } }],
   ];
 
@@ -87,7 +86,8 @@ describe("format spec examples", () => {
     );
   }
 
-  const cases: [string, (SchemaKind | "book")[]][] = [
+  // An off-page event's is its module's, which the Novel lists.
+  const cases: [string, (SchemaKind | "book" | "event")[]][] = [
     ["The manifest: `book.yaml`", ["book"]],
     ["Order files", ["manuscript-order", "manuscript-order", "part", "chapter"]],
     ["Scenes", ["scene"]],

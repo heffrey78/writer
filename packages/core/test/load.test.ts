@@ -30,7 +30,7 @@ describe("loading the sample novel", () => {
     const count = (type: string) => novel.entities.filter((e) => e.type === type).length;
     expect([count("character"), count("location"), count("plotline"), count("theme"), count("artifact")]).toEqual([4, 4, 2, 2, 1]);
     expect(novel.relationships).toHaveLength(8);
-    expect(novel.events).toHaveLength(3);
+    expect(novel.moduleRecords.map((r) => r.type)).toEqual(["event", "event", "event"]);
     expect(Object.keys(novel.layouts["relationship-graph"]!.nodes)).toHaveLength(5);
   });
 
