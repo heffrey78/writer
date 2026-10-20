@@ -6,7 +6,7 @@ import { api, keys } from "../api.ts";
 import { GitHubMark, useConnect, useGitHub } from "../github/connect.tsx";
 import { useGitHubRepo } from "../github/repo.ts";
 import { when } from "../issues/parts.tsx";
-import { useStatusLabel } from "./kind.ts";
+import { useBookKind, useStatusLabel, useWords } from "./kind.ts";
 import { ErrorAlert } from "../ui/alert.tsx";
 import { Button } from "../ui/button.tsx";
 
@@ -24,6 +24,8 @@ export function useBoardStatus(novelId: string) {
 }
 
 export function BoardOnGitHub({ novelId }: { novelId: string }) {
+  const w = useWords();
+  const levels = useBookKind().levels.map((l) => w.level(l.key).one);
   const repo = useGitHubRepo(novelId);
   const github = useGitHub().data;
   const status = useBoardStatus(novelId);
@@ -62,8 +64,8 @@ export function BoardOnGitHub({ novelId }: { novelId: string }) {
       <Row
         text={
           status.gone
-            ? "The board on GitHub has been deleted. Nothing in the novel was lost: make a new one to carry on."
-            : "Put this board on GitHub as a project: every scene a card, with its status, POV, part, chapter and words, in GitHub's board, table and roadmap views. Move a card there and the scene follows here."
+            ? `The board on GitHub has been deleted. Nothing in the ${w.book.one} was lost: make a new one to carry on.`
+            : `Put this board on GitHub as a project: every ${w.piece.one} a card, with its status, POV, ${levels.join(", ")} and words, in GitHub's board, table and roadmap views. Move a card there and the ${w.piece.one} follows here.`
         }
       >
         <Button size="sm" variant="primary" disabled={setUp.isPending} onClick={() => setUp.mutate()}>
@@ -96,7 +98,7 @@ export function BoardOnGitHub({ novelId }: { novelId: string }) {
         {status.conflicts.length > 0 && (
           <div role="alert" className="grid gap-2 rounded-md border border-warn/40 bg-warn-soft px-3 py-2">
             <p className="font-medium">
-              {status.conflicts.length === 1 ? "A scene's status was changed both here and on GitHub." : `${status.conflicts.length} scenes' statuses were changed both here and on GitHub.`} Neither has been
+              {status.conflicts.length === 1 ? `${w.piece.A}'s status was changed both here and on GitHub.` : `${w.piece.count(status.conflicts.length)}' statuses were changed both here and on GitHub.`} Neither has been
               overwritten: choose which to keep.
             </p>
             <ul className="grid gap-1.5">
@@ -154,6 +156,7 @@ function ConflictRow({ conflict, busy, onKeep }: { conflict: BoardConflict; busy
 /** What the last sync brought from GitHub, and what it put back. */
 function Summary({ status }: { status: BoardStatus }) {
   const label = useStatusLabel();
+  const w = useWords();
   const last = status.last;
   if (!last || (!last.fromBoard.length && !last.putBack.length)) return null;
   return (
@@ -161,7 +164,7 @@ function Summary({ status }: { status: BoardStatus }) {
       {last.fromBoard.length > 0 && <p>From GitHub: {last.fromBoard.map((m) => `“${m.title}” to ${label(m.status)}`).join(", ")}.</p>}
       {last.putBack.length > 0 && (
         <p>
-          Put back from the novel (these come from its files): {last.putBack.map((p) => `“${p.title}” ${p.fields.join(" and ")}`).join("; ")}.
+          Put back from the {w.book.one} (these come from its files): {last.putBack.map((p) => `“${p.title}” ${p.fields.join(" and ")}`).join("; ")}.
         </p>
       )}
     </div>

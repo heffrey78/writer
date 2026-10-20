@@ -157,7 +157,7 @@ export function EntryPage({
           {!tab && <div className={cn("flex items-center gap-2", embedded && "pr-8")}>
             <p className="flex-1 text-sm text-muted">
               <Link to={`/novels/${novelId}/bible`} className="underline-offset-2 hover:underline">
-                Story bible
+                {vocabulary(novel.kind).codex.One}
               </Link>{" "}
               · {type?.label ?? entity.type}
             </p>

@@ -1,4 +1,4 @@
-import { countWords, entryIds, outerSections, pieceSections, type Book, type Piece } from "@writer/core";
+import { countWords, entryIds, outerSections, pieceLevel, pieceSections, vocabulary, type Book, type Piece } from "@writer/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { GripVertical } from "lucide-react";
 import { Fragment, useEffect, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
@@ -24,6 +24,7 @@ export function OutlineTable({ novelId, novel, workspace }: { novelId: string; n
   const dragging = useRef<string | undefined>(undefined);
   const [drop, setDrop] = useState<{ id: string; after: boolean }>();
   const name = (id: string | undefined) => novel.entities.find((e) => e.id === id)?.name;
+  const w = vocabulary(novel.kind);
 
   const edit = useSceneEdit(novelId, workspace);
 
@@ -74,14 +75,16 @@ export function OutlineTable({ novelId, novel, workspace }: { novelId: string; n
     <div className="grid gap-4">
       <div className="overflow-x-auto">
         <table className="w-full min-w-[56rem] border-collapse text-sm">
-          <caption className="sr-only">Every scene in reading order, by chapter</caption>
+          <caption className="sr-only">
+            Every {w.piece.one} in reading order, by {w.level(pieceLevel(novel)).one}
+          </caption>
           <thead>
             <tr className="border-b border-rule text-left text-xs text-muted">
               <th scope="col" className="w-8 py-2">
                 <span className="sr-only">Move</span>
               </th>
               <th scope="col" className="w-48 py-2 pr-3 font-medium">
-                Scene
+                {w.piece.One}
               </th>
               <th scope="col" className="py-2 pr-3 font-medium">
                 Synopsis

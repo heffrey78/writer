@@ -1,4 +1,4 @@
-import { countWords, proseText, storyTimeline, type Book, type Piece, type StoryEvent } from "@writer/core";
+import { countWords, proseText, storyTimeline, vocabulary, type Book, type Piece, type StoryEvent } from "@writer/core";
 import { when } from "@writer/core/diagrams";
 import { useMemo } from "react";
 import { Link, useSearchParams } from "react-router";
@@ -36,6 +36,7 @@ const number = new Intl.NumberFormat();
 
 export function OutlineTimeTable({ novelId, novel, workspace }: { novelId: string; novel: Book; workspace: Workspace }) {
   const items = useMemo(() => inStoryTime(novel), [novel]);
+  const w = vocabulary(novel.kind);
   const edit = useSceneEdit(novelId, workspace);
   const name = (id: string | undefined) => novel.entities.find((e) => e.id === id)?.name;
   const names = (ids: string[] | undefined) => (ids ?? []).map(name).filter(Boolean).join(", ") || <span className="text-muted not-italic">—</span>;
@@ -44,14 +45,14 @@ export function OutlineTimeTable({ novelId, novel, workspace }: { novelId: strin
       <p className="text-sm text-muted">{NOT_MOVED}</p>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[56rem] border-collapse text-sm">
-          <caption className="sr-only">Every scene and off-page event in story-time order</caption>
+          <caption className="sr-only">Every {w.piece.one} and off-page event in story-time order</caption>
           <thead>
             <tr className="border-b border-rule text-left text-xs text-muted">
               <th scope="col" className="w-36 py-2 pr-3 font-medium">
                 When
               </th>
               <th scope="col" className="w-48 py-2 pr-3 font-medium">
-                Scene
+                {w.piece.One}
               </th>
               <th scope="col" className="py-2 pr-3 font-medium">
                 Synopsis
@@ -141,6 +142,7 @@ export function OutlineTimeCards({ novelId, novel }: { novelId: string; novel: B
     setParams(next, { replace: true });
   };
   const scenes = items.filter((i) => i.kind === "scene").length;
+  const w = vocabulary(novel.kind);
   return (
     <div className="grid gap-4">
       <div role="group" aria-label="Filters" className="flex flex-wrap items-end gap-3">
@@ -152,7 +154,7 @@ export function OutlineTimeCards({ novelId, novel }: { novelId: string; novel: B
         )}
       </div>
       <p role="status" className="text-sm text-muted">
-        {filtered ? `${scenes} of ${novel.pieces.length} scenes match` : `${novel.pieces.length} scenes`}, and {items.length - scenes} off-page {items.length - scenes === 1 ? "event" : "events"}. {NOT_MOVED}
+        {filtered ? `${scenes} of ${w.piece.count(novel.pieces.length)} match` : w.piece.count(novel.pieces.length)}, and {items.length - scenes} off-page {items.length - scenes === 1 ? "event" : "events"}. {NOT_MOVED}
       </p>
       <ol aria-label="In story time" className="grid grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-3">
         {items.map((item) =>

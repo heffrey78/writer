@@ -3,12 +3,16 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { loadBook, memorySource, type BookKind } from "@writer/core";
 import { novel } from "@writer/kinds";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 import { allCommands, useCommandRegistry } from "../src/commands.ts";
 import { BiblePage } from "../src/bible/bible-page.tsx";
 import { BookKindContext } from "../src/novel/kind.ts";
+import { OutlineCards } from "../src/novel/corkboard.tsx";
 import { ManuscriptTree } from "../src/novel/manuscript-tree.tsx";
+import { OutlineTable } from "../src/novel/outline.tsx";
+import type { Workspace } from "../src/novel/workspace.ts";
 import { groups } from "../src/novel/sidebar.tsx";
 import type { Structure } from "../src/novel/structure.ts";
 
@@ -81,5 +85,23 @@ describe("a kind's words on screen", () => {
     expect(screen.getByRole("combobox", { name: "Sort" }).textContent).toContain("Most days");
     expect(screen.getByText("1 day")).toBeTruthy();
     expect(document.body.textContent).not.toMatch(/scene|bible|entr(y|ies)/i);
+  });
+
+  it("name the outline's pieces and sections", async () => {
+    const b = await book(diary);
+    const page = (children: ReactNode) =>
+      render(
+        <QueryClientProvider client={new QueryClient()}>
+          <BookKindContext.Provider value={b.kind}>
+            <MemoryRouter>{children}</MemoryRouter>
+          </BookKindContext.Provider>
+        </QueryClientProvider>,
+      );
+    page(<OutlineCards novelId="lib_1" novel={b} workspace={{} as Workspace} />);
+    expect(screen.getByRole("status").textContent).toBe("1 day.");
+    cleanup();
+    page(<OutlineTable novelId="lib_1" novel={b} workspace={{} as Workspace} />);
+    expect(screen.getByRole("columnheader", { name: "Day" })).toBeTruthy();
+    expect(screen.getByRole("table").querySelector("caption")!.textContent!.trim()).toBe("Every day in reading order, by month");
   });
 });

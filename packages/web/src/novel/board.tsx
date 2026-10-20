@@ -1,4 +1,4 @@
-import { countWords, outerSections, pieceSections, type Book, type Piece, type PieceStatus } from "@writer/core";
+import { countWords, outerSections, pieceLevel, pieceSections, vocabulary, type Book, type Piece, type PieceStatus } from "@writer/core";
 import { GripVertical } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
 import { Link, useSearchParams } from "react-router";
@@ -23,10 +23,11 @@ type BoardFilter = { pov?: string; part?: string; chapter?: string };
 
 const number = new Intl.NumberFormat();
 const words = (n: number) => `${number.format(n)} ${n === 1 ? "word" : "words"}`;
-const scenes = (n: number) => `${number.format(n)} ${n === 1 ? "scene" : "scenes"}`;
 
 export function OutlineBoard({ novelId, novel, workspace }: { novelId: string; novel: Book; workspace: Workspace }) {
   const statuses = novel.kind.statuses.map((s) => s.key);
+  const w = vocabulary(novel.kind);
+  const scenes = (n: number) => `${number.format(n)} ${n === 1 ? w.piece.one : w.piece.many}`;
   const label = useStatusLabel();
   const edit = useSceneEdit(novelId, workspace);
   const conflicts = useBoardStatus(novelId)?.conflicts ?? [];
@@ -92,8 +93,8 @@ export function OutlineBoard({ novelId, novel, workspace }: { novelId: string; n
       <BoardOnGitHub novelId={novelId} />
       <div role="group" aria-label="Filters" className="flex flex-wrap items-end gap-3">
         <FilterSelect label="Point of view" value={filter.pov} onChange={(v) => setFilter("pov", v)} options={characters.map((c) => [c.id, c.name])} />
-        {outerSections(novel).length > 0 && <FilterSelect label="Part" value={filter.part} onChange={(v) => setFilter("part", v)} options={outerSections(novel).map((p, i) => [p.id, p.title || `Part ${i + 1}`])} />}
-        <FilterSelect label="Chapter" value={filter.chapter} onChange={(v) => setFilter("chapter", v)} options={pieceSections(novel).map((c) => [c.id, chapterTitle(novel, c)])} />
+        {outerSections(novel).length > 0 && <FilterSelect label={w.level(novel.levels[0]!).One} value={filter.part} onChange={(v) => setFilter("part", v)} options={outerSections(novel).map((p, i) => [p.id, p.title || `${w.level(p.level).One} ${i + 1}`])} />}
+        <FilterSelect label={w.level(pieceLevel(novel)).One} value={filter.chapter} onChange={(v) => setFilter("chapter", v)} options={pieceSections(novel).map((c) => [c.id, chapterTitle(novel, c)])} />
         {filtered && (
           <Button size="sm" onClick={() => setParams({}, { replace: true })}>
             Clear filters
@@ -166,7 +167,7 @@ export function OutlineBoard({ novelId, novel, workspace }: { novelId: string; n
                   })}
                 </ol>
               ) : (
-                <p className="px-1 text-sm text-muted">No scenes.</p>
+                <p className="px-1 text-sm text-muted">No {w.piece.many}.</p>
               )}
             </section>
           );

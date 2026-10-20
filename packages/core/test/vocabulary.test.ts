@@ -11,6 +11,7 @@ describe("a kind's words", () => {
     expect([w.book.one, w.piece.one, w.level("part").one, w.level("chapter").one, w.content.One, w.codex.One, w.entity.one]).toEqual(["novel", "scene", "part", "chapter", "Manuscript", "Story bible", "entry"]);
     expect([w.piece.Many, w.level("chapter").many, w.codex.one, w.entity.many]).toEqual(["Scenes", "chapters", "story bible", "entries"]);
     expect([w.piece.a, w.entity.a, w.book.a]).toEqual(["a scene", "an entry", "a novel"]);
+    expect([w.piece.A, w.entity.A]).toEqual(["A scene", "An entry"]);
     expect([w.piece.count(1), w.piece.count(3), w.level("chapter").count(0)]).toEqual(["1 scene", "3 scenes", "0 chapters"]);
     expect([w.of("scene").one, w.of("part").One]).toEqual(["scene", "Part"]);
     expect([w.codex.short, w.piece.short]).toEqual(["bible", "scene"]);

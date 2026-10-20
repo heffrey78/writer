@@ -1,4 +1,4 @@
-import { pieceSections, type Book, type Piece } from "@writer/core";
+import { pieceSections, vocabulary, type Book, type Piece } from "@writer/core";
 import { GripVertical } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
 import { Link, useSearchParams } from "react-router";
@@ -25,6 +25,7 @@ export const STATUS_TONE: Record<string, string> = {
 /** Outline as cards (the corkboard): scenes as cards by chapter, filtered, dragged to reorder. */
 export function OutlineCards({ novelId, novel, workspace }: { novelId: string; novel: Book; workspace: Workspace }) {
   const structure = useStructure(novelId, novel, workspace);
+  const w = vocabulary(novel.kind);
   const [params, setParams] = useSearchParams();
   const filter: CorkboardFilter = Object.fromEntries(filterParams(novel).flatMap((k) => (params.get(k) ? [[k, params.get(k)!]] : [])));
   const visible = useMemo(() => visibleScenes(novel, filter), [novel, params]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -96,7 +97,7 @@ export function OutlineCards({ novelId, novel, workspace }: { novelId: string; n
         )}
       </div>
       <p role="status" className="text-sm text-muted">
-        {filtered ? `${visible.length} of ${novel.pieces.length} scenes match.` : `${novel.pieces.length} scenes.`}
+        {filtered ? `${visible.length} of ${w.piece.count(novel.pieces.length)} match.` : `${w.piece.count(novel.pieces.length)}.`}
       </p>
       {chapters.map(({ chapter, scenes }) => (
         <section key={chapter.id} aria-labelledby={`cork-${chapter.id}`} className="grid gap-2">
@@ -151,7 +152,7 @@ export function OutlineCards({ novelId, novel, workspace }: { novelId: string; n
               ))}
             </ol>
           ) : (
-            <p className="text-sm text-muted">No scenes yet.</p>
+            <p className="text-sm text-muted">No {w.piece.many} yet.</p>
           )}
         </section>
       ))}
