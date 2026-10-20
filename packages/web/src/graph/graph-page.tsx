@@ -1,4 +1,4 @@
-import { backlinks, pieceSections, type Book } from "@writer/core";
+import { backlinks, pieceSections, vocabulary, type Book } from "@writer/core";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 import { api } from "../api.ts";
@@ -38,6 +38,7 @@ type Editing = { kind: "add"; from: string; to?: string } | { kind: "edge" | "ch
  * as a list.
  */
 export function GraphPage({ novelId, novel }: { novelId: string; novel: Book }) {
+  const w = vocabulary(novel.kind);
   const [params, set] = useViewParams();
   const theme = useTheme((s) => s.theme);
   const show = useNotice((s) => s.show);
@@ -123,7 +124,7 @@ export function GraphPage({ novelId, novel }: { novelId: string; novel: Book }) 
           <h1 className="text-xl font-semibold">Relationships</h1>
           <div className="flex gap-2">
             <Button size="sm" onClick={() => setEditing({ kind: "entry" })}>
-              New entry
+              New {w.entity.one}
             </Button>
             <ExportMenu
               name={scene ? `relationships-at-${scene.title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}` : "relationships"}
@@ -257,7 +258,7 @@ export function GraphPage({ novelId, novel }: { novelId: string; novel: Book }) 
               onEdgeOpen={(relId) => setEditing({ kind: "edge", id: relId })}
             />
           ) : (
-            <p className="p-6 text-muted">{filtered ? "Nothing matches these filters." : "No characters yet. Add some in the story bible to see how they relate."}</p>
+            <p className="p-6 text-muted">{filtered ? "Nothing matches these filters." : `No characters yet. Add some in the ${w.codex.one} to see how they relate.`}</p>
           )}
         </div>
         <section aria-labelledby={`${id}-list`} className="grid content-start gap-2 text-sm lg:overflow-y-auto">
@@ -290,7 +291,7 @@ export function GraphPage({ novelId, novel }: { novelId: string; novel: Book }) 
             <>
               <h3 className="mt-2 font-semibold">Appears in</h3>
               {appears.length ? (
-                <ul className="grid gap-1" aria-label={`Scenes with ${selected.name}`}>
+                <ul className="grid gap-1" aria-label={`${w.piece.Many} with ${selected.name}`}>
                   {appears.map(({ scene: s }) => (
                     <li key={s.id}>
                       <Link to={`/novels/${novelId}/scene/${s.id}`} className="text-accent underline-offset-2 hover:underline">
@@ -300,14 +301,14 @@ export function GraphPage({ novelId, novel }: { novelId: string; novel: Book }) 
                   ))}
                 </ul>
               ) : (
-                <p className="text-muted">No scenes yet.</p>
+                <p className="text-muted">No {w.piece.many} yet.</p>
               )}
               <div className="mt-2 flex flex-wrap gap-2">
                 <Button size="sm" onClick={() => setEditing({ kind: "add", from: selected.id })}>
                   Add a relationship
                 </Button>
                 <Link to={`/novels/${novelId}/bible/${selected.id}`} className="self-center text-accent underline-offset-2 hover:underline">
-                  Open the entry
+                  Open the {w.entity.one}
                 </Link>
               </div>
             </>

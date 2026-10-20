@@ -1,4 +1,4 @@
-import type { Book, Relationship } from "@writer/core";
+import { vocabulary, type Book, type Relationship } from "@writer/core";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog } from "radix-ui";
 import { api, keys } from "../api.ts";
@@ -56,7 +56,7 @@ export function EdgeDialog({
             <Button onClick={onEnd}>End it{at}…</Button>
             <Confirm
               title="Remove this relationship?"
-              description={`“${sentence}” will no longer be in the bible, at any point in the story.`}
+              description={`“${sentence}” will no longer be in the ${vocabulary(novel.kind).codex.short}, at any point in the story.`}
               action="Remove"
               danger
               onConfirm={() => remove.mutate()}
