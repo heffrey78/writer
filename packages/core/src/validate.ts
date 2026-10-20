@@ -30,7 +30,6 @@ export const RULES: Readonly<Record<string, Severity>> = {
   W_UNKNOWN_KEY: "warning",
   W_FILENAME_ORDER: "warning",
   W_HARD_WRAP: "warning",
-  W_POV_NOT_PRESENT: "warning",
   W_REL_SELF: "warning",
   W_LAYOUT_UNKNOWN: "warning",
   W_TIME_OVERLAP: "warning",
@@ -130,9 +129,6 @@ export function validateBook(novel: Book): Diagnostic[] {
         });
       }
     }
-    if (s.pov && !s.characters.includes(s.pov)) {
-      push("warning", "W_POV_NOT_PRESENT", s.file, `POV character ${s.pov} is not listed in characters`, { pointer: "/pov" });
-    }
     for (const m of mentions(s.body)) ref(m.id, MENTIONABLE, s.file, "", `Mention "${m.text}"`, s.bodyLine + m.line - 1);
     for (const p of pictures(s.body)) outsideImages(p, s.file, s.bodyLine);
     for (const line of hardWrappedLines(s.body)) {
@@ -190,7 +186,7 @@ export function validateBook(novel: Book): Diagnostic[] {
     const what = i.kind === "scene" ? `“${i.scene.title}”` : `the event “${i.event.title}”`;
     return `at ${locations.map(entityName).join(" and ")} in ${what}`;
   };
-  for (const o of overlaps(storyTimeline(novel))) {
+  for (const o of overlaps(novel, storyTimeline(novel))) {
     const file = o.a.kind === "scene" ? o.a.scene.file : o.a.event.file;
     push("warning", "W_TIME_OVERLAP", file, `${entityName(o.character)} is ${where(o.a)} and ${where(o.b)} at the same time`);
   }

@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { hardWrappedLines, memorySource, RULES, validate, type Diagnostic } from "../src/index.ts";
+import { KINDS } from "@writer/kinds";
+import { hardWrappedLines, memorySource, modulesOf, RULES, validate, type Diagnostic } from "../src/index.ts";
 import { nodeSource } from "../src/node.ts";
 
 const SAMPLE = fileURLToPath(new URL("../../../examples/sample-novel", import.meta.url));
@@ -350,7 +351,9 @@ describe("rule documentation", () => {
     const documented = Object.fromEntries(
       [...spec.matchAll(/^\| `([EW]_[A-Z_]+)` \|/gm)].map((m) => [m[1]!, m[1]!.startsWith("E_") ? "error" : "warning"]),
     );
-    expect(documented).toEqual(RULES);
+    // The base's, and those of the modules the shipped kinds use: a book's validator reports both.
+    const modules = Object.fromEntries(KINDS.flatMap((k) => modulesOf(k)).flatMap((m) => (m.checks ?? []).map((c) => [c.code, c.severity])));
+    expect(documented).toEqual({ ...RULES, ...modules });
   });
 
   it("every code used in the source is a known rule", () => {

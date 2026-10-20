@@ -8,6 +8,7 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@writer/core": "0.1.0"
+    "@writer/core": "0.1.0",
+    "@writer/module-point-of-view": "0.1.0"
   }
 }

@@ -1,5 +1,5 @@
 import { relationshipStyle, type SeriesSlot } from "./palette.ts";
-import { countWords, mentions, relationshipsAt, storyTimeline, levelLabel, sectionById, sectionsAt, type Section, type Entity, type Book, type Relationship, type Piece, type StoryInstant, type TimelineItem } from "./index.ts";
+import { carrierOf, carryingField, countWords, entriesOf, mentions, relationshipsAt, storyTimeline, levelLabel, sectionById, sectionsAt, type Section, type Entity, type Book, type BookKind, type Relationship, type Piece, type StoryInstant, type TimelineItem } from "./index.ts";
 
 /*
  * The data behind every diagram: the relationship graph, the plotline swimlanes, the presence matrix
@@ -97,9 +97,9 @@ export interface GraphFilter {
   to?: string;
 }
 
-/** Everything a scene refers to: point of view, people, places, plotlines, themes and mentions. */
-export function presentIn(scene: Piece): Set<string> {
-  return new Set([...(scene.pov ? [scene.pov] : []), ...scene.characters, ...scene.locations, ...scene.entities, ...scene.plotlines.map((p) => p.id), ...scene.themes.map((t) => t.id), ...mentions(scene.body).map((m) => m.id)]);
+/** Everything a scene refers to: the entries its fields name (its point of view, people, places, plotlines, themes…) and its mentions. */
+export function presentIn(book: Book, scene: Piece): Set<string> {
+  return new Set([...entriesOf(book, scene), ...mentions(scene.body).map((m) => m.id)]);
 }
 
 /** The entities the scene filters (plotline, range) allow, or undefined when neither is set. */
@@ -111,7 +111,7 @@ function presentInFiltered(novel: Book, f: GraphFilter): Set<string> | undefined
   novel.pieces.forEach((scene, i) => {
     if (i < lo! || i > hi!) return;
     if (f.plotline && !scene.plotlines.some((p) => p.id === f.plotline)) return;
-    for (const id of presentIn(scene)) out.add(id);
+    for (const id of presentIn(novel, scene)) out.add(id);
   });
   return out;
 }
@@ -275,9 +275,10 @@ export function sceneList(type: string): "characters" | "locations" | "themes" |
 }
 
 export interface Presence {
-  /** In the scene's metadata (for a character: its characters, or its point of view). */
+  /** In the scene's metadata: any field of its that names the entry (a character's: its characters, or its point of view). */
   listed: boolean;
-  pov: boolean;
+  /** It carries the scene: its point of view. */
+  carries: boolean;
   /** Named in the prose (a mention). */
   mentioned: boolean;
   /** A theme's strength (1–3), or a plotline's weight. */
@@ -309,15 +310,13 @@ export function presence(novel: Book, type: string, scenes: Piece[] = novel.piec
   const marks = new Map<string, Presence>();
   for (const scene of scenes) {
     const named = new Set(mentions(scene.body).map((m) => m.id));
-    const listed = new Map<string, Omit<Presence, "listed" | "pov" | "mentioned">>();
-    if (type === "character") for (const id of [...(scene.pov ? [scene.pov] : []), ...scene.characters]) listed.set(id, {});
-    if (type === "location") for (const id of scene.locations) listed.set(id, {});
+    const listed = new Map<string, Omit<Presence, "listed" | "carries" | "mentioned">>(entriesOf(novel, scene, type).map((id) => [id, {}]));
+    const carrier = carrierOf(novel.kind, scene);
     if (type === "theme") for (const t of scene.themes) listed.set(t.id, { ...(t.strength !== undefined ? { strength: t.strength } : {}), ...(t.note ? { note: t.note } : {}) });
     if (type === "plotline") for (const p of scene.plotlines) listed.set(p.id, { weight: p.weight, ...(p.beat ? { note: p.beat } : {}) });
-    if (!LISTS[type]) for (const id of scene.entities) listed.set(id, {});
     for (const id of new Set([...listed.keys(), ...named])) {
       if (!ids.has(id)) continue;
-      marks.set(gridKey(id, scene.id), { ...listed.get(id), listed: listed.has(id), pov: type === "character" && scene.pov === id, mentioned: named.has(id) });
+      marks.set(gridKey(id, scene.id), { ...listed.get(id), listed: listed.has(id), carries: carrier === id, mentioned: named.has(id) });
     }
   }
   return { type, rows, scenes, marks, words: scenes.map((s) => countWords(s.body)), ...sceneColumns(novel, scenes) };
@@ -350,7 +349,11 @@ export function sortRows(m: PresenceMatrix, order: RowOrder): Entity[] {
 
 // ——— Timeline ———
 
-export type LaneMode = "pov" | "plotline" | "location";
+/** How the timeline's lanes run: by the entry that carries each piece (its point of view), by plotline, or by location. */
+export type LaneMode = "carrier" | "plotline" | "location";
+
+/** The timeline's lanes when none are chosen: by carrier, for a kind whose pieces have one; else by location. */
+export const defaultLanes = (kind: BookKind): LaneMode => (carryingField(kind) ? "carrier" : "location");
 
 export interface Lane {
   id: string;
@@ -360,9 +363,9 @@ export interface Lane {
 export const itemId = (i: TimelineItem) => (i.kind === "scene" ? i.scene.id : i.event.id);
 export const itemTitle = (i: TimelineItem) => (i.kind === "scene" ? i.scene.title : i.event.title);
 
-/** The lanes an item runs in: its point of view, plotlines or locations; none of them, the "none" lane. Events have no point of view: "off page". */
-export function lanesOf(i: TimelineItem, mode: LaneMode): string[] {
-  if (mode === "pov") return i.kind === "scene" ? [i.scene.pov ?? NONE] : [OFF_PAGE];
+/** The lanes an item runs in: its carrier (point of view), plotlines or locations; none of them, the "none" lane. Events have no carrier: "off page". */
+export function lanesOf(book: Book, i: TimelineItem, mode: LaneMode): string[] {
+  if (mode === "carrier") return i.kind === "scene" ? [carrierOf(book.kind, i.scene) ?? NONE] : [OFF_PAGE];
   const ids = mode === "plotline" ? (i.kind === "scene" ? i.scene.plotlines.map((p) => p.id) : (i.event.plotlines ?? [])) : i.kind === "scene" ? i.scene.locations : (i.event.locations ?? []);
   return ids.length ? ids : [NONE];
 }
@@ -422,9 +425,9 @@ export function timeline(novel: Book, mode: LaneMode): Timeline {
     latest = Math.max(latest, rank);
   }
   const seen: string[] = [];
-  for (const i of t.items) for (const l of lanesOf(i, mode)) if (!seen.includes(l)) seen.push(l);
+  for (const i of t.items) for (const l of lanesOf(novel, i, mode)) if (!seen.includes(l)) seen.push(l);
   const special = [NONE, OFF_PAGE];
   const ordered = [...seen.filter((l) => !special.includes(l)), ...special.filter((l) => seen.includes(l))];
-  const name = (id: string) => (id === NONE ? (mode === "pov" ? "No point of view" : mode === "plotline" ? "No plotline" : "No location") : id === OFF_PAGE ? "Off page" : (novel.entities.find((e) => e.id === id)?.name ?? id));
+  const name = (id: string) => (id === NONE ? (mode === "carrier" ? `No ${carryingField(novel.kind)?.label.toLowerCase() ?? "one"}` : mode === "plotline" ? "No plotline" : "No location") : id === OFF_PAGE ? "Off page" : (novel.entities.find((e) => e.id === id)?.name ?? id));
   return { items: t.items, storyRank, flashbacks, undated: t.undatedScenes, undatedEvents: t.undatedEvents, lanes: ordered.map((id) => ({ id, name: name(id) })) };
 }

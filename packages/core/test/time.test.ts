@@ -68,7 +68,7 @@ describe("story time", () => {
       "The Last Rivet",
     ]);
     expect(t.undatedScenes).toEqual([]);
-    expect(overlaps(t)).toEqual([]);
+    expect(overlaps(novel, t)).toEqual([]);
   });
 
   it("finds the scenes either side of an event in story time", async () => {

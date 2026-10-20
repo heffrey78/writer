@@ -19,6 +19,7 @@ const diary: BookKind = {
   levels: [{ key: "month", label: "Month", plural: "Months", prefix: "mon", list: "months" }],
   piece: { key: "day", label: "Day", plural: "Days", prefix: "day", list: "days" },
   fields: [{ key: "people", label: "People", type: { kind: "entities", entityType: "character" }, mentionAdds: true }],
+  modules: [],
 };
 
 const lines = (...l: string[]) => `${l.join("\n")}\n`;

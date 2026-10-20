@@ -67,7 +67,9 @@ export function withModules(kind: BookKind): BookKind {
         fields.push(f);
       }
     }
-    full = { ...kind, fields };
+    const order = kind.fieldOrder ?? [];
+    const at = (f: FieldDef) => (order.includes(f.key) ? order.indexOf(f.key) : order.length);
+    full = { ...kind, fields: fields.map((f, i) => ({ f, i })).sort((a, b) => at(a.f) - at(b.f) || a.i - b.i).map(({ f }) => f) };
     withModulesOf.set(kind, full);
     complete.add(full);
   }

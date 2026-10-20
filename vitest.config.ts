@@ -2,7 +2,7 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
-    include: ["packages/*/test/**/*.test.{ts,tsx}"],
+    include: ["packages/*/test/**/*.test.{ts,tsx}", "packages/modules/*/test/**/*.test.{ts,tsx}"],
     setupFiles: ["./vitest.setup.ts"],
     // Most server, CLI and client tests drive real git and a real server: a second or so alone, but
     // several times that while the whole suite runs in parallel, which the default 5 s didn't allow

@@ -230,10 +230,10 @@ export class ManuscriptOperations {
       const cut = starts[paragraph]!;
       const first = text.slice(0, fmEnd) + body.slice(0, cut).replace(/\s*$/, "\n");
       const id = uniqueId(novel.kind.piece.prefix, new Set(indexById(novel).keys()));
+      // The rest keeps its status, tags and who and what it's about: the kind's fields of entries.
+      const kept = ["status", "tags", ...novel.kind.fields.filter((f) => f.type.kind === "entity" || f.type.kind === "entities").map((f) => f.key)];
       const keep = Object.fromEntries(
-        Object.entries(parse(text.slice(0, fmEnd).replace(/^\uFEFF?---\r?\n/, "").replace(/---[ \t]*\r?\n?$/, "")) ?? {}).filter(([k]) =>
-          ["status", "pov", "characters", "locations", "plotlines", "themes", "tags"].includes(k),
-        ),
+        Object.entries(parse(text.slice(0, fmEnd).replace(/^\uFEFF?---\r?\n/, "").replace(/---[ \t]*\r?\n?$/, "")) ?? {}).filter(([k]) => kept.includes(k)),
       );
       const path = `${posix.dirname(scene.file)}/${slugify(name)}.md`;
       o.set(scene.file, first);

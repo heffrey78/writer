@@ -1,3 +1,4 @@
+import { entriesOf } from "./fields.ts";
 import type { Book, Piece, StoryEvent } from "./model.ts";
 import type { StoryTime } from "./types.ts";
 
@@ -102,9 +103,9 @@ export function storyTimeline(novel: Book): StoryTimeline {
   return { items, undatedScenes, undatedEvents };
 }
 
-/** Who is where in an item: its characters (a scene's point of view too) and its locations. */
-function cast(i: TimelineItem): { characters: Set<string>; locations: Set<string> } {
-  if (i.kind === "scene") return { characters: new Set([...(i.scene.pov ? [i.scene.pov] : []), ...i.scene.characters]), locations: new Set(i.scene.locations) };
+/** Who is where in an item: its characters (any field of a scene's that names one: its point of view too) and its locations. */
+function cast(book: Book, i: TimelineItem): { characters: Set<string>; locations: Set<string> } {
+  if (i.kind === "scene") return { characters: new Set(entriesOf(book, i.scene, "character")), locations: new Set(i.scene.locations) };
   return { characters: new Set(i.event.characters ?? []), locations: new Set(i.event.locations ?? []) };
 }
 
@@ -119,12 +120,12 @@ export interface Overlap {
  * whose locations are given and share none. Items without a duration are moments: they overlap only
  * an item running across them, or a moment at the same time.
  */
-export function overlaps(timeline: StoryTimeline): Overlap[] {
+export function overlaps(book: Book, timeline: StoryTimeline): Overlap[] {
   const out: Overlap[] = [];
   const { items } = timeline;
   for (let i = 0; i < items.length; i++) {
     const a = items[i]!;
-    const ca = cast(a);
+    const ca = cast(book, a);
     if (!ca.locations.size) continue;
     for (let j = i + 1; j < items.length; j++) {
       const b = items[j]!;
@@ -133,7 +134,7 @@ export function overlaps(timeline: StoryTimeline): Overlap[] {
       if (b.at.start > a.at.end || (b.at.start === a.at.end && a.at.end > a.at.start)) break;
       const together = b.at.start < a.at.end || b.at.start === a.at.start;
       if (!together) continue;
-      const cb = cast(b);
+      const cb = cast(book, b);
       if (!cb.locations.size || [...ca.locations].some((l) => cb.locations.has(l))) continue;
       for (const character of ca.characters) if (cb.characters.has(character)) out.push({ character, a, b });
     }

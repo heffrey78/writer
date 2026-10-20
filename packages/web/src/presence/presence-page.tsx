@@ -1,4 +1,4 @@
-import { outerSections, pieceSections, type Entity, type Book, type Piece, type YamlEdit } from "@writer/core";
+import { carryingField, outerSections, pieceSections, roleOf, type Entity, type Book, type FieldDef, type Piece, type YamlEdit } from "@writer/core";
 import { Popover } from "radix-ui";
 import { useId, useMemo, useState } from "react";
 import { plural } from "../bible/types.ts";
@@ -15,6 +15,7 @@ import { GapControls } from "../diagrams/gap-controls.tsx";
 import { amount, readGap, writeGap } from "../diagrams/gap-param.ts";
 import { useViewParams } from "../ui/view-params.ts";
 import { presence, sceneList, sortRows, totals, type Presence, type RowOrder } from "@writer/core/diagrams";
+import { useWords } from "../novel/kind.ts";
 
 const number = new Intl.NumberFormat();
 const ORDERS: [RowOrder, string][] = [
@@ -23,20 +24,20 @@ const ORDERS: [RowOrder, string][] = [
   ["name", "Name"],
 ];
 
-/** How a presence is drawn: the point of view ringed, a listing filled (a theme's by its strength), a mention alone dashed. */
+/** How a presence is drawn: its carrier (the point of view) ringed, a listing filled (a theme's by its strength), a mention alone dashed. */
 function markOf(p: Presence): GridMark {
   const note = p.note ? { note: p.note } : {};
   if (!p.listed) return { size: 0.7, style: "dashed", ...note };
   if (p.weight) return { size: p.weight === "major" ? 0.95 : 0.7, style: p.weight === "major" ? "filled" : "hollow", ...note };
   if (p.strength !== undefined) return { size: 0.55 + 0.15 * p.strength, style: "filled", ...note };
-  return { size: 0.8, style: "filled", ...(p.pov ? { ring: true } : {}), ...note };
+  return { size: 0.8, style: "filled", ...(p.carries ? { ring: true } : {}), ...note };
 }
 
-/** What a screen reader says for a cell. */
-function describe(scene: string, name: string, p: Presence | undefined, gap?: Gap): string {
+/** What a screen reader says for a cell; `carrying` is the kind's carrying field, whose role names a carrier ("point of view"). */
+function describe(scene: string, name: string, p: Presence | undefined, carrying: FieldDef | undefined, gap?: Gap): string {
   if (!p) return `${scene}: ${name} not there${gap ? `, in an absence of ${gap.scenes} scene${gap.scenes === 1 ? "" : "s"}` : ""}`;
   if (!p.listed) return `${scene}: ${name} mentioned only`;
-  const how = [p.pov ? "point of view" : "", p.strength !== undefined ? `strength ${p.strength}` : "", p.weight ? `${p.weight} beat` : "", p.note ? `“${p.note}”` : ""].filter(Boolean).join(", ");
+  const how = [p.carries && carrying ? roleOf(carrying) : "", p.strength !== undefined ? `strength ${p.strength}` : "", p.weight ? `${p.weight} beat` : "", p.note ? `“${p.note}”` : ""].filter(Boolean).join(", ");
   return `${scene}: ${name} present${how ? `, ${how}` : ""}`;
 }
 
@@ -70,20 +71,24 @@ export function PresencePage({ novelId, novel, workspace }: { novelId: string; n
   }, [absences, whole]);
   const shaded = useMemo(() => new Set(inGap.keys()), [inGap]);
   const listedIn = sceneList(type);
+  // The field that carries a scene (its point of view), for entries of its type.
+  const carries = carryingField(novel.kind);
+  const carrying = carries && "entityType" in carries.type && carries.type.entityType === type ? carries : undefined;
   // What the legend calls the list: custom types' entries are listed as, e.g., "artifacts".
   const listName = listedIn === "entities" ? plural(label).toLowerCase() : listedIn;
   const sceneEdit = useSceneEdit(novelId, workspace);
   const [editing, setEditing] = useState<{ row: string; scene: string; el: HTMLElement }>();
 
-  /** A change to an entry in a scene's list (and, for a character, its point of view). */
-  const change = (scene: Piece, entry: Entity, what: EntryChange | { pov: boolean }, done?: string) =>
+  /** A change to an entry in a scene's list (and, for one of the carrier's type, whether it carries the scene: its point of view). */
+  const change = (scene: Piece, entry: Entity, what: EntryChange | { carries: boolean }, done?: string) =>
     sceneEdit(
       scene,
       (fm): YamlEdit[] => {
-        if ("pov" in what) return what.pov ? [{ path: ["pov"], value: entry.id }] : fm.pov === entry.id ? [{ path: ["pov"], remove: true }] : [];
+        const key = carrying?.key;
+        if ("carries" in what) return !key ? [] : what.carries ? [{ path: [key], value: entry.id }] : fm[key] === entry.id ? [{ path: [key], remove: true }] : [];
         const edits = entryEdits(fm, listedIn, entry.id, what);
-        // Taken out of a scene, a character is no longer its point of view either.
-        if ("remove" in what && fm.pov === entry.id) edits.push({ path: ["pov"], remove: true });
+        // Taken out of a scene, an entry no longer carries it either.
+        if ("remove" in what && key && fm[key] === entry.id) edits.push({ path: [key], remove: true });
         return edits;
       },
       done,
@@ -171,7 +176,7 @@ export function PresencePage({ novelId, novel, workspace }: { novelId: string; n
           scenes={m.scenes}
           marks={marks}
           shaded={shaded}
-          cellLabel={(row: string, scene: Piece) => describe(scene.title, m.rows.find((r) => r.id === row)?.name ?? row, m.marks.get(gridKey(row, scene.id)), inGap.get(gridKey(row, scene.id)))}
+          cellLabel={(row: string, scene: Piece) => describe(scene.title, m.rows.find((r) => r.id === row)?.name ?? row, m.marks.get(gridKey(row, scene.id)), carrying, inGap.get(gridKey(row, scene.id)))}
           onChoose={choose}
           hasPopup={(row, scene) => !!m.marks.get(gridKey(row, scene))?.listed}
           size={size}
@@ -210,6 +215,7 @@ export function PresencePage({ novelId, novel, workspace }: { novelId: string; n
           scene={editingScene}
           entry={editingEntry}
           presence={m.marks.get(gridKey(editingEntry.id, editingScene.id))}
+          carrying={carrying}
           onChange={(what, done) => change(editingScene, editingEntry, what, done)}
           onClose={() => {
             const el = document.querySelector<HTMLElement>(`[data-cell="${gridKey(editing.row, editing.scene)}"]`);
@@ -229,6 +235,7 @@ function PresenceEditor({
   scene,
   entry,
   presence: p,
+  carrying,
   onChange,
   onClose,
 }: {
@@ -237,12 +244,15 @@ function PresenceEditor({
   scene: Piece;
   entry: Entity;
   presence: Presence | undefined;
-  onChange: (what: EntryChange | { pov: boolean }, done?: string) => unknown;
+  /** The kind's carrying field, when entries of this type can carry a scene. */
+  carrying: FieldDef | undefined;
+  onChange: (what: EntryChange | { carries: boolean }, done?: string) => unknown;
   onClose: () => void;
 }) {
   const id = useId();
+  const w = useWords();
   // Answering at once; the saved value comes back with the model and replaces it.
-  const saved = { pov: p?.pov ?? false, strength: p?.strength === undefined ? "" : String(p.strength), weight: p?.weight ?? "major" };
+  const saved = { carries: p?.carries ?? false, strength: p?.strength === undefined ? "" : String(p.strength), weight: p?.weight ?? "major" };
   const [shown, setShown] = useState(saved);
   const [seen, setSeen] = useState(saved);
   if (JSON.stringify(saved) !== JSON.stringify(seen)) {
@@ -263,17 +273,17 @@ function PresenceEditor({
           <p id={`${id}-title`} className="font-semibold">
             {entry.name} in “{scene.title}”
           </p>
-          {type === "character" && (
+          {carrying && (
             <label className="flex items-center gap-2">
               <input
                 type="checkbox"
-                checked={shown.pov}
+                checked={shown.carries}
                 onChange={(e) => {
-                  setShown({ ...shown, pov: e.target.checked });
-                  void onChange({ pov: e.target.checked });
+                  setShown({ ...shown, carries: e.target.checked });
+                  void onChange({ carries: e.target.checked });
                 }}
               />
-              The scene's point of view
+              The {w.piece.one}'s {carrying.label.toLowerCase()}
             </label>
           )}
           {type === "theme" && (

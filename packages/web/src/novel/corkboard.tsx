@@ -1,4 +1,4 @@
-import { pieceSections, vocabulary, type Book, type Piece } from "@writer/core";
+import { carrierOf, pieceSections, vocabulary, type Book, type Piece } from "@writer/core";
 import { GripVertical } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
 import { Link, useSearchParams } from "react-router";
@@ -146,7 +146,7 @@ export function OutlineCards({ novelId, novel, workspace }: { novelId: string; n
                   {scene.synopsis && <p className="text-muted">{scene.synopsis}</p>}
                   <p className="text-xs text-muted">
                     {scene.status}
-                    {scene.pov && ` · ${name(scene.pov)}`}
+                    {carrierOf(novel.kind, scene) && ` · ${name(carrierOf(novel.kind, scene))}`}
                   </p>
                 </li>
               ))}

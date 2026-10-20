@@ -2,7 +2,7 @@ export * from "./ids.ts";
 export * from "./types.ts";
 export * from "./model.ts";
 export { kindOf, loadBook } from "./load.ts";
-export { entryIds, fieldName, itemsOf, itemText } from "./fields.ts";
+export { carrierOf, carryingField, entriesOf, entryIds, fieldName, itemsOf, itemText, roleOf } from "./fields.ts";
 export { EVENT_FILES_FORMAT, MANIFEST, NOVEL_MANIFEST, readManifest, SCHEMA_VERSION, type Manifest } from "./manifest.ts";
 export { kindByKey, knownKind, levelOf, registerKind, startLevels, V2_KIND, type BookKind, type FieldDef, type ItemProp, type LevelDef, type Noun, type StatusDef } from "./kinds.ts";
 export { vocabulary, word, type Vocabulary, type Word } from "./vocabulary.ts";

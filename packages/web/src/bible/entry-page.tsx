@@ -1,5 +1,5 @@
 import type { EntityFields, Reference } from "@writer/client";
-import { entityOfLabel, vocabulary, type Entity, type Book, type Relationship, type SceneLink } from "@writer/core";
+import { entityOfLabel, roleOf, vocabulary, type Entity, type Book, type Relationship } from "@writer/core";
 import { useGitHubRepo } from "../github/repo.ts";
 import { EntryIssues } from "../issues/entry-issues.tsx";
 import { useIssueList } from "../issues/use-issues.ts";
@@ -26,7 +26,6 @@ import { InTheStory } from "./strip.tsx";
 import { TypeSections } from "./type-sections.tsx";
 import { mentionEntities, typeOf } from "./types.ts";
 
-const VIA: Record<SceneLink, string> = { pov: "point of view", characters: "present", locations: "set here", entities: "present", plotlines: "plotline", themes: "theme", mention: "mentioned" };
 
 type FieldValue = string | number | boolean;
 
@@ -66,6 +65,11 @@ export function EntryPage({
   const type = typeOf(novel, entity);
   const file = useStore(workspace.store, (s) => s.files[entity.file]);
   const mentions = useMemo(() => mentionEntities(novel), [novel]);
+  /** How a piece refers to it, in the kind's words: a field's role ("point of view", "set here"), or a mention. */
+  const via = (link: string) => {
+    const f = novel.kind.fields.find((x) => x.key === link);
+    return f ? roleOf(f) : link === "mention" ? "mentioned" : link;
+  };
   const ids = { notes: useId() };
   const place = useInPlace(startEditing);
   const shape = shapeForType(entity.type);
@@ -305,7 +309,7 @@ export function EntryPage({
             <ul className="grid gap-1 text-sm">
               {references?.map((r) => (
                 <li key={`${r.kind}:${r.id}`}>
-                  {r.kind === "scene" ? `${vocabulary(novel.kind).piece.One} “${r.title}” (${r.via.map((v) => VIA[v as SceneLink] ?? v).join(", ")})` : r.kind === "event" ? `Event “${r.title}”` : r.kind === "entity" ? `${vocabulary(novel.kind).entity.One} “${r.title}”` : r.kind === "note" ? `Note “${r.title}”` : `Relationship: ${r.type} ${novel.entities.find((e) => e.id === r.other)?.name ?? r.other}`}
+                  {r.kind === "scene" ? `${vocabulary(novel.kind).piece.One} “${r.title}” (${r.via.map((v) => via(v)).join(", ")})` : r.kind === "event" ? `Event “${r.title}”` : r.kind === "entity" ? `${vocabulary(novel.kind).entity.One} “${r.title}”` : r.kind === "note" ? `Note “${r.title}”` : `Relationship: ${r.type} ${novel.entities.find((e) => e.id === r.other)?.name ?? r.other}`}
                 </li>
               ))}
             </ul>

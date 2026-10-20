@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { countWords, editFrontMatter, levelLabel, outerSections, pieceSections, vocabulary, type Book, type PieceStatus, type StatusDef } from "@writer/core";
+import { carrierOf, carryingField, countWords, editFrontMatter, levelLabel, outerSections, pieceSections, vocabulary, type Book, type PieceStatus, type StatusDef } from "@writer/core";
 import { git } from "./git.ts";
 import { GitHubError, type GitHub, type GitHubRepo } from "./github.ts";
 import type { TextFile } from "./files.ts";
@@ -393,7 +393,7 @@ export class BoardStore {
     state.project = { id: board.id, number: board.number, title: board.title, url: board.url };
 
     const wanted = desired(novel);
-    const fields = await this.#ensureFields(board, wanted, novel.kind.statuses);
+    const fields = await this.#ensureFields(board, wanted, novel.kind.statuses, carryingField(novel.kind) !== undefined);
     const summary: BoardSummary = { added: 0, removed: 0, updated: 0, fromBoard: [], putBack: [] };
     const mutations: string[] = [];
     const projectId = board.id;
@@ -518,7 +518,7 @@ export class BoardStore {
    * need. Changing a field's options may clear the values that used them (GitHub gives options new
    * IDs): those items' values are forgotten here, so they're set again.
    */
-  async #ensureFields(board: Board, wanted: Map<string, Wanted>, statuses: readonly StatusDef[]): Promise<Fields> {
+  async #ensureFields(board: Board, wanted: Map<string, Wanted>, statuses: readonly StatusDef[], carried: boolean): Promise<Fields> {
     const byName = (name: string) => board.fields.find((f) => f.name.toLowerCase() === name.toLowerCase());
     const forget = (field: Field) => board.items.forEach((i) => i.values.delete(field.id));
     const statusOptions = statuses.map((s) => ({ name: s.label, color: new Enum(s.color), description: s.description }));
@@ -558,7 +558,8 @@ export class BoardStore {
     const plain = async (name: string, dataType: "NUMBER" | "TEXT") => byName(name) ?? this.#createField(board, name, dataType);
     return {
       status,
-      pov: await select(FIELD.pov, unique(scenes.map((s) => s.pov))),
+      // A kind whose pieces have no carrier (no point of view) has no POV field.
+      pov: carried ? await select(FIELD.pov, unique(scenes.map((s) => s.pov))) : undefined,
       part: await select(FIELD.part, unique(scenes.map((s) => s.part))),
       chapter: await select(FIELD.chapter, unique(scenes.map((s) => s.chapter))),
       words: await plain(FIELD.words, "NUMBER"),
@@ -702,7 +703,10 @@ interface Wanted {
 
 /** What the board should show for each scene of the book, in reading order. */
 function desired(novel: Book): Map<string, Wanted> {
-  const names = uniqueNames(novel.entities.filter((e) => e.type === "character").map((e) => [e.id, e.name]));
+  // The carrier's: the point of view's, a character's.
+  const carrying = carryingField(novel.kind);
+  const type = carrying && "entityType" in carrying.type ? carrying.type.entityType : undefined;
+  const names = uniqueNames(novel.entities.filter((e) => e.type === type).map((e) => [e.id, e.name]));
   const parts = uniqueNames(outerSections(novel).map((p, i) => [p.id, p.title ? `${i + 1}. ${p.title}` : `${levelLabel(novel, p.level)} ${i + 1}`]));
   const chapters = uniqueNames(pieceSections(novel).map((c, i) => [c.id, c.title ? `${i + 1}. ${c.title}` : `${levelLabel(novel, c.level)} ${i + 1}`]));
   const out = new Map<string, Wanted>();
@@ -714,7 +718,7 @@ function desired(novel: Book): Map<string, Wanted> {
       synced: {
         status: s.status,
         title: s.title || "Untitled scene",
-        pov: (s.pov && names.get(s.pov)) ?? null,
+        pov: names.get(carrierOf(novel.kind, s) ?? "") ?? null,
         part: (chapter?.parentId && parts.get(chapter.parentId)) ?? null,
         chapter: (chapter && chapters.get(chapter.id)) ?? null,
         words: countWords(s.body),

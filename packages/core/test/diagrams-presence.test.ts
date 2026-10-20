@@ -13,7 +13,7 @@ describe("presence", () => {
       const m = presence(novel, type);
       for (const scene of novel.pieces) {
         const listed = new Set<string>(
-          field === "characters" ? [...(scene.pov ? [scene.pov] : []), ...scene.characters] : field === "locations" || field === "entities" ? scene[field] : scene[field].map((x) => x.id),
+          field === "characters" ? [...(typeof scene.fields["pov"] === "string" ? [scene.fields["pov"]] : []), ...scene.characters] : field === "locations" || field === "entities" ? scene[field] : scene[field].map((x) => x.id),
         );
         for (const row of m.rows) expect(m.marks.get(gridKey(row.id, scene.id))?.listed ?? false, `${type} ${row.name} in ${scene.title}`).toBe(listed.has(row.id));
       }
@@ -22,8 +22,8 @@ describe("presence", () => {
 
   it("marks the point of view, theme strengths, and entries only mentioned", () => {
     const characters = presence(novel, "character");
-    expect(characters.marks.get(gridKey("char_7f3k2q", "sc_0d9wm4"))).toMatchObject({ listed: true, pov: true, mentioned: true });
-    expect(characters.marks.get(gridKey("char_b3n0vs", "sc_0d9wm4"))).toMatchObject({ listed: true, pov: false });
+    expect(characters.marks.get(gridKey("char_7f3k2q", "sc_0d9wm4"))).toMatchObject({ listed: true, carries: true, mentioned: true });
+    expect(characters.marks.get(gridKey("char_b3n0vs", "sc_0d9wm4"))).toMatchObject({ listed: true, carries: false });
     const themes = presence(novel, "theme");
     expect(themes.marks.get(gridKey("theme_trvst5", "sc_0d9wm4"))).toMatchObject({ listed: true, strength: 3 });
     // Custom types are listed in a scene's entities, or present where mentioned.

@@ -1,4 +1,4 @@
-import { countWords, outerSections, pieceLevel, pieceSections, vocabulary, type Book, type Piece, type PieceStatus } from "@writer/core";
+import { carrierOf, carryingField, countWords, outerSections, pieceLevel, pieceSections, vocabulary, type Book, type Piece, type PieceStatus } from "@writer/core";
 import { GripVertical } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
 import { Link, useSearchParams } from "react-router";
@@ -41,7 +41,7 @@ export function OutlineBoard({ novelId, novel, workspace }: { novelId: string; n
   const counts = useMemo(() => new Map(novel.pieces.map((s) => [s.id, countWords(s.body)])), [novel]);
   const visible = novel.pieces.filter((s) => {
     const chapter = pieceSections(novel).find((c) => c.id === s.sectionId);
-    return (!filter.pov || s.pov === filter.pov) && (!filter.chapter || s.sectionId === filter.chapter) && (!filter.part || chapter?.parentId === filter.part);
+    return (!filter.pov || carrierOf(novel.kind, s) === filter.pov) && (!filter.chapter || s.sectionId === filter.chapter) && (!filter.part || chapter?.parentId === filter.part);
   });
   const total = visible.reduce((n, s) => n + (counts.get(s.id) ?? 0), 0);
 
@@ -86,13 +86,16 @@ export function OutlineBoard({ novelId, novel, workspace }: { novelId: string; n
     if (scene) void move(scene, status);
   };
 
-  const characters = novel.entities.filter((e) => e.type === "character").sort((a, b) => a.name.localeCompare(b.name));
+  // The point of view's, for a kind whose pieces have one: who can carry a piece.
+  const carrying = carryingField(novel.kind);
+  const type = carrying && "entityType" in carrying.type ? carrying.type.entityType : undefined;
+  const carriers = novel.entities.filter((e) => type !== undefined && e.type === type).sort((a, b) => a.name.localeCompare(b.name));
 
   return (
     <div className="grid gap-4">
       <BoardOnGitHub novelId={novelId} />
       <div role="group" aria-label="Filters" className="flex flex-wrap items-end gap-3">
-        <FilterSelect label="Point of view" value={filter.pov} onChange={(v) => setFilter("pov", v)} options={characters.map((c) => [c.id, c.name])} />
+        {carrying && <FilterSelect label={carrying.label} value={filter.pov} onChange={(v) => setFilter("pov", v)} options={carriers.map((c) => [c.id, c.name])} />}
         {outerSections(novel).length > 0 && <FilterSelect label={w.level(novel.levels[0]!).One} value={filter.part} onChange={(v) => setFilter("part", v)} options={outerSections(novel).map((p, i) => [p.id, p.title || `${w.level(p.level).One} ${i + 1}`])} />}
         <FilterSelect label={w.level(pieceLevel(novel)).One} value={filter.chapter} onChange={(v) => setFilter("chapter", v)} options={pieceSections(novel).map((c) => [c.id, chapterTitle(novel, c)])} />
         {filtered && (
@@ -158,7 +161,7 @@ export function OutlineBoard({ novelId, novel, workspace }: { novelId: string; n
                         </div>
                         <p className="text-xs text-muted">
                           {chapter && chapterTitle(novel, chapter)}
-                          {scene.pov && ` · ${name(scene.pov)}`}
+                          {carrierOf(novel.kind, scene) && ` · ${name(carrierOf(novel.kind, scene))}`}
                           {` · ${words(counts.get(scene.id) ?? 0)}`}
                         </p>
                         <ConflictNote conflict={conflicts.find((c) => c.scene === scene.id)} />

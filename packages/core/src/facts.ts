@@ -83,7 +83,7 @@ export function sceneFacts(novel: Book, sceneId: string): string[] {
   }
 
   // Characters: first seen here, or back after a long absence.
-  const present = scenes.map((s) => presentIn(s));
+  const present = scenes.map((s) => presentIn(novel, s));
   const characters = [...present[at]!].filter((id) => novel.entities.find((e) => e.id === id)?.type === "character");
   const first = characters.filter((id) => !present.slice(0, at).some((p) => p.has(id)));
   if (first.length) facts.push(`First appearance of ${list(first)}.`);

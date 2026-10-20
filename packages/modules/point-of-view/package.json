@@ -1,0 +1,13 @@
+{
+  "name": "@writer/module-point-of-view",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Point of view (D14, #27): whose piece it is, one entry of a piece's front matter, and the check that it's among the piece's cast.",
+  "exports": {
+    "./core": "./src/core.ts"
+  },
+  "dependencies": {
+    "@writer/core": "0.1.0"
+  }
+}

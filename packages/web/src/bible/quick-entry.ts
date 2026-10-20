@@ -1,4 +1,4 @@
-import { readFrontMatter, uniqueId, type Book, type YamlEdit } from "@writer/core";
+import { readFrontMatter, uniqueId, type Book, type BookKind, type YamlEdit } from "@writer/core";
 import { joinSceneFile } from "@writer/editor";
 import { useRef } from "react";
 import { create } from "zustand";
@@ -44,13 +44,13 @@ function askName(type: string): Promise<string | undefined> {
   );
 }
 
-const LISTS = ["characters", "locations", "entities", "plotlines", "themes"] as const;
 
 /**
  * Undo the links to an entry that won't be made: in every open file its mentions become their
- * words as plain text, and it comes off the scene's lists and point of view.
+ * words as plain text, and it comes off every field of the kind's that names it: a list, or one entry's (a point of view).
  */
-export function unlink(workspace: Workspace, id: string): void {
+export function unlink(workspace: Workspace, kind: BookKind | undefined, id: string): void {
+  const fields = kind?.fields ?? [];
   const link = new RegExp(`\\[([^\\]\\n]*)\\]\\(#${id}\\)`, "g");
   for (const path of Object.keys(workspace.store.getState().files)) {
     const body = workspace.current(path);
@@ -58,8 +58,8 @@ export function unlink(workspace: Workspace, id: string): void {
     const f = workspace.store.getState().files[path];
     const fm = f ? readFrontMatter(joinSceneFile(f)) : undefined;
     if (!fm) continue;
-    const edits: YamlEdit[] = fm.pov === id ? [{ path: ["pov"], remove: true }] : [];
-    for (const key of LISTS) {
+    const edits: YamlEdit[] = fields.filter((f) => f.type.kind === "entity" && fm[f.key] === id).map((f) => ({ path: [f.key], remove: true }));
+    for (const key of fields.filter((f) => f.type.kind === "entities" || f.type.kind === "own-entities").map((f) => f.key)) {
       const list: unknown[] = Array.isArray(fm[key]) ? fm[key] : [];
       const at = list.flatMap((item, i) => ((typeof item === "string" ? item : (item as { id?: unknown } | null)?.id) === id ? [i] : []));
       if (!at.length) continue;

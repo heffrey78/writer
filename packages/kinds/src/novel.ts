@@ -31,13 +31,13 @@ export const novel: BookKind = {
     { key: "final", label: "Final", description: "Done", color: "GREEN" },
   ],
   fields: [
-    { key: "pov", label: "Point of view", type: { kind: "entity", entityType: "character" }, outline: { column: true, filter: true } },
-    { key: "locations", label: "Where", group: "Locations", type: { kind: "entities", entityType: "location" }, mentionAdds: true },
-    { key: "characters", label: "Characters", type: { kind: "entities", entityType: "character" }, mentionAdds: true, outline: { column: true, filter: true } },
+    { key: "locations", label: "Where", group: "Locations", role: "set here", type: { kind: "entities", entityType: "location" }, mentionAdds: true },
+    { key: "characters", label: "Characters", role: "present", type: { kind: "entities", entityType: "character" }, mentionAdds: true, outline: { column: true, filter: true } },
     { key: "when", label: "When", type: { kind: "story-time", durationKey: "duration" } },
     {
       key: "plotlines",
       label: "Plotlines",
+      role: "plotline",
       type: {
         kind: "entities",
         entityType: "plotline",
@@ -48,10 +48,11 @@ export const novel: BookKind = {
       },
       outline: { column: true, filter: true },
     },
-    { key: "entities", label: "Also in it", type: { kind: "own-entities" }, mentionAdds: true },
+    { key: "entities", label: "Also in it", role: "present", type: { kind: "own-entities" }, mentionAdds: true },
     {
       key: "themes",
       label: "Themes",
+      role: "theme",
       type: {
         kind: "entities",
         entityType: "theme",
@@ -62,6 +63,9 @@ export const novel: BookKind = {
       },
     },
   ],
+  // Point of view comes first on the card, as it always has.
+  modules: ["point-of-view"],
+  fieldOrder: ["pov"],
   issueKinds: [
     { key: "plot-hole", label: "Plot hole", color: "d73a4a", description: "Something in the story that can't happen" },
     { key: "continuity", label: "Continuity", color: "fbca04", description: "Facts that don't agree" },

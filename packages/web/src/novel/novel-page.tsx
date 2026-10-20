@@ -114,7 +114,7 @@ export function NovelPage() {
           secondary: {
             label: "Unlink",
             run: () => {
-              unlink(ws, e.id);
+              unlink(ws, latest.current.novel?.kind, e.id);
               made.discard(e.id);
             },
           },

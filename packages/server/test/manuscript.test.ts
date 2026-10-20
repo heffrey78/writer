@@ -122,7 +122,8 @@ describe("splitting and merging", () => {
     const first = novel.allPieces.find((s) => s.id === "sc_5tat1n")!;
     const second = novel.allPieces.find((s) => s.id === id)!;
     expect(novel.pieces.map((s) => s.id).slice(0, 3)).toEqual(["sc_5tat1n", id, "sc_br1dg3"]);
-    expect(second).toMatchObject({ title: "The Flags", pov: station.pov, characters: station.characters, status: station.status });
+    expect(second).toMatchObject({ title: "The Flags", characters: station.characters, status: station.status });
+    expect(second.fields["pov"]).toBe(station.fields["pov"]);
     const paragraphs = (body: string) => body.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
     expect(paragraphs(first.body)).toEqual(paragraphs(station.body).slice(0, 2));
     expect(paragraphs(second.body)).toEqual(paragraphs(station.body).slice(2));

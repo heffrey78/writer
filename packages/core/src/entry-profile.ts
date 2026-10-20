@@ -1,4 +1,5 @@
 import { DEFAULT_GAP, gaps, swimlanes, when, type Gap } from "./diagrams.ts";
+import { entriesOf } from "./fields.ts";
 import type { Book, Piece } from "./model.ts";
 import { storyInstant, type TimelineItem } from "./time.ts";
 
@@ -23,7 +24,6 @@ function tally(novel: Book, ids: Iterable<string>[]): Tally[] {
     .sort((a, b) => b.scenes - a.scenes || a.name.localeCompare(b.name));
 }
 
-const castOf = (s: Piece) => [...(s.pov ? [s.pov] : []), ...s.characters];
 
 /** The story time a set of scenes covers: its earliest and latest, as read ("Day 1, 09:10"). */
 export function storySpan(novel: Book, scenes: Piece[]): { from: string; to: string } | undefined {
@@ -51,7 +51,7 @@ export interface LocationProfile {
 export function locationProfile(novel: Book, id: string): LocationProfile {
   const scenes = novel.pieces.filter((s) => s.locations.includes(id));
   const span = storySpan(novel, scenes);
-  return { visitors: tally(novel, scenes.map(castOf)), scenes, ...(span ? { span } : {}) };
+  return { visitors: tally(novel, scenes.map((s) => entriesOf(novel, s, "character"))), scenes, ...(span ? { span } : {}) };
 }
 
 export interface PlotlineProfile {
@@ -78,7 +78,7 @@ export function plotlineProfile(novel: Book, id: string): PlotlineProfile {
   return {
     beats,
     skips,
-    who: tally(novel, beats.map((b) => castOf(b.scene))),
+    who: tally(novel, beats.map((b) => entriesOf(novel, b.scene, "character"))),
     where: tally(novel, beats.map((b) => b.scene.locations)),
     quiet: gaps({ ...lanes, lanes: lanes.lanes.filter((l) => l.id === id) }, DEFAULT_GAP),
   };

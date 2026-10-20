@@ -21,7 +21,8 @@ export const diary: BookKind = {
     entity: { label: "Item", plural: "Items" },
   },
   folders: { ...novel.folders, content: "pages", codex: "index" },
-  // A field of its own, in place of the novel's: who was there that day.
+  // No modules: none of the novel's point of view. A field of its own, in place of the novel's: who was there that day.
+  modules: [],
   fields: [{ key: "people", label: "People", type: { kind: "entities", entityType: "character" }, mentionAdds: true }],
 };
 

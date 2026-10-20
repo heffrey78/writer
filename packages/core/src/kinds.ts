@@ -77,6 +77,13 @@ export interface FieldDef {
   /** Whether mentioning an entry in a piece's prose adds it here, so the list keeps up with the text. */
   mentionAdds?: boolean;
   /**
+   * Whether its entry carries the piece: whose piece it is, as a point of view is. One entry's field
+   * at most: presence rings it, the timeline can run a lane for each, profiles count it.
+   */
+  carries?: boolean;
+  /** How an entry in it is in the piece, said after the piece's title: "point of view", "set here". Default its label, in lower case. */
+  role?: string;
+  /**
    * How the outline shows it: as a column of its table, and as a filter of its cards. One entry's
    * field filters by itself ("Point of view"); a list filters by its entry type, matching any field of
    * that type ("Character": in it, or its point of view).
@@ -123,6 +130,11 @@ export interface BookKind extends Noun {
   issueKinds: readonly IssueKind[];
   /** The modules its books use, by id (D14): each adds its fields after the kind's own, and its checks. */
   modules?: readonly string[];
+  /**
+   * The order of its fields with its modules', by key, where a module's shouldn't simply follow the
+   * kind's own (the Novel's point of view comes first on the card). Fields it doesn't name follow.
+   */
+  fieldOrder?: readonly string[];
 }
 
 /** The kind of every book in format v2, which has no `kind`. */

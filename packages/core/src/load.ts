@@ -227,7 +227,6 @@ export async function loadBook(source: FileSource, kind?: BookKind): Promise<Boo
       title: str(d["title"]) ?? "",
       synopsis: str(d["synopsis"]),
       status: bookKind.statuses.some((s) => s.key === status) ? (status as PieceStatus) : bookKind.statuses[0]!.key,
-      pov: str(d["pov"]),
       characters: strList(d["characters"]),
       locations: strList(d["locations"]),
       entities: strList(d["entities"]),

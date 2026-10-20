@@ -1,7 +1,8 @@
+import { entryIds } from "./fields.ts";
 import { mentions, pieceById, type Note, type Book, type Relationship, type Piece, type StoryEvent } from "./model.ts";
 
-/** How a scene refers to an entity. */
-export type SceneLink = "pov" | "characters" | "locations" | "entities" | "plotlines" | "themes" | "mention";
+/** How a scene refers to an entity: by a field of its kind, by key ("pov", "characters"), or a mention in its prose. */
+export type SceneLink = string;
 
 export interface Backlinks {
   /** Scenes that name the entity, in reading order (scenes outside the order last), with how. */
@@ -17,13 +18,7 @@ export function backlinks(novel: Book, id: string): Backlinks {
   const ordered = [...novel.pieces, ...novel.allPieces.filter((s) => s.position < 0)];
   const scenes: Backlinks["scenes"] = [];
   for (const scene of ordered) {
-    const via: SceneLink[] = [];
-    if (scene.pov === id) via.push("pov");
-    if (scene.characters.includes(id)) via.push("characters");
-    if (scene.locations.includes(id)) via.push("locations");
-    if (scene.entities.includes(id)) via.push("entities");
-    if (scene.plotlines.some((p) => p.id === id)) via.push("plotlines");
-    if (scene.themes.some((t) => t.id === id)) via.push("themes");
+    const via: SceneLink[] = novel.kind.fields.filter((f) => entryIds(f, scene.fields[f.key]).includes(id)).map((f) => f.key);
     if (mentions(scene.body).some((m) => m.id === id)) via.push("mention");
     if (via.length) scenes.push({ scene, via });
   }

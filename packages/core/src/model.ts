@@ -77,7 +77,6 @@ export interface Piece {
   title: string;
   synopsis?: string;
   status: PieceStatus;
-  pov?: string;
   characters: string[];
   locations: string[];
   /** Entries of custom types (not characters, locations, plotlines or themes) in the scene. */

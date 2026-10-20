@@ -77,6 +77,7 @@ describe("the cards' filters, from the kind's fields (#25)", () => {
       ...novel,
       key: "diary",
       fields: [{ key: "people", label: "People", type: { kind: "entities", entityType: "character" }, outline: { filter: true } }],
+      modules: [],
     };
     const b = await book(kind, [scene("sc_000001", "people: [char_000002]"), scene("sc_000002", "pov: char_000002")]);
     expect(filterParams(b)).toEqual(["character", "status"]);

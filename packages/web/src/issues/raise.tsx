@@ -1,5 +1,5 @@
 import { ApiError } from "@writer/client";
-import { entityLabel, type Book } from "@writer/core";
+import { entityLabel, entriesOf, type Book } from "@writer/core";
 import { caretScene } from "@writer/editor";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Editor } from "@tiptap/core";
@@ -81,15 +81,7 @@ function Raise({ novelId, novel, passage, close }: { novelId: string; novel: Boo
   // Who and what the passage is about, to start with: the scene's people, places and threads, and anything it mentions.
   const [labels, setLabels] = useState<string[]>(() => {
     const scene = novel.allPieces.find((s) => s.id === passage.scene);
-    const ids = [
-      ...(scene?.pov ? [scene.pov] : []),
-      ...(scene?.characters ?? []),
-      ...(scene?.locations ?? []),
-      ...(scene?.entities ?? []),
-      ...(scene?.plotlines.map((p) => p.id) ?? []),
-      ...(scene?.themes.map((t) => t.id) ?? []),
-      ...passage.mentions,
-    ];
+    const ids = [...(scene ? entriesOf(novel, scene) : []), ...passage.mentions];
     return [...new Set(ids)].flatMap((id) => {
       const entity = novel.entities.find((e) => e.id === id);
       return entity ? [entityLabel(novel, entity).name] : [];

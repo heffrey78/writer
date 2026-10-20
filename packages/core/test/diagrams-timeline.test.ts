@@ -9,19 +9,19 @@ const H = 3_600_000;
 
 describe("the timeline", () => {
   it("marks The Flood as a flashback: first in story time, sixth in the book", () => {
-    const t = timeline(novel, "pov");
+    const t = timeline(novel, "carrier");
     expect([...t.flashbacks]).toEqual(["sc_f100d0"]);
     expect(t.storyRank.get("sc_f100d0")).toBe(1);
     expect(novel.pieces.findIndex((s) => s.id === "sc_f100d0")).toBe(5);
   });
 
-  it("puts items in lanes by point of view (events off page), plotline or location", () => {
-    expect(timeline(novel, "pov").lanes.map((l) => l.name)).toEqual(["Ben Varn", "Ada Varn", "Off page"]);
+  it("puts items in lanes by their carrier, the point of view (events off page), plotline or location", () => {
+    expect(timeline(novel, "carrier").lanes.map((l) => l.name)).toEqual(["Ben Varn", "Ada Varn", "Off page"]);
     const byPlace = timeline(novel, "location");
     expect(byPlace.lanes[0]!.name).toBe("The Varn Bridge");
     const flood = byPlace.items.find((i) => itemTitle(i) === "The flood of '09")!;
-    expect(lanesOf(flood, "location")).toEqual(["loc_br1dg3"]);
-    expect(lanesOf(flood, "pov")).toEqual(["(off page)"]);
+    expect(lanesOf(novel, flood, "location")).toEqual(["loc_br1dg3"]);
+    expect(lanesOf(novel, flood, "carrier")).toEqual(["(off page)"]);
   });
 
   it("says how far apart things are, and when they happen", () => {
@@ -31,7 +31,7 @@ describe("the timeline", () => {
     expect(jump(at(0), at(96 * H))).toBe("4 days later");
     expect(jump(at(0), at(14 * 365.25 * 24 * H))).toBe("14 years later");
     expect(jump(at(0), { start: 5, end: 5, dated: false })).toBe("");
-    const t = timeline(novel, "pov");
+    const t = timeline(novel, "carrier");
     expect(when(t.items.find((i) => itemTitle(i) === "The Betrayal")!)).toBe("Day 3, 18:30 (3 Mar 2024)");
     expect(when(t.items.find((i) => itemTitle(i) === "The Flood")!)).toBe("2 Nov 2009, 23:00");
   });

@@ -64,10 +64,18 @@ A module contributes only through these extension points. Each was added when a 
 
 | Extension point | Half | What it is |
 |---|---|---|
-| `fields` | core (`defineModule`) | Fields a piece's front matter holds, declared as a kind declares them (`FieldDef`), after the kind's own. They're in the schema and the validator's reference checks, on the piece's card, and in the outline, comparisons and mentions as their declaration says. A module can't declare a field its kind already has. |
+| `fields` | core (`defineModule`) | Fields a piece's front matter holds, declared as a kind declares them (`FieldDef`), after the kind's own unless the kind's `fieldOrder` places them. They're in the schema and the validator's reference checks, on the piece's card, and in the outline, comparisons and mentions as their declaration says. A module can't declare a field its kind already has. |
 | `checks` | core | Validator checks: a code, its severity, and `find(book)`, which returns what it found (file, message, and a pointer or line). They run after the base's, in the app, on the CLI and in a book's GitHub Action. |
 | `views` | web (`WebModule`) | Pages of the book: a route under it (and below it, `path/*`), a label and an icon, listed in the sidebar's Plan or Revise group after the base's views, and in the palette under "Go to". |
 | `commands` | web | Palette commands while a book of a kind that uses the module is open. |
+
+Features never ask for a module's field by name. A field says what it is to the rest of the app instead. `carries` marks the entry that carries a piece (the point of view): presence rings it, the timeline can run a lane for each, profiles count it, the drafting board mirrors it, all through `carrierOf(kind, piece)`. `role` says how an entry in it is in the piece ("set here"). `entriesOf(book, piece, type?)` gives every entry a piece's fields name. A kind without the module has none of it: no carrier, so no rings, no such lanes and no board field.
+
+The modules so far:
+
+| Module | Package | Adds |
+|---|---|---|
+| point-of-view (#27) | `@writer/module-point-of-view` | The `pov` field, which carries its piece, and the `W_POV_NOT_PRESENT` check. |
 
 ## Checks
 

@@ -1,4 +1,4 @@
-import { countWords, proseText, storyTimeline, vocabulary, type Book, type Piece, type StoryEvent } from "@writer/core";
+import { carrierOf, carryingField, countWords, proseText, storyTimeline, vocabulary, type Book, type Piece, type StoryEvent } from "@writer/core";
 import { when } from "@writer/core/diagrams";
 import { useMemo } from "react";
 import { Link, useSearchParams } from "react-router";
@@ -37,6 +37,7 @@ const number = new Intl.NumberFormat();
 export function OutlineTimeTable({ novelId, novel, workspace }: { novelId: string; novel: Book; workspace: Workspace }) {
   const items = useMemo(() => inStoryTime(novel), [novel]);
   const w = vocabulary(novel.kind);
+  const carrying = carryingField(novel.kind);
   const edit = useSceneEdit(novelId, workspace);
   const name = (id: string | undefined) => novel.entities.find((e) => e.id === id)?.name;
   const names = (ids: string[] | undefined) => (ids ?? []).map(name).filter(Boolean).join(", ") || <span className="text-muted not-italic">—</span>;
@@ -60,9 +61,11 @@ export function OutlineTimeTable({ novelId, novel, workspace }: { novelId: strin
               <th scope="col" className="w-28 py-2 pr-3 font-medium">
                 Status
               </th>
-              <th scope="col" className="w-28 py-2 pr-3 font-medium">
-                Point of view
-              </th>
+              {carrying && (
+                <th scope="col" className="w-28 py-2 pr-3 font-medium">
+                  {carrying.label}
+                </th>
+              )}
               <th scope="col" className="w-40 py-2 pr-3 font-medium">
                 Characters
               </th>
@@ -90,7 +93,7 @@ export function OutlineTimeTable({ novelId, novel, workspace }: { novelId: strin
                   <td className="py-1 pr-3">
                     <StatusSelect scene={item.scene} onChange={(v) => void edit(item.scene, "status", v)} />
                   </td>
-                  <td className="py-2 pr-3">{name(item.scene.pov) ?? <span className="text-muted">—</span>}</td>
+                  {carrying && <td className="py-2 pr-3">{name(carrierOf(novel.kind, item.scene)) ?? <span className="text-muted">—</span>}</td>}
                   <td className="py-2 pr-3">{names(item.scene.characters)}</td>
                   <td className="py-2 pr-3">{names(item.scene.plotlines.map((p) => p.id))}</td>
                   <td className="py-2 text-right tabular-nums">{number.format(countWords(item.scene.body))}</td>
@@ -167,7 +170,7 @@ export function OutlineTimeCards({ novelId, novel }: { novelId: string; novel: B
               {item.scene.synopsis && <p className="text-muted">{item.scene.synopsis}</p>}
               <p className="text-xs text-muted">
                 {item.scene.status}
-                {item.scene.pov && ` · ${name(item.scene.pov)}`}
+                {carrierOf(novel.kind, item.scene) && ` · ${name(carrierOf(novel.kind, item.scene))}`}
               </p>
             </li>
           ) : (

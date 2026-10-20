@@ -1,4 +1,4 @@
-import { editFrontMatter } from "@writer/core";
+import { editFrontMatter, kindByKey } from "@writer/core";
 import { joinSceneFile, splitSceneFile } from "@writer/editor";
 import { describe, expect, it } from "vitest";
 import { createStore } from "zustand/vanilla";
@@ -33,9 +33,9 @@ describe("unlinking an entry that won't be made", () => {
       },
       { "a.md": "She met [Mira](#char_m1rak0) and [Ada](#char_7f3k2q). [Mira Kostova](#char_m1rak0) left.\n" },
     );
-    unlink(ws, "char_m1rak0");
+    unlink(ws, kindByKey("novel"), "char_m1rak0");
     expect(text("a.md")).toBe("---\nid: sc_aaaaaa\ntitle: A\ncharacters: [char_7f3k2q]\n---\nShe met Mira and [Ada](#char_7f3k2q). Mira Kostova left.\n");
-    unlink(ws, "art_1edg3r");
+    unlink(ws, kindByKey("novel"), "art_1edg3r");
     expect(text("b.md")).toBe("---\nid: sc_bbbbbb\ntitle: B\nentities: []\nthemes:\n  - id: theme_aaaaaa\n---\nNothing here.\n");
   });
 });

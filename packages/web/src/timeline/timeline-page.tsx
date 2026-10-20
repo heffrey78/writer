@@ -1,4 +1,4 @@
-import { overlaps, storyTimeline, type Book, type TimelineItem } from "@writer/core";
+import { carryingField, overlaps, storyTimeline, type Book, type TimelineItem } from "@writer/core";
 import { Fragment, useMemo } from "react";
 import { Link } from "react-router";
 import { Button } from "../ui/button.tsx";
@@ -8,16 +8,16 @@ import { ExportMenu } from "../diagrams/export-menu.tsx";
 import { useNewEvent } from "../events/new-event.tsx";
 import { DayOne } from "./day-one.tsx";
 import { useViewParams } from "../ui/view-params.ts";
-import { itemId, itemTitle, jump, lanesOf, timeline, when, type LaneMode } from "@writer/core/diagrams";
+import { defaultLanes, itemId, itemTitle, jump, lanesOf, timeline, when, type LaneMode } from "@writer/core/diagrams";
 
 const SLOT = 152;
 const HEAD = 168;
 const LINKS = 88;
-const MODES: [LaneMode, string][] = [
-  ["pov", "Point of view"],
-  ["plotline", "Plotline"],
-  ["location", "Location"],
-];
+/** The ways the lanes can run: by carrier (named by the kind's carrying field, "Point of view") for a kind with one. */
+export const laneModes = (novel: Book): [LaneMode, string][] => {
+  const carrying = carryingField(novel.kind);
+  return [...(carrying ? [["carrier", carrying.label] as [LaneMode, string]] : []), ["plotline", "Plotline"], ["location", "Location"]];
+};
 
 /**
  * The book in story time: scenes and off-page events in the order they happen, evenly spaced with
@@ -28,16 +28,18 @@ const MODES: [LaneMode, string][] = [
  */
 export function TimelinePage({ novelId, novel }: { novelId: string; novel: Book }) {
   const [params, setParams] = useViewParams();
-  const mode: LaneMode = MODES.some(([m]) => m === params.get("lanes")) ? (params.get("lanes") as LaneMode) : "pov";
+  const MODES = laneModes(novel);
+  const fallback = defaultLanes(novel.kind);
+  const mode: LaneMode = MODES.some(([m]) => m === params.get("lanes")) ? (params.get("lanes") as LaneMode) : fallback;
   const t = useMemo(() => timeline(novel, mode), [novel, mode]);
-  const conflicts = useMemo(() => overlaps(storyTimeline(novel)), [novel]);
+  const conflicts = useMemo(() => overlaps(novel, storyTimeline(novel)), [novel]);
   const reading = novel.pieces.filter((s) => t.storyRank.has(s.id));
   const n = t.items.length;
   const readSlot = reading.length ? (n * SLOT) / reading.length : SLOT;
   const name = (id: string) => novel.entities.find((e) => e.id === id)?.name ?? id;
   // An event is added by its title, then opens on its own page (heffrey78/gh-writer#165): the novel's dialog.
   const add = useNewEvent((s) => s.set);
-  const lanesText = (i: TimelineItem) => lanesOf(i, mode).map((l) => t.lanes.find((x) => x.id === l)?.name ?? l).join(", ");
+  const lanesText = (i: TimelineItem) => lanesOf(novel, i, mode).map((l) => t.lanes.find((x) => x.id === l)?.name ?? l).join(", ");
 
   if (!n) {
     return (
@@ -57,7 +59,7 @@ export function TimelinePage({ novelId, novel }: { novelId: string; novel: Book 
       <div className="flex flex-wrap items-end gap-4 text-sm">
         <label className="grid gap-1 font-medium">
           Lanes
-          <select value={mode} onChange={(e) => setParams({ lanes: e.target.value === "pov" ? undefined : e.target.value })} className="h-8 rounded-md border border-rule bg-raised px-2 font-normal">
+          <select value={mode} onChange={(e) => setParams({ lanes: e.target.value === fallback ? undefined : e.target.value })} className="h-8 rounded-md border border-rule bg-raised px-2 font-normal">
             {MODES.map(([m, l]) => (
               <option key={m} value={m}>
                 {l}
@@ -99,7 +101,7 @@ export function TimelinePage({ novelId, novel }: { novelId: string; novel: Book 
                 {t.items.map((item) => (
                   <div key={itemId(item)} className="relative border-b border-l border-rule p-1.5">
                     <span className="pointer-events-none absolute inset-x-0 top-1/2 h-px bg-rule" aria-hidden />
-                    {lanesOf(item, mode).includes(lane.id) && (
+                    {lanesOf(novel, item, mode).includes(lane.id) && (
                       <Card
                         novelId={novelId}
                         item={item}
