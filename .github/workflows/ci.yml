@@ -3,11 +3,29 @@ name: CI
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - README.md
+      - USER.md
+      - DEVELOPER.md
+      - "packages/*/README.md"
+      - docs/architecture/**
   pull_request:
+    paths-ignore:
+      - README.md
+      - USER.md
+      - DEVELOPER.md
+      - "packages/*/README.md"
+      - docs/architecture/**
+
+# A newer push makes a run for an older commit on the same branch moot: it includes that commit.
+# Cancelling it saves Actions minutes, which a private repository on the free plan has 2,000 of a month.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -31,7 +49,7 @@ jobs:
           java -jar epubcheck-5.4.0/epubcheck.jar dist/sample/the-bridge-at-varn.epub
 
   e2e:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
