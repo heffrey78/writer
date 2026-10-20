@@ -40,7 +40,7 @@ The novel itself is the source of truth: plain Markdown and YAML files ([format 
 | [`export`](packages/export) | DOCX (hand-written WordprocessingML), EPUB 3 and PDF (pdfkit, with Liberation Serif) from a compiled book; zipped with fflate. |
 | [`cli`](packages/cli) | `writer serve`, `validate`, `snapshots`, `compile`, `migrate` and `new-id`, and the entry points bundled into novel repositories. |
 | [`desktop`](packages/desktop) | The desktop app: a Tauri shell that runs the server bundle on its own Node and git, and opens a window on it. |
-| [`kinds`](packages/kinds) | The kinds of book the app ships, as data (D14, D15): the Novel's levels, ID prefixes, folders, built-in entry types, statuses, issue kinds, its scenes' fields (each field's type is how the schema, the validator, the Scene card, the outline, comparisons and mentions read it) and the modules it uses. See *Kinds and modules*. |
+| [`kinds`](packages/kinds) | The kinds of book the app ships, as data (D14, D15): the Novel's levels, ID prefixes, folders, built-in entry types, statuses, issue kinds, its scenes' fields (each field's type is how the schema, the validator, the Scene card, the outline, comparisons and mentions read it), the modules it uses and its words on screen. See *Kinds and modules*. |
 
 Other folders:
 
@@ -58,7 +58,7 @@ The base never imports a kind or a module: `packages/core/test/boundary.test.ts`
 - `registerKinds()` from `@writer/kinds` registers the modules' core halves, then the kinds. The CLI, the bundles vendored into books, the editor's playground and the tests' setup call it. A kind is registered with what its modules add (`withModules`), and `loadBook` completes a kind passed to it the same way.
 - The web app's `main.tsx` registers the modules' web halves (`registerWebModule`). The web app gets the book's kind, complete, with the book from the server.
 
-The rest of the code reads a book's kind from its model (`book.kind`), or in the web app from `useBookKind()`.
+The rest of the code reads a book's kind from its model (`book.kind`), or in the web app from `useBookKind()`. The words on screen come from the kind too (#22): `vocabulary(kind)` in core, or `useWords()` in the web app, says the book, its levels, its piece, its content, its codex and an entity in the forms a sentence needs (`w.piece.one` "scene", `w.piece.a` "a scene", `w.level("chapter").count(3)` "3 chapters", `w.codex.One` "Story bible"). Base code never writes "scene" or "chapter" itself.
 
 A module contributes only through these extension points. Each was added when a module needed it (D14), so the list grows as modules move out of the base:
 

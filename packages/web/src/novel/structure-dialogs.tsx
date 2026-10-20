@@ -1,4 +1,4 @@
-import { levelLabel, pieceLevel, sectionById, type Book } from "@writer/core";
+import { pieceLevel, sectionById, vocabulary, type Book } from "@writer/core";
 import { useQuery } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { api } from "../api.ts";
@@ -8,6 +8,7 @@ import { Button } from "../ui/button.tsx";
 import { Modal } from "../ui/dialog.tsx";
 import { Field } from "../ui/field.tsx";
 import { Picker } from "../ui/picker.tsx";
+import { useWords } from "./kind.ts";
 import { chapterTitle } from "./navigation.tsx";
 import type { Structure } from "./structure.ts";
 
@@ -44,14 +45,14 @@ export function MoveToDialog({ novel, id, structure, onClose }: { novel: Book; i
   const isPiece = novel.allPieces.some((p) => p.id === id);
   const { levels } = novel.kind;
   const level = isPiece ? pieceLevel(novel) : levels[levels.findIndex((l) => l.key === sectionById(novel, id)?.level) - 1]?.key;
-  const label = level ? levelLabel(novel, level) : "";
+  const said = level ? vocabulary(novel.kind).level(level) : undefined;
   const items = novel.sections
     .filter((s) => s.level === level)
     .map((s) => ({ value: s.id, label: chapterTitle(novel, s), group: sectionById(novel, s.parentId)?.title ?? "" }));
   const [to, setTo] = useState<string>();
   const size = (target: string) => sectionById(novel, target)?.childIds.filter((c) => c !== id).length ?? 0;
   return (
-    <Frame title={`Move to ${level ?? ""}`} onClose={onClose}>
+    <Frame title={`Move to ${said?.one ?? ""}`} onClose={onClose}>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -59,7 +60,7 @@ export function MoveToDialog({ novel, id, structure, onClose }: { novel: Book; i
         }}
         className="grid gap-3"
       >
-        <Picker label={label} items={items} value={to} onChange={setTo} />
+        <Picker label={said?.One ?? ""} items={items} value={to} onChange={setTo} />
         <div className="flex justify-end gap-2">
           <Button onClick={onClose}>Cancel</Button>
           <Button type="submit" variant="primary" disabled={!to}>
@@ -73,6 +74,7 @@ export function MoveToDialog({ novel, id, structure, onClose }: { novel: Book; i
 
 /** Pieces and sections deleted from the manuscript (scenes, chapters, parts), each with Restore. */
 export function RecentlyDeletedDialog({ novelId, structure, onClose }: { novelId: string; structure: Structure; onClose: () => void }) {
+  const w = useWords();
   const deleted = useQuery({ queryKey: ["deleted", novelId], queryFn: () => api.manuscript.recentlyDeleted(novelId), staleTime: 0 });
   return (
     <Frame title="Recently deleted" onClose={onClose}>
@@ -88,7 +90,7 @@ export function RecentlyDeletedDialog({ novelId, structure, onClose }: { novelId
                 <span className="font-medium">{d.title}</span>
                 <span className="text-muted">
                   {" "}
-                  · {d.kind}, deleted {ago(d.date)}
+                  · {w.of(d.kind).one}, deleted {ago(d.date)}
                 </span>
               </span>
               <Button size="sm" aria-label={`Restore “${d.title}”`} onClick={() => void structure.restore(d.commit, d.id, d.title).then(onClose)}>

@@ -11,9 +11,15 @@ export const diary: BookKind = {
   ...novel,
   key: "diary",
   label: "Diary",
+  plural: "Diaries",
   prefix: "dia",
-  levels: [{ key: "month", label: "Month", prefix: "mon", list: "months" }],
-  piece: { key: "day", label: "Day", prefix: "day", list: "days" },
+  levels: [{ key: "month", label: "Month", plural: "Months", prefix: "mon", list: "months" }],
+  piece: { key: "day", label: "Day", plural: "Days", prefix: "day", list: "days" },
+  words: {
+    content: { label: "Pages", plural: "Pages" },
+    codex: { label: "Index", plural: "Indexes", article: "an" },
+    entity: { label: "Item", plural: "Items" },
+  },
   folders: { ...novel.folders, content: "pages", codex: "index" },
   // A field of its own, in place of the novel's: who was there that day.
   fields: [{ key: "people", label: "People", type: { kind: "entities", entityType: "character" }, mentionAdds: true }],
@@ -26,9 +32,9 @@ export const saga: BookKind = {
   label: "Saga",
   prefix: "sg",
   levels: [
-    { key: "volume", label: "Volume", prefix: "vol", list: "volumes", optional: true, titled: true },
-    { key: "part", label: "Part", prefix: "pt", list: "parts", optional: true, titled: true },
-    { key: "chapter", label: "Chapter", prefix: "ch", list: "chapters" },
+    { key: "volume", label: "Volume", plural: "Volumes", prefix: "vol", list: "volumes", optional: true, titled: true },
+    { key: "part", label: "Part", plural: "Parts", prefix: "pt", list: "parts", optional: true, titled: true },
+    { key: "chapter", label: "Chapter", plural: "Chapters", prefix: "ch", list: "chapters" },
   ],
 };
 

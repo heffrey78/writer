@@ -1,4 +1,4 @@
-import { pieceLevel, pieceSections, sectionById, type Book, type Section } from "@writer/core";
+import { pieceLevel, pieceSections, sectionById, vocabulary, type Book, type Section } from "@writer/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router";
 import { api, keys } from "../api.ts";
@@ -7,7 +7,7 @@ import { chapterTitle } from "./navigation.tsx";
 import { useNotice } from "./notice.tsx";
 import type { Workspace } from "./workspace.ts";
 
-/** What an item is, in the kind's words: the piece's key ("scene") or the section's level ("chapter", "part"). */
+/** What an item is: the piece's key ("scene") or the section's level ("chapter", "part"), said with vocabulary(kind).of(). */
 export type ItemKind = string;
 
 /** What an ID is in the manuscript, with its title for messages. */
@@ -99,6 +99,7 @@ export function useStructure(novelId: string, novel: Book, workspace: Workspace)
     }
   }
 
+  const w = vocabulary(novel.kind);
   const name = (id: string) => itemOf(novel, id)?.title ?? id;
   const where = (to: string | null) => (to ? (itemOf(novel, to)?.title ?? "") : "the top level");
 
@@ -117,20 +118,20 @@ export function useStructure(novelId: string, novel: Book, workspace: Workspace)
       }),
     rename: (id: string, title: string) => run("rename it", () => m.rename(novelId, id, title), () => `Renamed to “${title}”.`),
     createScene: (chapter: string, title: string, after?: string | null) =>
-      run("add the scene", () => m.createScene(novelId, chapter, title, after), ({ id }) => {
+      run(`add the ${w.piece.one}`, () => m.createScene(novelId, chapter, title, after), ({ id }) => {
         void navigate(`/novels/${novelId}/scene/${id}`);
-        return `Added the scene “${title}”.`;
+        return `Added the ${w.piece.one} “${title}”.`;
       }),
     /** A section at a level of the book's kind: one that holds pieces opens, as a chapter does. */
     createSection: (level: string, parent: string | null, title: string | undefined, after?: string | null) => {
       const { levels } = novel.kind;
       const child = levels[levels.findIndex((l) => l.key === level) + 1];
-      return run(`add the ${level}`, () => m.createSection(novelId, level, parent, title, after), ({ id }) => {
+      return run(`add the ${w.level(level).one}`, () => m.createSection(novelId, level, parent, title, after), ({ id }) => {
         if (!child) {
           void navigate(`/novels/${novelId}/chapter/${id}`);
-          return `Added the ${level}${title ? ` “${title}”` : ""}.`;
+          return `Added the ${w.level(level).one}${title ? ` “${title}”` : ""}.`;
         }
-        return `Added the ${level}${title ? ` “${title}”` : ""}. Add a ${child.key} to it from its menu.`;
+        return `Added the ${w.level(level).one}${title ? ` “${title}”` : ""}. Add ${w.level(child.key).a} to it from its menu.`;
       });
     },
     remove: async (id: string) => {
@@ -138,11 +139,11 @@ export function useStructure(novelId: string, novel: Book, workspace: Workspace)
       // Notes on only what's going (heffrey78/gh-writer#222): kept unattached or deleted too, as the author says.
       const gone = new Set(novel.allPieces.filter((s) => s.id === id || within(novel, s.sectionId, id)).map((s) => s.id));
       const left = novel.notes.filter((n) => n.scenes.length > 0 && n.scenes.every((s) => gone.has(s)));
-      const notes = left.length ? await useNotesLeft.getState().ask(`the ${item?.kind ?? "item"} “${item?.title ?? id}”`, left) : undefined;
+      const notes = left.length ? await useNotesLeft.getState().ask(`the ${item ? w.of(item.kind).one : "item"} “${item?.title ?? id}”`, left) : undefined;
       if (notes === null) return undefined;
       return run("delete it", () => m.delete(novelId, id, notes), (result) => {
         show({
-          message: `Deleted the ${item?.kind ?? "item"} “${item?.title ?? id}”.`,
+          message: `Deleted the ${item ? w.of(item.kind).one : "item"} “${item?.title ?? id}”.`,
           ...(result.commit ? { action: { label: "Undo", run: () => void run("bring it back", () => m.restore(novelId, result.commit!, id), () => `“${item?.title ?? id}” is back.`) } } : {}),
         });
         return undefined;
@@ -150,11 +151,11 @@ export function useStructure(novelId: string, novel: Book, workspace: Workspace)
     },
     restore: (commit: string, id: string, title: string) => run("bring it back", () => m.restore(novelId, commit, id), () => `“${title}” is back.`),
     split: (scene: string, paragraph: number, title: string) =>
-      run("split the scene", () => m.split(novelId, scene, paragraph, title), () => `Split “${name(scene)}”: the rest is now “${title}”.`),
+      run(`split the ${w.piece.one}`, () => m.split(novelId, scene, paragraph, title), () => `Split “${name(scene)}”: the rest is now “${title}”.`),
     merge: (scene: string) => {
       const chapter = novel.allSections.find((c) => c.level === pieceLevel(novel) && c.childIds.includes(scene));
       const next = chapter?.childIds[chapter.childIds.indexOf(scene) + 1];
-      return run("merge the scenes", () => m.merge(novelId, scene), () => `Merged “${next ? name(next) : "the next scene"}” into “${name(scene)}”.`);
+      return run(`merge the ${w.piece.many}`, () => m.merge(novelId, scene), () => `Merged “${next ? name(next) : `the next ${w.piece.one}`}” into “${name(scene)}”.`);
     },
   };
 }

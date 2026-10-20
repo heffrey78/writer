@@ -9,13 +9,24 @@ import { withModules } from "./modules.ts";
  */
 
 /**
+ * A word on screen for something in the kind's books (#22), as it reads in a title: "Chapter",
+ * "Story bible". The other forms sentences need come from vocabulary().
+ */
+export interface Noun {
+  label: string;
+  /** "Chapters". */
+  plural: string;
+  /** What goes before it, where its first letter doesn't tell: "an" for "Hour", "a" for "Unicorn". */
+  article?: "a" | "an";
+}
+
+/**
  * A level of sections above the pieces, such as a part or a chapter. A section is a folder with
  * _<key>.yaml in it: its ID, title and synopsis, and its children in order under the next level's
  * `list` (the pieces' at the innermost level).
  */
-export interface LevelDef {
+export interface LevelDef extends Noun {
   key: string;
-  label: string;
   prefix: string;
   /** The key its sections are listed under, in _order.yaml or the level above's file: "chapters". */
   list: string;
@@ -80,15 +91,17 @@ export interface StatusDef {
   color: "GRAY" | "BLUE" | "GREEN" | "YELLOW" | "ORANGE" | "RED" | "PINK" | "PURPLE";
 }
 
-export interface BookKind {
+/** A kind of book: its label and plural are what a book of it is called ("Novel", "Novels"). */
+export interface BookKind extends Noun {
   key: string;
-  label: string;
   /** The book's own ID prefix. */
   prefix: string;
   /** The levels of sections, outermost first. */
   levels: readonly LevelDef[];
   /** The writing unit: one file of prose. */
-  piece: { key: string; label: string; prefix: string; list: string };
+  piece: Noun & { key: string; prefix: string; list: string };
+  /** The words for what isn't a level or the piece: all the sections and pieces, the codex, and an entity of it. */
+  words: { content: Noun; codex: Noun; entity: Noun };
   folders: {
     /** The sections and pieces. */
     content: string;

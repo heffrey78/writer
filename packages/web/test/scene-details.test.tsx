@@ -16,8 +16,8 @@ const diary: BookKind = {
   ...novel,
   key: "diary",
   label: "Diary",
-  levels: [{ key: "month", label: "Month", prefix: "mon", list: "months" }],
-  piece: { key: "day", label: "Day", prefix: "day", list: "days" },
+  levels: [{ key: "month", label: "Month", plural: "Months", prefix: "mon", list: "months" }],
+  piece: { key: "day", label: "Day", plural: "Days", prefix: "day", list: "days" },
   fields: [{ key: "people", label: "People", type: { kind: "entities", entityType: "character" }, mentionAdds: true }],
 };
 

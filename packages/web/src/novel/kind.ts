@@ -1,4 +1,4 @@
-import type { BookKind } from "@writer/core";
+import { vocabulary, type BookKind, type Vocabulary } from "@writer/core";
 import { createContext, useContext } from "react";
 
 /**
@@ -18,3 +18,6 @@ export function useStatusLabel(): (key: string) => string {
   const { statuses } = useBookKind();
   return (key) => statuses.find((s) => s.key === key)?.label ?? key;
 }
+
+/** The open book's words on screen (#22): "scene", "a chapter", "Story bible". */
+export const useWords = (): Vocabulary => vocabulary(useBookKind());

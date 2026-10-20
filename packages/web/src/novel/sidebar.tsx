@@ -1,4 +1,4 @@
-import type { Book, BookKind } from "@writer/core";
+import { vocabulary, type Book, type BookKind } from "@writer/core";
 import { BookOpen, CircleDot, Columns2, Goal, ListTree, Map as MapIcon, Network, PanelLeftClose, PanelLeftOpen, PenLine, StickyNote, type LucideIcon } from "lucide-react";
 import { Dialog } from "radix-ui";
 import { useEffect, useId, useState, type ReactNode } from "react";
@@ -58,7 +58,7 @@ export function groups(onGitHub: boolean, kind: BookKind): { label: string; plac
         { path: "relationships", label: "Relationships", icon: Network },
         { path: "notes", label: "Notes", icon: StickyNote },
         { path: "progress", label: "Progress", icon: Goal },
-        { path: "bible", label: "Story bible", icon: BookOpen },
+        { path: "bible", label: vocabulary(kind).codex.One, icon: BookOpen },
         ...added("Plan"),
       ],
     },
@@ -163,7 +163,7 @@ function Expanded({ novelId, novel, workspace, current, onGitHub, toggle }: { no
                   {p.label}
                 </NavLink>
                 {p.path === "bible" && (
-                  <ul aria-label="Story bible types" className="mt-0.5 grid gap-0.5 pl-8 text-xs text-muted">
+                  <ul aria-label={`${vocabulary(novel.kind).codex.One} types`} className="mt-0.5 grid gap-0.5 pl-8 text-xs text-muted">
                     {novel.entityTypes.map((t) => (
                       <li key={t.key} className="flex justify-between pr-2">
                         <span>{plural(t.label)}</span>
@@ -217,7 +217,7 @@ function Strip({ novelId, kind, onGitHub, toggle }: { novelId: string; kind: Boo
     <aside aria-label="Sidebar" className="flex flex-col items-center gap-1 border-rule bg-panel py-2 md:border-r">
       <ToggleButton collapsed toggle={toggle} />
       <nav aria-label="Views" className="flex flex-col items-center gap-1">
-        {icon(`/novels/${novelId}`, "Manuscript", PenLine, true)}
+        {icon(`/novels/${novelId}`, vocabulary(kind).content.One, PenLine, true)}
         {groups(onGitHub, kind).map((g) => (
           <div key={g.label} role="group" aria-label={g.label} className="flex flex-col items-center gap-1 border-t border-rule pt-1">
             {g.places.map((p) => icon(`/novels/${novelId}/${p.path}`, p.label, p.icon))}

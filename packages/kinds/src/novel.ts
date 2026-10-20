@@ -4,12 +4,18 @@ import type { BookKind } from "@writer/core";
 export const novel: BookKind = {
   key: "novel",
   label: "Novel",
+  plural: "Novels",
   prefix: "nv",
   levels: [
-    { key: "part", label: "Part", prefix: "pt", list: "parts", optional: true, titled: true },
-    { key: "chapter", label: "Chapter", prefix: "ch", list: "chapters" },
+    { key: "part", label: "Part", plural: "Parts", prefix: "pt", list: "parts", optional: true, titled: true },
+    { key: "chapter", label: "Chapter", plural: "Chapters", prefix: "ch", list: "chapters" },
   ],
-  piece: { key: "scene", label: "Scene", prefix: "sc", list: "scenes" },
+  piece: { key: "scene", label: "Scene", plural: "Scenes", prefix: "sc", list: "scenes" },
+  words: {
+    content: { label: "Manuscript", plural: "Manuscripts" },
+    codex: { label: "Story bible", plural: "Story bibles" },
+    entity: { label: "Entry", plural: "Entries", article: "an" },
+  },
   folders: { content: "manuscript", codex: "bible", notes: "notes", events: "events" },
   entityTypes: [
     { key: "character", prefix: "char", folder: "characters", label: "Character", color: "1f77b4", builtin: true },

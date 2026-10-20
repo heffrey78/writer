@@ -1,5 +1,5 @@
 import { pieceSections, readAnchor, readFrontMatter, type Section, type Book, type Piece } from "@writer/core";
-import { countWords } from "@writer/core";
+import { countWords, vocabulary } from "@writer/core";
 import {
   appContextMenu,
   caretBlock,
@@ -45,6 +45,7 @@ import { useQuickEntry } from "../bible/quick-entry.ts";
 import { mentionEntities } from "../bible/types.ts";
 import { useCurrentScene } from "./current.ts";
 import { EntryTab, useEntryPanel } from "./entry-tab.tsx";
+import { useBookKind, useWords } from "./kind.ts";
 import { SceneNotes, useSceneNotes } from "../notes/scene-notes.tsx";
 import { leaveMention, MentionCard, useMentionCard } from "./mention-card.tsx";
 import { mentionEdits } from "./mention-sync.ts";
@@ -75,6 +76,7 @@ export const useWritingEditor = create<{ editor: Editor | undefined }>(() => ({ 
 /** The editor for a chapter or a scene, wired to the workspace's files, with word counts and find and replace. */
 export function WritingView({ novelId, novel, workspace, view, spell, entries }: Props) {
   const navigate = useNavigate();
+  const w = vocabulary(novel.kind);
   const files = useStore(workspace.store, (s) => s.files);
   const [editor, setEditor] = useState<Editor>();
   const byId = useMemo(() => new Map(novel.allPieces.map((s) => [s.id, s])), [novel]);
@@ -176,15 +178,15 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
         title: sidebar.open ? "Hide the right sidebar" : "Show the right sidebar",
         group: "Writing",
         keys: "Mod-Shift-\\",
-        keywords: ["scene details", "entry", "panel"],
+        keywords: [`${w.piece.one} details`, w.entity.one, "panel"],
         run: sidebar.toggle,
       },
-      { id: "writing.sceneTab", title: "Show the scene's details", group: "Writing", keywords: ["sidebar", "panel"], run: () => sidebar.show("scene") },
-      { id: "writing.entryTab", title: "Show the open entry", group: "Writing", keywords: ["sidebar", "story bible", "panel"], run: () => sidebar.show("entry") },
-      { id: "writing.notesTab", title: "Show the scene's notes", group: "Writing", keywords: ["sidebar", "panel", "sticky"], run: () => sidebar.show("notes") },
+      { id: "writing.sceneTab", title: `Show the ${w.piece.one}'s details`, group: "Writing", keywords: ["sidebar", "panel"], run: () => sidebar.show("scene") },
+      { id: "writing.entryTab", title: `Show the open ${w.entity.one}`, group: "Writing", keywords: ["sidebar", w.codex.one, "panel"], run: () => sidebar.show("entry") },
+      { id: "writing.notesTab", title: `Show the ${w.piece.one}'s notes`, group: "Writing", keywords: ["sidebar", "panel", "sticky"], run: () => sidebar.show("notes") },
       {
         id: "writing.newSceneNote",
-        title: "New note on this scene",
+        title: `New note on this ${w.piece.one}`,
         group: "Notes",
         keywords: ["idea", "sticky", "brainstorm"],
         run: () => {
@@ -193,7 +195,7 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
         },
       },
     ],
-    [sidebar.open, sidebar.toggle, sidebar.show],
+    [sidebar.open, sidebar.toggle, sidebar.show, w],
   );
   const toText = () => {
     if (editor && !editor.isDestroyed) editor.commands.focus(null, { scrollIntoView: false });
@@ -297,17 +299,17 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
     () => [
       {
         id: "writing.split",
-        title: "Split the scene at the caret",
-        group: "Manuscript",
+        title: `Split the ${w.piece.one} at the caret`,
+        group: w.content.One,
         run: () => {
           const at = editor && !editor.isDestroyed ? caretBlock(editor) : undefined;
           const scene = at && scenes.find((s) => s.file === at.sceneId);
           if (scene && at.block > 0) setSplitting({ scene: scene.id, block: at.block });
-          else if (scene) notify({ message: "The caret is in the scene's first paragraph: put it in the paragraph that should start the new scene." });
+          else if (scene) notify({ message: `The caret is in the ${w.piece.one}'s first paragraph: put it in the paragraph that should start the new ${w.piece.one}.` });
         },
       },
     ],
-    [editor, scenes],
+    [editor, scenes, w],
   );
 
   // The editor's own commands, run on this editor; their shortcuts work in the text.
@@ -410,8 +412,8 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
         {"scene" in view && pinned[view.scene.file] && <p className="ghw-pinned -mt-2 text-[13px] text-muted">{pinned[view.scene.file]}</p>}
         {splitting && (
           <TitleDialog
-            title="Split the scene here"
-            label="Title of the new scene"
+            title={`Split the ${w.piece.one} here`}
+            label={`Title of the new ${w.piece.one}`}
             action="Split"
             submit={(title) => structure.split(splitting.scene, splitting.block, title)}
             onClose={() => setSplitting(undefined)}
@@ -470,7 +472,7 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
         !focusMode && (
           <RightSidebar
             toText={toText}
-            labels={{ entry: entryShown && novel.events.some((e) => e.id === entryShown) ? "Event" : "Entry" }}
+            labels={{ scene: w.piece.One, entry: entryShown && novel.events.some((e) => e.id === entryShown) ? "Event" : w.entity.One }}
             content={{
               scene: detailsScene ? (
                 <SceneDetails
@@ -576,13 +578,18 @@ function SelectionMenu({ at, onClose, onRaise }: { at: { x: number; y: number };
 /** A chapter with no scenes yet: there's nothing to write in until it has one. */
 function EmptyChapter({ autofocus, onAdd }: { autofocus: boolean; onAdd: (title: string) => Promise<unknown> }) {
   const [adding, setAdding] = useState(false);
+  const w = useWords();
+  // The level that holds pieces: the innermost.
+  const section = w.level(useBookKind().levels.at(-1)?.key ?? "");
   return (
     <div className="grid justify-items-start gap-3 rounded-lg border border-dashed border-rule px-5 py-6">
-      <p>This chapter has no scenes yet.</p>
+      <p>
+        This {section.one} has no {w.piece.many} yet.
+      </p>
       <Button autoFocus={autofocus} onClick={() => setAdding(true)}>
-        <Plus className="size-4" aria-hidden /> Add a scene
+        <Plus className="size-4" aria-hidden /> Add {w.piece.a}
       </Button>
-      {adding && <TitleDialog title="New scene" action="Add scene" submit={onAdd} onClose={() => setAdding(false)} />}
+      {adding && <TitleDialog title={`New ${w.piece.one}`} action={`Add ${w.piece.one}`} submit={onAdd} onClose={() => setAdding(false)} />}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import type { SyncStatus } from "@writer/client";
-import { pieceLevel, pieceSections, sectionById, unreadable, type Book } from "@writer/core";
+import { pieceLevel, pieceSections, sectionById, unreadable, vocabulary, type Book } from "@writer/core";
 import { writingModes } from "@writer/editor";
 import { useWritingModes } from "@writer/editor/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -20,7 +20,7 @@ import { useNewNote } from "../notes/new-note.tsx";
 import { NotesPage } from "../notes/notes-page.tsx";
 import { NotesLeftDialog } from "../notes/notes-left.tsx";
 import { useNewFormat } from "../events/format-move.tsx";
-import { BookKindContext } from "./kind.ts";
+import { BookKindContext, useWords } from "./kind.ts";
 import { EntryOver, EventOver, NoteOver } from "./item-modals.tsx";
 import { cn } from "../ui/cn.ts";
 import { DraftsButton, useDrafts } from "./drafts.tsx";
@@ -85,14 +85,16 @@ export function NovelPage() {
     const detach = ws.autosave.attach(window);
     const unflush = flushOnQuit(() => ws.flush());
     const show = useNotice.getState().show;
-    const label = (type: string) => latest.current.novel?.entityTypes.find((t) => t.key === type)?.label.toLowerCase() ?? "entry";
+    // The book's words, once it's loaded: these run later than the workspace is made.
+    const words = () => latest.current.novel && vocabulary(latest.current.novel.kind);
+    const label = (type: string) => latest.current.novel?.entityTypes.find((t) => t.key === type)?.label.toLowerCase() ?? words()?.entity.one ?? "entry";
     const made = createQuickEntries({
       api,
       novelId,
       onMade: async (e) => {
         await queryClient.invalidateQueries({ queryKey: keys.novel(novelId) });
         show({
-          message: `Added ${label(e.type)} “${e.name}” to the story bible.`,
+          message: `Added ${label(e.type)} “${e.name}” to the ${words()?.codex.one ?? "story bible"}.`,
           action: {
             label: "Add details",
             run: () => {
@@ -106,7 +108,7 @@ export function NovelPage() {
       },
       onRefused: (e, why) =>
         show({
-          message: `Couldn't add “${e.name}” to the story bible: ${why}`,
+          message: `Couldn't add “${e.name}” to the ${words()?.codex.one ?? "story bible"}: ${why}`,
           action: { label: "Try again", run: () => made.retry(e.id) },
           secondary: {
             label: "Unlink",
@@ -172,6 +174,7 @@ export function NovelPage() {
   const versions = useVersions(novelId);
   const switchVersion = useSwitchVersion(novelId, workspace);
   const newFormat = useNewFormat(novelId, model);
+  const w = model && vocabulary(model.kind);
   useCommands(
     (): Command[] => [
       { id: "novel.syncNow", title: "Sync now", group: "Sync", run: () => syncNow.mutate() },
@@ -182,8 +185,8 @@ export function NovelPage() {
       ...(versions.data ?? [])
         .filter((v) => !v.current)
         .map((v) => ({ id: `novel.version.${v.id}`, title: `Open version: ${v.name}`, group: "Drafts", run: () => switchVersion.mutate(v) })),
-      { id: "novel.compile", title: "Compile the manuscript…", group: "Novel", keywords: ["export", "docx", "word", "epub", "pdf", "e-book", "manuscript"], run: () => setCompiling(true) },
-      { id: "novel.bible", title: "Story bible", group: "Go to", run: () => void navigate(`/novels/${novelId}/bible`) },
+      { id: "novel.compile", title: `Compile the ${w?.content.one ?? "manuscript"}…`, group: w?.book.One ?? "Novel", keywords: ["export", "docx", "word", "epub", "pdf", "e-book", w?.content.one ?? "manuscript"], run: () => setCompiling(true) },
+      { id: "novel.bible", title: w?.codex.One ?? "Story bible", group: "Go to", run: () => void navigate(`/novels/${novelId}/bible`) },
       { id: "novel.outline", title: "Outline", group: "Go to", keywords: ["table"], run: () => void navigate(`/novels/${novelId}/outline/table`) },
       { id: "novel.outlineCards", title: "Outline: cards", group: "Go to", keywords: ["corkboard", "index cards"], run: () => void navigate(`/novels/${novelId}/outline/cards`) },
       { id: "novel.outlineBoard", title: "Outline: drafting board", group: "Go to", keywords: ["board", "kanban", "status", "progress", "projects"], run: () => void navigate(`/novels/${novelId}/outline/board`) },
@@ -202,8 +205,8 @@ export function NovelPage() {
       { id: "novel.notes", title: "Notes", group: "Go to", keywords: ["ideas", "brainstorm", "cards"], run: () => void navigate(`/novels/${novelId}/notes`) },
       { id: "novel.newNote", title: "New note", group: "Notes", keywords: ["idea", "brainstorm", "what if"], run: () => useNewNote.getState().set(true) },
       ...(model?.notes ?? []).map((n) => ({ id: `novel.note.${n.id}`, title: `Note: ${n.title}`, group: "Go to", keywords: n.tags, run: () => void navigate(`/novels/${novelId}/note/${n.id}`) })),
-      { id: "novel.newEvent", title: "New off-page event", group: "Story bible", keywords: ["event", "backstory", "timeline"], run: () => useNewEvent.getState().set(true) },
-      ...(model?.entityTypes ?? []).map((t) => ({ id: `novel.newEntry.${t.key}`, title: `New ${t.label.toLowerCase()}`, group: "Story bible", run: () => openNew(`bible/new?type=${encodeURIComponent(t.key)}`, "bible") })),
+      { id: "novel.newEvent", title: "New off-page event", group: w?.codex.One ?? "Story bible", keywords: ["event", "backstory", "timeline"], run: () => useNewEvent.getState().set(true) },
+      ...(model?.entityTypes ?? []).map((t) => ({ id: `novel.newEntry.${t.key}`, title: `New ${t.label.toLowerCase()}`, group: w?.codex.One ?? "Story bible", run: () => openNew(`bible/new?type=${encodeURIComponent(t.key)}`, "bible") })),
       ...(model?.entities ?? []).map((e) => ({
         id: `novel.entry.${e.id}`,
         title: `${model!.entityTypes.find((t) => t.key === e.type)?.label ?? e.type}: ${e.name}`,
@@ -213,11 +216,11 @@ export function NovelPage() {
       })),
       ...(model?.events ?? []).map((e) => ({ id: `novel.event.${e.id}`, title: `Off the page: ${e.title}`, group: "Go to", keywords: ["event"], run: () => void navigate(`/novels/${novelId}/event/${e.id}`) })),
       ...(model ? pieceSections(model) : []).flatMap((c): Command[] => [
-        { id: `novel.chapter.${c.id}`, title: `Chapter: ${chapterTitle(model!, c)}`, group: "Go to", run: () => void navigate(`/novels/${novelId}/chapter/${c.id}`) },
+        { id: `novel.chapter.${c.id}`, title: `${w!.level(c.level).One}: ${chapterTitle(model!, c)}`, group: "Go to", run: () => void navigate(`/novels/${novelId}/chapter/${c.id}`) },
         ...c.childIds.flatMap((id): Command[] => {
           const s = model!.allPieces.find((x) => x.id === id);
           return s
-            ? [{ id: `novel.scene.${s.id}`, title: `Scene: ${s.title}`, group: "Go to", keywords: [chapterTitle(model!, c)], run: () => void navigate(`/novels/${novelId}/scene/${s.id}`) }]
+            ? [{ id: `novel.scene.${s.id}`, title: `${w!.piece.One}: ${s.title}`, group: "Go to", keywords: [chapterTitle(model!, c)], run: () => void navigate(`/novels/${novelId}/scene/${s.id}`) }]
             : [];
         }),
       ]),
@@ -299,7 +302,7 @@ export function NovelPage() {
           <div className="md:overflow-y-auto">
             <ErrorBoundary what="this view" remount={sameView}>
               <Routes>
-                <Route index element={pieceSections(book)[0] ? <Navigate to={`/novels/${novelId}/chapter/${pieceSections(book)[0]!.id}`} replace /> : <EmptyManuscript />} />
+                <Route index element={pieceSections(book)[0] ? <Navigate to={`/novels/${novelId}/chapter/${pieceSections(book)[0]!.id}`} replace /> : <EmptyManuscript novel={book} />} />
                 <Route path="chapter/:chapterId" element={<ChapterRoute novelId={novelId} novel={book} workspace={workspace} spell={spell} entries={entries} />} />
                 <Route path="scene/:sceneId" element={<SceneRoute novelId={novelId} novel={book} workspace={workspace} spell={spell} entries={entries} />} />
                 <Route
@@ -351,14 +354,14 @@ type RouteProps = { novelId: string; novel: Book; workspace: Workspace; spell: R
 function ChapterRoute(props: RouteProps) {
   const { chapterId } = useParams();
   const chapter = pieceSections(props.novel).find((c) => c.id === chapterId) ?? props.novel.allSections.find((c) => c.id === chapterId && c.level === pieceLevel(props.novel));
-  return chapter ? <WritingView {...props} view={{ chapter }} /> : <Missing what="chapter" />;
+  return chapter ? <WritingView {...props} view={{ chapter }} /> : <Missing what={vocabulary(props.novel.kind).level(pieceLevel(props.novel)).one} />;
 }
 
 function SceneRoute(props: RouteProps) {
   const { sceneId } = useParams();
   const scene = props.novel.allPieces.find((s) => s.id === sceneId);
   const chapter = sectionById(props.novel, scene?.sectionId);
-  return scene ? <WritingView {...props} view={{ scene, chapter }} /> : <Missing what="scene" />;
+  return scene ? <WritingView {...props} view={{ scene, chapter }} /> : <Missing what={vocabulary(props.novel.kind).piece.one} />;
 }
 
 /** A view only a novel on GitHub has: until that's known, a moment's wait; not on GitHub, the manuscript. */
@@ -375,10 +378,11 @@ function IssueRoute({ novelId, novel, workspace }: { novelId: string; novel: Boo
 }
 
 function Missing({ what }: { what: string }) {
+  const w = useWords();
   return (
     <div className="p-8">
       <h1 className="text-xl font-semibold">No such {what}</h1>
-      <p className="mt-2 text-muted">It may have been moved or deleted. Choose another from the manuscript.</p>
+      <p className="mt-2 text-muted">It may have been moved or deleted. Choose another from the {w.content.one}.</p>
     </div>
   );
 }
@@ -411,11 +415,14 @@ function TooNew({ kind }: { kind: boolean }) {
   );
 }
 
-function EmptyManuscript() {
+function EmptyManuscript({ novel }: { novel: Book }) {
+  const w = vocabulary(novel.kind);
   return (
     <div className="p-8">
-      <h1 className="text-xl font-semibold">No chapters yet</h1>
-      <p className="mt-2 text-muted">This novel's manuscript is empty.</p>
+      <h1 className="text-xl font-semibold">No {w.level(pieceLevel(novel)).many} yet</h1>
+      <p className="mt-2 text-muted">
+        This {w.book.one}'s {w.content.one} is empty.
+      </p>
     </div>
   );
 }

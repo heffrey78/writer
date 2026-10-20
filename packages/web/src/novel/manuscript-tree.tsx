@@ -1,4 +1,4 @@
-import { countWords, pieceLevel, sectionById, type Book, type LevelDef, type Section } from "@writer/core";
+import { countWords, pieceLevel, sectionById, vocabulary, type Book, type LevelDef, type Section } from "@writer/core";
 import { ChevronDown, ChevronRight, Ellipsis, FilePlus, FolderPlus, History, Layers, Plus } from "lucide-react";
 import { ContextMenu, DropdownMenu } from "radix-ui";
 import { memo, useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
@@ -56,6 +56,12 @@ export function ManuscriptTree({ novelId, novel, structure, current }: { novelId
 
   const { levels, piece } = novel.kind;
   const inner = pieceLevel(novel);
+  const w = vocabulary(novel.kind);
+  /** What an item is, in the kind's words: "scene", "part"; "it" for one that's gone. */
+  const what = (id: string) => {
+    const kind = itemOf(novel, id)?.kind;
+    return kind ? w.of(kind).one : "it";
+  };
   const levelOf = (key: string) => levels.find((l) => l.key === key);
   /** The level a section's children are at; none for one that holds pieces. */
   const childLevel = (key: string) => levels[levels.findIndex((l) => l.key === key) + 1];
@@ -240,14 +246,14 @@ export function ManuscriptTree({ novelId, novel, structure, current }: { novelId
     return [
       ...(n.role !== "outer" ? [{ label: "Open", run: () => open(n) }] : []),
       { label: "Rename…", keys: "F2", run: () => setDialog({ kind: "rename", id: n.id, title: titleOf(n) }) },
-      ...(chapterOf ? [{ label: `New ${piece.key} ${n.role === "piece" ? "after this" : "at the start"}`, run: () => setDialog({ kind: "new-scene", chapter: chapterOf, after: n.role === "piece" ? n.id : null }) }] : []),
-      ...(n.role === "outer" && child ? [{ label: `New ${child.key} at the start`, run: () => setDialog({ kind: "new-section", level: child, parent: n.id, after: null }) }] : []),
-      ...(n.role !== "piece" ? [{ label: `New ${n.kind} after this`, run: () => setDialog({ kind: "new-section", level: levelOf(n.kind)!, parent: n.parent, after: n.id }) }] : []),
+      ...(chapterOf ? [{ label: `New ${w.piece.one} ${n.role === "piece" ? "after this" : "at the start"}`, run: () => setDialog({ kind: "new-scene", chapter: chapterOf, after: n.role === "piece" ? n.id : null }) }] : []),
+      ...(n.role === "outer" && child ? [{ label: `New ${w.level(child.key).one} at the start`, run: () => setDialog({ kind: "new-section", level: child, parent: n.id, after: null }) }] : []),
+      ...(n.role !== "piece" ? [{ label: `New ${w.of(n.kind).one} after this`, run: () => setDialog({ kind: "new-section", level: levelOf(n.kind)!, parent: n.parent, after: n.id }) }] : []),
       "separator",
       { label: "Move up", keys: "Alt+↑", disabled: !up, run: () => void structure.step(n.id, -1) },
       { label: "Move down", keys: "Alt+↓", disabled: !down, run: () => void structure.step(n.id, 1) },
-      ...(moveTo ? [{ label: `Move to ${moveTo}…`, run: () => setDialog({ kind: "move", id: n.id }) }] : []),
-      ...(n.role === "piece" && n.pos < n.size ? [{ label: `Merge with the next ${piece.key}`, run: () => void structure.merge(n.id) }] : []),
+      ...(moveTo ? [{ label: `Move to ${w.level(moveTo).one}…`, run: () => setDialog({ kind: "move", id: n.id }) }] : []),
+      ...(n.role === "piece" && n.pos < n.size ? [{ label: `Merge with the next ${w.piece.one}`, run: () => void structure.merge(n.id) }] : []),
       "separator",
       { label: "Delete", keys: "Del", danger: true, run: () => void structure.remove(n.id) },
     ];
@@ -298,23 +304,23 @@ export function ManuscriptTree({ novelId, novel, structure, current }: { novelId
   useCommands((): Command[] => {
     const here = currentNode;
     return [
-      ...(currentChapter ? [{ id: "tree.newScene", title: `New ${piece.key}`, group: "Manuscript", run: () => setDialog({ kind: "new-scene", chapter: currentChapter, ...(here?.role === "piece" ? { after: here.id } : {}) }) }] : []),
-      ...usable.map(({ level }) => ({ id: level.key === inner ? "tree.newChapter" : `tree.new.${level.key}`, title: `New ${level.key}`, group: "Manuscript", run: () => setDialog(newSection(level)) })),
+      ...(currentChapter ? [{ id: "tree.newScene", title: `New ${w.piece.one}`, group: w.content.One, run: () => setDialog({ kind: "new-scene", chapter: currentChapter, ...(here?.role === "piece" ? { after: here.id } : {}) }) }] : []),
+      ...usable.map(({ level }) => ({ id: level.key === inner ? "tree.newChapter" : `tree.new.${level.key}`, title: `New ${w.level(level.key).one}`, group: w.content.One, run: () => setDialog(newSection(level)) })),
       ...novel.sections
         .filter((s) => s.level !== inner)
         .flatMap((s): Command[] => [
-          { id: `tree.rename.${s.id}`, title: `Rename ${s.level} “${s.title ?? ""}”…`, group: "Manuscript", run: () => setDialog({ kind: "rename", id: s.id, title: s.title ?? "" }) },
-          { id: `tree.delete.${s.id}`, title: `Delete ${s.level} “${s.title ?? ""}”`, group: "Manuscript", run: () => void structure.remove(s.id) },
+          { id: `tree.rename.${s.id}`, title: `Rename ${w.level(s.level).one} “${s.title ?? ""}”…`, group: w.content.One, run: () => setDialog({ kind: "rename", id: s.id, title: s.title ?? "" }) },
+          { id: `tree.delete.${s.id}`, title: `Delete ${w.level(s.level).one} “${s.title ?? ""}”`, group: w.content.One, run: () => void structure.remove(s.id) },
         ]),
-      { id: "tree.deleted", title: "Recently deleted", group: "Manuscript", run: () => setDialog({ kind: "deleted" }) },
+      { id: "tree.deleted", title: "Recently deleted", group: w.content.One, run: () => setDialog({ kind: "deleted" }) },
       ...(here
         ? [
-            { id: "tree.rename", title: `Rename ${here.kind}…`, group: "Manuscript", keys: "F2", run: () => setDialog({ kind: "rename", id: here.id, title: titleOf(here) }) },
-            { id: "tree.up", title: `Move ${here.kind} up`, group: "Manuscript", keys: "Alt-ArrowUp", run: () => void structure.step(here.id, -1) },
-            { id: "tree.down", title: `Move ${here.kind} down`, group: "Manuscript", keys: "Alt-ArrowDown", run: () => void structure.step(here.id, 1) },
-            ...(here.role === "piece" ? [{ id: "tree.moveTo", title: `Move ${piece.key} to ${inner}…`, group: "Manuscript", run: () => setDialog({ kind: "move", id: here.id }) }] : []),
-            ...(here.role === "piece" && here.pos < here.size ? [{ id: "tree.merge", title: `Merge ${piece.key} with the next`, group: "Manuscript", run: () => void structure.merge(here.id) }] : []),
-            { id: "tree.delete", title: `Delete ${here.kind}`, group: "Manuscript", keys: "Delete", run: () => void structure.remove(here.id) },
+            { id: "tree.rename", title: `Rename ${w.of(here.kind).one}…`, group: w.content.One, keys: "F2", run: () => setDialog({ kind: "rename", id: here.id, title: titleOf(here) }) },
+            { id: "tree.up", title: `Move ${w.of(here.kind).one} up`, group: w.content.One, keys: "Alt-ArrowUp", run: () => void structure.step(here.id, -1) },
+            { id: "tree.down", title: `Move ${w.of(here.kind).one} down`, group: w.content.One, keys: "Alt-ArrowDown", run: () => void structure.step(here.id, 1) },
+            ...(here.role === "piece" ? [{ id: "tree.moveTo", title: `Move ${w.piece.one} to ${w.level(inner).one}…`, group: w.content.One, run: () => setDialog({ kind: "move", id: here.id }) }] : []),
+            ...(here.role === "piece" && here.pos < here.size ? [{ id: "tree.merge", title: `Merge ${w.piece.one} with the next`, group: w.content.One, run: () => void structure.merge(here.id) }] : []),
+            { id: "tree.delete", title: `Delete ${w.of(here.kind).one}`, group: w.content.One, keys: "Delete", run: () => void structure.remove(here.id) },
           ]
         : []),
     ];
@@ -322,7 +328,7 @@ export function ManuscriptTree({ novelId, novel, structure, current }: { novelId
 
   return (
     <div className="grid gap-2">
-      <div className="flex flex-wrap gap-1" role="toolbar" aria-label="Manuscript actions">
+      <div className="flex flex-wrap gap-1" role="toolbar" aria-label={`${w.content.One} actions`}>
         {/* New scene, chapter or part, after where the caret is: one menu, not a row of buttons. */}
         <DropdownMenu.Root modal={false}>
           <DropdownMenu.Trigger asChild>
@@ -378,7 +384,7 @@ export function ManuscriptTree({ novelId, novel, structure, current }: { novelId
           </DropdownMenu.Root>
         )}
       </div>
-      <div role="tree" aria-label="Manuscript" ref={tree} onKeyDown={onKey} className="grid gap-px text-sm" onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget as Node) && setDrop(undefined)}>
+      <div role="tree" aria-label={w.content.One} ref={tree} onKeyDown={onKey} className="grid gap-px text-sm" onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget as Node) && setDrop(undefined)}>
         {visible.map((n) => (
           <ContextMenu.Root key={n.id} modal={false}>
             <ContextMenu.Trigger asChild>
@@ -447,7 +453,7 @@ export function ManuscriptTree({ novelId, novel, structure, current }: { novelId
 
       {dialog?.kind === "rename" && (
         <TitleDialog
-          title={`Rename ${itemOf(novel, dialog.id)?.kind ?? "it"}`}
+          title={`Rename ${what(dialog.id)}`}
           initial={dialog.title}
           required={titleRequired(novel, dialog.id)}
           action="Rename"
@@ -458,12 +464,12 @@ export function ManuscriptTree({ novelId, novel, structure, current }: { novelId
           }}
         />
       )}
-      {dialog?.kind === "new-scene" && <TitleDialog title={`New ${piece.key}`} action={`Add ${piece.key}`} submit={(title) => structure.createScene(dialog.chapter, title, dialog.after)} onClose={() => setDialog(undefined)} />}
+      {dialog?.kind === "new-scene" && <TitleDialog title={`New ${w.piece.one}`} action={`Add ${w.piece.one}`} submit={(title) => structure.createScene(dialog.chapter, title, dialog.after)} onClose={() => setDialog(undefined)} />}
       {dialog?.kind === "new-section" && (
         <TitleDialog
-          title={`New ${dialog.level.key}`}
+          title={`New ${w.level(dialog.level.key).one}`}
           {...(dialog.level.titled ? {} : { label: "Title (optional)", required: false })}
-          action={`Add ${dialog.level.key}`}
+          action={`Add ${w.level(dialog.level.key).one}`}
           submit={(title) => structure.createSection(dialog.level.key, dialog.parent, title || undefined, dialog.after)}
           onClose={() => setDialog(undefined)}
         />
