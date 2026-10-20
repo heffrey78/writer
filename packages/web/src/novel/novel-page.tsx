@@ -61,7 +61,8 @@ export function NovelPage() {
   const current = /\/(chapter|scene)\/([^/]+)$/.exec(pathname)?.[2];
   const queryClient = useQueryClient();
   const novel = useQuery({ queryKey: keys.novel(novelId), queryFn: () => api.novel<Book>(novelId) });
-  const sync = useQuery({ queryKey: keys.sync(novelId), queryFn: () => api.sync(novelId) });
+  // Asked for once the book is in: they'd slow the request the text is waiting for (a first launch).
+  const sync = useQuery({ queryKey: keys.sync(novelId), queryFn: () => api.sync(novelId), enabled: novel.isSuccess });
   const library = useQuery({ queryKey: keys.library, queryFn: api.library, staleTime: 30_000 });
   const folder = library.data?.novels.find((n) => n.id === novelId)?.path;
   const [workspace, setWorkspace] = useState<Workspace>();
@@ -171,7 +172,7 @@ export function NovelPage() {
   const repo = useGitHubRepo(novelId);
   const model = novel.data?.novel;
   const conflict = sync.data?.state === "conflict";
-  const versions = useVersions(novelId);
+  const versions = useVersions(novelId, { enabled: novel.isSuccess });
   const switchVersion = useSwitchVersion(novelId, workspace);
   const newFormat = useNewFormat(novelId, model);
   const w = model && vocabulary(model.kind);

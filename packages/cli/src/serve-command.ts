@@ -54,6 +54,7 @@ export async function runServe(dir: string | undefined, { port = 0, open = true,
     if (!web) say("The web app isn't built yet: run `npm run build` first. Serving the API only.");
     server = await createServer({ library, port, ...(web ? { web } : {}), ...(syncEvery !== undefined ? { sync: { intervalMs: syncEvery * 60_000 } } : {}) });
     launchUrl = novel ? server.launchUrlFor(`/novels/${novel.id}`) : server.launchUrl;
+    if (novel) server.prepare(novel.id);
     say(novel ? `Writer is serving ${novel.title} (${novel.path})` : `Writer is serving your library (${library.file})`);
   } catch (e) {
     // The desktop app reads failures from the JSON line; on the command line they surface as before.

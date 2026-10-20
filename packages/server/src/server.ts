@@ -39,6 +39,11 @@ export interface RunningServer {
   launchUrl: string;
   /** The launch URL for a page of the app, e.g. "/novels/lib_4k8h2c". */
   launchUrlFor(path: string): string;
+  /**
+   * Start reading a library book the browser is about to open, while it starts: its first request
+   * then finds the server's code and the book's files warm. Nothing is kept from it.
+   */
+  prepare(id: string): void;
   library: Library;
   github: GitHub;
   port: number;
@@ -84,7 +89,8 @@ export async function createServer({ library, token = newToken(), port = 0, shut
 
   const url = `http://${HOST}:${boundPort}`;
   const launchUrlFor = (path: string) => `${url}${path}?${TOKEN_PARAM}=${token}`;
-  return { app, url, launchUrl: launchUrlFor("/"), launchUrlFor, library, github, port: boundPort, token, close };
+  const prepare = (id: string) => void workspaces.get(id)?.loadModel().catch(() => {});
+  return { app, url, launchUrl: launchUrlFor("/"), launchUrlFor, prepare, library, github, port: boundPort, token, close };
 }
 
 /** A 256-bit secret, URL-safe. */

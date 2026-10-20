@@ -28,8 +28,8 @@ export const useAdoption = create<{ version: Version | undefined; conflicts: Con
 }));
 
 /** The novel's versions, the open one first in mind: for the header, the panel and the palette. */
-export function useVersions(novelId: string) {
-  return useQuery({ queryKey: keys.versions(novelId), queryFn: () => api.versions(novelId) });
+export function useVersions(novelId: string, { enabled = true } = {}) {
+  return useQuery({ queryKey: keys.versions(novelId), queryFn: () => api.versions(novelId), enabled });
 }
 
 /**
