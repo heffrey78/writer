@@ -1,5 +1,6 @@
 import type { BookKind, FieldDef } from "./kinds.ts";
 import type { Book, Piece } from "./model.ts";
+import type { StoryTime } from "./types.ts";
 
 /*
  * Reading a piece's declared fields (#25), the same way wherever they're shown: on the piece's card,
@@ -68,3 +69,16 @@ export function entriesOf(book: Book, piece: Piece, type?: string): string[] {
 
 /** The items of a list field's value: each a plain ID or `{ id, … }`. */
 export const itemsOf = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
+
+/** A story-time value as written: `{ at }` (a date) or `{ day, time? }` (a day of the story); undefined for anything else. */
+export function storyTimeValue(v: unknown): StoryTime | undefined {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return undefined;
+  const o = v as Record<string, unknown>;
+  if (typeof o["at"] === "string") return { at: o["at"] };
+  if (typeof o["day"] === "number") return typeof o["time"] === "string" ? { day: o["day"], time: o["time"] } : { day: o["day"] };
+  return undefined;
+}
+
+/** The kind's story-time field (when a piece happens), if it has one. */
+export const storyTimeField = (kind: BookKind): (FieldDef & { type: { kind: "story-time"; durationKey: string } }) | undefined =>
+  kind.fields.find((f): f is FieldDef & { type: { kind: "story-time"; durationKey: string } } => f.type.kind === "story-time");

@@ -1,9 +1,10 @@
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { apartInTime, dayOneFor, durationMs, loadBook, memorySource, overlaps, sceneNeighbours, storyInstant, storyTimeline, validate } from "../src/index.ts";
-import { nodeSource } from "../src/node.ts";
+import { loadBook, memorySource, validate } from "@writer/core";
+import { nodeSource } from "@writer/core/node";
+import { apartInTime, dayOneFor, durationMs, overlaps, sceneNeighbours, storyInstant, storyTimeline } from "../src/core/index.ts";
 
-const SAMPLE = fileURLToPath(new URL("../../../examples/sample-novel", import.meta.url));
+const SAMPLE = fileURLToPath(new URL("../../../../examples/sample-novel", import.meta.url));
 const H = 3_600_000;
 
 describe("story time", () => {

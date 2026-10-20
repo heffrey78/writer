@@ -11,6 +11,7 @@
     "@writer/core": "0.1.0",
     "@writer/module-plotlines": "0.1.0",
     "@writer/module-point-of-view": "0.1.0",
-    "@writer/module-presence": "0.1.0"
+    "@writer/module-presence": "0.1.0",
+    "@writer/module-story-time": "0.1.0"
   }
 }

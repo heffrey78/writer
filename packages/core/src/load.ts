@@ -1,12 +1,13 @@
 import { reservedPrefixes, type EntityTypeDef } from "./ids.ts";
 import { kindByKey, knownKind, startLevels, V2_KIND, type BookKind, type LevelDef } from "./kinds.ts";
+import { storyTimeValue } from "./fields.ts";
 import { withModules } from "./modules.ts";
 import { EVENT_FILES_FORMAT, MANIFEST, NOVEL_MANIFEST, readManifest, SCHEMA_VERSION } from "./manifest.ts";
 import type { Section, Entity, Book, Relationship, Piece, StoryEvent, ThemeRef } from "./model.ts";
 import { parseMarkdown, parseYaml } from "./parse.ts";
 import { checkSchema, type SchemaKind } from "./schemas.ts";
 import { joinPath, type FileSource } from "./source.ts";
-import type { CompileFile, Diagnostic, NovelFile, RelationshipTypeFile, PieceStatus, StoryTime } from "./types.ts";
+import type { CompileFile, Diagnostic, NovelFile, RelationshipTypeFile, PieceStatus } from "./types.ts";
 
 /**
  * The kind of the book in `source`, from its manifest (a book in format 1 or 2 is a novel), for what
@@ -235,8 +236,6 @@ export async function loadBook(source: FileSource, kind?: BookKind): Promise<Boo
         strength: typeof r.obj?.["strength"] === "number" ? r.obj["strength"] : undefined,
         note: str(r.obj?.["note"]),
       })),
-      when: storyTime(d["when"]),
-      duration: str(d["duration"]),
       tags: strList(d["tags"]),
       fields: Object.fromEntries(fieldKeys.filter((k) => d[k] !== undefined).map((k) => [k, d[k]])),
       sectionId: chapterId,
@@ -286,7 +285,7 @@ export async function loadBook(source: FileSource, kind?: BookKind): Promise<Boo
       const ev: StoryEvent = {
         id,
         title: str(e["title"]) ?? "",
-        when: storyTime(e["when"]),
+        when: storyTimeValue(e["when"]),
         duration: str(e["duration"]),
         characters: strList(e["characters"]),
         locations: strList(e["locations"]),
@@ -308,7 +307,7 @@ export async function loadBook(source: FileSource, kind?: BookKind): Promise<Boo
     const ev: StoryEvent = {
       id: str(d["id"])!,
       title: str(d["title"]) ?? "",
-      when: storyTime(d["when"]),
+      when: storyTimeValue(d["when"]),
       duration: str(d["duration"]),
       characters: strList(d["characters"]),
       locations: strList(d["locations"]),
@@ -456,13 +455,6 @@ function refList(v: unknown): { id: string; obj?: Record<string, unknown> }[] {
     if (isObject(x) && typeof x["id"] === "string") return [{ id: x["id"], obj: x }];
     return [];
   });
-}
-
-function storyTime(v: unknown): StoryTime | undefined {
-  if (!isObject(v)) return undefined;
-  if (typeof v["at"] === "string") return { at: v["at"] };
-  if (typeof v["day"] === "number") return typeof v["time"] === "string" ? { day: v["day"], time: v["time"] } : { day: v["day"] };
-  return undefined;
 }
 
 /** "neither _part.yaml nor _chapter.yaml", "no _chapter.yaml", "none of _a.yaml, _b.yaml or _c.yaml". */

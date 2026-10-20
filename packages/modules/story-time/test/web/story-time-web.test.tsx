@@ -5,12 +5,20 @@ import { novel } from "@writer/kinds";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
-import { BookKindContext } from "../src/novel/kind.ts";
-import { OutlineTimeTable } from "../src/novel/outline-time.tsx";
-import type { Workspace } from "../src/novel/workspace.ts";
-import { laneModes } from "../src/timeline/timeline-page.tsx";
+import { registerWebModule } from "@writer/web/modules.tsx";
+import { BookKindContext } from "@writer/web/novel/kind.ts";
+import { storyMapTabs } from "@writer/web/novel/story-map.tsx";
+import type { Workspace } from "@writer/web/novel/workspace.ts";
+import { storyTimeWeb } from "../../src/web/index.tsx";
+import { OutlineTimeTable } from "../../src/web/outline-time.tsx";
+import { laneModes } from "../../src/web/timeline-page.tsx";
 
-/** Point of view on screen comes from its module (#27): a kind without it offers none. */
+/**
+ * Story time on screen comes from its module (#30): the timeline's tab, its lanes by whatever the
+ * kind's fields carry or run lanes by (point of view #27, plotlines #28), and the outline in story time.
+ */
+
+registerWebModule(storyTimeWeb);
 
 const lines = (...l: string[]) => `${l.join("\n")}\n`;
 const book = (kind: BookKind) =>
@@ -24,12 +32,24 @@ const book = (kind: BookKind) =>
     }),
     kind,
   );
-const plain: BookKind = { ...novel, key: "plain", modules: [] };
+/** The Novel with story time and nothing else. */
+const plain: BookKind = { ...novel, key: "plain", modules: ["story-time"] };
 
 afterEach(cleanup);
 
-describe("point of view on screen", () => {
-  it("is a lane choice and a column of the outline in story time for the Novel, and neither without the module", async () => {
+describe("story time on screen", () => {
+  it("is the timeline's tab and an order of the outline, and neither without the module", () => {
+    expect(storyMapTabs(kindByKey("novel")).map((t) => t.label)).toEqual(["Timeline"]);
+    expect(storyTimeWeb.outlineOrders?.map((o) => o.label)).toEqual(["Story time"]);
+    expect(storyMapTabs({ ...novel, key: "none", modules: [] }).map((t) => t.label)).toEqual([]);
+  });
+
+  it("runs lanes by plotline for the Novel, and by nothing a kind hasn't", async () => {
+    expect(laneModes(await book(kindByKey("novel"))).map(([, label]) => label)).toEqual(["Point of view", "Location", "Plotline"]);
+    expect(laneModes(await book(plain)).map(([, label]) => label)).toEqual(["Location"]);
+  });
+
+  it("has point of view as a lane choice and a column of the outline in story time for the Novel, and neither without that module", async () => {
     for (const [kind, shown] of [[kindByKey("novel"), true], [plain, false]] as const) {
       const b = await book(kind);
       expect(laneModes(b).map(([, label]) => label).includes("Point of view")).toBe(shown);

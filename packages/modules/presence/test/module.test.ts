@@ -73,7 +73,7 @@ describe("presence", () => {
     const files = snapshots(book);
     expect(files.get("diagrams/presence-witnesses.svg")).toContain("<title>Witnesses by day</title>");
     const readme = files.get("diagrams/README.md")!;
-    expect(readme).toContain("## Presence\n\nFilled where the day lists them (for witnesses, larger for a stronger one), dashed where the prose only mentions them. The number by each name is how many days it's in; shaded, an absence of more than three days.\n\n![Witnesses by day](presence-witnesses.svg)\n\n## Timeline");
+    expect(readme).toContain("## Presence\n\nFilled where the day lists them (for witnesses, larger for a stronger one), dashed where the prose only mentions them. The number by each name is how many days it's in; shaded, an absence of more than three days.\n\n![Witnesses by day](presence-witnesses.svg)\n");
   });
 
   it("says what it needs before there's anything to draw", async () => {

@@ -19,6 +19,8 @@ export interface EntityTypeDef {
   label: string;
   color?: string;
   builtin: boolean;
+  /** What its entries are, where a feature needs to know: people (who can't be in two places at once) or places. */
+  is?: "person" | "place";
 }
 
 /** Prefixes a book's own entry types may not use: its kind's and every kind's records'. */

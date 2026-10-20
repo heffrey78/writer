@@ -28,7 +28,7 @@ export interface ModuleView {
   render(view: BookView): ReactNode;
 }
 
-/** A tab of the story map a module adds (the swimlanes): at /story-map/<key>, before the base's tabs, and under "Go to". */
+/** A tab of the story map a module adds (the swimlanes, the timeline): at /story-map/<key>, in the order the kind lists its modules, and under "Go to". */
 export interface StoryMapTab {
   key: string;
   label: string;
@@ -36,6 +36,17 @@ export interface StoryMapTab {
   keywords?: readonly string[];
   render(view: BookView): ReactNode;
 }
+
+/** An order the outline can show its table and cards in, beside reading order (story time): at ?order=<key>, remembered. */
+export interface OutlineOrder {
+  key: string;
+  label: string;
+  table(view: BookView): ReactNode;
+  cards(view: BookView): ReactNode;
+}
+
+/** What a module offers under a story-time editor once a day of the story has become a date: dating Day 1 from it. */
+export type DayToDate = (view: { novelId: string; novel: Book; day: number; date: string; done: () => void }) => ReactNode;
 
 /** A section a module adds to the profile of an entry of a type: a plotline's beats. */
 export interface ProfileSection {
@@ -49,6 +60,8 @@ export interface WebModule {
   views?: readonly ModuleView[];
   storyMapTabs?: readonly StoryMapTab[];
   profileSections?: readonly ProfileSection[];
+  outlineOrders?: readonly OutlineOrder[];
+  dayToDate?: DayToDate;
   /** Commands in the palette while a book that uses it is open. Its views are offered under "Go to" without asking. */
   commands?(view: BookView & { navigate: (to: string) => void }): Command[];
 }
@@ -73,6 +86,12 @@ export const moduleStoryMapTabs = (kind: BookKind): StoryMapTab[] => webModulesO
 
 /** The profile sections the book's modules add for an entry of `type`. */
 export const moduleProfileSections = (kind: BookKind, type: string): ProfileSection[] => webModulesOf(kind).flatMap((m) => (m.profileSections ?? []).filter((s) => s.entityType === type));
+
+/** The orders the book's modules add to the outline. */
+export const moduleOutlineOrders = (kind: BookKind): OutlineOrder[] => webModulesOf(kind).flatMap((m) => m.outlineOrders ?? []);
+
+/** What the book's modules offer once a day of the story has become a date. */
+export const moduleDayToDate = (kind: BookKind): DayToDate[] => webModulesOf(kind).flatMap((m) => (m.dayToDate ? [m.dayToDate] : []));
 
 /** Routes for the book's modules' views, to go among the book's own. */
 export function moduleRoutes(view: BookView) {

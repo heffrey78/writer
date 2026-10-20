@@ -18,8 +18,8 @@ export const novel: BookKind = {
   },
   folders: { content: "manuscript", codex: "bible", notes: "notes", events: "events" },
   entityTypes: [
-    { key: "character", prefix: "char", folder: "characters", label: "Character", color: "1f77b4", builtin: true },
-    { key: "location", prefix: "loc", folder: "locations", label: "Location", color: "2ca02c", builtin: true },
+    { key: "character", prefix: "char", folder: "characters", label: "Character", color: "1f77b4", builtin: true, is: "person" },
+    { key: "location", prefix: "loc", folder: "locations", label: "Location", color: "2ca02c", builtin: true, is: "place" },
     { key: "theme", prefix: "theme", folder: "themes", label: "Theme", color: "9467bd", builtin: true },
   ],
   statuses: [
@@ -32,7 +32,6 @@ export const novel: BookKind = {
   fields: [
     { key: "locations", label: "Where", group: "Locations", role: "set here", type: { kind: "entities", entityType: "location" }, mentionAdds: true, lanes: true, marks: { present: "set here" } },
     { key: "characters", label: "Characters", role: "present", type: { kind: "entities", entityType: "character" }, mentionAdds: true, outline: { column: true, filter: true }, snapshot: true },
-    { key: "when", label: "When", type: { kind: "story-time", durationKey: "duration" } },
     { key: "entities", label: "Also in it", role: "present", type: { kind: "own-entities" }, mentionAdds: true },
     {
       key: "themes",
@@ -50,9 +49,9 @@ export const novel: BookKind = {
       },
     },
   ],
-  // Its modules' fields and types where they've always been: point of view first on the card,
-  // plotlines after when, the plotline type after locations.
-  modules: ["point-of-view", "plotlines", "presence"],
+  // Its modules' fields and types where they've always been: point of view first on the card, when
+  // after the characters and plotlines after it, the plotline type after locations.
+  modules: ["point-of-view", "plotlines", "presence", "story-time"],
   fieldOrder: ["pov", "locations", "characters", "when", "plotlines", "entities", "themes"],
   entityTypeOrder: ["character", "location", "plotline", "theme"],
   issueKinds: [

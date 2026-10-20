@@ -1,32 +1,12 @@
 import { DEFAULT_GAP, presentIn } from "./diagrams.ts";
 import { entryIds } from "./fields.ts";
 import type { Book, Piece, Relationship } from "./model.ts";
-import { storyInstant, storyTimeline } from "./time.ts";
-
-const MINUTE = 60_000;
-const HOUR = 60 * MINUTE;
-const DAY = 24 * HOUR;
-
-/** A stretch of story time, as read: "40 min", "8 h 10 min", "3 days", "2 years". */
-export function readableSpan(ms: number): string {
-  if (ms < HOUR) return `${Math.round(ms / MINUTE)} min`;
-  if (ms < DAY) {
-    const h = Math.floor(ms / HOUR);
-    const m = Math.round((ms % HOUR) / MINUTE);
-    return m ? `${h} h ${m} min` : `${h} h`;
-  }
-  if (ms < 365 * DAY) {
-    const d = Math.round(ms / DAY);
-    return `${d} day${d === 1 ? "" : "s"}`;
-  }
-  const y = Math.round(ms / (365 * DAY));
-  return `${y} year${y === 1 ? "" : "s"}`;
-}
+import { moduleFacts } from "./modules.ts";
 
 /**
  * What the rest of the book says about a scene, worked out from the model (heffrey78/gh-writer#154): where it stands
- * in the book, how it sits in story time against the scene before, who appears for the first time
- * or comes back after a long absence, the plotlines that begin or end in it, and the relationships
+ * in the book, what its kind's modules say of it (how it sits in story time), who appears for the
+ * first time or comes back after a long absence, the plotlines that begin or end in it, and the relationships
  * that start or end there. Only what holds and is worth saying; nothing for a scene that isn't in
  * the reading order.
  */
@@ -47,41 +27,8 @@ export function sceneFacts(novel: Book, sceneId: string): string[] {
   // Off-page events it was written from, and kept (heffrey78/gh-writer#165).
   for (const e of novel.events) if (e.scene === sceneId) facts.push(`Dramatizes the off-page event “${e.title}”.`);
 
-  // Story time, against the latest point the story had reached before it (the scene before, or
-  // after a flashback the one it went back from), on the same scale.
-  const calendar = novel.config?.calendar?.start;
-  const here = storyInstant(scene.when, scene.duration, calendar);
-  if (here) {
-    let latest: { title: string; start: number; end: number } | undefined;
-    for (const before of scenes.slice(0, at)) {
-      const then = storyInstant(before.when, before.duration, calendar);
-      if (then && then.dated === here.dated && (!latest || then.end >= latest.end)) latest = { title: before.title, ...then };
-    }
-    if (latest) {
-      if (here.start < latest.start) facts.push(`A flashback: ${readableSpan(latest.start - here.start)} before “${latest.title}”.`);
-      else if (here.start < latest.end) facts.push(`Overlaps “${latest.title}” in story time.`);
-      else if (here.start === latest.end) facts.push(`Follows straight on from “${latest.title}”.`);
-      else facts.push(`${readableSpan(here.start - latest.end)} after “${latest.title}”.`);
-    }
-  }
-
-  // An off-page event right before or after it in story time, with no scene between (heffrey78/gh-writer#165).
-  if (here) {
-    const items = storyTimeline(novel).items;
-    const i = items.findIndex((x) => x.kind === "scene" && x.scene.id === sceneId);
-    const neighbour = (j: number) => {
-      const x = items[j];
-      return x?.kind === "event" && x.at.dated === here.dated && x.event.scene !== sceneId ? { title: x.event.title, ...x.at } : undefined;
-    };
-    const before = neighbour(i - 1);
-    const after = neighbour(i + 1);
-    if (before) {
-      if (here.start < before.end) facts.push(`During the off-page event “${before.title}”.`);
-      else if (here.start === before.end) facts.push(`Straight after the off-page event “${before.title}”.`);
-      else facts.push(`${readableSpan(here.start - before.end)} after the off-page event “${before.title}”.`);
-    }
-    if (after) facts.push(after.start <= here.end ? `The off-page event “${after.title}” begins during it.` : `${readableSpan(after.start - here.end)} before the off-page event “${after.title}”.`);
-  }
+  // What the kind's modules say: how it sits in story time.
+  facts.push(...moduleFacts(novel, scene));
 
   // Characters: first seen here, or back after a long absence.
   const present = scenes.map((s) => presentIn(novel, s));

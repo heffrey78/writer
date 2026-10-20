@@ -41,9 +41,9 @@ describe("loading the sample novel", () => {
       { id: "plot_h315tz", beat: "The plans have been sold" },
       { id: "plot_gr1efa", beat: "Ben confesses the debt" },
     ]);
-    expect(betrayal.when).toEqual({ day: 3, time: "18:30" });
+    expect(betrayal.fields["when"]).toEqual({ day: 3, time: "18:30" });
     expect(betrayal.body.startsWith("The wind came off the river")).toBe(true);
-    expect(novel.pieces.find((s) => s.id === "sc_f100d0")!.when).toEqual({ at: "2009-11-02T23:00" });
+    expect(novel.pieces.find((s) => s.id === "sc_f100d0")!.fields["when"]).toEqual({ at: "2009-11-02T23:00" });
   });
 
   it("resolves time-scoped relationships", () => {

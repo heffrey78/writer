@@ -1,5 +1,5 @@
 import { carryingField, kindByKey, loadBook, memorySource, validateBook, withModules, type BookKind } from "@writer/core";
-import { defaultLanes, gridKey, presence, timeline } from "@writer/core/diagrams";
+import { gridKey, presence } from "@writer/core/diagrams";
 import { novel } from "@writer/kinds";
 import { describe, expect, it } from "vitest";
 
@@ -33,8 +33,6 @@ describe("point of view", () => {
     const b = await book(kind);
     expect(validateBook(b).filter((d) => d.code === "W_POV_NOT_PRESENT").map((d) => d.file)).toEqual(["manuscript/01-one/01.md"]);
     expect(presence(b, "character").marks.get(gridKey("char_000001", "sc_000001"))).toMatchObject({ listed: true, carries: true });
-    expect(defaultLanes(kind)).toBe("carrier");
-    expect(timeline(b, "carrier").lanes.map((l) => l.name)).toEqual(["Ada", "No point of view"]);
   });
 
   it("is nowhere in a kind without the module: no field, no check, no carrier, no lanes by it", async () => {
@@ -46,6 +44,5 @@ describe("point of view", () => {
     const codes = validateBook(b).map((d) => d.code);
     expect(codes).not.toContain("W_POV_NOT_PRESENT");
     expect(presence(b, "character").marks.get(gridKey("char_000001", "sc_000001"))).toBeUndefined();
-    expect(defaultLanes(kind)).toBe("location");
   });
 });

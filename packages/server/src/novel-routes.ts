@@ -9,6 +9,7 @@ import { compileRoutes } from "./compile-routes.ts";
 import { imageRoutes } from "./image-routes.ts";
 import { versionRoutes } from "./version-routes.ts";
 import { compareRoutes } from "./compare-routes.ts";
+import { moduleRoutes } from "./modules.ts";
 import { statsRoutes } from "./stats.ts";
 import { diagramRoutes } from "./diagrams.ts";
 import { manuscriptRoutes } from "./manuscript-routes.ts";
@@ -195,6 +196,7 @@ export function novelRoutes(library: Library, workspaces: Workspaces, github?: G
   statsRoutes(routes);
   diagramRoutes(routes);
   manuscriptRoutes(routes);
+  moduleRoutes(routes);
 
   routes.get("/:id/events", (c) =>
     streamSSE(c, async (stream) => {

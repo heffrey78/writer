@@ -1,7 +1,6 @@
 import type { Book, BookKind } from "@writer/core";
 import { useEffect, useRef, type KeyboardEvent, type ReactNode } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router";
-import { TimelinePage } from "../timeline/timeline-page.tsx";
 import { moduleStoryMapTabs } from "../modules.tsx";
 import { cn } from "../ui/cn.ts";
 import type { Workspace } from "./workspace.ts";
@@ -9,15 +8,13 @@ import { PAGE_WIDTH } from "../ui/page.ts";
 
 /*
  * The story map (heffrey78/gh-writer#136): the views that set the story's elements against its scenes, as tabs of one
- * page. Each tab has its own address (/story-map/presence…); each view keeps its controls and export. The
- * kind's modules add theirs first (the swimlanes, presence), then come the base's.
+ * page. Each tab has its own address (/story-map/presence…); each view keeps its controls and export.
+ * The kind's modules add every tab (the swimlanes, presence, the timeline): a kind without any has no
+ * story map.
  */
 
-/** The base's tabs, after the modules'. */
-const BASE_TABS = [{ key: "timeline", label: "Timeline" }] as const;
-
-/** The story map's tabs for a kind: its modules', then the base's. The first is where /story-map goes. */
-export const storyMapTabs = (kind: BookKind): { key: string; label: string }[] => [...moduleStoryMapTabs(kind).map(({ key, label }) => ({ key, label })), ...BASE_TABS];
+/** The story map's tabs for a kind, in the order its modules come. The first is where /story-map goes. */
+export const storyMapTabs = (kind: BookKind): { key: string; label: string }[] => moduleStoryMapTabs(kind).map(({ key, label }) => ({ key, label }));
 
 export function StoryMapPage({ novelId, novel, workspace }: { novelId: string; novel: Book; workspace: Workspace }) {
   const { tab } = useParams();
@@ -30,6 +27,7 @@ export function StoryMapPage({ novelId, novel, workspace }: { novelId: string; n
   useEffect(() => {
     if (state?.focusTab) tabs.current[current]?.focus();
   }, [state, current]);
+  if (!TABS.length) return <Navigate to={`/novels/${novelId}`} replace />;
   if (current < 0) return <Navigate to={`/novels/${novelId}/story-map/${TABS[0]!.key}`} replace />;
   const go = (i: number, focus = false) => {
     const t = TABS[(i + TABS.length) % TABS.length]!;
@@ -43,10 +41,7 @@ export function StoryMapPage({ novelId, novel, workspace }: { novelId: string; n
     e.preventDefault();
     go(to, true);
   };
-  const panels: Record<string, ReactNode> = {
-    ...Object.fromEntries(moduleStoryMapTabs(novel.kind).map((t) => [t.key, t.render({ novelId, novel, workspace })])),
-    timeline: <TimelinePage novelId={novelId} novel={novel} />,
-  };
+  const panels: Record<string, ReactNode> = Object.fromEntries(moduleStoryMapTabs(novel.kind).map((t) => [t.key, t.render({ novelId, novel, workspace })]));
   const active = TABS[current]!;
   return (
     <div className={cn(PAGE_WIDTH, "grid content-start")}>

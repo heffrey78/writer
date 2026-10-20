@@ -1,10 +1,10 @@
 import { fileURLToPath } from "node:url";
-import { loadBook } from "../src/index.ts";
-import { nodeSource } from "../src/node.ts";
+import { loadBook } from "@writer/core";
+import { nodeSource } from "@writer/core/node";
 import { describe, expect, it } from "vitest";
-import { itemTitle, jump, lanesOf, timeline, when } from "../src/diagrams.ts";
+import { itemTitle, jump, lanesOf, timeline, when } from "../src/core/index.ts";
 
-const novel = await loadBook(nodeSource(fileURLToPath(new URL("../../../examples/sample-novel/", import.meta.url))));
+const novel = await loadBook(nodeSource(fileURLToPath(new URL("../../../../examples/sample-novel/", import.meta.url))));
 const H = 3_600_000;
 
 describe("the timeline", () => {

@@ -1,11 +1,14 @@
-import { apartInTime, storyTimeline, type Book } from "@writer/core";
+import type { Book } from "@writer/core";
+import type { OperationResult } from "@writer/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useId, useMemo, useState } from "react";
-import { api, keys } from "../api.ts";
-import { storyDate } from "../format.ts";
-import { AddButton, EditorButtons, EditorFrame, PencilButton, useInPlace, type InPlace } from "../bible/profile.tsx";
-import { Button } from "../ui/button.tsx";
-import { Picker } from "../ui/picker.tsx";
+import { api, keys } from "@writer/web/api.ts";
+import { AddButton, EditorButtons, EditorFrame, PencilButton, useInPlace, type InPlace } from "@writer/web/bible/profile.tsx";
+import { storyDate } from "@writer/web/format.ts";
+import { useNotice } from "@writer/web/novel/notice.tsx";
+import { Button } from "@writer/web/ui/button.tsx";
+import { Picker } from "@writer/web/ui/picker.tsx";
+import { apartInTime, dayOneFor, storyTimeline, timeOf } from "../core/index.ts";
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -16,7 +19,7 @@ export const readDate = storyDate;
 export function useSetDayOne(novelId: string) {
   const queryClient = useQueryClient();
   return async (start: string | null) => {
-    await api.setCalendar(novelId, start);
+    await api.module<OperationResult>(novelId, "story-time", "PUT", "calendar", { start });
     await queryClient.invalidateQueries({ queryKey: keys.novel(novelId) });
   };
 }
@@ -62,7 +65,10 @@ export function DayOne({ novelId, novel }: { novelId: string; novel: Book }) {
 function DayOneEditor({ novelId, novel, place }: { novelId: string; novel: Book; place: InPlace }) {
   const start = novel.config?.calendar?.start;
   const setDayOne = useSetDayOne(novelId);
-  const dated = novel.pieces.filter((s) => s.when && "at" in s.when);
+  const dated = novel.pieces.flatMap((s) => {
+    const { when } = timeOf(s);
+    return when && "at" in when ? [{ scene: s, at: when.at }] : [];
+  });
   const id = useId();
   const [draft, setDraft] = useState(start ?? "");
   const [problem, setProblem] = useState<string>();
@@ -109,11 +115,11 @@ function DayOneEditor({ novelId, novel, place }: { novelId: string; novel: Book;
       {dated.length > 0 && (
         <Picker
           label="Or the day of a scene"
-          items={dated.map((s) => ({ value: s.id, label: `${s.title} (${readDate((s.when as { at: string }).at.slice(0, 10))})` }))}
+          items={dated.map(({ scene, at }) => ({ value: scene.id, label: `${scene.title} (${readDate(at.slice(0, 10))})` }))}
           value={undefined}
           onChange={(v) => {
-            const scene = dated.find((s) => s.id === v);
-            if (scene) void run((scene.when as { at: string }).at.slice(0, 10));
+            const chosen = dated.find((d) => d.scene.id === v);
+            if (chosen) void run(chosen.at.slice(0, 10));
           }}
           placeholder="Choose a dated scene…"
           className="max-w-sm"
@@ -128,5 +134,40 @@ function DayOneEditor({ novelId, novel, place }: { novelId: string; novel: Book;
         )}
       </div>
     </EditorFrame>
+  );
+}
+
+/**
+ * Under a story-time editor, once a day of the story has become a date while Day 1 has none: "This was
+ * Day 3: make 12 Oct 2026 Day 3, so Day 1 is 10 Oct 2026?" Once, in place (heffrey78/gh-writer#239).
+ */
+export function DateDayOne({ novelId, novel, day, date, done }: { novelId: string; novel: Book; day: number; date: string; done: () => void }) {
+  const setDayOne = useSetDayOne(novelId);
+  const show = useNotice((s) => s.show);
+  if (novel.config?.calendar?.start) return null;
+  const start = dayOneFor(date, day);
+  return (
+    <div role="group" aria-label="Date Day 1 from this" className="grid gap-1.5 rounded-md border border-rule bg-raised p-2 text-sm">
+      <p>
+        This was Day {day}. Make {readDate(date)} Day {day}, so Day 1 is {readDate(start)}? Every day of the story then has its date.
+      </p>
+      <div className="flex gap-2">
+        <Button
+          size="sm"
+          variant="primary"
+          onClick={() =>
+            void setDayOne(start)
+              .then(() => show({ message: `Day 1 is ${readDate(start)}.` }))
+              .catch((e: unknown) => show({ message: `Couldn't date Day 1: ${e instanceof Error ? e.message : String(e)}` }))
+              .finally(done)
+          }
+        >
+          Make it Day {day}
+        </Button>
+        <Button size="sm" variant="ghost" onClick={done}>
+          No
+        </Button>
+      </div>
+    </div>
   );
 }

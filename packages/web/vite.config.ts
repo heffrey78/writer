@@ -14,7 +14,10 @@ function writerServer(): Plugin {
     name: "writer-server",
     apply: "serve",
     async configureServer(vite) {
-      const { createServer, Library, sessionCookie } = await import("@writer/server");
+      const { createServer, Library, registerServerModule, sessionCookie } = await import("@writer/server");
+      // An entry point like the CLI's: the kinds of book the app ships, and their modules' server halves (D14).
+      (await import("@writer/kinds")).registerKinds();
+      registerServerModule((await import("@writer/module-story-time/server")).storyTimeServer);
       const token = randomBytes(32).toString("base64url");
       const server = await createServer({ library: await Library.open(), token });
       const cookie = `${sessionCookie(server.port)}=${token}`;

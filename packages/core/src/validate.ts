@@ -4,7 +4,6 @@ import { EVENT_FILES_FORMAT } from "./manifest.ts";
 import { moduleDiagnostics } from "./modules.ts";
 import { allRecords, levelLabel, mentions, pieceLevel, picturePath, pictures, sectionsAt, type Book, type Picture, type RecordRef } from "./model.ts";
 import type { FileSource } from "./source.ts";
-import { overlaps, storyTimeline, type TimelineItem } from "./time.ts";
 import type { Diagnostic, Severity } from "./types.ts";
 
 /** Every diagnostic code, with its severity. docs/format/v3.md documents each one. */
@@ -32,7 +31,6 @@ export const RULES: Readonly<Record<string, Severity>> = {
   W_HARD_WRAP: "warning",
   W_REL_SELF: "warning",
   W_LAYOUT_UNKNOWN: "warning",
-  W_TIME_OVERLAP: "warning",
   W_MISSING_IMAGE: "warning",
   W_IMAGE_OUTSIDE: "warning",
   W_EVENTS_YAML: "warning",
@@ -178,18 +176,6 @@ export function validateBook(novel: Book): Diagnostic[] {
       if (!typeByKey.has(k)) push("error", "E_ENTITY_TYPE", novel.manifest, `Relationship type "${t.key}" refers to unknown entity type "${k}"`, { pointer: `/relationship_types/${i}` });
     }
   });
-
-  // Story time: someone in two places at once.
-  const entityName = (id: string) => novel.entities.find((e) => e.id === id)?.name ?? id;
-  const where = (i: TimelineItem) => {
-    const locations = i.kind === "scene" ? i.scene.locations : (i.event.locations ?? []);
-    const what = i.kind === "scene" ? `“${i.scene.title}”` : `the event “${i.event.title}”`;
-    return `at ${locations.map(entityName).join(" and ")} in ${what}`;
-  };
-  for (const o of overlaps(novel, storyTimeline(novel))) {
-    const file = o.a.kind === "scene" ? o.a.scene.file : o.a.event.file;
-    push("warning", "W_TIME_OVERLAP", file, `${entityName(o.character)} is ${where(o.a)} and ${where(o.b)} at the same time`);
-  }
 
   // Diagram layouts: positions for records that no longer exist are harmless, but stale.
   for (const [name, layout] of Object.entries(novel.layouts)) {

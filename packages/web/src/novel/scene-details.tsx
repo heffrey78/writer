@@ -1,20 +1,20 @@
-import { countWords, dayOneFor, itemText, pieceLevel, pieceSections, readFrontMatter, sceneFacts, vocabulary, type Book, type FieldDef, type ItemProp, type YamlEdit } from "@writer/core";
+import { countWords, itemText, pieceLevel, pieceSections, readFrontMatter, sceneFacts, vocabulary, type Book, type FieldDef, type ItemProp, type YamlEdit } from "@writer/core";
 import { chapterTitle } from "@writer/core/diagrams";
 import { joinSceneFile } from "@writer/editor";
 import { ChevronLeft, ChevronRight, Pencil, Pin, Plus, X } from "lucide-react";
 import { DropdownMenu } from "radix-ui";
-import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { Fragment, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useParams } from "react-router";
 import { create, useStore } from "zustand";
 import { plural } from "../bible/types.ts";
 import { MENU_ITEM } from "../layout.tsx";
+import { moduleDayToDate } from "../modules.tsx";
 import { Button } from "../ui/button.tsx";
 import { cn } from "../ui/cn.ts";
 import { Picker, type PickerItem, type PickerProps } from "../ui/picker.tsx";
 import { useEntryPanel } from "./entry-tab.tsx";
 import { useNotice } from "./notice.tsx";
 import type { Workspace } from "./workspace.ts";
-import { readDate, useSetDayOne } from "../timeline/day-one.tsx";
 import { storyDate } from "../format.ts";
 
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -590,15 +590,16 @@ export function StoryTimeFields({
   when: { at?: string; day?: number; time?: string } | undefined;
   duration: string;
   edit: (edits: YamlEdit[]) => void;
-  /** The book, for when Day 1 is: a day changed to a date offers to date Day 1 from it (heffrey78/gh-writer#239). */
+  /** The book, for what its modules offer once a day becomes a date: dating Day 1 from it (heffrey78/gh-writer#239). */
   novel?: Book;
   /** The front-matter keys of the time and how long it lasts (a story-time field's). */
   keys?: { when: string; duration: string };
 }) {
   const whenKind = when?.at !== undefined ? "date" : when?.day !== undefined ? "day" : "";
   const set = (key: string, value: unknown) => edit([value === undefined || value === "" ? { path: [key], remove: true } : { path: [key], value }]);
-  // The day it was on before it was given a date, while Day 1 has none: that date can be that day.
+  // The day it was on before it was given a date: a module may offer to make that date that day.
   const [wasDay, setWasDay] = useState<number>();
+  const { novelId } = useParams<{ novelId: string }>();
   return (
     <Group label="Story time">
       <SelectField
@@ -641,9 +642,8 @@ export function StoryTimeFields({
           onSave={(v) => edit([{ path: [keys.when, "at"], value: v }])}
         />
       )}
-      {novel && !novel.config?.calendar?.start && wasDay !== undefined && whenKind === "date" && when?.at && AT.test(when.at) && (
-        <DateDayOne day={wasDay} date={when.at.slice(0, 10)} onDone={() => setWasDay(undefined)} />
-      )}
+      {novel && novelId && wasDay !== undefined && whenKind === "date" && when?.at && AT.test(when.at) &&
+        moduleDayToDate(novel.kind).map((offer, i) => <Fragment key={i}>{offer({ novelId, novel, day: wasDay, date: when.at!.slice(0, 10), done: () => setWasDay(undefined) })}</Fragment>)}
       <TextField
         label="Duration"
         placeholder="PT45M"
@@ -653,38 +653,6 @@ export function StoryTimeFields({
         onSave={(v) => set(keys.duration, v)}
       />
     </Group>
-  );
-}
-
-/** "This was Day 3: make 12 Oct 2026 Day 3, so Day 1 is 10 Oct 2026?" Once, in place (heffrey78/gh-writer#239). */
-function DateDayOne({ day, date, onDone }: { day: number; date: string; onDone: () => void }) {
-  const { novelId } = useParams<{ novelId: string }>();
-  const setDayOne = useSetDayOne(novelId!);
-  const show = useNotice((s) => s.show);
-  const start = dayOneFor(date, day);
-  return (
-    <div role="group" aria-label="Date Day 1 from this" className="grid gap-1.5 rounded-md border border-rule bg-raised p-2 text-sm">
-      <p>
-        This was Day {day}. Make {readDate(date)} Day {day}, so Day 1 is {readDate(start)}? Every day of the story then has its date.
-      </p>
-      <div className="flex gap-2">
-        <Button
-          size="sm"
-          variant="primary"
-          onClick={() =>
-            void setDayOne(start)
-              .then(() => show({ message: `Day 1 is ${readDate(start)}.` }))
-              .catch((e: unknown) => show({ message: `Couldn't date Day 1: ${e instanceof Error ? e.message : String(e)}` }))
-              .finally(onDone)
-          }
-        >
-          Make it Day {day}
-        </Button>
-        <Button size="sm" variant="ghost" onClick={onDone}>
-          No
-        </Button>
-      </div>
-    </div>
   );
 }
 

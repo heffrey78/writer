@@ -6,7 +6,7 @@ import { NavLink, useLocation } from "react-router";
 import { create } from "zustand";
 import { plural } from "../bible/types.ts";
 import { useCommands } from "../commands.ts";
-import { moduleViews } from "../modules.tsx";
+import { moduleStoryMapTabs, moduleViews } from "../modules.tsx";
 import { cn } from "../ui/cn.ts";
 import { ManuscriptSidebar } from "./manuscript-tree.tsx";
 import type { Workspace } from "./workspace.ts";
@@ -45,7 +45,7 @@ interface Place {
   icon: LucideIcon;
 }
 
-/** The views by group, the book's modules' after the base's in each; Issues only for a novel on GitHub. */
+/** The views by group, the book's modules' after the base's in each; the story map only with a tab from a module; Issues only for a novel on GitHub. */
 export function groups(onGitHub: boolean, kind: BookKind): { label: string; places: Place[] }[] {
   const views = moduleViews(kind);
   const added = (group: string) => views.filter((v) => v.group === group).map(({ path, label, icon }) => ({ path, label, icon }));
@@ -54,7 +54,7 @@ export function groups(onGitHub: boolean, kind: BookKind): { label: string; plac
       label: "Plan",
       places: [
         { path: "outline", label: "Outline", icon: ListTree },
-        { path: "story-map", label: "Story map", icon: MapIcon },
+        ...(moduleStoryMapTabs(kind).length ? [{ path: "story-map", label: "Story map", icon: MapIcon }] : []),
         { path: "relationships", label: "Relationships", icon: Network },
         { path: "notes", label: "Notes", icon: StickyNote },
         { path: "progress", label: "Progress", icon: Goal },

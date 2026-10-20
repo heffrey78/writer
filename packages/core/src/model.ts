@@ -8,7 +8,6 @@ import type {
   RelationshipRecord,
   RelationshipTypeFile,
   PieceStatus,
-  StoryTime,
 } from "./types.ts";
 
 /** A book loaded into memory. Collections are in reading order where that applies. */
@@ -76,8 +75,6 @@ export interface Piece {
   /** Entries of custom types (not characters, locations, plotlines or themes) in the scene. */
   entities: string[];
   themes: ThemeRef[];
-  when?: StoryTime;
-  duration?: string;
   tags: string[];
   /**
    * The values of its kind's declared fields (BookKind.fields), as its front matter has them, by key:

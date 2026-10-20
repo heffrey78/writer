@@ -1,11 +1,11 @@
 import type { Book } from "@writer/core";
 import { useEffect, useRef } from "react";
+import { moduleOutlineOrders } from "../modules.tsx";
 import { Navigate, useLocation, useNavigate, useParams, useSearchParams } from "react-router";
 import { cn } from "../ui/cn.ts";
 import { OutlineBoard } from "./board.tsx";
 import { OutlineCards } from "./corkboard.tsx";
 import { OutlineTable } from "./outline.tsx";
-import { OutlineTimeCards, OutlineTimeTable } from "./outline-time.tsx";
 import type { Workspace } from "./workspace.ts";
 import { PAGE } from "../ui/page.ts";
 
@@ -25,19 +25,18 @@ const KEY = "ghw.outlineView";
 
 const isView = (v: string | null | undefined): v is View => VIEWS.some((x) => x.key === v);
 
-/** The table and the cards in reading order, or in story time with the off-page events among the scenes (heffrey78/gh-writer#165): ?order=time, remembered. */
-const ORDERS = [
-  { key: "reading", label: "Reading order" },
-  { key: "time", label: "Story time" },
-] as const;
-type Order = (typeof ORDERS)[number]["key"];
+/**
+ * The table and the cards in reading order, or in an order a module adds (story time, with the
+ * off-page events among the scenes, heffrey78/gh-writer#165): ?order=<key>, remembered.
+ */
+const READING = "reading";
 const ORDER_KEY = "ghw.outlineOrder";
 
-function rememberedOrder(): Order {
+function rememberedOrder(): string {
   try {
-    return localStorage.getItem(ORDER_KEY) === "time" ? "time" : "reading";
+    return localStorage.getItem(ORDER_KEY) ?? READING;
   } catch {
-    return "reading";
+    return READING;
   }
 }
 
@@ -64,8 +63,11 @@ export function OutlinePage({ novelId, novel, workspace }: { novelId: string; no
   const { state } = useLocation() as { state: { focusSwitch?: boolean } | null };
   const group = useRef<HTMLDivElement>(null);
   const [params, setParams] = useSearchParams();
-  const order: Order = params.get("order") === "time" ? "time" : "reading";
-  const chooseOrder = (next: Order) => {
+  const orders = moduleOutlineOrders(novel.kind);
+  const ORDERS = [{ key: READING, label: "Reading order" }, ...orders];
+  const moduleOrder = orders.find((o) => o.key === params.get("order"));
+  const order = moduleOrder?.key ?? READING;
+  const chooseOrder = (next: string) => {
     try {
       localStorage.setItem(ORDER_KEY, next);
     } catch {
@@ -74,7 +76,7 @@ export function OutlinePage({ novelId, novel, workspace }: { novelId: string; no
     setParams(
       (p) => {
         const out = new URLSearchParams(p);
-        if (next === "time") out.set("order", "time");
+        if (next !== READING) out.set("order", next);
         else out.delete("order");
         return out;
       },
@@ -85,17 +87,19 @@ export function OutlinePage({ novelId, novel, workspace }: { novelId: string; no
   useEffect(() => {
     if (state?.focusSwitch) group.current?.querySelector<HTMLInputElement>("input:checked")?.focus();
   }, [state, view]);
-  if (!isView(view)) return <Navigate to={`/novels/${novelId}/outline/${remembered()}${remembered() !== "board" && rememberedOrder() === "time" ? "?order=time" : ""}`} replace />;
+  const remembers = orders.find((o) => o.key === rememberedOrder());
+  if (!isView(view)) return <Navigate to={`/novels/${novelId}/outline/${remembered()}${remembered() !== "board" && remembers ? `?order=${remembers.key}` : ""}`} replace />;
   const choose = (next: View) => {
     remember(next);
-    void navigate(`/novels/${novelId}/outline/${next}${order === "time" && next !== "board" ? "?order=time" : ""}`, { replace: true, state: { focusSwitch: true } });
+    void navigate(`/novels/${novelId}/outline/${next}${moduleOrder && next !== "board" ? `?order=${moduleOrder.key}` : ""}`, { replace: true, state: { focusSwitch: true } });
   };
+  const bookView = { novelId, novel, workspace };
   return (
     <div className={cn(PAGE, "grid gap-4")}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-semibold">Outline</h1>
         <div className="flex flex-wrap items-center gap-3">
-          {view !== "board" && (
+          {view !== "board" && orders.length > 0 && (
             <div role="radiogroup" aria-label="Order" className="inline-flex rounded-md border border-rule bg-raised p-0.5 text-sm">
               {ORDERS.map((o) => (
                 <label key={o.key} className={cn("cursor-pointer rounded px-3 py-1 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent", order === o.key ? "bg-accent-soft font-medium" : "text-muted hover:text-ink")}>
@@ -118,9 +122,9 @@ export function OutlinePage({ novelId, novel, workspace }: { novelId: string; no
       {view === "board" ? (
         <OutlineBoard novelId={novelId} novel={novel} workspace={workspace} />
       ) : view === "cards" ? (
-        order === "time" ? <OutlineTimeCards novelId={novelId} novel={novel} /> : <OutlineCards novelId={novelId} novel={novel} workspace={workspace} />
-      ) : order === "time" ? (
-        <OutlineTimeTable novelId={novelId} novel={novel} workspace={workspace} />
+        moduleOrder ? moduleOrder.cards(bookView) : <OutlineCards novelId={novelId} novel={novel} workspace={workspace} />
+      ) : moduleOrder ? (
+        moduleOrder.table(bookView)
       ) : (
         <OutlineTable novelId={novelId} novel={novel} workspace={workspace} />
       )}

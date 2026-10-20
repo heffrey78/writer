@@ -1,6 +1,10 @@
-import { entriesOf } from "./fields.ts";
-import type { Book, Piece, StoryEvent } from "./model.ts";
-import type { StoryTime } from "./types.ts";
+import { entriesOf, storyTimeValue, type Book, type Piece, type StoryEvent, type StoryTime } from "@writer/core";
+
+/*
+ * Story time (D14, #30): when each piece and off-page event happens, a day of the story or a date,
+ * and how long it lasts; the book's items in that order; and who would have to be in two places at
+ * once. A piece's time is the module's `when` field, with its duration; an event's is its own.
+ */
 
 const MINUTE = 60_000;
 const DAY = 24 * 60 * MINUTE;
@@ -70,6 +74,22 @@ export function apartInTime(timeline: StoryTimeline): TimelineItem[] {
   return days.length && days.length < timeline.items.length ? days : [];
 }
 
+/** The module's field: when a piece happens, with how long under `duration`. */
+export const WHEN = { key: "when", durationKey: "duration" } as const;
+
+/** When a piece happens, and for how long: its `when` field, read as story time. */
+export function timeOf(piece: Piece): { when?: StoryTime; duration?: string } {
+  const when = storyTimeValue(piece.fields[WHEN.key]);
+  const duration = piece.fields[WHEN.durationKey];
+  return { ...(when ? { when } : {}), ...(typeof duration === "string" && duration ? { duration } : {}) };
+}
+
+/** Where a piece is in story time, through the book's calendar: undefined for one without a time. */
+export function pieceInstant(book: Book, piece: Piece): StoryInstant | undefined {
+  const { when, duration } = timeOf(piece);
+  return storyInstant(when, duration, book.config?.calendar?.start);
+}
+
 export type TimelineItem = { kind: "scene"; scene: Piece; at: StoryInstant } | { kind: "event"; event: StoryEvent; at: StoryInstant };
 
 export interface StoryTimeline {
@@ -89,7 +109,7 @@ export function storyTimeline(novel: Book): StoryTimeline {
   const undatedScenes: Piece[] = [];
   const undatedEvents: StoryEvent[] = [];
   for (const scene of novel.pieces) {
-    const at = storyInstant(scene.when, scene.duration, start);
+    const at = pieceInstant(novel, scene);
     if (at) items.push({ kind: "scene", scene, at });
     else undatedScenes.push(scene);
   }
@@ -103,9 +123,16 @@ export function storyTimeline(novel: Book): StoryTimeline {
   return { items, undatedScenes, undatedEvents };
 }
 
-/** Who is where in an item: its characters (any field of a scene's that names one: its point of view too) and its locations. */
-function cast(book: Book, i: TimelineItem): { characters: Set<string>; locations: Set<string> } {
-  if (i.kind === "scene") return { characters: new Set(entriesOf(book, i.scene, "character")), locations: new Set(i.scene.locations) };
+/** The entry types whose entries are people, or places (`is` on the type): who can't be in two places at once, and where. */
+export const typesThatAre = (book: Book, is: "person" | "place") => book.entityTypes.filter((t) => t.is === is).map((t) => t.key);
+
+/**
+ * Who is where in an item: the people a piece's fields name (its point of view too) and the places,
+ * by their types; an event's characters and locations.
+ */
+export function cast(book: Book, i: TimelineItem): { characters: Set<string>; locations: Set<string> } {
+  const of = (is: "person" | "place") => (i.kind === "scene" ? new Set(typesThatAre(book, is).flatMap((t) => entriesOf(book, i.scene, t))) : new Set<string>());
+  if (i.kind === "scene") return { characters: of("person"), locations: of("place") };
   return { characters: new Set(i.event.characters ?? []), locations: new Set(i.event.locations ?? []) };
 }
 

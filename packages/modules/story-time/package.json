@@ -1,0 +1,17 @@
+{
+  "name": "@writer/module-story-time",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Story time (D14, #30): when a piece happens and for how long, Day 1's date, the timeline and its snapshot, the outline in story time, and the warning for someone in two places at once.",
+  "exports": {
+    "./core": "./src/core/index.ts",
+    "./server": "./src/server/index.ts",
+    "./web": "./src/web/index.tsx"
+  },
+  "dependencies": {
+    "@writer/core": "0.1.0",
+    "@writer/server": "0.1.0",
+    "@writer/web": "0.1.0"
+  }
+}

@@ -1,14 +1,13 @@
-import { carryingField, overlaps, storyTimeline, type Book, type TimelineItem } from "@writer/core";
+import { carryingField, type Book } from "@writer/core";
 import { Fragment, useMemo } from "react";
 import { Link } from "react-router";
-import { Button } from "../ui/button.tsx";
-import { cn } from "../ui/cn.ts";
-import { timelineMermaid, timelineSvg } from "@writer/core/snapshots";
-import { ExportMenu } from "../diagrams/export-menu.tsx";
-import { useNewEvent } from "../events/new-event.tsx";
+import { ExportMenu } from "@writer/web/diagrams/export-menu.tsx";
+import { useNewEvent } from "@writer/web/events/new-event.tsx";
+import { Button } from "@writer/web/ui/button.tsx";
+import { cn } from "@writer/web/ui/cn.ts";
+import { useViewParams } from "@writer/web/ui/view-params.ts";
+import { defaultLanes, itemId, itemTitle, jump, laneModes as modesOf, lanesOf, overlaps, storyTimeline, timeline, timelineMermaid, timelineSvg, when, type LaneMode, type TimelineItem } from "../core/index.ts";
 import { DayOne } from "./day-one.tsx";
-import { useViewParams } from "../ui/view-params.ts";
-import { defaultLanes, itemId, itemTitle, jump, laneModes as modesOf, lanesOf, timeline, when, type LaneMode } from "@writer/core/diagrams";
 
 const SLOT = 152;
 const HEAD = 168;

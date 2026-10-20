@@ -1,4 +1,4 @@
-import { proseText, relationshipsAt, vocabulary, type Book, type Piece } from "@writer/core";
+import { proseText, relationshipsAt, storyClock, vocabulary, type Book, type Piece } from "@writer/core";
 import type { MentionTarget } from "@writer/editor";
 import type { Editor } from "@tiptap/core";
 import { X } from "lucide-react";
@@ -145,7 +145,7 @@ export function MentionCard({ novelId, novel }: { novelId: string; novel: Book }
       </div>
       {event ? (
         <>
-          {(() => {
+          {storyClock(novel) && (() => {
             const time = whenOf({ when: event.when, duration: event.duration });
             return time.when && <Lead size="card">{[time.when, time.duration].filter(Boolean).join(" · ")}</Lead>;
           })()}

@@ -1,6 +1,6 @@
 import type { EntityTypeDef } from "./ids.ts";
 import type { BookKind, FieldDef } from "./kinds.ts";
-import type { Book } from "./model.ts";
+import type { Book, Piece, StoryEvent } from "./model.ts";
 import type { Diagnostic, Severity } from "./types.ts";
 
 /*
@@ -32,6 +32,24 @@ export interface BookModule {
   checks?: readonly ModuleCheck[];
   /** Its diagrams for the book's diagrams/ folder, and its section of their README. */
   snapshots?: (book: Book) => ModuleSnapshots;
+  /** What it says about a piece among the piece's facts, after where it stands in the book: "A flashback: 3 days before “The Betrayal”." */
+  facts?: (book: Book, piece: Piece) => string[];
+  /** Where things are in story time, for what the base shows of off-page events and places (the story-time module's). */
+  clock?: StoryClock;
+}
+
+/**
+ * Story time as the base reads it (#30): the order of the off-page events, the pieces either side of
+ * one, and the time some pieces span. The base's off-page events and a place's profile show times only
+ * through it, so a kind whose modules keep no clock shows none. Until events are a module (#33).
+ */
+export interface StoryClock {
+  /** The off-page events in story-time order, those without a time after them. */
+  events(book: Book): StoryEvent[];
+  /** The pieces either side of an off-page event in story time, on its own scale. */
+  around(book: Book, id: string): { before?: Piece; after?: Piece };
+  /** The story time some pieces span, as read: from "Day 1, 09:10" to "Day 3". */
+  span(book: Book, pieces: Piece[]): { from: string; to: string } | undefined;
 }
 
 /** A module's diagram snapshots: files by path from the book's root, and the lines of its README section. */
@@ -107,3 +125,11 @@ export function moduleSnapshots(book: Book): ModuleSnapshots[] {
 export function moduleDiagnostics(book: Book): Diagnostic[] {
   return modulesOf(book.kind).flatMap((m) => (m.checks ?? []).flatMap((c) => c.find(book).map((f): Diagnostic => ({ severity: c.severity, code: c.code, ...f }))));
 }
+
+/** What the book's modules say about a piece, in the order its kind lists them. */
+export function moduleFacts(book: Book, piece: Piece): string[] {
+  return modulesOf(book.kind).flatMap((m) => m.facts?.(book, piece) ?? []);
+}
+
+/** The book's story clock: the first of its modules that keeps one, if any does. */
+export const storyClock = (book: Book): StoryClock | undefined => modulesOf(book.kind).find((m) => m.clock)?.clock;

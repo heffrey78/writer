@@ -29,8 +29,11 @@ afterEach(cleanup);
 describe("a module's web half", () => {
   it("lists its view in its group of the sidebar, after the base's, for a kind that uses it", () => {
     const plan = (kind: BookKind) => groups(false, kind).find((g) => g.label === "Plan")!.places.map((p) => p.label);
-    expect(plan(sociable)).toEqual(["Outline", "Story map", "Relationships", "Notes", "Progress", "Story bible", "Company"]);
+    // No module of its adds a tab of the story map, so it has none.
+    expect(plan(sociable)).toEqual(["Outline", "Relationships", "Notes", "Progress", "Story bible", "Company"]);
     expect(plan(novel)).not.toContain("Company");
+    registerWebModule({ id: "map", storyMapTabs: [{ key: "map", label: "Map", render: () => null }] });
+    expect(plan({ ...sociable, modules: ["company", "map"] })).toEqual(["Outline", "Story map", "Relationships", "Notes", "Progress", "Story bible", "Company"]);
   });
 
   it("shows its view at its route under the book", () => {

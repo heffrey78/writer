@@ -3,7 +3,7 @@ import { JSDOM } from "jsdom";
 import { describe, expect, it } from "vitest";
 import { loadBook } from "../src/index.ts";
 import { nodeSource } from "../src/node.ts";
-import { relationshipMermaid, snapshots, timelineMermaid } from "../src/snapshots.ts";
+import { relationshipMermaid, snapshots } from "../src/snapshots.ts";
 
 const novel = await loadBook(nodeSource(fileURLToPath(new URL("../../../examples/sample-novel", import.meta.url))));
 
@@ -25,17 +25,6 @@ describe("snapshots", () => {
         "",
       ].join("\n"),
     );
-  });
-
-  it("put the timeline in Mermaid in story-time order, the flashback noted, colons kept out of labels", () => {
-    const t = timelineMermaid(novel);
-    expect(t.split("\n").slice(0, 4)).toEqual([
-      "timeline",
-      "  title Story time",
-      "  2 Nov 2009 : The flood of '09 (off page)",
-      "  2 Nov 2009, 23∶00 : The Flood (6th in the book, a flashback)",
-    ]);
-    expect(t).toContain("  Day 3, 18∶30 (3 Mar 2024) : The Betrayal (5th in the book)");
   });
 
   it("write well-formed SVGs with the diagrams' labels, and an overview embedding them", () => {

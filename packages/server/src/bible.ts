@@ -23,6 +23,7 @@ import {
   type Relationship,
   type SeriesSlot,
   type YamlEdit,
+  storyTimeField,
 } from "@writer/core";
 import { nodeSource } from "@writer/core/node";
 import { parse, stringify } from "yaml";
@@ -402,7 +403,9 @@ export class BibleOperations {
         if (references.length) throw new OperationError("REFERENCED", `“${event.title}” is mentioned in ${references.length} place${references.length === 1 ? "" : "s"}, so it's kept.`, { references });
       }
       const synopsis = proseText(event.body).replace(/\s+/g, " ").trim();
-      const front = clean({ synopsis, characters: event.characters, locations: event.locations, plotlines: event.plotlines, when: event.when, duration: event.duration });
+      // Its time goes to the kind's story-time field, where it has one.
+      const time = storyTimeField(novel.kind);
+      const front = clean({ synopsis, characters: event.characters, locations: event.locations, plotlines: event.plotlines, ...(time ? { [time.key]: event.when, [time.type.durationKey]: event.duration } : {}) });
       const scene = await manuscript.sceneWrites(novel, chapter, { title: event.title, front });
       const text = (await read(event.file)) ?? "";
       const writes: FileWrite[] = [...scene.writes, keep ? { path: event.file, content: editFrontMatter(text, [{ path: ["scene"], value: scene.id }]) } : { path: event.file, content: null }];
@@ -606,15 +609,11 @@ export class BibleOperations {
   }
 
   /**
-   * Say when Day 1 is (heffrey78/gh-writer#239): novel.yaml's calendar.start, so days of the story sit among dates (Day 0
-   * the day before). null removes it, and the calendar with it. One commit.
+   * Edit the book's manifest (novel.yaml, book.yaml), keeping its comments and layout: a module's
+   * settings, such as when Day 1 is. One commit, with `message`.
    */
-  updateCalendar(start: string | null): Promise<OperationResult> {
-    return this.#run(async (novel) => {
-      if (start !== null && !(typeof start === "string" && /^\d{4}-\d{2}-\d{2}$/.test(start) && !Number.isNaN(Date.parse(`${start}T00:00:00Z`)))) throw new OperationError("BAD_REQUEST", "Day 1 is a date, YYYY-MM-DD.");
-      const content = editYaml(await this.#read(novel.manifest), [start === null ? { path: ["calendar"], remove: true } : { path: ["calendar", "start"], value: start }]);
-      return transaction(this.root, [{ path: novel.manifest, content }], start === null ? "Day 1 has no date" : "Set when Day 1 is");
-    });
+  editManifest(edits: YamlEdit[], message: string): Promise<OperationResult> {
+    return this.#run(async (novel) => transaction(this.root, [{ path: novel.manifest, content: editYaml(await this.#read(novel.manifest), edits) }], message));
   }
 
   /** Add a custom entity type to novel.yaml. Its folder is bible/<folder> (default: the key, plural). */

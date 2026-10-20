@@ -191,7 +191,6 @@ export function NovelPage() {
       { id: "novel.outline", title: "Outline", group: "Go to", keywords: ["table"], run: () => void navigate(`/novels/${novelId}/outline/table`) },
       { id: "novel.outlineCards", title: "Outline: cards", group: "Go to", keywords: ["corkboard", "index cards"], run: () => void navigate(`/novels/${novelId}/outline/cards`) },
       { id: "novel.outlineBoard", title: "Outline: drafting board", group: "Go to", keywords: ["board", "kanban", "status", "progress", "projects"], run: () => void navigate(`/novels/${novelId}/outline/board`) },
-      { id: "novel.timeline", title: "Story map: Timeline", group: "Go to", keywords: ["chronology", "story time", "flashback", "diagram"], run: () => void navigate(`/novels/${novelId}/story-map/timeline`) },
       { id: "novel.progress", title: "Progress", group: "Go to", keywords: ["stats", "statistics", "goal", "target", "deadline", "streak", "words a day"], run: () => void navigate(`/novels/${novelId}/progress`) },
       { id: "novel.compare", title: "Compare: what changed between drafts", group: "Go to", keywords: ["diff", "changes"], run: () => void navigate(`/novels/${novelId}/compare`) },
       { id: "novel.graph", title: "Relationships", group: "Go to", keywords: ["diagram", "characters", "graph"], run: () => void navigate(`/novels/${novelId}/relationships`) },
@@ -316,7 +315,7 @@ export function NovelPage() {
                     </Suspense>
                   }
                 />
-                <Route path="story-map" element={<Navigate to={`/novels/${novelId}/story-map/${storyMapTabs(book.kind)[0]!.key}`} replace />} />
+                <Route path="story-map" element={<Navigate to={`/novels/${novelId}${storyMapTabs(book.kind)[0] ? `/story-map/${storyMapTabs(book.kind)[0]!.key}` : ""}`} replace />} />
                 <Route path="story-map/:tab" element={<StoryMapPage novelId={novelId} novel={book} workspace={workspace} />} />
                 <Route path="outline" element={<OutlinePage novelId={novelId} novel={book} workspace={workspace} />} />
                 <Route path="outline/:view" element={<OutlinePage novelId={novelId} novel={book} workspace={workspace} />} />

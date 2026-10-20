@@ -1,13 +1,13 @@
-import { carrierOf, carryingField, countWords, entryIds, proseText, storyTimeline, vocabulary, type Book, type Piece, type StoryEvent } from "@writer/core";
-import { when } from "@writer/core/diagrams";
+import { carrierOf, carryingField, countWords, entryIds, proseText, vocabulary, type Book, type Piece, type StoryEvent } from "@writer/core";
 import { useMemo } from "react";
 import { Link, useSearchParams } from "react-router";
-import { Button } from "../ui/button.tsx";
-import { cn } from "../ui/cn.ts";
-import { FieldFilters, STATUS_TONE } from "./corkboard.tsx";
-import { filterParams, filtersOf, shows, type CorkboardFilter } from "./corkboard-order.ts";
-import { StatusSelect, Synopsis, useSceneEdit } from "./outline.tsx";
-import type { Workspace } from "./workspace.ts";
+import { FieldFilters, STATUS_TONE } from "@writer/web/novel/corkboard.tsx";
+import { filterParams, filtersOf, shows, type CorkboardFilter } from "@writer/web/novel/corkboard-order.ts";
+import { StatusSelect, Synopsis, useSceneEdit } from "@writer/web/novel/outline.tsx";
+import type { Workspace } from "@writer/web/novel/workspace.ts";
+import { Button } from "@writer/web/ui/button.tsx";
+import { cn } from "@writer/web/ui/cn.ts";
+import { storyTimeline, when } from "../core/index.ts";
 
 /*
  * The outline in story time (heffrey78/gh-writer#165): the scenes in the order things happen, with the off-page events

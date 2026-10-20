@@ -1,4 +1,4 @@
-import { entryPresences, proseText, storyTimeline, vocabulary, type Entity, type EntryPresence, type Book, type Vocabulary } from "@writer/core";
+import { entryPresences, proseText, storyClock, vocabulary, type Entity, type EntryPresence, type Book, type Vocabulary } from "@writer/core";
 import { useNewEvent } from "../events/new-event.tsx";
 import { whenOf } from "../novel/scene-details.tsx";
 import { Plus, Search } from "lucide-react";
@@ -202,14 +202,13 @@ function EntryCard({ novelId, entity, presence }: { novelId: string; entity: Ent
 
 /**
  * Off-page events (heffrey78/gh-writer#223): the story's facts that aren't shown, as a group of cards after the entries,
- * found by title or note. Story-time order, but by title for the Name sort.
+ * found by title or note. Story-time order where the book keeps story time (else as the files have
+ * them), but by title for the Name sort.
  */
 function EventCards({ novelId, novel, query, sort }: { novelId: string; novel: Book; query: string; sort: Sort }) {
   const add = useNewEvent((s) => s.set);
-  const all = useMemo(() => {
-    const t = storyTimeline(novel);
-    return [...t.items.flatMap((i) => (i.kind === "event" ? [i.event] : [])), ...t.undatedEvents];
-  }, [novel]);
+  const clock = storyClock(novel);
+  const all = useMemo(() => clock?.events(novel) ?? novel.events, [novel, clock]);
   const q = query.trim().toLowerCase();
   const shown = all.filter((e) => !q || e.title.toLowerCase().includes(q) || proseText(e.body).toLowerCase().includes(q));
   if (sort === "name") shown.sort((a, b) => a.title.localeCompare(b.title));
@@ -238,7 +237,7 @@ function EventCards({ novelId, novel, query, sort }: { novelId: string; novel: B
                   state={{ fromGallery: true }}
                   className="grid content-start gap-1.5 rounded-lg border border-dashed border-muted bg-raised px-4 py-3 hover:border-accent focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
                 >
-                  <span className="text-xs text-muted">{[time.when || "No time", time.duration].filter(Boolean).join(" · ")}</span>
+                  {clock && <span className="text-xs text-muted">{[time.when || "No time", time.duration].filter(Boolean).join(" · ")}</span>}
                   <span className="font-semibold">{e.title}</span>
                   {note && <span className="line-clamp-2 font-prose leading-snug italic">{note}</span>}
                   {who.length > 0 && <span className="text-[13px] text-muted">{who.join(", ")}</span>}

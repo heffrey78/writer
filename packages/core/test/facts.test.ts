@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { loadBook, memorySource, readableSpan, sceneFacts } from "../src/index.ts";
+import { loadBook, memorySource, sceneFacts } from "../src/index.ts";
 
 const ROOT = fileURLToPath(new URL("../../../examples/sample-novel/", import.meta.url));
 const sample: Record<string, string> = Object.fromEntries(
@@ -83,12 +83,5 @@ describe("sceneFacts", () => {
     expect(sceneFacts(book, "sc_5tat1n")).toEqual(["The book's only scene.", "6 days after the off-page event “The plans are stolen”.", "First appearance of Ada Varn.", "The Sale begins and ends here."]);
     expect(sceneFacts(book, "sc_br1dg3")).toEqual([]);
     expect(sceneFacts(book, "sc_nope00")).toEqual([]);
-  });
-
-  it("reads spans of story time", () => {
-    expect(readableSpan(40 * 60_000)).toBe("40 min");
-    expect(readableSpan(3 * 3_600_000)).toBe("3 h");
-    expect(readableSpan(26 * 3_600_000)).toBe("1 day");
-    expect(readableSpan(3 * 365 * 86_400_000)).toBe("3 years");
   });
 });

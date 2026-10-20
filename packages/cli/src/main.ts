@@ -2,6 +2,8 @@
 import { parseArgs } from "node:util";
 import { newId, SCHEMA_VERSION } from "@writer/core";
 import { registerKinds } from "@writer/kinds";
+import { storyTimeServer } from "@writer/module-story-time/server";
+import { registerServerModule } from "@writer/server";
 import { runCompile } from "./compile-command.ts";
 import { runMigrate } from "./migrate-command.ts";
 import { runServe } from "./serve-command.ts";
@@ -9,6 +11,8 @@ import { runSnapshots } from "./snapshots-command.ts";
 import { runValidate } from "./validate-command.ts";
 
 registerKinds(); // The kinds of book the app ships (D14).
+// The server halves of the modules they use: their routes under a book.
+for (const module of [storyTimeServer]) registerServerModule(module);
 
 const USAGE = `Usage: writer <command> [options]
 

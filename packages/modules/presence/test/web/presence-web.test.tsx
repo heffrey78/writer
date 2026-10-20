@@ -65,8 +65,8 @@ function page(b: Book) {
 
 describe("presence on screen", () => {
   it("is a tab of the Novel's story map, and none without the module", () => {
-    expect(storyMapTabs(kindByKey("novel")).map((t) => t.label)).toEqual(["Presence", "Timeline"]);
-    expect(storyMapTabs(withModules({ ...novelKind, key: "plain", modules: ["point-of-view"] })).map((t) => t.label)).toEqual(["Timeline"]);
+    expect(storyMapTabs(kindByKey("novel")).map((t) => t.label)).toEqual(["Presence"]);
+    expect(storyMapTabs(withModules({ ...novelKind, key: "plain", modules: ["point-of-view"] })).map((t) => t.label)).toEqual([]);
   });
 
   it("shows a kind's own type against its days, in its words, with no point of view", async () => {

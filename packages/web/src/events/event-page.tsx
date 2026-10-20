@@ -1,6 +1,6 @@
 import type { Reference } from "@writer/client";
 import { imageUrl } from "@writer/client";
-import { readFrontMatter, sceneNeighbours, storyTimeline, type Book, type StoryEvent, type YamlEdit } from "@writer/core";
+import { readFrontMatter, storyClock, type Book, type StoryEvent, type YamlEdit } from "@writer/core";
 import { joinSceneFile } from "@writer/editor";
 import { SceneEditor, type SpellService } from "@writer/editor/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -115,7 +115,9 @@ export function EventPage({
       {name(id)}
     </Link>
   );
-  const { before, after } = useMemo(() => sceneNeighbours(storyTimeline(novel), event.id), [novel, event.id]);
+  // Its time and the scenes around it, where the book keeps story time.
+  const clock = storyClock(novel);
+  const { before, after } = useMemo(() => clock?.around(novel, event.id) ?? {}, [clock, novel, event.id]);
   const sceneLink = (id: string, title: string) => (
     <Link to={`/novels/${novelId}/scene/${id}`} className="text-accent underline decoration-accent/35 underline-offset-[3px] hover:decoration-accent">
       “{title}”
@@ -160,7 +162,7 @@ export function EventPage({
         )}
       </div>
 
-      {place.editing === "when" ? (
+      {!clock ? null : place.editing === "when" ? (
         <EditorFrame place={place}>
           <StoryTimeFields when={when} duration={typeof fm.duration === "string" ? fm.duration : ""} edit={edit} novel={novel} />
           <EditorButtons onCancel={() => place.done()} hint="Each change is saved as it's made · Esc returns" />
@@ -243,22 +245,26 @@ export function EventPage({
         )}
       </section>
 
-      <ProfileSection title="In story time">
-        <p className="text-sm">
-          {!time.when ? (
-            "Not placed in story time: give it a time to see it among the scenes."
-          ) : before || after ? (
-            <>
-              {before && <>After {sceneLink(before.id, before.title)}</>}
-              {before && after && ", "}
-              {after && <>{before ? "before" : "Before"} {sceneLink(after.id, after.title)}</>}.
-            </>
-          ) : (
-            "No scene is placed near it in story time."
+      {(clock || dramatized) && (
+        <ProfileSection title={clock ? "In story time" : "In the book"}>
+          {clock && (
+            <p className="text-sm">
+              {!time.when ? (
+                "Not placed in story time: give it a time to see it among the scenes."
+              ) : before || after ? (
+                <>
+                  {before && <>After {sceneLink(before.id, before.title)}</>}
+                  {before && after && ", "}
+                  {after && <>{before ? "before" : "Before"} {sceneLink(after.id, after.title)}</>}.
+                </>
+              ) : (
+                "No scene is placed near it in story time."
+              )}
+            </p>
           )}
-        </p>
-        {dramatized && <p className="text-sm">Written as the scene {sceneLink(dramatized.id, dramatized.title)}.</p>}
-      </ProfileSection>
+          {dramatized && <p className="text-sm">Written as the scene {sceneLink(dramatized.id, dramatized.title)}.</p>}
+        </ProfileSection>
+      )}
 
       <NotesAbout novelId={novelId} novel={novel} id={event.id} />
 
