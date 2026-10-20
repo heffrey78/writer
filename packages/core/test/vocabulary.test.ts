@@ -13,6 +13,7 @@ describe("a kind's words", () => {
     expect([w.piece.a, w.entity.a, w.book.a]).toEqual(["a scene", "an entry", "a novel"]);
     expect([w.piece.count(1), w.piece.count(3), w.level("chapter").count(0)]).toEqual(["1 scene", "3 scenes", "0 chapters"]);
     expect([w.of("scene").one, w.of("part").One]).toEqual(["scene", "Part"]);
+    expect([w.codex.short, w.piece.short]).toEqual(["bible", "scene"]);
   });
 
   it("are another kind's own, with nothing of the novel's", () => {

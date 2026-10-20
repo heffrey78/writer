@@ -8,6 +8,7 @@ import { ErrorAlert } from "../ui/alert.tsx";
 import { Button } from "../ui/button.tsx";
 import { Modal } from "../ui/dialog.tsx";
 import { Field } from "../ui/field.tsx";
+import { useWords } from "./kind.ts";
 
 /** What the dialog is for: a new picture to put in at `at` (from a file dropped or pasted, or one to choose), or the picture at `at` to change. */
 export type PictureRequest = { kind: "add"; at: number; file?: File } | { kind: "edit"; at: number; picture: PictureAttrs };
@@ -33,6 +34,7 @@ export function PictureInTextDialog({
   onClose: () => void;
 }) {
   const editing = request.kind === "edit" ? request.picture : undefined;
+  const w = useWords();
   const [file, setFile] = useState<File | undefined>(request.kind === "add" ? request.file : undefined);
   const [image, setImage] = useState<{ bitmap: ImageBitmap; url: string }>();
   const [rendered, setRendered] = useState<Rendered>();
@@ -50,7 +52,7 @@ export function PictureInTextDialog({
     setProblem(undefined);
     setImage(undefined);
     setRendered(undefined);
-    const refused = refusal(file);
+    const refused = refusal(file, w.book.one);
     if (refused) return setProblem(refused);
     decodeImage(file).then(
       async (bitmap) => {

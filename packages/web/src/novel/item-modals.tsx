@@ -1,4 +1,4 @@
-import type { Book } from "@writer/core";
+import { vocabulary, type Book } from "@writer/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { useId, useState } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router";
@@ -92,9 +92,10 @@ export function EntryOver({ novelId, novel, workspace, spell }: Props) {
   const entity = novel.entities.find((e) => e.id === entityId);
   const asked = params.get("type") ?? undefined;
   const [chosen, setChosen] = useState(novel.entityTypes.some((t) => t.key === asked) ? asked! : (novel.entityTypes[0]?.key ?? "character"));
-  const label = (novel.entityTypes.find((t) => t.key === chosen)?.label ?? "entry").toLowerCase();
+  const w = vocabulary(novel.kind);
+  const label = (novel.entityTypes.find((t) => t.key === chosen)?.label ?? w.entity.one).toLowerCase();
   return (
-    <ItemModal title={entityId === "new" ? `New ${label}` : (entity?.name ?? "Entry")} onClose={close}>
+    <ItemModal title={entityId === "new" ? `New ${label}` : (entity?.name ?? w.entity.One)} onClose={close}>
       {entityId === "new" ? (
         <NewItem heading={`New ${label}`} label="Name" make={async (name) => made((await api.bible.createEntity(novelId, chosen, { name })).id)}>
           {!asked && (
@@ -113,7 +114,7 @@ export function EntryOver({ novelId, novel, workspace, spell }: Props) {
       ) : entity ? (
         <EntryPage key={entity.id} novelId={novelId} novel={novel} entity={entity} workspace={workspace} spell={spell} embedded={{ headingId, modal: true }} />
       ) : (
-        <Gone what="entry" />
+        <Gone what={w.entity.one} />
       )}
     </ItemModal>
   );

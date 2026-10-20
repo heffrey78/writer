@@ -2,9 +2,12 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { loadBook, memorySource, type BookKind } from "@writer/core";
 import { novel } from "@writer/kinds";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 import { allCommands, useCommandRegistry } from "../src/commands.ts";
+import { BiblePage } from "../src/bible/bible-page.tsx";
+import { BookKindContext } from "../src/novel/kind.ts";
 import { ManuscriptTree } from "../src/novel/manuscript-tree.tsx";
 import { groups } from "../src/novel/sidebar.tsx";
 import type { Structure } from "../src/novel/structure.ts";
@@ -19,7 +22,7 @@ const diary: BookKind = {
   levels: [{ key: "month", label: "Month", plural: "Months", prefix: "mon", list: "months" }],
   piece: { key: "day", label: "Day", plural: "Days", prefix: "day", list: "days" },
   folders: { ...novel.folders, content: "pages", codex: "index" },
-  words: { content: { label: "Pages", plural: "Pages" }, codex: { label: "Index", plural: "Indexes" }, entity: { label: "Item", plural: "Items" } },
+  words: { content: { label: "Pages", plural: "Pages" }, codex: { label: "Index", plural: "Indexes", article: "an" }, entity: { label: "Item", plural: "Items", article: "an" } },
 };
 
 const lines = (...l: string[]) => `${l.join("\n")}\n`;
@@ -29,7 +32,8 @@ const book = (kind: BookKind) =>
       "novel.yaml": lines("schema_version: 2", "id: nv_000001", "title: The Year"),
       "pages/_order.yaml": lines("months: [mon_000001]"),
       "pages/01-march/_month.yaml": lines("id: mon_000001", "title: March", "days: [day_000001]"),
-      "pages/01-march/01-monday.md": lines("---", "id: day_000001", "title: Monday", "---", "Words."),
+      "pages/01-march/01-monday.md": lines("---", "id: day_000001", "title: Monday", "characters: [char_000001]", "---", "Words."),
+      "index/characters/ada.md": lines("---", "id: char_000001", "name: Ada", "---"),
     }),
     kind,
   );
@@ -58,5 +62,24 @@ describe("a kind's words on screen", () => {
     expect(plan).toContain("Index");
     expect(plan).not.toContain("Story bible");
     expect(groups(false, novel).find((g) => g.label === "Plan")!.places.map((p) => p.label)).toContain("Story bible");
+  });
+
+  it("name the codex, its items and the pieces they're in", async () => {
+    const b = await book(diary);
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <BookKindContext.Provider value={b.kind}>
+          <MemoryRouter>
+            <BiblePage novelId="lib_1" novel={b} />
+          </MemoryRouter>
+        </BookKindContext.Provider>
+      </QueryClientProvider>,
+    );
+    expect(screen.getByRole("heading", { level: 1, name: "Index" })).toBeTruthy();
+    expect(screen.getByRole("searchbox", { name: "Search the index" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "New item" })).toBeTruthy();
+    expect(screen.getByRole("combobox", { name: "Sort" }).textContent).toContain("Most days");
+    expect(screen.getByText("1 day")).toBeTruthy();
+    expect(document.body.textContent).not.toMatch(/scene|bible|entr(y|ies)/i);
   });
 });

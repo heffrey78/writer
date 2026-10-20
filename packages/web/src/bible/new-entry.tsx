@@ -1,6 +1,6 @@
 import { ApiError } from "@writer/client";
 import type { Book } from "@writer/core";
-import { slugify } from "@writer/core";
+import { slugify, vocabulary } from "@writer/core";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog } from "radix-ui";
 import { useState, type FormEvent, type ReactNode } from "react";
@@ -48,7 +48,7 @@ export function NewEntryDialog({
   const [name, setName] = useState("");
   const [chosen, setChosen] = useState(type ?? novel.entityTypes[0]?.key ?? "character");
   const kind = type ?? chosen;
-  const label = novel.entityTypes.find((t) => t.key === kind)?.label ?? "entry";
+  const label = novel.entityTypes.find((t) => t.key === kind)?.label ?? vocabulary(novel.kind).entity.One;
   const create = useMutation({
     mutationFn: () => api.bible.createEntity(novelId, kind, { name: name.trim() }),
     onSuccess: async ({ id }) => {
@@ -111,7 +111,7 @@ export function NewTypeDialog({ novelId, novel, open, onOpenChange }: { novelId:
   });
   const taken = novel.entityTypes.some((t) => t.key === key);
   return (
-    <Frame open={open} onOpenChange={onOpenChange} title="New entry type">
+    <Frame open={open} onOpenChange={onOpenChange} title={`New ${vocabulary(novel.kind).entity.one} type`}>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -124,7 +124,7 @@ export function NewTypeDialog({ novelId, novel, open, onOpenChange }: { novelId:
           label="ID prefix"
           value={prefix ?? suggested}
           onChange={(e) => setPrefix(e.target.value.toLowerCase())}
-          hint={`Entries get IDs like ${(prefix ?? suggested) || "art"}_4k8h2c. 2 to 8 letters, not used by another type.`}
+          hint={`${vocabulary(novel.kind).entity.Many} get IDs like ${(prefix ?? suggested) || "art"}_4k8h2c. 2 to 8 letters, not used by another type.`}
           pattern="[a-z]{2,8}"
         />
         {taken && <p className="text-sm text-danger">There's already a type called that.</p>}

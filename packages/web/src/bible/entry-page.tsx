@@ -1,5 +1,5 @@
 import type { EntityFields, Reference } from "@writer/client";
-import { entityOfLabel, type Entity, type Book, type Relationship, type SceneLink } from "@writer/core";
+import { entityOfLabel, vocabulary, type Entity, type Book, type Relationship, type SceneLink } from "@writer/core";
 import { useGitHubRepo } from "../github/repo.ts";
 import { EntryIssues } from "../issues/entry-issues.tsx";
 import { useIssueList } from "../issues/use-issues.ts";
@@ -292,7 +292,7 @@ export function EntryPage({
       <RelationshipArcs novelId={novelId} novel={novel} entity={entity} compact={tab} />
       {tab && (
         <Link to={`/novels/${novelId}/bible/${entity.id}`} className="justify-self-start text-sm text-accent underline decoration-accent/35 underline-offset-[3px] hover:decoration-accent">
-          Open the full entry
+          Open the full {vocabulary(novel.kind).entity.one}
         </Link>
       )}
 
@@ -301,11 +301,11 @@ export function EntryPage({
           <AlertDialog.Overlay className="fixed inset-0 z-[60] bg-black/40" />
           <AlertDialog.Content className="fixed top-1/2 left-1/2 z-[60] grid max-h-[80vh] w-[min(32rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 gap-3 overflow-y-auto rounded-lg border border-rule bg-raised p-5 text-ink shadow-xl">
             <AlertDialog.Title className="text-base font-semibold">Delete “{entity.name}”? The story still refers to it.</AlertDialog.Title>
-            <AlertDialog.Description className="text-sm text-muted">These will point at an entry that no longer exists, and the validator will list them until they're changed:</AlertDialog.Description>
+            <AlertDialog.Description className="text-sm text-muted">These will point at {vocabulary(novel.kind).entity.a} that no longer exists, and the validator will list them until they're changed:</AlertDialog.Description>
             <ul className="grid gap-1 text-sm">
               {references?.map((r) => (
                 <li key={`${r.kind}:${r.id}`}>
-                  {r.kind === "scene" ? `Scene “${r.title}” (${r.via.map((v) => VIA[v as SceneLink] ?? v).join(", ")})` : r.kind === "event" ? `Event “${r.title}”` : r.kind === "entity" ? `Entry “${r.title}”` : r.kind === "note" ? `Note “${r.title}”` : `Relationship: ${r.type} ${novel.entities.find((e) => e.id === r.other)?.name ?? r.other}`}
+                  {r.kind === "scene" ? `${vocabulary(novel.kind).piece.One} “${r.title}” (${r.via.map((v) => VIA[v as SceneLink] ?? v).join(", ")})` : r.kind === "event" ? `Event “${r.title}”` : r.kind === "entity" ? `${vocabulary(novel.kind).entity.One} “${r.title}”` : r.kind === "note" ? `Note “${r.title}”` : `Relationship: ${r.type} ${novel.entities.find((e) => e.id === r.other)?.name ?? r.other}`}
                 </li>
               ))}
             </ul>

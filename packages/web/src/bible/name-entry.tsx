@@ -1,4 +1,4 @@
-import type { Book } from "@writer/core";
+import { vocabulary, type Book } from "@writer/core";
 import { useState } from "react";
 import { Button } from "../ui/button.tsx";
 import { Modal } from "../ui/dialog.tsx";
@@ -9,7 +9,7 @@ import { useNaming } from "./quick-entry.ts";
 export function NameEntryDialog({ novel }: { novel: Book }) {
   const { type, answer } = useNaming();
   if (!type) return null;
-  const label = (novel.entityTypes.find((t) => t.key === type)?.label ?? "entry").toLowerCase();
+  const label = (novel.entityTypes.find((t) => t.key === type)?.label ?? vocabulary(novel.kind).entity.one).toLowerCase();
   return <Ask key={type} label={label} answer={answer} />;
 }
 

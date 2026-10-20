@@ -1,4 +1,4 @@
-import { entryPresences, proseText, storyTimeline, type Entity, type EntryPresence, type Book } from "@writer/core";
+import { entryPresences, proseText, storyTimeline, vocabulary, type Entity, type EntryPresence, type Book, type Vocabulary } from "@writer/core";
 import { useNewEvent } from "../events/new-event.tsx";
 import { whenOf } from "../novel/scene-details.tsx";
 import { Plus, Search } from "lucide-react";
@@ -10,15 +10,16 @@ import { pictureAlt, shapeForType } from "./pictures.ts";
 import { NewTypeDialog } from "./new-entry.tsx";
 import { RelationshipTypes } from "./relationship-types.tsx";
 import { markWords } from "./strip.tsx";
+import { useWords } from "../novel/kind.ts";
 import { entriesByType, matches, plural } from "./types.ts";
 import { PAGE } from "../ui/page.ts";
 import { cn } from "../ui/cn.ts";
 
 type Sort = "first" | "name" | "most";
-const SORTS: { key: Sort; label: string }[] = [
+const sorts = (w: Vocabulary): { key: Sort; label: string }[] => [
   { key: "first", label: "First appearance" },
   { key: "name", label: "Name" },
-  { key: "most", label: "Most scenes" },
+  { key: "most", label: `Most ${w.piece.many}` },
 ];
 
 const MARK = { carries: "bg-accent", present: "bg-accent/40", mentioned: "bg-accent/15", absent: "bg-rule/60" } as const;
@@ -29,6 +30,7 @@ const MARK = { carries: "bg-accent", present: "bg-accent/40", mentioned: "bg-acc
  * first appearance, name or most scenes. An entry or an event opens in a modal over it (`over`, heffrey78/gh-writer#236, heffrey78/gh-writer#237).
  */
 export function BiblePage({ novelId, novel, over }: { novelId: string; novel: Book; over?: ReactNode }) {
+  const w = vocabulary(novel.kind);
   const [params, setParams] = useSearchParams();
   const query = params.get("q") ?? "";
   const navigate = useNavigate();
@@ -66,18 +68,18 @@ export function BiblePage({ novelId, novel, over }: { novelId: string; novel: Bo
   return (
     <div className={cn(PAGE, "grid gap-6")}>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold">Story bible</h1>
+        <h1 className="text-xl font-semibold">{w.codex.One}</h1>
         <div className="flex gap-2">
           <Button onClick={() => setAddingType(true)}>New type</Button>
           <Button variant="primary" onClick={() => add()}>
-            <Plus className="size-4" aria-hidden /> New entry
+            <Plus className="size-4" aria-hidden /> New {w.entity.one}
           </Button>
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative min-w-60 flex-1">
           <label htmlFor={searchId} className="sr-only">
-            Search the bible
+            Search the {w.codex.short}
           </label>
           <Search className="pointer-events-none absolute top-2.5 left-3 size-4 text-muted" aria-hidden />
           <input
@@ -92,7 +94,7 @@ export function BiblePage({ novelId, novel, over }: { novelId: string; novel: Bo
         <label htmlFor={sortId} className="flex items-center gap-2 text-sm text-muted">
           Sort
           <select id={sortId} value={sort} onChange={(e) => setParam("sort", e.target.value === "first" ? undefined : e.target.value)} className="h-9 rounded-md border border-rule bg-raised px-2 text-ink">
-            {SORTS.map((s) => (
+            {sorts(w).map((s) => (
               <option key={s.key} value={s.key}>
                 {s.label}
               </option>
@@ -102,7 +104,7 @@ export function BiblePage({ novelId, novel, over }: { novelId: string; novel: Bo
       </div>
       {query && (
         <p role="status" className="text-sm text-muted">
-          {found === 1 ? "1 entry" : `${found} entries`} match “{query}” (and the off-page events below that do)
+          {w.entity.count(found)} match “{query}” (and the off-page events below that do)
         </p>
       )}
       {groups.map(({ type, entries, shown }) =>
@@ -147,7 +149,8 @@ function EntryCard({ novelId, entity, presence }: { novelId: string; entity: Ent
   const url = usePictureUrl(novelId, entity.image);
   const count = presence?.count ?? 0;
   const n = presence?.scenes.length ?? 0;
-  const words = markWords(entity.type);
+  const w = useWords();
+  const words = markWords(entity.type, w);
   const facts = [
     ...Object.entries(entity.fields)
       .slice(0, 2)
@@ -191,7 +194,7 @@ function EntryCard({ novelId, entity, presence }: { novelId: string; entity: Ent
             ))}
           </span>
         )}
-        <span className="text-xs whitespace-nowrap text-muted">{count === 0 ? "Not in the story yet" : `${count} ${count === 1 ? "scene" : "scenes"}`}</span>
+        <span className="text-xs whitespace-nowrap text-muted">{count === 0 ? "Not in the story yet" : w.piece.count(count)}</span>
       </span>
     </Link>
   );
@@ -245,7 +248,7 @@ function EventCards({ novelId, novel, query, sort }: { novelId: string; novel: B
           })}
         </ul>
       ) : (
-        <p className="text-sm text-muted">No off-page events yet: backstory, and what happens between scenes.</p>
+        <p className="text-sm text-muted">No off-page events yet: backstory, and what happens between {vocabulary(novel.kind).piece.many}.</p>
       )}
     </section>
   );

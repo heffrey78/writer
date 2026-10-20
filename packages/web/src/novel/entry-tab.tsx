@@ -1,4 +1,4 @@
-import type { Book } from "@writer/core";
+import { vocabulary, type Book } from "@writer/core";
 import type { SpellService } from "@writer/editor/react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useId, useRef } from "react";
@@ -64,6 +64,7 @@ export function EntryTab({
   spell: { service: SpellService; onAddWord: (w: string) => void } | undefined;
 }) {
   const { history, at, editing, opened, focus, step } = useEntryPanel();
+  const w = vocabulary(novel.kind);
   const id = history[at];
   const headingId = useId();
   const ref = useRef<HTMLElement>(null);
@@ -81,7 +82,7 @@ export function EntryTab({
   if (!id) {
     return (
       <p className="p-4 text-sm text-muted">
-        No entry open. Choose a name on the Scene tab, or point at a name in the text (or put the caret on it and press Alt+Enter) and choose “Open entry”.
+        No {w.entity.one} open. Choose a name on the {w.piece.One} tab, or point at a name in the text (or put the caret on it and press Alt+Enter) and choose “Open {w.entity.one}”.
       </p>
     );
   }
@@ -90,13 +91,13 @@ export function EntryTab({
   return (
     <section ref={ref} tabIndex={-1} aria-labelledby={headingId} className="grid content-start gap-3 p-4 text-sm outline-none">
       <div className="flex items-center gap-1">
-        <button type="button" disabled={at <= 0} onClick={() => step(-1)} aria-label="Previous entry" title="Previous entry" className="rounded p-1 text-muted hover:bg-paper hover:text-ink disabled:opacity-40">
+        <button type="button" disabled={at <= 0} onClick={() => step(-1)} aria-label={`Previous ${w.entity.one}`} title={`Previous ${w.entity.one}`} className="rounded p-1 text-muted hover:bg-paper hover:text-ink disabled:opacity-40">
           <ChevronLeft className="size-4" aria-hidden />
         </button>
-        <button type="button" disabled={at >= history.length - 1} onClick={() => step(1)} aria-label="Next entry" title="Next entry" className="rounded p-1 text-muted hover:bg-paper hover:text-ink disabled:opacity-40">
+        <button type="button" disabled={at >= history.length - 1} onClick={() => step(1)} aria-label={`Next ${w.entity.one}`} title={`Next ${w.entity.one}`} className="rounded p-1 text-muted hover:bg-paper hover:text-ink disabled:opacity-40">
           <ChevronRight className="size-4" aria-hidden />
         </button>
-        <span className="flex-1 text-xs text-muted">{event ? "Off the page" : (type?.label ?? "Entry")}</span>
+        <span className="flex-1 text-xs text-muted">{event ? "Off the page" : (type?.label ?? w.entity.One)}</span>
       </div>
       {entity ? (
         <EntryPage
@@ -113,7 +114,7 @@ export function EntryTab({
       ) : event ? (
         <EventPage key={`${event.id}:${opened}`} novelId={novelId} novel={novel} event={event} workspace={workspace} spell={spell} embedded={{ headingId }} size="tab" />
       ) : (
-        <p id={headingId}>This entry no longer exists.</p>
+        <p id={headingId}>This {w.entity.one} no longer exists.</p>
       )}
     </section>
   );

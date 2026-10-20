@@ -1,4 +1,4 @@
-import { entryPresence, locationProfile, plotlineProfile, readFrontMatter, themeProfile, type Entity, type Book, type Piece, type Tally } from "@writer/core";
+import { entryPresence, locationProfile, plotlineProfile, readFrontMatter, themeProfile, vocabulary, type Entity, type Book, type Piece, type Tally, type Word } from "@writer/core";
 import { joinSceneFile } from "@writer/editor";
 import { useMemo } from "react";
 import { Link } from "react-router";
@@ -23,7 +23,7 @@ export function TypeSections({ novelId, novel, entity, workspace }: { novelId: s
 }
 
 /** "Ada Varn (4), Ben Varn (4)", each a link to the entry. */
-function Tallied({ novelId, tally, unit }: { novelId: string; tally: Tally[]; unit: string }) {
+function Tallied({ novelId, tally, unit }: { novelId: string; tally: Tally[]; unit: Word }) {
   return (
     <ul className="flex flex-wrap gap-x-3 gap-y-1">
       {tally.map((t) => (
@@ -32,7 +32,7 @@ function Tallied({ novelId, tally, unit }: { novelId: string; tally: Tally[]; un
             {t.name}
           </Link>{" "}
           <span className="text-muted">
-            ({t.scenes} {t.scenes === 1 ? unit : `${unit}s`})
+            ({unit.count(t.scenes)})
           </span>
         </li>
       ))}
@@ -48,9 +48,10 @@ const sceneLink = (novelId: string, scene: Piece) => (
 
 function LocationSection({ novelId, novel, entity }: { novelId: string; novel: Book; entity: Entity }) {
   const p = useMemo(() => locationProfile(novel, entity.id), [novel, entity.id]);
+  const w = vocabulary(novel.kind);
   return (
     <ProfileSection title="Who comes here">
-      {p.visitors.length ? <Tallied novelId={novelId} tally={p.visitors} unit="scene" /> : <p className="text-sm text-muted">No one yet: no scene set here has characters.</p>}
+      {p.visitors.length ? <Tallied novelId={novelId} tally={p.visitors} unit={w.piece} /> : <p className="text-sm text-muted">No one yet: no {w.piece.one} set here has characters.</p>}
       {p.span && <p className="text-sm">Story time: {p.span.from === p.span.to ? p.span.from : `${p.span.from} to ${p.span.to}`}.</p>}
     </ProfileSection>
   );
@@ -58,6 +59,7 @@ function LocationSection({ novelId, novel, entity }: { novelId: string; novel: B
 
 function PlotlineSection({ novelId, novel, entity, workspace }: { novelId: string; novel: Book; entity: Entity; workspace: Workspace }) {
   const p = useMemo(() => plotlineProfile(novel, entity.id), [novel, entity.id]);
+  const w = vocabulary(novel.kind);
   const place = useInPlace();
   const title = (id: string) => novel.allPieces.find((s) => s.id === id)?.title ?? id;
 
@@ -76,7 +78,9 @@ function PlotlineSection({ novelId, novel, entity, workspace }: { novelId: strin
   return (
     <ProfileSection title="Beats">
       {p.beats.length === 0 ? (
-        <p className="text-sm text-muted">No scene has a beat of {entity.name} yet.</p>
+        <p className="text-sm text-muted">
+          No {w.piece.one} has a beat of {entity.name} yet.
+        </p>
       ) : (
         <ol className="grid gap-1.5 text-sm">
           {p.beats.map((b) => {
@@ -111,7 +115,7 @@ function PlotlineSection({ novelId, novel, entity, workspace }: { novelId: strin
       <ul className="grid list-disc gap-1 pl-5 text-sm">
         {p.skips.length > 0 && (
           <li>
-            Skips {p.skips.length === 1 ? "one scene" : `${p.skips.length} scenes`} between its first beat and its last:{" "}
+            Skips {p.skips.length === 1 ? `one ${w.piece.one}` : w.piece.count(p.skips.length)} between its first beat and its last:{" "}
             {p.skips.map((s, i) => (
               <span key={s.id}>
                 {i > 0 && ", "}
@@ -130,13 +134,13 @@ function PlotlineSection({ novelId, novel, entity, workspace }: { novelId: strin
       {p.who.length > 0 && (
         <div className="grid gap-1 text-sm">
           <h3 className="text-[13px] text-muted">Who's in it</h3>
-          <Tallied novelId={novelId} tally={p.who} unit="scene" />
+          <Tallied novelId={novelId} tally={p.who} unit={w.piece} />
         </div>
       )}
       {p.where.length > 0 && (
         <div className="grid gap-1 text-sm">
           <h3 className="text-[13px] text-muted">Where it happens</h3>
-          <Tallied novelId={novelId} tally={p.where} unit="scene" />
+          <Tallied novelId={novelId} tally={p.where} unit={w.piece} />
         </div>
       )}
     </ProfileSection>
@@ -149,13 +153,14 @@ function ThemeSection({ novel, entity }: { novel: Book; entity: Entity }) {
   const p = useMemo(() => themeProfile(novel, entity.id), [novel, entity.id]);
   const presence = useMemo(() => entryPresence(novel, entity.id), [novel, entity.id]);
   const n = p.strengths.length;
+  const w = vocabulary(novel.kind);
   if (!presence || n === 0) return null;
   return (
-    <ProfileSection title="Strength, scene by scene">
+    <ProfileSection title={`Strength, ${w.piece.one} by ${w.piece.one}`}>
       <div className="grid grid-cols-[6.5rem_minmax(0,1fr)] items-end gap-x-3 gap-y-1.5">
         <StripHeader presence={presence} />
         <StripRow label="Strength" columns={n} className="h-12 items-end">
-          <ol aria-label="Strength in each scene, in reading order" className="contents">
+          <ol aria-label={`Strength in each ${w.piece.one}, in reading order`} className="contents">
             {p.strengths.map(({ scene, strength, note }) => {
               const said = `${scene.title}: ${STRENGTH[strength]}${strength ? ` (${strength})` : ""}${note ? `, ${note}` : ""}`;
               return (

@@ -18,6 +18,8 @@ export interface Noun {
   plural: string;
   /** What goes before it, where its first letter doesn't tell: "an" for "Hour", "a" for "Unicorn". */
   article?: "a" | "an";
+  /** A shorter name, once the full one has been said: "Bible" for "Story bible". */
+  short?: string;
 }
 
 /**

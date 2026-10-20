@@ -22,9 +22,9 @@ describe("picture shapes", () => {
 
 describe("refusing a file before it's read", () => {
   it("refuses one over GitHub's 100 MB limit, and one that isn't an image", () => {
-    expect(refusal({ size: MAX_PICTURE_BYTES + 1, type: "image/jpeg", name: "huge.jpg" })).toBe("huge.jpg is 100.0 MB: larger than GitHub's 100 MB limit, so it can't be kept in the novel. Try a smaller copy.");
-    expect(refusal({ size: 10, type: "application/pdf", name: "notes.pdf" })).toContain("isn't an image");
-    expect(refusal({ size: 10_000, type: "image/png" })).toBeUndefined();
+    expect(refusal({ size: MAX_PICTURE_BYTES + 1, type: "image/jpeg", name: "huge.jpg" }, "novel")).toBe("huge.jpg is 100.0 MB: larger than GitHub's 100 MB limit, so it can't be kept in the novel. Try a smaller copy.");
+    expect(refusal({ size: 10, type: "application/pdf", name: "notes.pdf" }, "novel")).toContain("isn't an image");
+    expect(refusal({ size: 10_000, type: "image/png" }, "novel")).toBeUndefined();
   });
 });
 

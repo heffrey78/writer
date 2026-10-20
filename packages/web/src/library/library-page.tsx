@@ -177,6 +177,8 @@ function Book({ novel, menus }: { novel: LibraryEntry; menus: HTMLElement | null
   // The book's own cover (heffrey78/gh-writer#168), set or changed from its menu, as from Compile.
   const shown = () => Promise.all([queryClient.invalidateQueries({ queryKey: keys.library }), queryClient.invalidateQueries({ queryKey: keys.novel(novel.id) })]);
   const cover = usePictureFlow({
+    // The shelf doesn't know a book's kind yet (#22's shelf area).
+    book: "novel",
     name: novel.title,
     shape: SHAPES.cover,
     onSave: async (picture) => {

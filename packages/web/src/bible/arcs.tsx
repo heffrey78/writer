@@ -1,4 +1,4 @@
-import { entryPresence, relationshipsAt, relationshipStyle, type Entity, type Book, type Relationship } from "@writer/core";
+import { entryPresence, relationshipsAt, relationshipStyle, vocabulary, type Entity, type Book, type Relationship } from "@writer/core";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
 import { DropdownMenu } from "radix-ui";
@@ -151,7 +151,7 @@ export function RelationshipArcs({ novelId, novel, entity, compact }: { novelId:
             {/* The marker: one scene at a time, by arrow keys or a click, read below. */}
             <div className={cn("grid items-center gap-x-3", cols)}>
               <span className="text-[13px] text-muted">Read at</span>
-              <div role="radiogroup" aria-label="Read the relationships at a scene" className="grid gap-[3px]" style={{ gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))` }}>
+              <div role="radiogroup" aria-label={`Read the relationships at ${vocabulary(novel.kind).piece.a}`} className="grid gap-[3px]" style={{ gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))` }}>
                   {presence.scenes.map(({ scene: s }, i) => (
                     <label key={s.id} title={s.title} className={cn("flex cursor-pointer justify-center rounded-sm text-[11px] leading-4 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent", i === at ? "text-ink" : "text-rule hover:text-muted")}>
                       <input type="radio" name={markerName} checked={i === at} onChange={() => setAt(i)} className="sr-only" />
@@ -183,7 +183,7 @@ export function RelationshipArcs({ novelId, novel, entity, compact }: { novelId:
         open={dialog?.kind === "remove"}
         onOpenChange={(o) => !o && setDialog(undefined)}
         title="Remove this relationship?"
-        description={dialog?.kind === "remove" ? `“${describe(novel, entity.id, dialog.relationship)}” will no longer be in the bible.` : ""}
+        description={dialog?.kind === "remove" ? `“${describe(novel, entity.id, dialog.relationship)}” will no longer be in the ${vocabulary(novel.kind).codex.short}.` : ""}
         action="Remove"
         danger
         onConfirm={() => dialog?.kind === "remove" && remove.mutate(dialog.relationship.id)}

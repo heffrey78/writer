@@ -43,9 +43,9 @@ export function expectedPath(shape: PictureShape, name: string, png: boolean): s
 /** GitHub refuses files over 100 MB; so does the app, before reading them. */
 export const MAX_PICTURE_BYTES = 100 * 1024 * 1024;
 
-/** Why a file can't be a picture, before it's read, or undefined if it may be one. */
-export function refusal(file: { size: number; type: string; name?: string }): string | undefined {
-  if (file.size > MAX_PICTURE_BYTES) return `${file.name ?? "That image"} is ${megabytes(file.size)}: larger than GitHub's 100 MB limit, so it can't be kept in the novel. Try a smaller copy.`;
+/** Why a file can't be a picture in a book (`book` is what its kind calls it), before it's read, or undefined if it may be one. */
+export function refusal(file: { size: number; type: string; name?: string }, book: string): string | undefined {
+  if (file.size > MAX_PICTURE_BYTES) return `${file.name ?? "That image"} is ${megabytes(file.size)}: larger than GitHub's 100 MB limit, so it can't be kept in the ${book}. Try a smaller copy.`;
   if (file.type && !file.type.startsWith("image/")) return `${file.name ?? "That file"} isn't an image. Choose a photo or a picture (JPEG, PNG, WebP…).`;
   return undefined;
 }

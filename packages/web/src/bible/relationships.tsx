@@ -1,4 +1,4 @@
-import type { Entity, Book, Relationship } from "@writer/core";
+import { vocabulary, type Entity, type Book, type Relationship } from "@writer/core";
 import { describeRelationship as describe } from "@writer/core/diagrams";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog } from "radix-ui";
@@ -96,7 +96,7 @@ export function AddRelationshipDialog({
     <Frame open onOpenChange={(o) => !o && onClose()} title={`New relationship for ${entity.name}`}>
       <form onSubmit={submit} className="grid gap-3">
         <RoleSelect options={options} value={chosen} onChange={setRole} />
-        <Picker label="With" items={entityItems(novel, entity.id)} value={other} onChange={setOther} placeholder="Choose an entry…" />
+        <Picker label="With" items={entityItems(novel, entity.id)} value={other} onChange={setOther} placeholder={`Choose ${vocabulary(novel.kind).entity.a}…`} />
         <Picker label="From" items={sceneItems(novel)} value={since} onChange={setSince} placeholder="The beginning" allowNone />
         <Picker label="Until" items={sceneItems(novel)} value={until} onChange={setUntil} placeholder="The end" allowNone />
         <Field label="Note" value={note} onChange={(e) => setNote(e.target.value)} />
@@ -159,7 +159,7 @@ export function RelationshipAtSceneDialog({
         }}
         className="grid gap-3"
       >
-        <Picker label={kind === "end" ? "It no longer holds from" : "It changes at"} items={sceneItems(novel)} value={at} onChange={setAt} placeholder="Choose a scene…" />
+        <Picker label={kind === "end" ? "It no longer holds from" : "It changes at"} items={sceneItems(novel)} value={at} onChange={setAt} placeholder={`Choose ${vocabulary(novel.kind).piece.a}…`} />
         {kind === "change" && (
           <>
             <RoleSelect options={options} value={chosen} onChange={setRole} label="From then on" />

@@ -1,4 +1,4 @@
-import { pieceSections, type Book } from "@writer/core";
+import { pieceSections, vocabulary, type Book } from "@writer/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { useId, useState } from "react";
 import { api, keys } from "../api.ts";
@@ -175,6 +175,7 @@ function CoverRow({ novelId, novel }: { novelId: string; novel: Book }) {
   const [removing, setRemoving] = useState(false);
   const shown = () => Promise.all([queryClient.invalidateQueries({ queryKey: keys.novel(novelId) }), queryClient.invalidateQueries({ queryKey: keys.library })]);
   const flow = usePictureFlow({
+    book: vocabulary(novel.kind).book.one,
     name: title,
     shape: SHAPES.cover,
     onSave: async (picture) => {

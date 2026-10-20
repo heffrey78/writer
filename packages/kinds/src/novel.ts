@@ -13,7 +13,7 @@ export const novel: BookKind = {
   piece: { key: "scene", label: "Scene", plural: "Scenes", prefix: "sc", list: "scenes" },
   words: {
     content: { label: "Manuscript", plural: "Manuscripts" },
-    codex: { label: "Story bible", plural: "Story bibles" },
+    codex: { label: "Story bible", plural: "Story bibles", short: "Bible" },
     entity: { label: "Entry", plural: "Entries", article: "an" },
   },
   folders: { content: "manuscript", codex: "bible", notes: "notes", events: "events" },

@@ -9,6 +9,7 @@ import { Confirm } from "../ui/confirm.tsx";
 import { cn } from "../ui/cn.ts";
 import { PictureDialog, type PictureSource } from "./picture-dialog.tsx";
 import { objectPosition, pictureAlt, refusal, type PictureShape } from "./pictures.ts";
+import { useWords } from "../novel/kind.ts";
 
 /** The version of each picture the model shows (from the server's `images`), for its URL. */
 export function useImageVersions(novelId: string): Record<string, string> {
@@ -52,7 +53,7 @@ export function pictureWord(shape: PictureShape): string {
  * once if it's too large or not an image), `choose` one, or `recrop` the saved one, then frame it in
  * the dialog. `element` holds the file chooser and the dialog; render it once.
  */
-export function usePictureFlow({ name, shape, onSave }: { name: string; shape: PictureShape; onSave: (picture: Blob, focus: [number, number] | undefined) => Promise<unknown> }): {
+export function usePictureFlow({ book, name, shape, onSave }: { book: string; name: string; shape: PictureShape; onSave: (picture: Blob, focus: [number, number] | undefined) => Promise<unknown> }): {
   take: (file: File | null | undefined) => void;
   choose: () => void;
   recrop: (url: string, path: string, focus: [number, number] | undefined) => Promise<void>;
@@ -67,7 +68,7 @@ export function usePictureFlow({ name, shape, onSave }: { name: string; shape: P
   const take = (file: File | null | undefined) => {
     if (!file) return;
     // Refused at once, before anything is read.
-    const refused = refusal(file);
+    const refused = refusal(file, book);
     setProblem(refused);
     if (!refused) setSource({ source: { blob: file, name: file.name || "Pasted image" } });
   };
@@ -86,6 +87,7 @@ export function usePictureFlow({ name, shape, onSave }: { name: string; shape: P
       {source && (
         <PictureDialog
           title={pictureAlt(shape, name)}
+          book={book}
           name={name}
           shape={shape}
           source={source.source}
@@ -156,7 +158,8 @@ export function PictureSlot({
   const hint = useId();
   const word = pictureWord(shape);
   const alt = pictureAlt(shape, name);
-  const { take, choose, recrop, problem, setProblem, element } = usePictureFlow({ name, shape, onSave });
+  const w = useWords();
+  const { take, choose, recrop, problem, setProblem, element } = usePictureFlow({ book: w.book.one, name, shape, onSave });
   const { over, handlers: drop } = usePictureDrop(take);
   const box = cn("relative shrink-0 overflow-hidden rounded-lg", shape.key === "wide" ? "aspect-video w-48" : "aspect-[4/5] w-32", className);
 
@@ -208,7 +211,7 @@ export function PictureSlot({
         open={removing}
         onOpenChange={setRemoving}
         title={`Remove the ${word}?`}
-        description={image?.startsWith("images/") ? `${alt} is taken away, and its file deleted from images/. The novel's history keeps it.` : `${alt} is taken away; its file stays where it is.`}
+        description={image?.startsWith("images/") ? `${alt} is taken away, and its file deleted from images/. The ${w.book.one}'s history keeps it.` : `${alt} is taken away; its file stays where it is.`}
         action="Remove"
         danger
         onConfirm={() => void onRemove().catch((e: unknown) => setProblem(e instanceof Error ? e.message : String(e)))}

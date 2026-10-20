@@ -1,4 +1,4 @@
-import { entryPresence, type Entity, type EntryPresence, type Book, type PresenceMark } from "@writer/core";
+import { entryPresence, vocabulary, type Entity, type EntryPresence, type Book, type PresenceMark, type Vocabulary } from "@writer/core";
 import { useMemo, type CSSProperties, type ReactNode } from "react";
 import { Link } from "react-router";
 import { cn } from "../ui/cn.ts";
@@ -11,12 +11,12 @@ import { ProfileSection } from "./profile.tsx";
  */
 
 /** What each mark means for an entry of a type, as read aloud and in the legend. */
-export function markWords(type: string): Record<Exclude<PresenceMark, "absent">, string | undefined> {
-  if (type === "character") return { carries: "point of view", present: "in the scene", mentioned: "mentioned" };
+export function markWords(type: string, w: Vocabulary): Record<Exclude<PresenceMark, "absent">, string | undefined> {
+  if (type === "character") return { carries: "point of view", present: `in the ${w.piece.one}`, mentioned: "mentioned" };
   if (type === "plotline") return { carries: "a major beat", present: "a minor beat", mentioned: "mentioned" };
   if (type === "theme") return { carries: "strongly", present: "present", mentioned: "mentioned" };
   if (type === "location") return { carries: undefined, present: "set here", mentioned: "mentioned" };
-  return { carries: undefined, present: "in the scene", mentioned: "mentioned" };
+  return { carries: undefined, present: `in the ${w.piece.one}`, mentioned: "mentioned" };
 }
 
 const CELL: Record<PresenceMark, string> = {
@@ -81,19 +81,20 @@ export function StripHeader({ presence }: { presence: EntryPresence }) {
 export function InTheStory({ novelId, novel, entity, compact }: { novelId: string; novel: Book; entity: Entity; compact?: boolean }) {
   const presence = useMemo(() => entryPresence(novel, entity.id), [novel, entity.id]);
   if (!presence) return null;
-  const words = markWords(entity.type);
+  const w = vocabulary(novel.kind);
+  const words = markWords(entity.type, w);
   const said = (mark: PresenceMark) => (mark === "absent" ? "not there" : words[mark] ?? words.present);
   const n = presence.scenes.length;
 
   return (
     <ProfileSection title="In the story">
       {n === 0 ? (
-        <p className="text-sm text-muted">The book has no scenes yet.</p>
+        <p className="text-sm text-muted">The book has no {w.piece.many} yet.</p>
       ) : (
         <div className={cn("grid items-center gap-x-3 gap-y-1.5", compact ? "grid-cols-[3.5rem_minmax(0,1fr)]" : "grid-cols-[6.5rem_minmax(0,1fr)]")}>
           <StripHeader presence={presence} />
-          <StripRow label="Scenes" columns={n}>
-            <ol aria-label="Scenes, in reading order" className="contents">
+          <StripRow label={w.piece.Many} columns={n}>
+            <ol aria-label={`${w.piece.Many}, in reading order`} className="contents">
               {presence.scenes.map(({ scene, mark }) => {
                 const name = `${scene.title}: ${said(mark)}`;
                 const cell = cn("block h-4 rounded-sm", CELL[mark]);
@@ -126,17 +127,19 @@ export function InTheStory({ novelId, novel, entity, compact }: { novelId: strin
       )}
       <ul className="grid list-disc gap-1 pl-5 text-sm">
         {presence.count === 0 ? (
-          <li>Not in the story yet: no scene lists or mentions {entity.name}.</li>
+          <li>
+            Not in the story yet: no {w.piece.one} lists or mentions {entity.name}.
+          </li>
         ) : (
           <li>
-            In {presence.count === n ? `all ${n}` : `${presence.count} of ${n}`} {n === 1 ? "scene" : "scenes"}
+            In {presence.count === n ? `all ${n}` : `${presence.count} of ${n}`} {n === 1 ? w.piece.one : w.piece.many}
             {presence.first && presence.last && presence.first !== presence.last ? `, from “${presence.first.title}” to “${presence.last.title}”` : presence.first ? `: “${presence.first.title}”` : ""}
             {words.carries && presence.carries > 0 ? `; ${words.carries} in ${presence.carries}` : ""}.
           </li>
         )}
         {presence.longestAbsence && (
           <li>
-            Longest absence: {presence.longestAbsence.scenes} {presence.longestAbsence.scenes === 1 ? "scene" : "scenes"}
+            Longest absence: {w.piece.count(presence.longestAbsence.scenes)}
             {presence.longestAbsence.scenes === 1 ? ` (“${presence.longestAbsence.from.title}”)` : `, “${presence.longestAbsence.from.title}” to “${presence.longestAbsence.to.title}”`}.
           </li>
         )}

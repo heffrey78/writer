@@ -1,4 +1,4 @@
-import { proseText, relationshipsAt, type Book, type Piece } from "@writer/core";
+import { proseText, relationshipsAt, vocabulary, type Book, type Piece } from "@writer/core";
 import type { MentionTarget } from "@writer/editor";
 import type { Editor } from "@tiptap/core";
 import { X } from "lucide-react";
@@ -134,7 +134,7 @@ export function MentionCard({ novelId, novel }: { novelId: string; novel: Book }
       <div className="flex items-start justify-between gap-2">
         {entity && picture && <Picture src={picture} alt={pictureAlt(shapeForType(entity.type), entity.name)} focus={entity.imageFocus} className="size-13 shrink-0 rounded-full" />}
         <div className="flex-1">
-          <p className="text-xs text-muted">{event ? OFF_THE_PAGE : (type?.label ?? "Unknown entry")}</p>
+          <p className="text-xs text-muted">{event ? OFF_THE_PAGE : (type?.label ?? `Unknown ${vocabulary(novel.kind).entity.one}`)}</p>
           <h2 id={headingId} className="font-semibold">
             {entity?.name ?? event?.title ?? card.id}
           </h2>
@@ -172,7 +172,7 @@ export function MentionCard({ novelId, novel }: { novelId: string; novel: Book }
           </div>
         </>
       ) : !entity ? (
-        <p className="text-muted">No entry or event has this ID. It may have been deleted.</p>
+        <p className="text-muted">No {vocabulary(novel.kind).entity.one} or event has this ID. It may have been deleted.</p>
       ) : (
         <>
           {entity.summary && <Lead size="card">{entity.summary}</Lead>}
@@ -195,7 +195,7 @@ export function MentionCard({ novelId, novel }: { novelId: string; novel: Book }
                 openEntry(entity.id);
               }}
             >
-              Open entry
+              Open {vocabulary(novel.kind).entity.one}
             </Button>
           </div>
         </>

@@ -22,6 +22,7 @@ const STAGE = { width: 340, height: 400 };
  */
 export function PictureDialog({
   title,
+  book,
   name,
   shape,
   source,
@@ -31,6 +32,8 @@ export function PictureDialog({
   onClose,
 }: {
   title: string;
+  /** What the book's kind calls it, for saying why a file can't be kept in it: "novel". */
+  book: string;
   /** What it's a picture of: names the file it's saved as. */
   name: string;
   shape: PictureShape;
@@ -58,7 +61,7 @@ export function PictureDialog({
   useEffect(() => {
     let cancelled = false;
     setProblem(undefined);
-    const refused = refusal({ size: file.blob.size, type: file.blob.type, name: file.name });
+    const refused = refusal({ size: file.blob.size, type: file.blob.type, name: file.name }, book);
     if (refused) return setProblem(refused);
     let made: { bitmap: ImageBitmap; url: string } | undefined;
     decodeImage(file.blob).then(
