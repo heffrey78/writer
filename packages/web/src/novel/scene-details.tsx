@@ -1,4 +1,4 @@
-import { countWords, dayOneFor, itemText, pieceSections, readFrontMatter, sceneFacts, type Book, type FieldDef, type ItemProp, type YamlEdit } from "@writer/core";
+import { countWords, dayOneFor, itemText, pieceLevel, pieceSections, readFrontMatter, sceneFacts, vocabulary, type Book, type FieldDef, type ItemProp, type YamlEdit } from "@writer/core";
 import { chapterTitle } from "@writer/core/diagrams";
 import { joinSceneFile } from "@writer/editor";
 import { ChevronLeft, ChevronRight, Pencil, Pin, Plus, X } from "lucide-react";
@@ -413,6 +413,7 @@ export function SceneDetails({
     </div>
   );
 
+  const w = vocabulary(novel.kind);
   const pin = (key: string, label: string) => {
     const on = pins.keys.includes(key);
     return (
@@ -420,8 +421,8 @@ export function SceneDetails({
         type="button"
         onClick={() => pins.toggle(key)}
         aria-pressed={on}
-        aria-label={`Pin ${label.toLowerCase()} under the scene titles`}
-        title={on ? "Pinned under the scene titles" : "Pin under the scene titles"}
+        aria-label={`Pin ${label.toLowerCase()} under the ${w.piece.one} titles`}
+        title={on ? `Pinned under the ${w.piece.one} titles` : `Pin under the ${w.piece.one} titles`}
         className={cn("shrink-0 rounded p-1 hover:bg-paper hover:text-ink", on ? "text-accent" : "text-muted opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-60")}
       >
         <Pin className="size-3.5" fill={on ? "currentColor" : "none"} aria-hidden />
@@ -451,17 +452,17 @@ export function SceneDetails({
             {title}
           </h2>
           <p className="text-xs text-muted">
-            {chapter ? `${chapterTitle(novel, chapter)} · scene ${at + 1} of ${chapter.childIds.length}` : "Not in a chapter"}
+            {chapter ? `${chapterTitle(novel, chapter)} · ${w.piece.one} ${at + 1} of ${chapter.childIds.length}` : `Not in ${w.level(pieceLevel(novel)).a}`}
             {/* Its length as it's written (the text's own count, from its file). */}
             {file && ` · ${words.format(countWords(file.body))} words`}
           </p>
         </div>
         {onStep && chapter && (
           <>
-            <button type="button" disabled={!prev} onClick={() => prev && onStep(prev)} aria-label="Previous scene" title="Previous scene" className="rounded p-1 text-muted hover:bg-paper hover:text-ink disabled:opacity-40">
+            <button type="button" disabled={!prev} onClick={() => prev && onStep(prev)} aria-label={`Previous ${w.piece.one}`} title={`Previous ${w.piece.one}`} className="rounded p-1 text-muted hover:bg-paper hover:text-ink disabled:opacity-40">
               <ChevronLeft className="size-4" aria-hidden />
             </button>
-            <button type="button" disabled={!next} onClick={() => next && onStep(next)} aria-label="Next scene" title="Next scene" className="rounded p-1 text-muted hover:bg-paper hover:text-ink disabled:opacity-40">
+            <button type="button" disabled={!next} onClick={() => next && onStep(next)} aria-label={`Next ${w.piece.one}`} title={`Next ${w.piece.one}`} className="rounded p-1 text-muted hover:bg-paper hover:text-ink disabled:opacity-40">
               <ChevronRight className="size-4" aria-hidden />
             </button>
           </>

@@ -2,6 +2,7 @@ import { Extension, type Editor } from "@tiptap/core";
 import { createStore } from "zustand/vanilla";
 import type { EditorCommand } from "./modes.ts";
 import type { SearchScope } from "./search.ts";
+import type { EditorWords } from "./words.ts";
 
 /*
  * Opening the find panel. The panel belongs to the app, so the editor's shortcuts (and the
@@ -35,18 +36,23 @@ export function closeFind(): void {
   findPanel.setState({ open: false });
 }
 
-export const findCommands: EditorCommand[] = [
-  { id: "editor.findInScene", title: "Find in scene", keys: "Mod-f", run: (editor) => openFind("scene", editor) },
-  { id: "editor.findInChapter", title: "Find in chapter", run: (editor) => openFind("chapter", editor) },
-  { id: "editor.findInManuscript", title: "Find and replace in manuscript", keys: "Mod-Shift-h", run: (editor) => openFind("manuscript", editor) },
+const FINDS: { id: string; scope: SearchScope; keys?: string; title: (w: EditorWords) => string }[] = [
+  { id: "editor.findInScene", scope: "scene", keys: "Mod-f", title: (w) => `Find in ${w.piece.one}` },
+  { id: "editor.findInChapter", scope: "chapter", title: (w) => `Find in ${w.section.one}` },
+  { id: "editor.findInManuscript", scope: "manuscript", keys: "Mod-Shift-h", title: (w) => `Find and replace in ${w.content.one}` },
 ];
+
+/** The find commands, in the book's words: "Find in scene". */
+export function findCommands(words: EditorWords): EditorCommand[] {
+  return FINDS.map((f) => ({ id: f.id, title: f.title(words), ...(f.keys ? { keys: f.keys } : {}), run: (editor) => openFind(f.scope, editor) }));
+}
 
 /** The find shortcuts, from inside the text. */
 export const FindExtension = Extension.create({
   name: "find",
   addKeyboardShortcuts() {
     const shortcuts: Record<string, () => boolean> = {};
-    for (const command of findCommands) if (command.keys) shortcuts[command.keys] = () => (command.run(this.editor), true);
+    for (const f of FINDS) if (f.keys) shortcuts[f.keys] = () => (openFind(f.scope, this.editor), true);
     return shortcuts;
   },
 });

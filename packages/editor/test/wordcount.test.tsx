@@ -3,6 +3,7 @@ import "./dom.ts";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { countWords } from "@writer/core";
+import { novel } from "@writer/kinds";
 import { Editor } from "@tiptap/core";
 import { Transform } from "@tiptap/pm/transform";
 import { act, cleanup, render, screen } from "@testing-library/react";
@@ -26,6 +27,9 @@ import {
   writingSession,
 } from "../src/index.ts";
 import { ChapterEditor, SceneEditor, WordCount } from "../src/react.tsx";
+import { editorWords } from "../src/words.ts";
+
+const words = editorWords(novel);
 
 const root = join(import.meta.dirname, "../../..");
 const bodies = readdirSync(join(root, "examples/sample-novel/manuscript"), { recursive: true, encoding: "utf8" })
@@ -161,8 +165,8 @@ describe("WordCount", () => {
     let editor: Editor | undefined;
     render(
       <>
-        <ChapterEditor scenes={[{ id: "a", markdown: "One two three.\n" }, { id: "b", markdown: "Four five.\n" }]} onReady={(e) => (editor = e)} />
-        <WordCount />
+        <ChapterEditor label="Chapter text" words={words} scenes={[{ id: "a", markdown: "One two three.\n" }, { id: "b", markdown: "Four five.\n" }]} onReady={(e) => (editor = e)} />
+        <WordCount words={words} />
       </>,
     );
     await act(() => new Promise<void>((done) => requestAnimationFrame(() => done())));
@@ -180,8 +184,8 @@ describe("WordCount", () => {
   test("a single-scene editor shows the chapter count the app gives it", async () => {
     render(
       <>
-        <SceneEditor sceneId="a" markdown={"One two.\n"} />
-        <WordCount chapterWords={1234} />
+        <SceneEditor sceneId="a" label="Scene text" markdown={"One two.\n"} />
+        <WordCount chapterWords={1234} words={words} />
       </>,
     );
     await act(() => new Promise<void>((done) => requestAnimationFrame(() => done())));
@@ -189,7 +193,7 @@ describe("WordCount", () => {
   });
 
   test("hides in focus mode unless pinned", () => {
-    render(<WordCount />);
+    render(<WordCount words={words} />);
     const bar = screen.getByRole("group", { name: "Word count", hidden: true });
     expect(bar.hidden).toBe(false);
     act(() => writingModes.getState().set({ focus: true }));

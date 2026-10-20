@@ -6,7 +6,7 @@ import { Editor } from "@tiptap/core";
 import { UndoRedo } from "@tiptap/extensions";
 import { AllSelection, TextSelection } from "@tiptap/pm/state";
 import { afterEach, describe, expect, test } from "vitest";
-import { chapterContent, getMarkdown, loadChapter, replaceScene, serializeChapter, splitSceneFile, touchedScenes, type SceneSource } from "../src/index.ts";
+import { chapterContent, getMarkdown, loadChapter, replaceScene, Scene, serializeChapter, splitSceneFile, touchedScenes, type SceneSource } from "../src/index.ts";
 
 const chapterDir = join(import.meta.dirname, "../../../examples/sample-novel/manuscript/02-the-sale/01-night-crossing");
 const sample: SceneSource[] = readdirSync(chapterDir)
@@ -23,8 +23,10 @@ const three: SceneSource[] = [
 let editor: Editor;
 afterEach(() => editor?.destroy());
 
-function open(scenes: SceneSource[]): Editor {
-  editor = new Editor({ element: document.createElement("div"), extensions: [...chapterContent, UndoRedo] });
+/** A chapter editor whose scenes are called `piece` at their boundaries, as the app names them from the kind. */
+function open(scenes: SceneSource[], piece = "Scene"): Editor {
+  const content = chapterContent.map((e) => ((e as unknown) === Scene ? Scene.configure({ label: piece }) : e));
+  editor = new Editor({ element: document.createElement("div"), extensions: [...content, UndoRedo] });
   loadChapter(editor, scenes);
   return editor;
 }
@@ -87,6 +89,9 @@ describe("splitting a chapter into scenes", () => {
       ["sc_2", "Scene: Two"],
       ["sc_3", "Scene: Three"],
     ]);
+    editor.destroy();
+    open(three, "Day");
+    expect(editor.view.dom.querySelector("section[data-scene]")!.getAttribute("aria-label")).toBe("Day: One");
   });
 });
 

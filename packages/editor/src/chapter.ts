@@ -34,8 +34,10 @@ export const ChapterDoc = Node.create({
 
 const sceneGuardKey = new PluginKey("ghwSceneGuard");
 
-export const Scene = Node.create({
+export const Scene = Node.create<{ label: string }>({
   name: "scene",
+  /** What a scene is called at its boundary, for screen readers: the kind's word ("Scene"). */
+  addOptions: () => ({ label: "" }),
   // Ahead of the core keymap, so a Backspace over several scenes is handled here first.
   priority: 1100,
   content: "block+",
@@ -49,17 +51,20 @@ export const Scene = Node.create({
     ...hidden({ trailing: "\n", eol: "\n", style: null }),
   }),
   parseHTML: () => [{ tag: "section[data-scene]" }],
-  renderHTML: ({ node }) => [
-    "section",
-    {
-      class: "ghw-scene",
-      "data-scene": node.attrs.id,
-      "data-title": node.attrs.title,
-      role: "group",
-      "aria-label": node.attrs.title ? `Scene: ${node.attrs.title}` : "Scene",
-    },
-    0,
-  ],
+  renderHTML({ node }) {
+    const { label } = this.options;
+    return [
+      "section",
+      {
+        class: "ghw-scene",
+        "data-scene": node.attrs.id,
+        "data-title": node.attrs.title,
+        role: "group",
+        "aria-label": node.attrs.title ? `${label}: ${node.attrs.title}` : label,
+      },
+      0,
+    ];
+  },
   addKeyboardShortcuts() {
     const remove = () => deleteAcrossScenes(this.editor);
     return { Backspace: remove, Delete: remove, "Mod-Backspace": remove, "Mod-Delete": remove };

@@ -16,6 +16,7 @@ import {
   type SearchMatch,
   type SearchScope,
 } from "./search.ts";
+import type { EditorWords } from "./words.ts";
 
 export interface FindReplaceProps {
   /** Every chapter in reading order, with each scene's saved Markdown. */
@@ -26,6 +27,8 @@ export interface FindReplaceProps {
   onReplace?: (changed: SceneMarkdown[]) => void;
   /** Opens a scene that isn't in the editor, to show a match in it. The panel selects the match once it is. */
   onOpenScene?: (sceneId: string) => void;
+  /** The book's words for its pieces, their sections and all of them. */
+  words: EditorWords;
   className?: string;
 }
 
@@ -40,17 +43,18 @@ interface Hit {
 /** Most results listed at once; the rest are still counted, found and replaced. */
 const LIST_LIMIT = 500;
 
-const SCOPES: [SearchScope, string][] = [
-  ["scene", "Scene"],
-  ["chapter", "Chapter"],
-  ["manuscript", "Manuscript"],
+/** The scopes, in the book's words. */
+const scopes = (w: EditorWords): [SearchScope, string][] => [
+  ["scene", w.piece.One],
+  ["chapter", w.section.One],
+  ["manuscript", w.content.One],
 ];
 
 /**
  * Find and replace across the manuscript: a keyboard-first panel that opens on Mod-F (this
  * scene) and Mod-Shift-H (the manuscript) from the editor, or from the command palette.
  */
-export function FindReplace({ manuscript, editor, onReplace, onOpenScene, className }: FindReplaceProps) {
+export function FindReplace({ manuscript, editor, onReplace, onOpenScene, words, className }: FindReplaceProps) {
   const panel = useStore(findPanel);
   const [text, setText] = useState("");
   const [replacement, setReplacement] = useState("");
@@ -204,7 +208,7 @@ export function FindReplace({ manuscript, editor, onReplace, onOpenScene, classN
       ? "Type to search"
       : results.count === 0
         ? "No matches"
-        : `${index + 1} of ${results.count} ${results.count === 1 ? "match" : "matches"}${sceneCount > 1 ? ` in ${sceneCount} scenes` : ""}`;
+        : `${index + 1} of ${results.count} ${results.count === 1 ? "match" : "matches"}${sceneCount > 1 ? ` in ${words.piece.count(sceneCount)}` : ""}`;
   const openScenes = editor && !editor.isDestroyed ? editorScenes(editor) : new Map();
   let listed = 0;
 
@@ -257,7 +261,7 @@ export function FindReplace({ manuscript, editor, onReplace, onOpenScene, classN
       <div className="ghw-find-row">
         <fieldset className="ghw-find-scope">
           <legend>Search in</legend>
-          {SCOPES.map(([scope, label]) => (
+          {scopes(words).map(([scope, label]) => (
             <label key={scope}>
               <input
                 type="radio"
@@ -277,7 +281,7 @@ export function FindReplace({ manuscript, editor, onReplace, onOpenScene, classN
         </button>
       </div>
       <p className="ghw-find-status" id={ids.status} role="status">
-        {undo ? `Replaced ${undo.replaced} in ${undo.scenes} ${undo.scenes === 1 ? "scene" : "scenes"}.` : status}
+        {undo ? `Replaced ${undo.replaced} in ${words.piece.count(undo.scenes)}.` : status}
         {undo && (
           <button type="button" onClick={undoReplaceAll}>
             Undo

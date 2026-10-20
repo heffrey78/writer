@@ -18,10 +18,10 @@ afterEach(() => {
 });
 
 function mount(markdown: string, props: Partial<Parameters<typeof SceneEditor>[0]> = {}) {
-  const view = render(<SceneEditor markdown={markdown} onChange={onChange} onReady={(e) => (editor = e)} {...props} />);
+  const view = render(<SceneEditor markdown={markdown} label="Scene text" onChange={onChange} onReady={(e) => (editor = e)} {...props} />);
   return {
     ...view,
-    update: (next: string) => view.rerender(<SceneEditor markdown={next} onChange={onChange} onReady={(e) => (editor = e)} {...props} />),
+    update: (next: string) => view.rerender(<SceneEditor markdown={next} label="Scene text" onChange={onChange} onReady={(e) => (editor = e)} {...props} />),
   };
 }
 

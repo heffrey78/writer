@@ -4,7 +4,8 @@ import { Dropcursor, Gapcursor, Placeholder, UndoRedo } from "@tiptap/extensions
 import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 import { useEffect, useRef } from "react";
 import { useStore } from "zustand";
-import { chapterContent, loadChapter, parseChapter, replaceScene, type SceneMarkdown, type SceneSource } from "./chapter.ts";
+import { chapterContent, loadChapter, parseChapter, replaceScene, Scene, type SceneMarkdown, type SceneSource } from "./chapter.ts";
+import type { EditorWords } from "./words.ts";
 import { loadMarkdown, setInitialMarkdown } from "./editor.ts";
 import { Picture, proseContent } from "./extensions.ts";
 import { FindExtension } from "./find.ts";
@@ -34,7 +35,7 @@ export interface SceneEditorProps {
   /** How long typing must pause before onChange, in milliseconds. */
   changeDelay?: number;
   /** Accessible name of the text area. */
-  label?: string;
+  label: string;
   placeholder?: string;
   autofocus?: boolean;
   className?: string;
@@ -170,7 +171,7 @@ export function SceneEditor({
   markdown,
   onChange,
   changeDelay = 300,
-  label = "Scene text",
+  label,
   placeholder = "Start writing…",
   autofocus = false,
   className,
@@ -289,7 +290,9 @@ export interface ChapterEditorProps {
   /** How long typing must pause before onChange, in milliseconds. */
   changeDelay?: number;
   /** Accessible name of the text area. */
-  label?: string;
+  label: string;
+  /** The book's words: a scene's boundary is named with its piece's ("Scene: The Station"). */
+  words: EditorWords;
   autofocus?: boolean;
   className?: string;
   /** Receives the TipTap editor once it exists, for commands and state outside the component. */
@@ -320,7 +323,8 @@ export function ChapterEditor({
   scenes,
   onChange,
   changeDelay = 300,
-  label = "Chapter text",
+  label,
+  words,
   autofocus = false,
   className,
   onReady,
@@ -373,7 +377,7 @@ export function ChapterEditor({
   }).current;
 
   const editor = useEditor({
-    extensions: [...withPictures(chapterContent, pictureUrl), UndoRedo, SelectFocusExtension, issueMarksExtension, pinnedLines, WritingModesExtension, WordCountExtension, FindExtension, SearchHighlightExtension, spellExtension, ...mentionExtension, mentionInfo, picturesExtension, ...movingAround],
+    extensions: [...withPictures(chapterContent, pictureUrl).map((e) => ((e as unknown) === Scene ? Scene.configure({ label: words.piece.One }) : e)), UndoRedo, SelectFocusExtension, issueMarksExtension, pinnedLines, WritingModesExtension, WordCountExtension, FindExtension, SearchHighlightExtension, spellExtension, ...mentionExtension, mentionInfo, picturesExtension, ...movingAround],
     editorProps: {
       attributes: { role: "textbox", "aria-multiline": "true", "aria-label": label, class: "ghw-prose ghw-chapter" },
     },
@@ -450,6 +454,8 @@ export interface WordCountProps {
   show?: readonly ("scene" | "chapter" | "session")[];
   /** Its name for screen readers ("Word count"). */
   label?: string;
+  /** The book's words for the scene's and chapter's counts. */
+  words: EditorWords;
   className?: string;
 }
 
@@ -460,7 +466,7 @@ const signed = (n: number) => (n > 0 ? `+${format.format(n)}` : n < 0 ? `−${fo
  * Scene, chapter and session word counts. It follows the editor the writer last used, and hides in
  * focus mode unless the count is pinned.
  */
-export function WordCount({ chapterWords, show = ["scene", "chapter", "session"], label = "Word count", className }: WordCountProps) {
+export function WordCount({ chapterWords, show = ["scene", "chapter", "session"], label = "Word count", words: names, className }: WordCountProps) {
   const counts = useStore(liveCounts);
   const session = useStore(writingSession);
   const hidden = useWritingModes((m) => m.focus && !m.pinCount);
@@ -471,12 +477,12 @@ export function WordCount({ chapterWords, show = ["scene", "chapter", "session"]
     <div className={["ghw-wordcount", className].filter(Boolean).join(" ")} role="group" aria-label={label} hidden={hidden}>
       {show.includes("scene") && (
         <span>
-          Scene <strong>{format.format(counts.scene)}</strong>
+          {names.piece.One} <strong>{format.format(counts.scene)}</strong>
         </span>
       )}
       {show.includes("chapter") && chapter !== undefined && (
         <span>
-          Chapter <strong>{format.format(chapter)}</strong>
+          {names.section.One} <strong>{format.format(chapter)}</strong>
         </span>
       )}
       {show.includes("session") && (

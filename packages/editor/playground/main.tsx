@@ -2,11 +2,12 @@ import type { Editor } from "@tiptap/core";
 import { StrictMode, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { countWords, loadBook, memorySource, uniqueId } from "@writer/core";
-import { registerKinds } from "@writer/kinds";
+import { novel, registerKinds } from "@writer/kinds";
 import { addToDictionary, knownWords, parseDictionary } from "@writer/core/dictionary";
 import { useStore } from "zustand";
 import {
   createWorkerSpellService,
+  editorWords,
   findCommands,
   joinSceneFile,
   liveCounts,
@@ -28,6 +29,9 @@ import "../src/styles.css";
 import "./playground.css";
 
 registerKinds(); // The kinds of book the app ships (D14): the sample is read as a novel.
+
+/** The editor says the novel's words: the sample is one. */
+const words = editorWords(novel);
 
 declare global {
   interface Window {
@@ -191,7 +195,7 @@ function App() {
       <header>
         <h1>Scene editor</h1>
         <div className="modes" role="group" aria-label="Commands">
-          {[...writingModeCommands, ...sessionCommands, ...findCommands, ...spellCommands, ...linkCommands].map((c) => (
+          {[...writingModeCommands, ...sessionCommands, ...findCommands(words), ...spellCommands, ...linkCommands].map((c) => (
             <button
               key={c.id}
               type="button"
@@ -224,18 +228,21 @@ function App() {
         </label>
       </header>
       <main>
-        <WordCount className="counts" chapterWords={chapterWords} />
+        <WordCount className="counts" chapterWords={chapterWords} words={words} />
         <FindReplace
           className="find"
           manuscript={manuscript}
           editor={editor}
           onReplace={(changed) => setBodies((b) => ({ ...b, ...Object.fromEntries(changed.map((c) => [c.id, c.markdown])) }))}
           onOpenScene={(id) => setOpen(kind === "chapter" ? `chapter:${chapterOf(id)}` : `scene:${id}`)}
+          words={words}
         />
         {kind === "chapter" ? (
           <ChapterEditor
             key={open}
             scenes={sources}
+            label="Chapter text"
+            words={words}
             changeDelay={150}
             autofocus
             onChange={(changes) => changes.forEach((c) => setBody(c.id, c.markdown))}
@@ -249,6 +256,7 @@ function App() {
             key={open}
             sceneId={target}
             markdown={sources[0]!.markdown}
+            label="Scene text"
             changeDelay={150}
             autofocus
             onChange={(md) => setBody(target, md)}

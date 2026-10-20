@@ -1,10 +1,11 @@
-import { pieceSections, readAnchor, readFrontMatter, type Section, type Book, type Piece } from "@writer/core";
+import { pieceLevel, pieceSections, readAnchor, readFrontMatter, type Section, type Book, type Piece } from "@writer/core";
 import { countWords, vocabulary } from "@writer/core";
 import {
   appContextMenu,
   caretBlock,
   caretScene,
   contributeMenuItems,
+  editorWords,
   findCommands,
   getMarkdown,
   insertPicture,
@@ -77,6 +78,7 @@ export const useWritingEditor = create<{ editor: Editor | undefined }>(() => ({ 
 export function WritingView({ novelId, novel, workspace, view, spell, entries }: Props) {
   const navigate = useNavigate();
   const w = vocabulary(novel.kind);
+  const words = useMemo(() => editorWords(novel.kind), [novel.kind]);
   const files = useStore(workspace.store, (s) => s.files);
   const [editor, setEditor] = useState<Editor>();
   const byId = useMemo(() => new Map(novel.allPieces.map((s) => [s.id, s])), [novel]);
@@ -314,8 +316,9 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
 
   // The editor's own commands, run on this editor; their shortcuts work in the text.
   useCommands(() => {
-    const group = (c: EditorCommand) => (findCommands.includes(c) ? "Find" : "Writing");
-    return [...writingModeCommands, ...structureCommands, ...sessionCommands, ...findCommands, ...spellCommands, ...linkCommands].map((c: EditorCommand) => ({
+    const finding = findCommands(words);
+    const group = (c: EditorCommand) => (finding.includes(c) ? "Find" : "Writing");
+    return [...writingModeCommands, ...structureCommands, ...sessionCommands, ...finding, ...spellCommands, ...linkCommands].map((c: EditorCommand) => ({
       id: c.id,
       title: c.title,
       group: group(c),
@@ -323,7 +326,7 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
       ...(c.isActive ? { isActive: () => c.isActive!() } : {}),
       run: () => c.run(editor),
     }));
-  }, [editor]);
+  }, [editor, words]);
 
   // For the single-scene view, the chapter's count is the other scenes' plus this one's live count.
   const liveScene = useStore(liveCounts, (c) => c.scene);
@@ -407,7 +410,7 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
         <div className="flex flex-wrap items-baseline justify-between gap-3">
           <h1 className="text-xl font-semibold">{heading}</h1>
           {/* The chapter's length by its title; the scene's is on its card, the session's and today's below. */}
-          <WordCount chapterWords={chapterWords} show={["chapter"]} />
+          <WordCount chapterWords={chapterWords} show={["chapter"]} words={words} />
         </div>
         {"scene" in view && pinned[view.scene.file] && <p className="ghw-pinned -mt-2 text-[13px] text-muted">{pinned[view.scene.file]}</p>}
         {splitting && (
@@ -419,7 +422,7 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
             onClose={() => setSplitting(undefined)}
           />
         )}
-        <FindReplace manuscript={manuscript} editor={editor ?? null} onReplace={replaceClosed} onOpenScene={openScene} />
+        <FindReplace manuscript={manuscript} editor={editor ?? null} onReplace={replaceClosed} onOpenScene={openScene} words={words} />
         {!("scene" in view) && scenes.length === 0 ? (
           <EmptyChapter autofocus={autofocus} onAdd={(title) => structure.createScene(view.chapter.id, title)} />
         ) : !loaded ? (
@@ -429,6 +432,7 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
         ) : "scene" in view ? (
           <SceneEditor
             key={view.scene.file}
+            label={`${w.piece.One} text`}
             sceneId={view.scene.file}
             markdown={files[view.scene.file]!.body}
             onChange={(md) => workspace.change(view.scene.file, md)}
@@ -445,6 +449,8 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
         ) : (
           <ChapterEditor
             key={view.chapter.id}
+            label={`${w.level(view.chapter.level).One} text`}
+            words={words}
             scenes={scenes.map((s) => ({ id: s.file, title: s.title, markdown: files[s.file]!.body }))}
             pinned={pinned}
             onChange={(changed) => changed.forEach((c) => workspace.change(c.id, c.markdown))}
@@ -487,12 +493,12 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
                   onOpenIssue={(n) => issueMarks.onOpen([n])}
                 />
               ) : (
-                <p className="p-4 text-sm text-muted">{loaded ? "A scene’s details show here once the chapter has one." : "Opening…"}</p>
+                <p className="p-4 text-sm text-muted">{loaded ? `${w.piece.A}’s details show here once the ${w.level(pieceLevel(novel)).one} has one.` : "Opening…"}</p>
               ),
               notes: detailsScene ? (
                 <SceneNotes key={detailsScene.id} novelId={novelId} novel={novel} workspace={workspace} scene={detailsScene} spell={spell} />
               ) : (
-                <p className="p-4 text-sm text-muted">{loaded ? "A scene’s notes show here once the chapter has one." : "Opening…"}</p>
+                <p className="p-4 text-sm text-muted">{loaded ? `${w.piece.A}’s notes show here once the ${w.level(pieceLevel(novel)).one} has one.` : "Opening…"}</p>
               ),
               entry: <EntryTab novelId={novelId} novel={novel} workspace={workspace} spell={spell} />,
             }}
@@ -600,10 +606,11 @@ function EmptyChapter({ autofocus, onAdd }: { autofocus: boolean; onAdd: (title:
  */
 function StatusBar({ novelId, workspace }: { novelId: string; workspace: Workspace }) {
   const hidden = useWritingModes((m) => m.focus && !m.pinCount);
+  const words = editorWords(useBookKind());
   if (hidden) return null;
   return (
     <div className="sticky bottom-0 z-10 flex flex-wrap items-baseline justify-end gap-x-4 gap-y-1 border-t border-rule bg-paper px-6 py-1.5 text-[13px] text-muted">
-      <WordCount show={["session"]} label="This session" />
+      <WordCount show={["session"]} label="This session" words={words} />
       <TodayCount novelId={novelId} workspace={workspace} />
     </div>
   );

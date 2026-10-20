@@ -8,8 +8,10 @@ The scene prose editor: a TipTap (ProseMirror) schema for scene prose, a lossles
 import { SceneEditor } from "@writer/editor/react";
 import "@writer/editor/styles.css";
 
-<SceneEditor key={scene.id} markdown={scene.body} onChange={(body) => save(scene.id, body)} />;
+<SceneEditor key={scene.id} label="Scene text" markdown={scene.body} onChange={(body) => save(scene.id, body)} />;
 ```
+
+`label` is the text box's accessible name. The editor says no kind's words of its own (#22): where it names a scene, a chapter or the manuscript (the chapter view's scene boundaries, the word counts, the find panel and its commands), it takes `words`, from `editorWords(kind)`.
 
 `markdown` is the scene body: the Markdown after the front matter (`splitSceneFile` separates them). `onChange` receives the new body once typing pauses (`changeDelay`, 300 ms by default), and straight away on blur, page hide and unmount. A new `markdown` value that isn't the editor's own output loads as a new document. Give each scene its own `key`, so that switching scenes reports pending edits for the scene they belong to. `onReady` hands you the TipTap editor for commands.
 
@@ -51,7 +53,7 @@ Typewriter scrolling follows typing and keyboard movement, but not clicks, so th
 ```tsx
 import { WordCount } from "@writer/editor/react";
 
-<WordCount chapterWords={chapterTotal} />; // chapterWords only for a single-scene editor
+<WordCount chapterWords={chapterTotal} words={editorWords(kind)} />; // chapterWords only for a single-scene editor
 ```
 
 `WordCount` shows the scene, chapter and session counts for the editor the writer last used. It hides in focus mode unless the count is pinned (the "Show the word count in focus mode" command). Give `SceneEditor` a `sceneId` so its scene is tracked in the session; chapter scenes carry their own IDs.
@@ -72,6 +74,7 @@ import { FindReplace } from "@writer/editor/react";
   editor={editor}
   onReplace={(changed) => changed.forEach(({ id, markdown }) => save(id, markdown))}
   onOpenScene={(sceneId) => openSceneOrItsChapter(sceneId)}
+  words={editorWords(kind)}
 />;
 ```
 
@@ -90,7 +93,7 @@ The panel searches the scene holding the caret, its chapter or the whole manuscr
 - **Replacing in the open document** is a single editor transaction, undone with Mod+Z. Closed scenes get new Markdown through `onReplace`. "Replace all" also offers one Undo for everything, which restores the closed scenes and undoes the editor's step if nothing has happened there since. Scenes without matches aren't touched, and within a changed scene only the matching paragraphs are rewritten.
 - **Mentions:** replacing a mention's whole name renames the mention and keeps its link to the entity. A match on part of a name can be found but not replaced.
 
-`findCommands` has "Find in scene", "Find in chapter" and "Find and replace in manuscript" for the palette, and both editors include `FindExtension` (the shortcuts) and `SearchHighlightExtension`. Headless, `searchManuscript`, `replaceAll`, `replaceInMarkdown` and `replaceInEditor` do the work.
+`findCommands(words)` has "Find in scene", "Find in chapter" and "Find and replace in manuscript" (in the kind's words) for the palette, and both editors include `FindExtension` (the shortcuts) and `SearchHighlightExtension`. Headless, `searchManuscript`, `replaceAll`, `replaceInMarkdown` and `replaceInEditor` do the work.
 
 ### Spell check
 
@@ -116,6 +119,8 @@ import { ChapterEditor } from "@writer/editor/react";
 
 <ChapterEditor
   key={chapter.id}
+  label="Chapter text"
+  words={editorWords(kind)}
   scenes={chapter.scenes.map((s) => ({ id: s.id, title: s.title, markdown: s.body }))}
   onChange={(changed) => changed.forEach(({ id, markdown }) => save(id, markdown))}
 />;
