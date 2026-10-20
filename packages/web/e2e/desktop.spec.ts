@@ -11,17 +11,17 @@ test("a novel opens in its own window, the library comes forward from a novel, a
   await asDesktop(page);
   await launch(page, app);
   await page.goto(`${app.url}/`);
-  await expect(page.getByRole("heading", { name: "Your novels" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Your books" })).toBeVisible();
   await expect.poll(() => calls(page, "set_recent")).toContainEqual({ novels: [{ id: expect.stringMatching(/^lib_/), title: "The Bridge at Varn" }] });
 
   await page.getByRole("link", { name: /The Bridge at Varn/ }).click();
   await expect.poll(() => calls(page, "open_novel")).toEqual([{ id: expect.stringMatching(/^lib_/) }]);
   // The library stays: the novel went to a window of its own.
-  await expect(page.getByRole("heading", { name: "Your novels" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Your books" })).toBeVisible();
 
   const [{ id }] = (await calls(page, "open_novel")) as [{ id: string }];
   await page.goto(`${app.url}/novels/${id}`);
-  await page.getByRole("link", { name: "Writer: your novels" }).click();
+  await page.getByRole("link", { name: "Writer: your books" }).click();
   await expect.poll(() => calls(page, "show_library")).toEqual([{ path: "/" }]);
   await expect(page).toHaveURL(new RegExp(`/novels/${id}`));
 });

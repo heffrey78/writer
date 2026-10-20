@@ -63,8 +63,8 @@ test("reaches sync, checkpoints, the library and the theme", async ({ page, app 
   await page.keyboard.press("Escape");
   await run(page, "theme dark");
   await expect.poll(() => page.evaluate(() => document.documentElement.dataset.theme)).toBe("dark");
-  await run(page, "your novels");
-  await expect(page.getByRole("heading", { level: 1, name: "Your novels" })).toBeVisible();
+  await run(page, "your books");
+  await expect(page.getByRole("heading", { level: 1, name: "Your books" })).toBeVisible();
   // From the library, a novel opens by name.
   await run(page, "bridge at varn");
   await expect(page.getByRole("textbox", { name: "Chapter text" })).toBeVisible();

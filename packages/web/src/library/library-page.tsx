@@ -38,10 +38,10 @@ export function LibraryPage() {
   return (
     <Shell>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold">Your novels</h1>
+        <h1 className="text-2xl font-semibold">Your books</h1>
         <div className="flex flex-wrap gap-2">
           <Button variant="primary" onClick={() => add("new")}>
-            <Plus className="size-4" aria-hidden /> New novel
+            <Plus className="size-4" aria-hidden /> New book
           </Button>
           <Button onClick={() => add("open")}>
             <FolderOpen className="size-4" aria-hidden /> Open a folder
@@ -81,7 +81,7 @@ export function LibraryPage() {
           <>
             {library.data.novels.length === 0 && (
               <p className="mb-4 text-sm text-muted">
-                <span className="font-medium text-ink">No novels yet.</span> Start one, open a novel you already have on this computer, or clone one from GitHub.
+                <span className="font-medium text-ink">No books yet.</span> Start one, open a book you already have on this computer, or clone one from GitHub.
               </p>
             )}
             <Shelf>
@@ -92,11 +92,11 @@ export function LibraryPage() {
                 <button
                   type="button"
                   onClick={() => add("new")}
-                  title="New novel"
+                  title="New book"
                   className="grid aspect-[2/3] w-36 place-items-center rounded-[2px_5px_5px_2px] border-2 border-dashed border-rule text-muted transition-colors hover:border-muted hover:text-ink"
                 >
                   <Plus className="size-7" strokeWidth={1.5} aria-hidden />
-                  <span className="sr-only">New novel</span>
+                  <span className="sr-only">New book</span>
                 </button>
               </li>
             </Shelf>
@@ -122,7 +122,7 @@ function Shelf({ children }: { children: ReactNode }) {
   ].join(", ");
   return (
     <ul
-      aria-label="Novels"
+      aria-label="Books"
       className="grid grid-cols-[repeat(auto-fill,9rem)] auto-rows-[17.5rem] justify-between gap-x-6 gap-y-6 px-3 sm:justify-start sm:gap-x-8"
       style={{ backgroundImage: plank, backgroundSize: "100% 19rem", backgroundRepeat: "repeat-y" }}
     >
@@ -177,8 +177,8 @@ function Book({ novel, menus }: { novel: LibraryEntry; menus: HTMLElement | null
   // The book's own cover (heffrey78/gh-writer#168), set or changed from its menu, as from Compile.
   const shown = () => Promise.all([queryClient.invalidateQueries({ queryKey: keys.library }), queryClient.invalidateQueries({ queryKey: keys.novel(novel.id) })]);
   const cover = usePictureFlow({
-    // The shelf doesn't know a book's kind yet (#22's shelf area).
-    book: "novel",
+    // The shelf holds books of every kind: it says "book" (#22).
+    book: "book",
     name: novel.title,
     shape: SHAPES.cover,
     onSave: async (picture) => {
@@ -253,7 +253,7 @@ function Book({ novel, menus }: { novel: LibraryEntry; menus: HTMLElement | null
         open={removingCover}
         onOpenChange={setRemovingCover}
         title={`Remove the cover of “${novel.title}”?`}
-        description="The shelf shows a generated cover again, and e-books and PDFs go out without one. Its file is deleted from images/; the novel's history keeps it."
+        description="The shelf shows a generated cover again, and e-books and PDFs go out without one. Its file is deleted from images/; the book's history keeps it."
         action="Remove"
         danger
         onConfirm={() => void api.removeCover(novel.id).then(shown, (e: unknown) => cover.setProblem(e instanceof Error ? e.message : String(e)))}

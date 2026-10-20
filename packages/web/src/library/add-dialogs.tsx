@@ -64,7 +64,7 @@ export function NewNovelDialog({ folder, authors, onClose }: { folder: string | 
   const failed = create.isError && !(create.error instanceof ApiError && create.error.code === "NEEDS_IDENTITY");
 
   return (
-    <Modal title="New novel" onClose={onClose}>
+    <Modal title="New book" onClose={onClose}>
       <form onSubmit={submit} className="grid gap-3">
         <Field label="Title" value={title} onChange={(e) => setTitle(e.target.value)} required autoFocus />
         <Field label="Author" value={author} onChange={(e) => setAuthor(e.target.value)} hint="Optional. Shown on the cover and in novel.yaml." />
@@ -75,7 +75,7 @@ export function NewNovelDialog({ folder, authors, onClose }: { folder: string | 
           placeholder={where}
           hint={where ? <>Leave empty for {where}. It must be new or empty.</> : "It must be new or empty."}
         />
-        <ChooseFolder title="Where the new novel goes (a new or empty folder)" onChosen={setPath} />
+        <ChooseFolder title="Where the new book goes (a new or empty folder)" onChosen={setPath} />
         {askingIdentity && (
           <fieldset className="grid gap-3 rounded-md border border-rule p-3">
             <legend className="px-1 text-sm font-medium">Who's writing?</legend>
@@ -84,7 +84,7 @@ export function NewNovelDialog({ folder, authors, onClose }: { folder: string | 
             <Field label="Email" type="email" value={identity.email} onChange={(e) => setIdentity({ ...identity, email: e.target.value })} required />
           </fieldset>
         )}
-        {failed && <ErrorAlert title="Couldn't start the novel">{create.error.message}</ErrorAlert>}
+        {failed && <ErrorAlert title="Couldn't start the book">{create.error.message}</ErrorAlert>}
         <div className="flex justify-end gap-2">
           <Button onClick={onClose}>Cancel</Button>
           <Button type="submit" variant="primary" disabled={!ready || create.isPending}>
@@ -119,7 +119,7 @@ export function OpenFolderDialog({ onClose, initial }: { onClose: () => void; in
     <Modal title="Open a folder" onClose={onClose}>
       <form onSubmit={submit} className="grid gap-3">
         <Field label="Folder" placeholder="~/novels/my-novel" value={path} onChange={(e) => setPath(e.target.value)} hint="A git repository holding novel.yaml." required autoFocus />
-        <ChooseFolder title="A novel's folder" onChosen={setPath} />
+        <ChooseFolder title="A book's folder" onChosen={setPath} />
         {add.isError && <ErrorAlert title="Couldn't open that folder">{add.error.message}</ErrorAlert>}
         <div className="flex justify-end gap-2">
           <Button onClick={onClose}>Cancel</Button>

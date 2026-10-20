@@ -148,8 +148,8 @@ for (const [name, viewport] of [
     await palette(page, "follow the system");
 
     // Back to the library, by keyboard.
-    await palette(page, "your novels");
-    await expect(page.getByRole("heading", { level: 1, name: "Your novels" })).toBeVisible();
+    await palette(page, "your books");
+    await expect(page.getByRole("heading", { level: 1, name: "Your books" })).toBeVisible();
     await noSideways(page);
   });
 }

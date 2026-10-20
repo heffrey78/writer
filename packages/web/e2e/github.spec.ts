@@ -182,7 +182,7 @@ test("signed out, puts a new novel on GitHub from the shelf: connects, creates a
 
   expect(app.github.repos.find((r) => r.name === "the-salt-road")?.private).toBe(true);
   expect(app.git(app.github.repoPath("ada", "the-salt-road"), "log", "--format=%s", "main").trim()).toBe("Start The Salt Road");
-  await expect(page.getByRole("list", { name: "Novels" })).toContainText(`${app.github.url}/ada/the-salt-road.git`);
+  await expect(page.getByRole("list", { name: "Books" })).toContainText(`${app.github.url}/ada/the-salt-road.git`);
 });
 
 test("puts a novel on GitHub from its sync badge, then syncs with it", async ({ page, app }) => {

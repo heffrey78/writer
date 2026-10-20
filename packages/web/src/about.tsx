@@ -59,7 +59,7 @@ export function AboutDialog() {
             <a href={info.update.url} target="_blank" rel="noreferrer" className="text-accent underline">
               Download it from GitHub
             </a>
-            , then install it over this one. Your novels and settings stay as they are.
+            , then install it over this one. Your books and settings stay as they are.
           </p>
         </section>
       )}

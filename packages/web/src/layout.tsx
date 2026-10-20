@@ -57,7 +57,7 @@ export function Shell({
             showLibrary();
           }}
           className="flex shrink-0 items-center gap-2 rounded-md px-1 font-semibold"
-          aria-label={heading ? "Writer: your novels" : undefined}
+          aria-label={heading ? "Writer: your books" : undefined}
         >
           <Logo />
           {!heading && "writer"}

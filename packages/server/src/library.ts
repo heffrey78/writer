@@ -180,7 +180,7 @@ export class Library {
     } catch (e) {
       throw classifyGitError(e);
     }
-    if (!isRepo) throw new LibraryError("NOT_A_REPO", `${path} isn't a git repository. A novel needs one to keep its history and sync with GitHub.`);
+    if (!isRepo) throw new LibraryError("NOT_A_REPO", `${path} isn't a git repository. A book needs one to keep its history and sync with GitHub.`);
 
     const cover = await coverOf(path);
     if (!cover) throw new LibraryError("NOT_A_NOVEL", `${path} has no ${MANIFEST} or ${NOVEL_MANIFEST}, so it isn't a book Writer can open.`);
@@ -206,7 +206,7 @@ export class Library {
   /** Record that the author opened a novel. */
   async touch(id: string): Promise<void> {
     const entry = this.get(id);
-    if (!entry) throw new LibraryError("UNKNOWN_NOVEL", `No novel ${id} in the library.`);
+    if (!entry) throw new LibraryError("UNKNOWN_NOVEL", `No book ${id} in the library.`);
     entry.lastOpened = new Date().toISOString();
     await this.refresh(id);
   }
@@ -217,7 +217,7 @@ export class Library {
    */
   async refresh(id: string): Promise<void> {
     const entry = this.get(id);
-    if (!entry) throw new LibraryError("UNKNOWN_NOVEL", `No novel ${id} in the library.`);
+    if (!entry) throw new LibraryError("UNKNOWN_NOVEL", `No book ${id} in the library.`);
     const [cover, remote] = await Promise.all([coverOf(entry.path), remoteOf(entry.path)]);
     if (remote) entry.remote = remote;
     else delete entry.remote;

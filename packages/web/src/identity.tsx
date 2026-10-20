@@ -80,7 +80,7 @@ function IdentityForm({ onClose }: { onClose: () => void }) {
     <Modal title="Your name and email" onClose={onClose}>
       <form onSubmit={submit} className="grid gap-3">
         <p className="text-sm text-muted">
-          Every change saved to your book's history is signed with a name and an email. They're kept with your novels, and are seen by anyone you share a novel
+          Every change saved to your book's history is signed with a name and an email. They're kept with your books, and are seen by anyone you share a novel
           with on GitHub.
         </p>
         <Field label="Name" value={name} onChange={(e) => setName(e.target.value)} required autoFocus />

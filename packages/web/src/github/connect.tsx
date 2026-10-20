@@ -90,7 +90,7 @@ export function AccountItems({ item }: { item: string }) {
       {missingScopes && (
         <>
           <p className="max-w-64 px-2 pb-1.5 text-xs text-warn">
-            This sign-in doesn't allow {missingScopes.join(" and ")}, which Writer needs to put novels on GitHub. Reconnect to grant it.
+            This sign-in doesn't allow {missingScopes.join(" and ")}, which Writer needs to put books on GitHub. Reconnect to grant it.
           </p>
           <DropdownMenu.Item className={item} onSelect={() => show()}>
             Reconnect GitHub…
@@ -175,7 +175,7 @@ function Connect({ then, onClose }: { then: (() => void) | undefined; onClose: (
       {step.kind === "choose" ? (
         <div className="grid gap-3 text-sm">
           <p className="text-muted">
-            Writer uses your GitHub account to clone and sync your novels, and to put new ones on GitHub. Your sign-in is kept in this computer's keychain.
+            Writer uses your GitHub account to clone and sync your books, and to put new ones on GitHub. Your sign-in is kept in this computer's keychain.
           </p>
           {status?.keychain && <ErrorAlert title="The keychain can't be reached">{status.keychain}</ErrorAlert>}
           {status?.gh && (

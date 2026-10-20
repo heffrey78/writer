@@ -21,7 +21,7 @@ test("a novel in a newer format says to update Writer, and nothing in it can be 
     await axe(page);
   }
 
-  await page.getByRole("link", { name: "Back to your novels" }).click();
-  await expect(page.getByRole("heading", { name: "Your novels" })).toBeVisible();
+  await page.getByRole("link", { name: "Back to your books" }).click();
+  await expect(page.getByRole("heading", { name: "Your books" })).toBeVisible();
   expect(app.git(dir, "status", "--porcelain")).toBe("");
 });

@@ -3,11 +3,11 @@ import { join } from "node:path";
 import type { Page } from "@playwright/test";
 import { axe, expect, launch, test } from "./fixtures.ts";
 
-const dialog = (page: Page) => page.getByRole("dialog", { name: "New novel" });
+const dialog = (page: Page) => page.getByRole("dialog", { name: "New book" });
 
 test("starts a novel from the shelf's + and opens it, ready to write", async ({ page, app }) => {
   await launch(page, app);
-  await page.getByRole("list", { name: "Novels" }).getByRole("button", { name: "New novel" }).click();
+  await page.getByRole("list", { name: "Books" }).getByRole("button", { name: "New book" }).click();
   await expect(dialog(page).getByRole("textbox", { name: "Title" })).toBeFocused();
   await page.keyboard.type("The Salt Road");
   await expect(dialog(page).getByRole("textbox", { name: "Folder" })).toHaveAttribute("placeholder", "~/writer/the-salt-road");
@@ -34,7 +34,7 @@ test("starts a novel from the shelf's + and opens it, ready to write", async ({ 
 test("asks who's writing when git doesn't know, for this novel only", async ({ page, app }) => {
   writeFileSync(join(app.home, ".gitconfig"), "[init]\n\tdefaultBranch = main\n");
   await launch(page, app);
-  await page.getByRole("button", { name: "New novel" }).first().click();
+  await page.getByRole("button", { name: "New book" }).first().click();
   await dialog(page).getByRole("textbox", { name: "Title" }).fill("Nobody Knows");
   await dialog(page).getByRole("button", { name: "Create" }).click();
 
@@ -61,7 +61,7 @@ test("says so when the folder is taken, and from the palette too", async ({ page
   await page.reload();
 
   await page.keyboard.press("ControlOrMeta+k");
-  await page.keyboard.type("new novel");
+  await page.keyboard.type("new book");
   await page.keyboard.press("Enter");
   await expect(dialog(page)).toBeVisible();
   await page.keyboard.type("Varn");

@@ -166,7 +166,7 @@ fn set_recent(app: AppHandle, novels: Vec<RecentNovel>) {
     let Some(menu) = app.state::<Shell>().recent_menu.lock().unwrap().clone() else { return };
     while let Ok(Some(_)) = menu.remove_at(0) {}
     if novels.is_empty() {
-        if let Ok(none) = MenuItemBuilder::with_id("recent-none", "No novels yet").enabled(false).build(&app) {
+        if let Ok(none) = MenuItemBuilder::with_id("recent-none", "No books yet").enabled(false).build(&app) {
             let _ = menu.append(&none);
         }
     }
@@ -478,19 +478,19 @@ fn watch_server(app: AppHandle) {
     });
 }
 
-/// The app's menu: novels in and out of the library, the novels most recently opened, the choice of
-/// git, and About. Its New Novel…, Open Folder… and Clone… open the library's own dialogs.
+/// The app's menu: books in and out of the library, the books most recently opened, the choice of
+/// git, and About. Its New Book…, Open Folder… and Clone… open the library's own dialogs.
 fn build_menu(app: &AppHandle) -> tauri::Result<()> {
     let shell = app.state::<Shell>();
     let recent = SubmenuBuilder::new(app, "Open Recent").build()?;
     let system_git = CheckMenuItemBuilder::with_id("system-git", "Use This Computer's git").checked(shell.settings.lock().unwrap().system_git).build(app)?;
     let file = SubmenuBuilder::new(app, "File")
-        .item(&MenuItemBuilder::with_id("new-novel", "New Novel…").build(app)?)
+        .item(&MenuItemBuilder::with_id("new-novel", "New Book…").build(app)?)
         .item(&MenuItemBuilder::with_id("open-folder", "Open Folder…").build(app)?)
         .item(&MenuItemBuilder::with_id("clone", "Clone from GitHub…").build(app)?)
         .item(&recent)
         .separator()
-        .item(&MenuItemBuilder::with_id("library", "Your Novels").build(app)?)
+        .item(&MenuItemBuilder::with_id("library", "Your Books").build(app)?)
         .separator()
         .item(&system_git)
         .separator()

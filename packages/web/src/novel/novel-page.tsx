@@ -260,10 +260,10 @@ export function NovelPage() {
   if (novel.isError) {
     return (
       <Shell>
-        <h1 className="text-2xl font-semibold">Couldn't open this novel</h1>
+        <h1 className="text-2xl font-semibold">Couldn't open this book</h1>
         <ErrorAlert title={novel.error.message} className="mt-4">
           <Link to="/" className="text-accent underline">
-            Back to your novels
+            Back to your books
           </Link>
         </ErrorAlert>
       </Shell>
@@ -404,11 +404,11 @@ function TooNew({ kind }: { kind: boolean }) {
         <a href={LATEST_RELEASE} target="_blank" rel="noreferrer" className="text-accent underline">
           Get the latest Writer
         </a>
-        , then open the novel again. Nothing in it has changed.
+        , then open the {kind ? "book" : "novel"} again. Nothing in it has changed.
       </p>
       <p className="mt-6">
         <Link to="/" className="text-accent underline">
-          Back to your novels
+          Back to your books
         </Link>
       </p>
     </div>

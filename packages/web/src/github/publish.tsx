@@ -64,7 +64,7 @@ function Publish({ novel, onClose }: { novel: { id: string; folder: string }; on
     <Modal title="Put on GitHub" onClose={onClose}>
       {github.data && !signedIn ? (
         <div className="grid gap-3 text-sm">
-          <p>Connect Writer to GitHub first. The novel will go in a new repository on your account.</p>
+          <p>Connect Writer to GitHub first. The book will go in a new repository on your account.</p>
           <div className="flex justify-end gap-2">
             <Button onClick={onClose}>Cancel</Button>
             <Button variant="primary" onClick={connect}>
@@ -75,7 +75,7 @@ function Publish({ novel, onClose }: { novel: { id: string; folder: string }; on
       ) : (
         <form onSubmit={submit} className="grid gap-3">
           <p className="text-sm text-muted">
-            A new repository{login ? <> on <span className="font-medium text-ink">{login}</span>'s account</> : null} for this novel. From then on it syncs with it, and you can work on it from any computer.
+            A new repository{login ? <> on <span className="font-medium text-ink">{login}</span>'s account</> : null} for this book. From then on it syncs with it, and you can work on it from any computer.
           </p>
           <Field
             label="Repository name"
@@ -96,7 +96,7 @@ function Publish({ novel, onClose }: { novel: { id: string; folder: string }; on
           </label>
           {missing && !publish.isError && (
             <div className="grid justify-items-start gap-2 rounded-md border border-warn/40 bg-warn-soft px-3 py-2 text-sm">
-              <p>Your GitHub sign-in doesn't allow {missing.join(" and ")}, which GitHub requires to push a novel's workflows. Reconnect first.</p>
+              <p>Your GitHub sign-in doesn't allow {missing.join(" and ")}, which GitHub requires to push a book's workflows. Reconnect first.</p>
               <Button size="sm" onClick={connect}>
                 Reconnect GitHub
               </Button>

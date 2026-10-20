@@ -19,11 +19,11 @@ export function GlobalCommands() {
   const signedIn = github.data?.signedIn ?? false;
   useCommands(
     () => [
-      { id: "app.library", title: "Go to your novels", group: "Go to", run: () => showLibrary() },
-      { id: "app.new", title: "New novel…", group: "Novels", keywords: ["start", "create"], run: () => showLibrary("/?add=new") },
-      { id: "app.open-folder", title: "Open a novel's folder…", group: "Novels", keywords: ["add"], run: () => showLibrary("/?add=open") },
-      { id: "app.clone", title: "Clone a novel from GitHub…", group: "Novels", keywords: ["add", "repository"], run: () => showLibrary("/?add=clone") },
-      ...novels.map((n) => ({ id: `app.open.${n.id}`, title: `Open “${n.title}”`, group: "Novels", keywords: [n.path], run: () => openNovel(n.id) })),
+      { id: "app.library", title: "Go to your books", group: "Go to", run: () => showLibrary() },
+      { id: "app.new", title: "New book…", group: "Books", keywords: ["start", "create"], run: () => showLibrary("/?add=new") },
+      { id: "app.open-folder", title: "Open a book's folder…", group: "Books", keywords: ["add"], run: () => showLibrary("/?add=open") },
+      { id: "app.clone", title: "Clone a book from GitHub…", group: "Books", keywords: ["add", "repository"], run: () => showLibrary("/?add=clone") },
+      ...novels.map((n) => ({ id: `app.open.${n.id}`, title: `Open “${n.title}”`, group: "Books", keywords: [n.path], run: () => openNovel(n.id) })),
       ...(["system", "light", "dark"] as ThemeChoice[]).map((t) => ({
         id: `app.theme.${t}`,
         title: `Theme: ${t === "system" ? "follow the system" : t}`,

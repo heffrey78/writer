@@ -6,11 +6,11 @@ This guide is for the person writing the book. It assumes Writer is installed an
 
 ## Your library
 
-`npx writer serve` opens your library in the browser: the novels on this computer, most recently opened first. From there:
+`npx writer serve` opens your library in the browser: the books on this computer, most recently opened first. From there:
 
-- **New novel** starts one from the novel template, in `~/writer/<title>` unless you choose another folder. The first time, Writer may ask who's writing: the name and email that sign your saved work.
-- **Open a folder** adds a novel already on this computer.
-- **Clone from GitHub** copies a novel from GitHub, after you've connected (see [GitHub](#github)), listing your repositories to choose from.
+- **New book** starts a novel from the novel template, in `~/writer/<title>` unless you choose another folder. The first time, Writer may ask who's writing: the name and email that sign your saved work.
+- **Open a folder** adds a book already on this computer.
+- **Clone from GitHub** copies a book from GitHub, after you've connected (see [GitHub](#github)), listing your repositories to choose from.
 
 Each book stands on the shelf in a cover of its own design, or with your cover: its **⋯** menu has *Set a cover…* (and *Change the cover…*, *Remove the cover…*), as does the Compile dialog. A cover is framed like a [picture](#the-story-bible), at 5:8, and saved as `images/cover.jpg`, 1600 × 2560 px.
 
@@ -18,11 +18,11 @@ Each book stands on the shelf in a cover of its own design, or with your cover: 
 
 ### The desktop app
 
-In the desktop app, the library has a window of its own, and each novel opens in a window of its own. Opening a novel that's already open brings its window forward. The logo at the top left, or *File › Your Novels*, brings back the library.
+In the desktop app, the library has a window of its own, and each novel opens in a window of its own. Opening a novel that's already open brings its window forward. The logo at the top left, or *File › Your Books*, brings back the library.
 
 - **Choose…** beside a folder field opens your system's folder dialog, so you needn't type a path.
 - **Drop a novel's folder** on the library window to open it, or open one from a terminal with `writer path/to/novel`. If it isn't a novel, the library says why.
-- **File › Open Recent** lists the novels you've opened most recently.
+- **File › Open Recent** lists the books you've opened most recently.
 - **Right-click** (or **Shift+F10**, or the Menu key) anywhere for the app's own menu: **Back** and **Forward** everywhere, with **Cut**, **Copy**, **Paste** and **Select all** above them in text and in fields (and **Copy** elsewhere when text is selected). On a misspelled word the suggestions come first, and on selected text in a novel on GitHub, **Raise an issue…**; the manuscript tree keeps its own menu.
 - **File › Use This Computer's git** switches from the git that comes with Writer to the one installed on your computer, if you'd rather use your own setup. Your open windows come back where they were.
 - Quitting, or closing a window, saves what you've typed first.

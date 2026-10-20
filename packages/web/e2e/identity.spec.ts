@@ -36,7 +36,7 @@ test("at first run, signed in and unknown to git: asked once, with the account's
   expect(readFileSync(gitconfig(app), "utf8")).toMatch(/name = Ada Writer[\s\S]*email = 4242\+ada@users\.noreply\./);
 
   await page.reload();
-  await expect(page.getByRole("heading", { name: "Your novels" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Your books" })).toBeVisible();
   await expect(dialog).toHaveCount(0);
 });
 

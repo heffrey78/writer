@@ -6,7 +6,7 @@ import type { Page } from "@playwright/test";
 import { axe, expect, git, launch, test } from "./fixtures.ts";
 
 /** The books on the shelf (not the + tile). */
-const novels = (page: Page) => page.getByRole("list", { name: "Novels" }).getByRole("listitem").filter({ has: page.getByRole("link") });
+const novels = (page: Page) => page.getByRole("list", { name: "Books" }).getByRole("listitem").filter({ has: page.getByRole("link") });
 
 /** Open a book's menu, where its folder is shown. */
 async function bookMenu(page: Page, title: string) {
@@ -30,9 +30,9 @@ async function cloneFrom(page: Page, repo: string) {
 test("the launch URL opens the app and trades its token for a session", async ({ page, app }) => {
   await launch(page, app);
   await expect(page).toHaveURL(`${app.url}/`);
-  await expect(page.getByRole("heading", { level: 1, name: "Your novels" })).toBeVisible();
-  await expect(page.getByText("No novels yet")).toBeVisible();
-  await expect(page.getByRole("list", { name: "Novels" }).getByRole("button", { name: "New novel" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Your books" })).toBeVisible();
+  await expect(page.getByText("No books yet")).toBeVisible();
+  await expect(page.getByRole("list", { name: "Books" }).getByRole("button", { name: "New book" })).toBeVisible();
   // Without the session, nothing answers.
   const other = await page.context().browser()!.newContext();
   expect((await (await other.newPage()).goto(app.url))!.status()).toBe(403);
@@ -183,7 +183,7 @@ test("removes a novel from the library after confirming, keeping its folder", as
   await expect(novels(page)).toHaveCount(1);
   await (await bookMenu(page, "The Bridge at Varn")).getByRole("menuitem", { name: "Remove from library…" }).click();
   await dialog.getByRole("button", { name: "Remove" }).click();
-  await expect(page.getByText("No novels yet")).toBeVisible();
+  await expect(page.getByText("No books yet")).toBeVisible();
   expect(app.git(dir, "rev-parse", "--is-inside-work-tree").trim()).toBe("true");
 });
 
@@ -207,8 +207,8 @@ test("follows the OS theme, and remembers a chosen one", async ({ page, app }) =
 test("unknown pages say so", async ({ page, app }) => {
   await launch(page, app, "/no/such/page");
   await expect(page.getByRole("heading", { name: "Nothing here" })).toBeVisible();
-  await page.getByRole("link", { name: "Back to your novels" }).click();
-  await expect(page.getByRole("heading", { name: "Your novels" })).toBeVisible();
+  await page.getByRole("link", { name: "Back to your books" }).click();
+  await expect(page.getByRole("heading", { name: "Your books" })).toBeVisible();
 });
 
 test("has no accessibility violations, empty or with novels, light or dark", async ({ page, app }) => {
@@ -223,7 +223,7 @@ test("has no accessibility violations, empty or with novels, light or dark", asy
   await bookMenu(page, "The Bridge at Varn");
   await axe(page);
   await page.keyboard.press("Escape");
-  for (const dialog of ["Open a folder", "Clone from GitHub", "New novel"]) {
+  for (const dialog of ["Open a folder", "Clone from GitHub", "New book"]) {
     await page.getByRole("button", { name: dialog }).first().click();
     await expect(page.getByRole("dialog", { name: dialog })).toBeVisible();
     await axe(page);
