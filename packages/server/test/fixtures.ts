@@ -1,8 +1,10 @@
 import { execFileSync } from "node:child_process";
-import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { registerKind } from "@writer/core";
+import { diary, lines, pieceFile } from "../../core/test/kinds.ts";
 
 export const sample = fileURLToPath(new URL("../../../examples/sample-novel", import.meta.url));
 
@@ -52,6 +54,34 @@ export function fakeClock() {
 /** A git repository holding a copy of the sample novel, committed. */
 export function novelRepo(dir: string): string {
   cpSync(sample, dir, { recursive: true });
+  gitIn(dir, "init", "-q");
+  gitIn(dir, "add", "-A");
+  gitIn(dir, "commit", "-qm", "Start");
+  return dir;
+}
+
+/** A diary's first day, in its pages. */
+export const MONDAY = "pages/01-march/01-monday.md";
+/** A person in the diary's index. */
+export const DIARY_ADA = "index/characters/ada.md";
+
+/**
+ * A diary in format 3 (book.yaml naming its kind) in `dir`, committed: a month of one day under
+ * pages/, and Ada under index/, where a novel has manuscript/ and bible/. Registers the diary kind.
+ */
+export function diaryRepo(dir: string): string {
+  registerKind(diary);
+  const files = {
+    "book.yaml": lines("schema_version: 3", "id: bk_000001", "kind: diary", "title: The Year", "relationship_types:", "  - key: friend", "    label: friends with", "    symmetric: true"),
+    "pages/_order.yaml": lines("months: [mon_000001]"),
+    "pages/01-march/_month.yaml": lines("id: mon_000001", "title: March", "days: [day_000001]"),
+    [MONDAY]: pieceFile("day_000001", "Monday", "Rain all day."),
+    [DIARY_ADA]: lines("---", "id: char_000001", "name: Ada", "---", "An old friend."),
+  };
+  for (const [path, text] of Object.entries(files)) {
+    mkdirSync(dirname(join(dir, path)), { recursive: true });
+    writeFileSync(join(dir, path), text);
+  }
   gitIn(dir, "init", "-q");
   gitIn(dir, "add", "-A");
   gitIn(dir, "commit", "-qm", "Start");

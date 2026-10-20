@@ -29,15 +29,16 @@ interface Change {
   path: string;
 }
 
-const isScene = (path: string) => path.startsWith("manuscript/") && path.endsWith(".md");
+/** Whether a path is a piece: Markdown in the kind's content folder. */
+const isPiece = (content: string, path: string) => path.startsWith(`${content}/`) && path.endsWith(".md");
 
-/** What each commit since the start did to the manuscript, oldest first. */
-export async function writingHistory(root: string): Promise<CommitWords[]> {
-  const log = await gitPlumbing(root, ["log", "--reverse", "--no-merges", "--root", "-M", "--raw", "-z", "--no-abbrev", "--relative", "--format=%x01%H%x00%aI", "HEAD", "--", "manuscript"]).catch(
+/** What each commit since the start did to the pieces in the `content` folder (the kind's), oldest first. */
+export async function writingHistory(root: string, content: string): Promise<CommitWords[]> {
+  const log = await gitPlumbing(root, ["log", "--reverse", "--no-merges", "--root", "-M", "--raw", "-z", "--no-abbrev", "--relative", "--format=%x01%H%x00%aI", "HEAD", "--", content]).catch(
     // No commits yet.
     () => Buffer.alloc(0),
   );
-  const commits = parseLog(log.toString("utf8"));
+  const commits = parseLog(log.toString("utf8"), content);
   const cacheFile = join(await gitDir(root), CACHE);
   const cache = await readCache(cacheFile);
 
@@ -69,10 +70,10 @@ export async function writingHistory(root: string): Promise<CommitWords[]> {
  * Words added and removed by saved work not committed yet: each scene file that differs from the
  * last commit (or is new), word-diffed against it. What the history will say once it's committed.
  */
-export async function uncommittedChange(root: string): Promise<{ added: number; removed: number }> {
-  const changed = (await gitPlumbing(root, ["diff", "--name-only", "-z", "--relative", "HEAD", "--", "manuscript"]).catch(() => Buffer.alloc(0))).toString().split("\0");
-  const untracked = (await gitPlumbing(root, ["ls-files", "--others", "--exclude-standard", "-z", "--", "manuscript"]).catch(() => Buffer.alloc(0))).toString().split("\0");
-  const paths = [...new Set([...changed, ...untracked])].filter(isScene);
+export async function uncommittedChange(root: string, content: string): Promise<{ added: number; removed: number }> {
+  const changed = (await gitPlumbing(root, ["diff", "--name-only", "-z", "--relative", "HEAD", "--", content]).catch(() => Buffer.alloc(0))).toString().split("\0");
+  const untracked = (await gitPlumbing(root, ["ls-files", "--others", "--exclude-standard", "-z", "--", content]).catch(() => Buffer.alloc(0))).toString().split("\0");
+  const paths = [...new Set([...changed, ...untracked])].filter((p) => isPiece(content, p));
   if (!paths.length) return { added: 0, removed: 0 };
   const before = await readBlobs(root, paths.map((p) => `HEAD:./${p}`));
   const body = (text: string | undefined, path: string) => (text === undefined ? undefined : /^---\r?\n/.test(text) ? parseMarkdown(text, path).body : text);
@@ -88,7 +89,7 @@ export async function uncommittedChange(root: string): Promise<{ added: number; 
 }
 
 /** git log's records: each commit's hash, author date and the scene files it changed. */
-function parseLog(out: string): { commit: string; date: string; changes: Change[] }[] {
+function parseLog(out: string, content: string): { commit: string; date: string; changes: Change[] }[] {
   const commits: { commit: string; date: string; changes: Change[] }[] = [];
   for (const record of out.split("\x01").slice(1)) {
     const fields = record.split("\0");
@@ -101,9 +102,9 @@ function parseLog(out: string): { commit: string; date: string; changes: Change[
       const copied = status.startsWith("R") || status.startsWith("C");
       const from = fields[++i]!;
       const to = copied ? fields[++i]! : from;
-      // A scene moved in or out of the manuscript counts as added or removed; within it, as itself.
+      // A piece moved in or out of the content folder counts as added or removed; within it, as itself.
       // A copy leaves its source where it was: only the new file is new.
-      const [was, now] = [isScene(from), isScene(to)];
+      const [was, now] = [isPiece(content, from), isPiece(content, to)];
       if (!was && !now) continue;
       changes.push({
         path: now ? to : from,
@@ -181,7 +182,8 @@ export function statsRoutes(routes: Hono<Env>): void {
   routes.get("/:id/stats", async (c) => {
     const { novel } = await c.var.ws.loadModel();
     const words = novel.allPieces.reduce((n, s) => n + countWords(s.body), 0);
-    const days = writingDays(await writingHistory(c.var.ws.root), words);
-    return c.json({ days, words, target: novel.config?.target ?? null, pending: await uncommittedChange(c.var.ws.root) });
+    const { content } = novel.kind.folders;
+    const days = writingDays(await writingHistory(c.var.ws.root, content), words);
+    return c.json({ days, words, target: novel.config?.target ?? null, pending: await uncommittedChange(c.var.ws.root, content) });
   });
 }

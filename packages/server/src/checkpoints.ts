@@ -1,4 +1,4 @@
-import { countWords, loadBook, parseMarkdown, type Book } from "@writer/core";
+import { countWords, kindOf, loadBook, parseMarkdown, vocabulary, type Book, type BookKind } from "@writer/core";
 import { nodeSource } from "@writer/core/node";
 import type { Committer } from "./committer.ts";
 import { atomicWrite, writablePath } from "./files.ts";
@@ -7,9 +7,6 @@ import { git } from "./git.ts";
 
 /** Checkpoints are annotated tags under this prefix; sync fetches and pushes them. */
 export const CHECKPOINT_PREFIX = "refs/tags/checkpoint/";
-
-/** What "the whole manuscript" means for a restore: the prose and the story bible. */
-const RESTORED_PATHS = ["manuscript", "bible"];
 
 const WORDS_TRAILER = "Words";
 const AUTO_TRAILER = "Checkpoint";
@@ -134,8 +131,10 @@ export class Checkpoints {
     return this.#exclusive(async () => {
       const checkpoint = await this.get(id);
       const tag = `${CHECKPOINT_PREFIX}${id}`;
-      const scene = sceneId === undefined ? undefined : await this.#sceneAt(tag, sceneId);
-      const what = scene ? `“${scene.title}”` : "the manuscript";
+      const kind = await this.#kind();
+      const w = vocabulary(kind);
+      const scene = sceneId === undefined ? undefined : await this.#sceneAt(tag, sceneId, kind);
+      const what = scene ? `“${scene.title}”` : `the ${w.content.one}`;
       const undo = await this.#create(`Before restoring ${what} from “${checkpoint.name}”`, true);
       const g = git(this.root);
 
@@ -149,7 +148,8 @@ export class Checkpoints {
       } else {
         // Paths in neither the checkpoint nor the work tree would be an error for git.
         paths = [];
-        for (const p of RESTORED_PATHS) {
+        // The whole book, for a restore: its sections and pieces, and its codex.
+        for (const p of [kind.folders.content, kind.folders.codex]) {
           const atCheckpoint = (await g.raw(["ls-tree", "--name-only", tag, "--", p])).trim();
           const now = (await g.raw(["ls-files", "--", p])).trim();
           if (atCheckpoint || now) paths.push(p);
@@ -160,7 +160,7 @@ export class Checkpoints {
 
       const files = paths.length ? (await g.raw(["diff", "--cached", "--name-only", "--relative", "--", ...paths])).split("\n").filter(Boolean) : [];
       if (!files.length) return { undo, commit: null, files };
-      const message = `Restore ${scene ? `scene ${what}` : what} from checkpoint “${checkpoint.name}”`;
+      const message = `Restore ${scene ? `${w.piece.one} ${what}` : what} from checkpoint “${checkpoint.name}”`;
       await g.raw(["commit", "--quiet", "--no-verify", "-m", message, "--", ...paths]);
       return { undo, commit: (await g.raw(["rev-parse", "HEAD"])).trim(), files };
     });
@@ -203,16 +203,23 @@ export class Checkpoints {
     return wordsIn(await loadBook(nodeSource(this.root)));
   }
 
-  async #sceneAt(tag: string, sceneId: string): Promise<{ path: string; title: string; content: string }> {
+  /** The book's kind, for its folders and words. */
+  async #kind(): Promise<BookKind> {
+    const kind = await kindOf(nodeSource(this.root));
+    if (!kind) throw new Error("This copy of Writer doesn't know this kind of book, so it can't restore it.");
+    return kind;
+  }
+
+  async #sceneAt(tag: string, sceneId: string, kind: BookKind): Promise<{ path: string; title: string; content: string }> {
     const g = git(this.root);
-    const files = (await g.raw(["ls-tree", "-r", "-z", "--name-only", tag, "--", "manuscript"])).split("\0").filter((f) => f.endsWith(".md"));
+    const files = (await g.raw(["ls-tree", "-r", "-z", "--name-only", tag, "--", kind.folders.content])).split("\0").filter((f) => f.endsWith(".md"));
     for (const path of files) {
       const content = await g.raw(["show", `${tag}:./${path}`]);
       const { data } = parseMarkdown(content, path);
       const fm = (data ?? {}) as { id?: unknown; title?: unknown };
       if (fm.id === sceneId) return { path, title: typeof fm.title === "string" ? fm.title : sceneId, content };
     }
-    throw new CheckpointError("SCENE_NOT_FOUND", `The checkpoint has no scene "${sceneId}".`);
+    throw new CheckpointError("SCENE_NOT_FOUND", `The checkpoint has no ${vocabulary(kind).piece.one} "${sceneId}".`);
   }
 
   async #currentScenePath(sceneId: string): Promise<string | undefined> {

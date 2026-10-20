@@ -283,12 +283,12 @@ export class NovelWorkspace {
   }
 
   /**
-   * After a scene is saved: a picture it no longer names, that no other scene, entry or the cover does,
+   * After a piece is saved: a picture it no longer names, that no other piece, entry or the cover does,
    * has its file deleted (no picture is left behind in images/); one it names again whose file this
    * deleted is put back.
    */
   async #prosePictures(path: string, before: string, after: string): Promise<void> {
-    if (!path.startsWith("manuscript/") || !path.endsWith(".md")) return;
+    if (!path.startsWith(`${this.kind.folders.content}/`) || !path.endsWith(".md")) return;
     const named = (text: string) => new Set(pictures(text).flatMap((p) => picturePath(p.src) ?? []));
     const was = named(before);
     const now = named(after);

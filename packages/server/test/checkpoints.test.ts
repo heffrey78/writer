@@ -4,7 +4,7 @@ import { countWords, loadBook } from "@writer/core";
 import { nodeSource } from "@writer/core/node";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Checkpoints, Committer, createServer, Library, sessionCookie, Syncer, type Checkpoint, type RestoreResult } from "../src/index.ts";
-import { gitIn, novelRepo, scratch } from "./fixtures.ts";
+import { DIARY_ADA, diaryRepo, gitIn, MONDAY, novelRepo, scratch } from "./fixtures.ts";
 import { send } from "./http.ts";
 
 const SCENE = "manuscript/01-return/01-arrival/01-the-station.md";
@@ -262,3 +262,27 @@ describe("through the server", () => {
     }
   });
 });
+
+describe("a kind with folders of its own", () => {
+  it("restores a diary's pages and index, and one day by its ID", async () => {
+    const root = diaryRepo(fresh("diary"));
+    const diary = open(root);
+    const checkpoint = await diary.create("Before");
+    const at = (path: string) => readFileSync(join(root, path), "utf8");
+    const was = { monday: at(MONDAY), ada: at(DIARY_ADA) };
+    writeFileSync(join(root, MONDAY), `${was.monday}Then sun.\n`);
+    writeFileSync(join(root, DIARY_ADA), `${was.ada}Moved away.\n`);
+    gitIn(root, "commit", "-qam", "Later");
+
+    await diary.restore(checkpoint.id);
+    expect([at(MONDAY), at(DIARY_ADA)]).toEqual([was.monday, was.ada]);
+    expect(gitIn(root, "log", "-1", "--format=%s").trim()).toBe("Restore the pages from checkpoint “Before”");
+
+    writeFileSync(join(root, MONDAY), `${was.monday}Then snow.\n`);
+    gitIn(root, "commit", "-qam", "Later still");
+    await diary.restore(checkpoint.id, { sceneId: "day_000001" });
+    expect(at(MONDAY)).toBe(was.monday);
+    expect(gitIn(root, "log", "-1", "--format=%s").trim()).toBe("Restore day “Monday” from checkpoint “Before”");
+  });
+});
+

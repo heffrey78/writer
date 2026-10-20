@@ -9,6 +9,15 @@ import { joinPath, type FileSource } from "./source.ts";
 import type { CompileFile, Diagnostic, NovelFile, RelationshipTypeFile, PieceStatus, StoryTime } from "./types.ts";
 
 /**
+ * The kind of the book in `source`, from its manifest (a book in format 1 or 2 is a novel), for what
+ * needs its folders or words without loading it. Undefined for a kind this build doesn't ship.
+ */
+export async function kindOf(source: Pick<FileSource, "read">): Promise<BookKind | undefined> {
+  const manifest = await readManifest(source);
+  return manifest?.kind === undefined ? kindByKey(V2_KIND) : knownKind(manifest.kind);
+}
+
+/**
  * Load a book's repository into a story model, as the kind of book its manifest names (D15): book.yaml's
  * `kind`, or a novel for a book in format 1 or 2 (novel.yaml). `kind` reads it as another kind (tests).
  *

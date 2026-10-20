@@ -101,7 +101,8 @@ function checkStyle(style: RelationshipTypeFields["style"]): void {
   if (style.line !== undefined && !LINES.includes(style.line)) throw new OperationError("BAD_REQUEST", `A line is solid, dashed or dotted.`);
 }
 
-const RELATIONSHIPS = "bible/relationships.yaml";
+/** Where the book's relationships are: relationships.yaml in its kind's codex folder. */
+const relationshipsFile = (novel: Book) => `${novel.kind.folders.codex}/relationships.yaml`;
 
 /**
  * The story bible's changes, each one commit: entities of any type, relationships (including a change
@@ -134,7 +135,7 @@ export class BibleOperations {
         if (ID_PATTERN.exec(wanted)?.[1] !== def.prefix || ids.has(wanted)) throw new OperationError("BAD_REQUEST", `“${wanted}” can't be a new ${def.label.toLowerCase()}'s ID.`);
       }
       const id = wanted ?? uniqueId(def.prefix, ids);
-      const folder = `bible/${def.folder}`;
+      const folder = `${novel.kind.folders.codex}/${def.folder}`;
       const taken = new Set(novel.entities.filter((e) => e.file.startsWith(`${folder}/`)).map((e) => e.file.slice(folder.length + 1)));
       const file = `${folder}/${uniqueFileName(slugify(name), ".md", taken)}`;
       const front = stringify({ id, ...clean({ ...fields, name }) }, { lineWidth: 0 });
@@ -261,8 +262,8 @@ export class BibleOperations {
       this.#checkRelationship(novel, fields);
       const id = uniqueId(RECORD_PREFIXES.relationship, new Set(indexById(novel).keys()));
       const record = { id, ...clean(fields) };
-      const content = await this.#appendRelationship(record);
-      const result = await transaction(this.root, [{ path: RELATIONSHIPS, content }], `Bible: ${this.#describe(novel, fields)}`);
+      const content = await this.#appendRelationship(novel, record);
+      const result = await transaction(this.root, [{ path: relationshipsFile(novel), content }], `Bible: ${this.#describe(novel, fields)}`);
       return { ...result, id };
     });
   }
@@ -272,12 +273,12 @@ export class BibleOperations {
     return this.#run(async (novel) => {
       const { index, relationship } = this.#find(novel, id);
       this.#checkRelationship(novel, { ...relationship, ...nullsToUndefined(changes) });
-      const text = await this.#read(RELATIONSHIPS);
+      const text = await this.#read(relationshipsFile(novel));
       const content = editYaml(
         text,
         Object.entries(changes).map(([key, value]) => (value === null ? { path: ["relationships", index, key], remove: true as const } : { path: ["relationships", index, key], value })),
       );
-      return transaction(this.root, [{ path: RELATIONSHIPS, content }], `Bible: edit ${this.#describe(novel, relationship)}`);
+      return transaction(this.root, [{ path: relationshipsFile(novel), content }], `Bible: edit ${this.#describe(novel, relationship)}`);
     });
   }
 
@@ -300,10 +301,10 @@ export class BibleOperations {
       });
       this.#checkRelationship(novel, next as RelationshipFields);
       const newId = uniqueId(RECORD_PREFIXES.relationship, new Set(indexById(novel).keys()));
-      const ended = editYaml(await this.#read(RELATIONSHIPS), [{ path: ["relationships", index, "until"], value: at }]);
-      const content = await this.#appendRelationship({ id: newId, ...next }, ended);
+      const ended = editYaml(await this.#read(relationshipsFile(novel)), [{ path: ["relationships", index, "until"], value: at }]);
+      const content = await this.#appendRelationship(novel, { id: newId, ...next }, ended);
       const scene = novel.allPieces.find((s) => s.id === at)!;
-      const result = await transaction(this.root, [{ path: RELATIONSHIPS, content }], `Bible: ${this.#describe(novel, relationship)} becomes ${next.type} at “${scene.title}”`);
+      const result = await transaction(this.root, [{ path: relationshipsFile(novel), content }], `Bible: ${this.#describe(novel, relationship)} becomes ${next.type} at “${scene.title}”`);
       return { ...result, id: newId };
     });
   }
@@ -313,17 +314,17 @@ export class BibleOperations {
     return this.#run(async (novel) => {
       const { index, relationship } = this.#find(novel, id);
       this.#checkSpan(novel, relationship.since, at, "The end must come after the relationship starts.");
-      const content = editYaml(await this.#read(RELATIONSHIPS), [{ path: ["relationships", index, "until"], value: at }]);
+      const content = editYaml(await this.#read(relationshipsFile(novel)), [{ path: ["relationships", index, "until"], value: at }]);
       const scene = novel.allPieces.find((s) => s.id === at)!;
-      return transaction(this.root, [{ path: RELATIONSHIPS, content }], `Bible: ${this.#describe(novel, relationship)} ends at “${scene.title}”`);
+      return transaction(this.root, [{ path: relationshipsFile(novel), content }], `Bible: ${this.#describe(novel, relationship)} ends at “${scene.title}”`);
     });
   }
 
   deleteRelationship(id: string): Promise<OperationResult> {
     return this.#run(async (novel) => {
       const { index, relationship } = this.#find(novel, id);
-      const content = editYaml(await this.#read(RELATIONSHIPS), [{ path: ["relationships", index], remove: true }]);
-      return transaction(this.root, [{ path: RELATIONSHIPS, content }], `Bible: remove ${this.#describe(novel, relationship)}`);
+      const content = editYaml(await this.#read(relationshipsFile(novel)), [{ path: ["relationships", index], remove: true }]);
+      return transaction(this.root, [{ path: relationshipsFile(novel), content }], `Bible: remove ${this.#describe(novel, relationship)}`);
     });
   }
 
@@ -751,8 +752,8 @@ export class BibleOperations {
   }
 
   /** relationships.yaml with `record` appended (written fresh, in block style, when the list is empty). */
-  async #appendRelationship(record: Record<string, unknown>, text?: string): Promise<string> {
-    return this.#appendToList(RELATIONSHIPS, "relationships", record, text);
+  async #appendRelationship(novel: Book, record: Record<string, unknown>, text?: string): Promise<string> {
+    return this.#appendToList(relationshipsFile(novel), "relationships", record, text);
   }
 
   async #appendToList(path: string, key: string, item: Record<string, unknown>, text?: string): Promise<string> {

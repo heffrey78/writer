@@ -5,7 +5,7 @@ import { countWords, loadBook, writingDays } from "@writer/core";
 import { nodeSource } from "@writer/core/node";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { uncommittedChange, writingHistory } from "../src/index.ts";
-import { gitIn, novelRepo, scratch } from "./fixtures.ts";
+import { diaryRepo, gitIn, MONDAY, novelRepo, scratch } from "./fixtures.ts";
 
 const STATION = "manuscript/01-return/01-arrival/01-the-station.md";
 const RIVET = "manuscript/02-the-sale/02-varn-holds/02-the-last-rivet.md";
@@ -53,7 +53,7 @@ describe("writingHistory", { timeout: 30_000 }, () => {
     commitAt(dir, "main", "2026-11-03T11:00:00+01:00");
     execFileSync("git", ["-C", dir, "merge", "-q", "--no-edit", "side"], { env: { ...process.env, GIT_AUTHOR_DATE: "2026-11-03T12:00:00+01:00", GIT_COMMITTER_DATE: "2026-11-03T12:00:00+01:00" } });
 
-    const history = await writingHistory(dir);
+    const history = await writingHistory(dir, "manuscript");
     expect(history.map((c) => [c.date.slice(0, 10), c.added, c.removed])).toEqual([
       [expect.any(String), start, 0],
       ["2026-11-01", 3, 0],
@@ -75,7 +75,7 @@ describe("writingHistory", { timeout: 30_000 }, () => {
     // A fresh clone, with nothing but git, works out the same.
     const clone = fresh("clone");
     gitIn(tmp, "clone", "-q", dir, clone);
-    expect(writingDays(await writingHistory(clone), await wordsNow(clone))).toEqual(days);
+    expect(writingDays(await writingHistory(clone, "manuscript"), await wordsNow(clone))).toEqual(days);
 
     // Kept in the clone's .git: a new commit is the only one worked out again.
     const cache = join(dir, ".git/gh-writer/stats.json");
@@ -83,25 +83,33 @@ describe("writingHistory", { timeout: 30_000 }, () => {
     edit(dir, RIVET, "Side words.", "Side words. More.");
     commitAt(dir, "more", "2026-11-04T08:00:00+01:00");
     expect(existsSync(cache)).toBe(true);
-    const again = await writingHistory(dir);
+    const again = await writingHistory(dir, "manuscript");
     expect(again.at(-1)).toMatchObject({ added: 1, removed: 0 });
     expect(Object.keys((JSON.parse(read(dir, ".git/gh-writer/stats.json")) as { commits: object }).commits)).toHaveLength(8);
   });
 
   it("counts saved work not yet committed: edits and new scenes, against the last commit", async () => {
     const dir = novelRepo(fresh("novel"));
-    expect(await uncommittedChange(dir)).toEqual({ added: 0, removed: 0 });
+    expect(await uncommittedChange(dir, "manuscript")).toEqual({ added: 0, removed: 0 });
     edit(dir, STATION, "counted them twice", "counted them three times");
     writeFileSync(join(dir, "manuscript/01-return/01-arrival/03 a new scene.md"), "---\nid: sc_new001\ntitle: New\n---\n\nFour brand new words.\n");
-    expect(await uncommittedChange(dir)).toEqual({ added: 6, removed: 1 });
+    expect(await uncommittedChange(dir, "manuscript")).toEqual({ added: 6, removed: 1 });
     commitAt(dir, "commit it", "2026-11-05T10:00:00Z");
-    expect(await uncommittedChange(dir)).toEqual({ added: 0, removed: 0 });
+    expect(await uncommittedChange(dir, "manuscript")).toEqual({ added: 0, removed: 0 });
+  });
+
+  it("reads a kind's own content folder: a diary's pages", async () => {
+    const dir = diaryRepo(fresh("diary"));
+    edit(dir, MONDAY, "Rain all day.", "Rain all day. Then sun at six.");
+    expect(await uncommittedChange(dir, "pages")).toEqual({ added: 4, removed: 0 });
+    commitAt(dir, "later", "2026-11-05T10:00:00Z");
+    expect((await writingHistory(dir, "pages")).map((c) => [c.added, c.removed])).toEqual([[3, 0], [4, 0]]);
   });
 
   it("is empty for a novel with no commits yet", async () => {
     const dir = fresh("empty");
     execFileSync("git", ["init", "-q", dir]);
-    expect(await writingHistory(dir)).toEqual([]);
+    expect(await writingHistory(dir, "manuscript")).toEqual([]);
   });
 });
 
