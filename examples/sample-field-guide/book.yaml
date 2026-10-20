@@ -1,0 +1,10 @@
+schema_version: 3
+kind: field-guide
+id: fg_b1rd5v
+title: Birds of the Varn Estuary
+author: Writer sample
+relationship_types:
+  - key: watches
+    label: Watches at
+    from_types: [observer]
+    to_types: [site]

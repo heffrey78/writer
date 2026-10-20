@@ -1,0 +1,2 @@
+relationships:
+  - {id: rel_m1raw4, from: obs_m1ra00, to: site_n0rth5, type: watches}

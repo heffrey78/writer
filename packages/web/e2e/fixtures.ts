@@ -10,6 +10,8 @@ import { fakeGitHub, type FakeGitHub } from "../../server/test/fake-github.ts";
 const repo = fileURLToPath(new URL("../../..", import.meta.url));
 export const sample = join(repo, "examples/sample-novel");
 const cli = join(repo, "packages/cli/src/main.ts");
+/** The CLI, knowing the test kinds too (#35): for a spec on a book of one, `test.use({ entry: withTestKinds })`. */
+export const withTestKinds = join(repo, "packages/cli/test/with-test-kinds.ts");
 
 /** A running `writer serve`. */
 export interface Server {
@@ -39,6 +41,8 @@ export interface App {
   serveAnother: (args: string[], env?: Record<string, string>) => Promise<Server>;
   /** A git repository holding a copy of the sample novel, committed. */
   novelRepo: (name?: string) => string;
+  /** A git repository holding a copy of another sample book (examples/sample-field-guide), committed. */
+  bookRepo: (source: string, name?: string) => string;
   /** A bare repository with the sample novel, for cloning from. */
   bareRepo: (name?: string) => string;
   git: (dir: string, ...args: string[]) => string;
@@ -122,7 +126,9 @@ export async function launch(page: Page, app: App, path = "/") {
   await expect(page).not.toHaveURL(/token=/);
 }
 
-export const test = base.extend<{ app: App; csp: void }>({
+export const test = base.extend<{ app: App; csp: void; entry: string }>({
+  // The script `writer serve` runs: the CLI, or one that registers test kinds first.
+  entry: [cli, { option: true }],
   // Every test fails on a Content Security Policy violation: the page must work within its own policy.
   csp: [
     async ({ page }, use) => {
@@ -133,7 +139,7 @@ export const test = base.extend<{ app: App; csp: void }>({
     },
     { auto: true },
   ],
-  app: async ({}, use, testInfo) => {
+  app: async ({ entry }, use, testInfo) => {
     const home = mkdtempSync(join(tmpdir(), "writer-web-"));
     writeFileSync(join(home, ".gitconfig"), "[user]\n\tname = Test Author\n\temail = author@example.com\n[init]\n\tdefaultBranch = main\n");
     const github = await fakeGitHub({ gitRoot: join(home, "github") });
@@ -163,10 +169,11 @@ export const test = base.extend<{ app: App; csp: void }>({
       url: "",
       env,
       git: gitHere,
-      novelRepo: (name = `novel-${++n}`) => {
+      novelRepo: (name = `novel-${++n}`) => app.bookRepo(sample, name),
+      bookRepo: (source, name = `book-${++n}`) => {
         const dir = join(home, "novels", name);
         mkdirSync(join(home, "novels"), { recursive: true });
-        cpSync(sample, dir, { recursive: true });
+        cpSync(source, dir, { recursive: true });
         gitHere(dir, "init", "-q");
         gitHere(dir, "add", "-A");
         gitHere(dir, "commit", "-qm", "Start");
@@ -181,7 +188,7 @@ export const test = base.extend<{ app: App; csp: void }>({
       },
       restart: async (...args) => {
         await stop(child);
-        const started = await serve(args, env, (s) => (log += s));
+        const started = await serve(entry, args, env, (s) => (log += s));
         child = started.child;
         app.launchUrl = started.launchUrl;
         app.url = new URL(started.launchUrl).origin;
@@ -189,7 +196,7 @@ export const test = base.extend<{ app: App; csp: void }>({
       stop: () => stop(child),
       kill: () => stop(child, "SIGKILL"),
       serveAnother: async (args, extra = {}) => {
-        const started = await serve(args, { ...env, ...extra }, (s) => (log += `[another] ${s}`));
+        const started = await serve(entry, args, { ...env, ...extra }, (s) => (log += `[another] ${s}`));
         others.push(started.child);
         return { launchUrl: started.launchUrl, url: new URL(started.launchUrl).origin, stop: () => stop(started.child), kill: () => stop(started.child, "SIGKILL") };
       },
@@ -205,8 +212,8 @@ export const test = base.extend<{ app: App; csp: void }>({
 });
 
 /** Start `writer serve` and wait for its launch URL. */
-function serve(args: string[], env: NodeJS.ProcessEnv, log: (s: string) => void): Promise<{ child: ChildProcess; launchUrl: string }> {
-  const child = spawn("node", [cli, "serve", "--no-open", ...args], { cwd: env.HOME, env, stdio: ["ignore", "pipe", "pipe"] });
+function serve(entry: string, args: string[], env: NodeJS.ProcessEnv, log: (s: string) => void): Promise<{ child: ChildProcess; launchUrl: string }> {
+  const child = spawn("node", [entry, "serve", "--no-open", ...args], { cwd: env.HOME, env, stdio: ["ignore", "pipe", "pipe"] });
   return new Promise((resolve, reject) => {
     let out = "";
     child.stdout!.on("data", (chunk: Buffer) => {

@@ -356,3 +356,25 @@ describe("writer compile", () => {
     expect(run(main, "compile", sample, "--from", "ch_h01d50", "--to", "ch_arr1va", "--out", out)).toMatchObject({ code: 1, out: expect.stringContaining("ends before it starts") });
   });
 });
+
+describe("a book of a kind that isn't a novel (#35)", () => {
+  const withTestKinds = join(repo, "packages/cli/test/with-test-kinds.ts");
+  const guide = join(repo, "examples/sample-field-guide");
+
+  it("validates, draws its diagrams and compiles, in its own folders", () => {
+    expect(run(withTestKinds, "validate", guide)).toMatchObject({ code: 0, out: expect.stringContaining("✔ Birds of the Varn Estuary: 0 errors, 0 warnings") });
+    const book = join(tmp, "field-guide");
+    cpSync(guide, book, { recursive: true });
+    for (const args of [["init", "-q"], ["add", "-A"], ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "Draft"]]) spawnSync("git", ["-C", book, ...args]);
+    const drawn = run(withTestKinds, "snapshots", book);
+    expect(drawn.code, drawn.out + drawn.err).toBe(0);
+    expect(readFileSync(join(book, "diagrams/README.md"), "utf8")).toContain("Relationships");
+    const r = run(withTestKinds, "compile", book, "--format", "docx,epub,pdf");
+    expect(r.code, r.out + r.err).toBe(0);
+    expect(r.out).toMatch(/^Compiled 2 chapters \(\d+ words\): .*compiled\/birds-of-the-varn-estuary\.docx, .*\.epub, .*\.pdf\n$/);
+  });
+
+  it("is a kind the shipped app doesn't know", () => {
+    expect(run(main, "validate", guide)).toMatchObject({ code: 1, out: expect.stringContaining("E_UNKNOWN_KIND") });
+  });
+});

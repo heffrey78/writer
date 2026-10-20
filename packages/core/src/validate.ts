@@ -88,7 +88,7 @@ export function validateBook(novel: Book): Diagnostic[] {
   }
 
   const builtinTypes = new Set(novel.entityTypes.filter((t) => t.builtin).map((t) => t.key));
-  /** Check that `id` names a record of an allowed kind (entity type keys, "scene", "*entity": any entry, "*custom": a custom type's). */
+  /** Check that `id` names a record of an allowed kind (entity type keys, the kind's piece, "*entity": any entry, "*custom": a custom type's). */
   function ref(id: string | undefined, allowed: string[], file: string, pointer: string, field: string, line?: number) {
     if (id === undefined) return;
     const target = index.get(id);
@@ -159,10 +159,10 @@ export function validateBook(novel: Book): Diagnostic[] {
   }
   // Notes (D12): their mentions, and what they became: a piece, or a module's record.
   for (const n of novel.notes) {
-    ref(n.became, [...recordTypes.map((t) => t.key), "scene"], n.file, "/became", "became");
-    n.scenes.forEach((id, i) => ref(id, ["scene"], n.file, `/scenes/${i}`, "scenes"));
+    ref(n.became, [...recordTypes.map((t) => t.key), kind.piece.key], n.file, "/became", "became");
+    n.scenes.forEach((id, i) => ref(id, [kind.piece.key], n.file, `/scenes/${i}`, "scenes"));
     n.pinned.forEach((id, i) => {
-      ref(id, ["scene"], n.file, `/pinned/${i}`, "pinned");
+      ref(id, [kind.piece.key], n.file, `/pinned/${i}`, "pinned");
       if (!n.scenes.includes(id)) push("warning", "W_NOTE_PIN", n.file, `Pinned in ${id}, which isn't one of the note's scenes`, { pointer: `/pinned/${i}` });
     });
     for (const m of mentions(n.body)) ref(m.id, MENTIONABLE, n.file, "", `Mention "${m.text}"`, n.bodyLine + m.line - 1);
@@ -192,8 +192,8 @@ export function validateBook(novel: Book): Diagnostic[] {
     const p = `/relationships/${r.index}`;
     ref(r.from, ["*entity"], r.file, `${p}/from`, "from");
     ref(r.to, ["*entity"], r.file, `${p}/to`, "to");
-    ref(r.since, ["scene"], r.file, `${p}/since`, "since");
-    ref(r.until, ["scene"], r.file, `${p}/until`, "until");
+    ref(r.since, [kind.piece.key], r.file, `${p}/since`, "since");
+    ref(r.until, [kind.piece.key], r.file, `${p}/until`, "until");
     if (r.from === r.to) push("warning", "W_REL_SELF", r.file, `Relationship ${r.id} connects ${r.from} to itself`, { pointer: p });
 
     const type = relTypes.get(r.type);

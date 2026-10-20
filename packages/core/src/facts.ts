@@ -2,6 +2,7 @@ import { DEFAULT_GAP, presentIn } from "./diagrams.ts";
 import { entryIds } from "./fields.ts";
 import type { Book, Piece, Relationship } from "./model.ts";
 import { moduleFacts } from "./modules.ts";
+import { vocabulary } from "./vocabulary.ts";
 
 /**
  * What the rest of the book says about a scene, worked out from the model (heffrey78/gh-writer#154): where it stands
@@ -19,17 +20,19 @@ export function sceneFacts(novel: Book, sceneId: string): string[] {
   const name = (id: string) => novel.entities.find((e) => e.id === id)?.name ?? id;
   const list = (ids: string[]) => (ids.length < 3 ? ids.map(name).join(" and ") : `${ids.slice(0, -1).map(name).join(", ")} and ${name(ids.at(-1)!)}`);
 
-  // Where it stands in the book.
-  if (scenes.length === 1) facts.push("The book's only scene.");
-  else if (at === 0) facts.push("The book's first scene.");
-  else if (at === scenes.length - 1) facts.push("The book's last scene.");
+  // Where it stands in the book, in the kind's word for a piece.
+  const piece = vocabulary(novel.kind).piece;
+  if (scenes.length === 1) facts.push(`The book's only ${piece.one}.`);
+  else if (at === 0) facts.push(`The book's first ${piece.one}.`);
+  else if (at === scenes.length - 1) facts.push(`The book's last ${piece.one}.`);
 
   // What the kind's modules say: the off-page event it dramatizes, how it sits in story time.
   facts.push(...moduleFacts(novel, scene));
 
-  // Characters: first seen here, or back after a long absence.
+  // People (the entries of types that are people, a novel's characters): first seen here, or back after a long absence.
   const present = scenes.map((s) => presentIn(novel, s));
-  const characters = [...present[at]!].filter((id) => novel.entities.find((e) => e.id === id)?.type === "character");
+  const people = new Set(novel.entityTypes.filter((t) => t.is === "person").map((t) => t.key));
+  const characters = [...present[at]!].filter((id) => people.has(novel.entities.find((e) => e.id === id)?.type ?? ""));
   const first = characters.filter((id) => !present.slice(0, at).some((p) => p.has(id)));
   if (first.length) facts.push(`First appearance of ${list(first)}.`);
   for (const id of characters) {
@@ -37,7 +40,7 @@ export function sceneFacts(novel: Book, sceneId: string): string[] {
     let last = at - 1;
     while (last >= 0 && !present[last]!.has(id)) last--;
     const away = at - last - 1;
-    if ("scenes" in DEFAULT_GAP && away >= DEFAULT_GAP.scenes) facts.push(`${name(id)} is back after ${away} scenes away.`);
+    if ("scenes" in DEFAULT_GAP && away >= DEFAULT_GAP.scenes) facts.push(`${name(id)} is back after ${away} ${piece.many} away.`);
   }
 
   // Threads (plotlines) beginning or ending here.
