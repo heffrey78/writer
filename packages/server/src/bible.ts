@@ -18,6 +18,7 @@ import {
   slugify,
   uniqueFileName,
   uniqueId,
+  vocabulary,
   type Book,
   type Relationship,
   type SeriesSlot,
@@ -101,6 +102,9 @@ function checkStyle(style: RelationshipTypeFields["style"]): void {
   if (style.line !== undefined && !LINES.includes(style.line)) throw new OperationError("BAD_REQUEST", `A line is solid, dashed or dotted.`);
 }
 
+/** A commit message's prefix: the kind's short name for its codex, "Bible". */
+const codex = (novel: Book) => vocabulary(novel.kind).codex.Short;
+
 /** Where the book's relationships are: relationships.yaml in its kind's codex folder. */
 const relationshipsFile = (novel: Book) => `${novel.kind.folders.codex}/relationships.yaml`;
 
@@ -140,7 +144,7 @@ export class BibleOperations {
       const file = `${folder}/${uniqueFileName(slugify(name), ".md", taken)}`;
       const front = stringify({ id, ...clean({ ...fields, name }) }, { lineWidth: 0 });
       const content = `---\n${front}---\n${notes ? `\n${notes.trimEnd()}\n` : ""}`;
-      const result = await transaction(this.root, [{ path: file, content, base: null }], `Bible: add ${name}`);
+      const result = await transaction(this.root, [{ path: file, content, base: null }], `${codex(novel)}: add ${name}`);
       return { ...result, id, file };
     });
   }
@@ -167,7 +171,7 @@ export class BibleOperations {
         }
       }
       if (!writes.length) writes.push({ path: entity.file, content, base });
-      const message = changes.name && changes.name !== entity.name ? `Bible: rename ${entity.name} to ${changes.name}` : `Bible: edit ${entity.name}`;
+      const message = changes.name && changes.name !== entity.name ? `${codex(novel)}: rename ${entity.name} to ${changes.name}` : `${codex(novel)}: edit ${entity.name}`;
       return { ...(await transaction(this.root, writes, message)), file };
     });
   }
@@ -192,7 +196,7 @@ export class BibleOperations {
       }
       // Its picture goes with it, unless something else shows the same file.
       const picture = this.#ownPicture(novel, entity.image, id);
-      return transaction(this.root, [{ path: entity.file, content: null, base }, ...(picture ? [{ path: picture, content: null }] : [])], `Bible: remove ${entity.name}`);
+      return transaction(this.root, [{ path: entity.file, content: null, base }, ...(picture ? [{ path: picture, content: null }] : [])], `${codex(novel)}: remove ${entity.name}`);
     });
   }
 
@@ -213,7 +217,7 @@ export class BibleOperations {
       const content = editFrontMatter(text, [{ path: ["image"], value: image }, focus ? { path: ["image_focus"], value: checkFocus(focus) } : { path: ["image_focus"], remove: true }]);
       const writes: FileWrite[] = [{ path: image, content: bytes }, { path: entity.file, content, base }];
       if (own && own !== image) writes.push({ path: own, content: null });
-      const message = entity.image ? `Bible: change the picture of ${entity.name}` : `Bible: add a picture of ${entity.name}`;
+      const message = entity.image ? `${codex(novel)}: change the picture of ${entity.name}` : `${codex(novel)}: add a picture of ${entity.name}`;
       return { ...(await transaction(this.root, writes, message)), file: entity.file, image };
     });
   }
@@ -229,7 +233,7 @@ export class BibleOperations {
       const own = this.#ownPicture(novel, entity.image, id);
       const content = editFrontMatter(text, [{ path: ["image"], remove: true }, { path: ["image_focus"], remove: true }]);
       const writes: FileWrite[] = [{ path: entity.file, content, base }, ...(own ? [{ path: own, content: null }] : [])];
-      return { ...(await transaction(this.root, writes, `Bible: remove the picture of ${entity.name}`)), file: entity.file };
+      return { ...(await transaction(this.root, writes, `${codex(novel)}: remove the picture of ${entity.name}`)), file: entity.file };
     });
   }
 
@@ -263,7 +267,7 @@ export class BibleOperations {
       const id = uniqueId(RECORD_PREFIXES.relationship, new Set(indexById(novel).keys()));
       const record = { id, ...clean(fields) };
       const content = await this.#appendRelationship(novel, record);
-      const result = await transaction(this.root, [{ path: relationshipsFile(novel), content }], `Bible: ${this.#describe(novel, fields)}`);
+      const result = await transaction(this.root, [{ path: relationshipsFile(novel), content }], `${codex(novel)}: ${this.#describe(novel, fields)}`);
       return { ...result, id };
     });
   }
@@ -278,7 +282,7 @@ export class BibleOperations {
         text,
         Object.entries(changes).map(([key, value]) => (value === null ? { path: ["relationships", index, key], remove: true as const } : { path: ["relationships", index, key], value })),
       );
-      return transaction(this.root, [{ path: relationshipsFile(novel), content }], `Bible: edit ${this.#describe(novel, relationship)}`);
+      return transaction(this.root, [{ path: relationshipsFile(novel), content }], `${codex(novel)}: edit ${this.#describe(novel, relationship)}`);
     });
   }
 
@@ -304,7 +308,7 @@ export class BibleOperations {
       const ended = editYaml(await this.#read(relationshipsFile(novel)), [{ path: ["relationships", index, "until"], value: at }]);
       const content = await this.#appendRelationship(novel, { id: newId, ...next }, ended);
       const scene = novel.allPieces.find((s) => s.id === at)!;
-      const result = await transaction(this.root, [{ path: relationshipsFile(novel), content }], `Bible: ${this.#describe(novel, relationship)} becomes ${next.type} at “${scene.title}”`);
+      const result = await transaction(this.root, [{ path: relationshipsFile(novel), content }], `${codex(novel)}: ${this.#describe(novel, relationship)} becomes ${next.type} at “${scene.title}”`);
       return { ...result, id: newId };
     });
   }
@@ -316,7 +320,7 @@ export class BibleOperations {
       this.#checkSpan(novel, relationship.since, at, "The end must come after the relationship starts.");
       const content = editYaml(await this.#read(relationshipsFile(novel)), [{ path: ["relationships", index, "until"], value: at }]);
       const scene = novel.allPieces.find((s) => s.id === at)!;
-      return transaction(this.root, [{ path: relationshipsFile(novel), content }], `Bible: ${this.#describe(novel, relationship)} ends at “${scene.title}”`);
+      return transaction(this.root, [{ path: relationshipsFile(novel), content }], `${codex(novel)}: ${this.#describe(novel, relationship)} ends at “${scene.title}”`);
     });
   }
 
@@ -324,7 +328,7 @@ export class BibleOperations {
     return this.#run(async (novel) => {
       const { index, relationship } = this.#find(novel, id);
       const content = editYaml(await this.#read(relationshipsFile(novel)), [{ path: ["relationships", index], remove: true }]);
-      return transaction(this.root, [{ path: relationshipsFile(novel), content }], `Bible: remove ${this.#describe(novel, relationship)}`);
+      return transaction(this.root, [{ path: relationshipsFile(novel), content }], `${codex(novel)}: remove ${this.#describe(novel, relationship)}`);
     });
   }
 
@@ -339,7 +343,7 @@ export class BibleOperations {
       const id = uniqueId(RECORD_PREFIXES.event, new Set(indexById(novel).keys()));
       const { note, ...front } = clean({ ...fields, title });
       const file = this.#eventFileName(novel, title);
-      return { writes: [{ path: file, content: eventFile({ id, ...front }, note), base: null }], message: `Bible: add event “${title}”`, extra: { id, file } };
+      return { writes: [{ path: file, content: eventFile({ id, ...front }, note), base: null }], message: `${codex(novel)}: add event “${title}”`, extra: { id, file } };
     });
   }
 
@@ -362,7 +366,7 @@ export class BibleOperations {
       const title = changes.title?.trim() || event.title;
       const renamed = changes.title && changes.title.trim() !== event.title ? this.#eventFileName(novel, title, event.file) : event.file;
       const writes: FileWrite[] = renamed === event.file ? [{ path: event.file, content, ...check }] : [{ path: event.file, content: null, ...check }, { path: renamed, content, base: null }];
-      const message = renamed === event.file ? `Bible: edit event “${title}”` : `Bible: rename event “${event.title}” to “${title}”`;
+      const message = renamed === event.file ? `${codex(novel)}: edit event “${title}”` : `${codex(novel)}: rename event “${event.title}” to “${title}”`;
       return { writes, message, extra: { file: renamed } };
     });
   }
@@ -380,7 +384,7 @@ export class BibleOperations {
       }
       const text = (await read(event.file)) ?? "";
       if (base !== undefined && !migrated.has(event.file) && hashText(text) !== base) throw new OperationError("STALE", `“${event.title}” changed since it was read.`, { path: event.file });
-      return { writes: [{ path: event.file, content: null, ...(migrated.has(event.file) ? {} : { base: hashText(text) }) }], message: `Bible: remove event “${event.title}”`, extra: {} };
+      return { writes: [{ path: event.file, content: null, ...(migrated.has(event.file) ? {} : { base: hashText(text) }) }], message: `${codex(novel)}: remove event “${event.title}”`, extra: {} };
     });
   }
 
@@ -402,7 +406,7 @@ export class BibleOperations {
       const scene = await manuscript.sceneWrites(novel, chapter, { title: event.title, front });
       const text = (await read(event.file)) ?? "";
       const writes: FileWrite[] = [...scene.writes, keep ? { path: event.file, content: editFrontMatter(text, [{ path: ["scene"], value: scene.id }]) } : { path: event.file, content: null }];
-      return { writes, message: `Manuscript: write “${event.title}” as a scene${keep ? "" : ", removing the event"}`, extra: { scene: scene.id, file: scene.file } };
+      return { writes, message: `${vocabulary(novel.kind).content.One}: write “${event.title}” as ${vocabulary(novel.kind).piece.a}${keep ? "" : ", removing the event"}`, extra: { scene: scene.id, file: scene.file } };
     });
   }
 
@@ -515,7 +519,7 @@ export class BibleOperations {
       const synopsis = proseText(note.body).replace(/\s+/g, " ").trim();
       const scene = await manuscript.sceneWrites(novel, to.chapter, { title: note.title, front: synopsis ? { synopsis } : {} });
       const writes = [...scene.writes, await noteWrite(novel, (path) => this.#read(path), scene.id)];
-      const message = `Notes: write “${note.title}” as a scene${keep ? "" : ", removing the note"}`;
+      const message = `Notes: write “${note.title}” as ${vocabulary(novel.kind).piece.a}${keep ? "" : ", removing the note"}`;
       return { ...(await transaction(this.root, writes, message)), id: scene.id, file: scene.file };
     });
   }
@@ -557,7 +561,7 @@ export class BibleOperations {
 
   /** Scene IDs that are scenes, each once; anything else is refused. */
   #checkScenes(novel: Book, ids: string[]): string[] {
-    for (const id of ids) if (!novel.allPieces.some((s) => s.id === id)) throw new OperationError("BAD_REQUEST", `No scene “${id}”.`);
+    for (const id of ids) if (!novel.allPieces.some((s) => s.id === id)) throw new OperationError("BAD_REQUEST", `No ${vocabulary(novel.kind).piece.one} “${id}”.`);
     return [...new Set(ids)];
   }
 
@@ -626,7 +630,7 @@ export class BibleOperations {
       const folder = fields.folder ?? `${key}s`;
       const def = clean({ key, prefix: fields.prefix, folder, label: required(fields.label, "label"), color: fields.color });
       const content = await this.#appendToList(novel.manifest, "entity_types", def);
-      return transaction(this.root, [{ path: novel.manifest, content }], `Bible: add the ${fields.label} type`);
+      return transaction(this.root, [{ path: novel.manifest, content }], `${codex(novel)}: add the ${fields.label} type`);
     });
   }
 
@@ -637,7 +641,7 @@ export class BibleOperations {
       const index = custom.findIndex((t) => t.key === key);
       if (index < 0) throw new OperationError("NOT_FOUND", `No custom entity type “${key}”.`);
       const content = editYaml(await this.#read(novel.manifest), editsAt(["entity_types", index], changes));
-      return transaction(this.root, [{ path: novel.manifest, content }], `Bible: edit the ${key} type`);
+      return transaction(this.root, [{ path: novel.manifest, content }], `${codex(novel)}: edit the ${key} type`);
     });
   }
 
@@ -653,7 +657,7 @@ export class BibleOperations {
       // Its own colour from the start, the first no type uses, so adding a type never repaints the others.
       const style = { color: fields.style?.color ?? nextSeriesSlot(novel), line: fields.style?.line ?? "solid" };
       const content = await this.#appendToList(novel.manifest, "relationship_types", clean({ ...fields, label: required(fields.label, "label"), style }));
-      return transaction(this.root, [{ path: novel.manifest, content }], `Bible: add the “${fields.label}” relationship`);
+      return transaction(this.root, [{ path: novel.manifest, content }], `${codex(novel)}: add the “${fields.label}” relationship`);
     });
   }
 
@@ -666,7 +670,7 @@ export class BibleOperations {
       // The style's own lines, so the rest of the type is left as written.
       const styleEdits = Object.entries(style ?? {}).map(([k, value]) => ({ path: ["relationship_types", index, "style", k], value }));
       const content = editYaml(await this.#read(novel.manifest), [...editsAt(["relationship_types", index], rest), ...styleEdits]);
-      return transaction(this.root, [{ path: novel.manifest, content }], `Bible: edit the “${key}” relationship`);
+      return transaction(this.root, [{ path: novel.manifest, content }], `${codex(novel)}: edit the “${key}” relationship`);
     });
   }
 
@@ -709,7 +713,7 @@ export class BibleOperations {
     }
     if (!r.type || !novel.relationshipTypes.some((t) => t.key === r.type)) throw new OperationError("BAD_REQUEST", `No relationship type “${r.type ?? ""}”.`);
     for (const scene of [r.since, r.until]) {
-      if (scene && !novel.allPieces.some((s) => s.id === scene)) throw new OperationError("BAD_REQUEST", `No scene “${scene}”.`);
+      if (scene && !novel.allPieces.some((s) => s.id === scene)) throw new OperationError("BAD_REQUEST", `No ${vocabulary(novel.kind).piece.one} “${scene}”.`);
     }
     this.#checkSpan(novel, r.since ?? undefined, r.until ?? undefined, "A relationship must start before it ends.");
   }
@@ -730,7 +734,7 @@ export class BibleOperations {
     if (f.duration && !/^P(?!$)(\d+Y)?(\d+M)?(\d+W)?(\d+D)?(T(?=\d)(\d+H)?(\d+M)?(\d+(\.\d+)?S)?)?$/.test(f.duration)) {
       throw new OperationError("BAD_REQUEST", "A duration is ISO 8601, like PT45M or P2D.");
     }
-    if (f.scene && !novel.allPieces.some((sc) => sc.id === f.scene)) throw new OperationError("BAD_REQUEST", `No scene “${f.scene}”.`);
+    if (f.scene && !novel.allPieces.some((sc) => sc.id === f.scene)) throw new OperationError("BAD_REQUEST", `No ${vocabulary(novel.kind).piece.one} “${f.scene}”.`);
     for (const [key, type] of [["characters", "character"], ["locations", "location"], ["plotlines", "plotline"]] as const) {
       for (const id of f[key] ?? []) {
         if (!novel.entities.some((e) => e.id === id && e.type === type)) throw new OperationError("BAD_REQUEST", `No ${type} “${id}”.`);

@@ -36,7 +36,7 @@ export function libraryRoutes(library: Library, github?: GitHub): Hono {
   // Read straight from the folder: opening the novel for this would start syncing every book on the shelf.
   routes.get("/:id/cover", async (c) => {
     const entry = library.get(c.req.param("id"));
-    if (!entry?.cover) return c.json({ code: "NOT_FOUND", error: "That novel has no cover." }, 404);
+    if (!entry?.cover) return c.json({ code: "NOT_FOUND", error: "That book has no cover." }, 404);
     try {
       const image = await servableImage(entry.path, entry.cover);
       if (!image) return c.json({ code: "NOT_FOUND", error: `No image "${entry.cover}".` }, 404);
@@ -77,7 +77,7 @@ export function libraryRoutes(library: Library, github?: GitHub): Hono {
 
   routes.post("/", async (c) => {
     const body = await jsonBody(c);
-    if (typeof body?.path !== "string" || !body.path) return c.json({ code: "BAD_REQUEST", error: "Send { path }: the novel's folder." }, 400);
+    if (typeof body?.path !== "string" || !body.path) return c.json({ code: "BAD_REQUEST", error: "Send { path }: the book's folder." }, 400);
     try {
       return c.json({ novel: await library.add(body.path) }, 201);
     } catch (e) {
@@ -85,7 +85,7 @@ export function libraryRoutes(library: Library, github?: GitHub): Hono {
     }
   });
 
-  routes.delete("/:id", async (c) => (await library.remove(c.req.param("id")) ? c.body(null, 204) : c.json({ code: "UNKNOWN_NOVEL", error: "No such novel." }, 404)));
+  routes.delete("/:id", async (c) => (await library.remove(c.req.param("id")) ? c.body(null, 204) : c.json({ code: "UNKNOWN_NOVEL", error: "No such book." }, 404)));
 
   routes.post("/gh-writer", async (c) => c.json(await library.importGhWriter()));
 

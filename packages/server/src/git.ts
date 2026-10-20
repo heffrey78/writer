@@ -24,7 +24,7 @@ const GUIDANCE: Record<Exclude<GitErrorCode, "GIT">, string> = {
     "(or sign in with Git Credential Manager); for a git@github.com: address, add an SSH key to GitHub " +
     "(https://github.com/settings/keys) and load it with ssh-add. Then try again.",
   SCOPE:
-    "GitHub won't let Writer add or change the novel's GitHub workflows (.github/workflows) without the workflow permission. " +
+    "GitHub won't let Writer add or change the book's GitHub workflows (.github/workflows) without the workflow permission. " +
     "Reconnect to GitHub with a code to grant it: Sign out of GitHub, then Connect GitHub. (With gh's account, run `gh auth refresh -s workflow` first.)",
   NOT_FOUND: "No repository at that address. Check the owner and name, and that your GitHub account can see it.",
   NETWORK: "Couldn't reach the server. Check your connection and try again.",

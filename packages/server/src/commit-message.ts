@@ -1,4 +1,4 @@
-import { countWords, parseMarkdown } from "@writer/core";
+import { countWords, parseMarkdown, vocabulary, type BookKind } from "@writer/core";
 
 /** One staged file: its git status and its text before and after. */
 export interface FileChange {
@@ -13,11 +13,12 @@ export interface FileChange {
 const MAX_NAMES = 3;
 
 /**
- * A commit message from what changed: a summary naming the scenes and bible entries, with the net
- * change in manuscript words, e.g. "Draft: The Station, The Bridge (+214 words)", then a body
- * listing each file.
+ * A commit message from what changed, in the kind's words: a summary naming the pieces and codex
+ * entries, with the net change in the pieces' words, e.g. "Draft: The Station, The Bridge (+214
+ * words)", then a body listing each file.
  */
-export function commitMessage(changes: FileChange[]): { summary: string; body: string } {
+export function commitMessage(changes: FileChange[], kind: BookKind): { summary: string; body: string } {
+  const w = vocabulary(kind);
   const drafted: string[] = [];
   const added: string[] = [];
   const removed: string[] = [];
@@ -27,15 +28,15 @@ export function commitMessage(changes: FileChange[]): { summary: string; body: s
   const lines: string[] = [];
 
   for (const change of changes) {
-    const kind = kindOf(change.path);
+    const what = whatIs(kind, change.path);
     let line = `${change.status} ${change.oldPath ? `${change.oldPath} → ` : ""}${change.path}`;
-    if (kind === "scene") {
+    if (what === "piece") {
       const title = field(change.after ?? change.before, "title") ?? fileTitle(change.path);
       const delta = bodyWords(change.after) - bodyWords(change.before);
       words += delta;
       if (delta) line += ` (${signed(delta)})`;
       (change.status === "A" ? added : change.status === "D" ? removed : drafted).push(title);
-    } else if (kind === "bible") {
+    } else if (what === "entity") {
       bible.push(field(change.after ?? change.before, "name") ?? fileTitle(change.path));
     } else {
       other.push(change.path.split("/").pop()!);
@@ -45,22 +46,21 @@ export function commitMessage(changes: FileChange[]): { summary: string; body: s
 
   const parts: string[] = [];
   if (drafted.length) parts.push(`Draft: ${names(drafted)}`);
-  if (added.length) parts.push(`${added.length === 1 ? "New scene" : "New scenes"}: ${names(added)}`);
-  if (removed.length) parts.push(`${removed.length === 1 ? "Remove scene" : "Remove scenes"}: ${names(removed)}`);
-  if (bible.length) parts.push(`Bible: ${names(bible)}`);
+  if (added.length) parts.push(`New ${added.length === 1 ? w.piece.one : w.piece.many}: ${names(added)}`);
+  if (removed.length) parts.push(`Remove ${removed.length === 1 ? w.piece.one : w.piece.many}: ${names(removed)}`);
+  if (bible.length) parts.push(`${w.codex.Short}: ${names(bible)}`);
   if (other.length) parts.push(`Update ${names(other)}`);
   const scenes = drafted.length + added.length + removed.length;
-  const summary = (parts.join("; ") || "Update the novel") + (scenes && words ? ` (${signed(words)})` : "");
+  const summary = (parts.join("; ") || `Update the ${w.book.one}`) + (scenes && words ? ` (${signed(words)})` : "");
   return { summary, body: lines.join("\n") };
 }
 
-type Kind = "scene" | "bible" | "other";
-
-function kindOf(path: string): Kind {
+/** What a changed file is, by the kind's folders: a piece, an entity of the codex, or something else. */
+function whatIs(kind: BookKind, path: string): "piece" | "entity" | "other" {
   const file = path.split("/").pop()!;
   if (!file.endsWith(".md") || file.startsWith("_")) return "other";
-  if (path.startsWith("manuscript/")) return "scene";
-  if (path.startsWith("bible/")) return "bible";
+  if (path.startsWith(`${kind.folders.content}/`)) return "piece";
+  if (path.startsWith(`${kind.folders.codex}/`)) return "entity";
   return "other";
 }
 

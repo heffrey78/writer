@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { entityLabel, entityOfLabel, issueKindOf, kindByKey, passageIssueBody, V2_KIND, type BookKind, type Book } from "@writer/core";
+import { entityLabel, entityOfLabel, issueKindOf, kindByKey, passageIssueBody, V2_KIND, vocabulary, type BookKind, type Book } from "@writer/core";
 import { git } from "./git.ts";
 import { GitHubError, unreachable, type GitHub, type GitHubRepo } from "./github.ts";
 
@@ -713,7 +713,7 @@ export class IssueStore {
 
   async #requireRepo(): Promise<GitHubRepo> {
     await this.#load();
-    if (!this.#status.repo) throw new IssuesError("NOT_ON_GITHUB", "This novel isn't on GitHub.");
+    if (!this.#status.repo) throw new IssuesError("NOT_ON_GITHUB", `This ${vocabulary(this.#kind()).book.one} isn't on GitHub.`);
     return this.#status.repo;
   }
 

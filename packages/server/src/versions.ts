@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { editYaml, loadBook } from "@writer/core";
+import { editYaml, loadBook, pieceLevel, vocabulary } from "@writer/core";
 import { nodeSource } from "@writer/core/node";
 import { slug, wordsIn, type Checkpoint, type Checkpoints } from "./checkpoints.ts";
 import { operationInProgress, type Committer } from "./committer.ts";
@@ -291,7 +291,7 @@ export class Versions {
       const source = await commitSource(this.root, version.commit);
       const there = await loadBook(source);
       const scene = there.allPieces.find((s) => s.id === sceneId);
-      if (!scene) throw new VersionError("NOT_FOUND", `“${version.name}” has no scene “${sceneId}”.`);
+      if (!scene) throw new VersionError("NOT_FOUND", `“${version.name}” has no ${vocabulary(there.kind).piece.one} “${sceneId}”.`);
       const content = (await source.read(scene.file))!;
       const here = await loadBook(nodeSource(this.root));
       const g = git(this.root);
@@ -304,7 +304,8 @@ export class Versions {
         files.push(existing.file);
       } else {
         const chapter = here.allSections.find((c) => c.id === scene.sectionId);
-        if (!chapter) throw new VersionError("NOT_HERE", `“${scene.title}” is in a chapter this version doesn't have: adopt the whole version, or add the chapter first.`);
+        const section = vocabulary(here.kind).level(pieceLevel(here));
+        if (!chapter) throw new VersionError("NOT_HERE", `“${scene.title}” is in ${section.a} this version doesn't have: adopt the whole version, or add the ${section.one} first.`);
         let path = `${chapter.dir}/${scene.file.split("/").at(-1)}`;
         for (let n = 2; await readFile(join(this.root, path)).then(() => true, () => false); n++) path = `${chapter.dir}/${scene.file.split("/").at(-1)!.replace(/\.md$/, `-${n}.md`)}`;
         await atomicWrite(await writablePath(this.root, path, content), content);
@@ -380,11 +381,11 @@ export class Versions {
   /** Commit saved work, then make the change with writes held off; tell sync. */
   async #change<T>(fn: () => Promise<T>): Promise<T> {
     const result = await this.#exclusive(async () => {
-      if (await operationInProgress(this.root)) throw new VersionError("BUSY", "Another change to the novel's history is under way (a sync being settled). Try again once it's finished.");
+      if (await operationInProgress(this.root)) throw new VersionError("BUSY", "Another change to the book's history is under way (a sync being settled). Try again once it's finished.");
       const committed = await this.#committer.commit();
       if ("skipped" in committed && committed.skipped !== "NOTHING") {
         const blocked = (await this.#committer.status()).blocked;
-        throw new VersionError("BLOCKED", `Your latest work couldn't be saved into the novel's history, so nothing changed. ${blocked?.message ?? ""}`.trim());
+        throw new VersionError("BLOCKED", `Your latest work couldn't be saved into the book's history, so nothing changed. ${blocked?.message ?? ""}`.trim());
       }
       return fn();
     });

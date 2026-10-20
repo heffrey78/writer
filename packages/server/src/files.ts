@@ -67,7 +67,7 @@ export function checkPath(path: string): string {
     /^[A-Za-z]:/.test(path) ||
     segments.some((s) => s === "" || s.startsWith(".") || s === "node_modules")
   ) {
-    throw new FileError("BAD_PATH", `Not a path inside the novel: "${path}"`);
+    throw new FileError("BAD_PATH", `Not a path inside the book: "${path}"`);
   }
   return path;
 }
@@ -92,7 +92,7 @@ export const TOOLS_DIR = ".github/gh-writer";
 
 /** Check that a path is one of the novel's vendored tools, and return its full path. Only migrations write these. */
 export async function writableToolPath(root: string, path: string): Promise<string> {
-  if (!path.startsWith(`${TOOLS_DIR}/`)) throw new FileError("NOT_WRITABLE", `Not one of the novel's tools: "${path}"`);
+  if (!path.startsWith(`${TOOLS_DIR}/`)) throw new FileError("NOT_WRITABLE", `Not one of the book's tools: "${path}"`);
   checkPath(path.slice(TOOLS_DIR.length + 1));
   return resolveChecked(root, path);
 }
@@ -105,7 +105,7 @@ async function resolveChecked(root: string, path: string): Promise<string> {
   for (;;) {
     const real = await realpath(dir).catch(() => undefined);
     if (real !== undefined) {
-      if (real !== realRoot && !real.startsWith(realRoot + sep)) throw new FileError("BAD_PATH", `"${path}" leads outside the novel.`);
+      if (real !== realRoot && !real.startsWith(realRoot + sep)) throw new FileError("BAD_PATH", `"${path}" leads outside the book.`);
       break;
     }
     dir = dirname(dir);

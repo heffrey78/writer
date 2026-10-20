@@ -49,7 +49,7 @@ export function novelRoutes(library: Library, workspaces: Workspaces, github?: G
 
   routes.use("/:id/*", async (c, next) => {
     const ws = workspaces.get(c.req.param("id")!);
-    if (!ws) return c.json({ code: "UNKNOWN_NOVEL", error: "No such novel in the library." }, 404);
+    if (!ws) return c.json({ code: "UNKNOWN_NOVEL", error: "No such book in the library." }, 404);
     c.set("ws", ws);
     // A novel in a newer format is read only: written by this server, it would be written wrong. Syncing may still bring it.
     if (c.req.method !== "GET" && c.req.method !== "HEAD" && !c.req.path.endsWith("/sync")) {
@@ -62,7 +62,7 @@ export function novelRoutes(library: Library, workspaces: Workspaces, github?: G
   routes.get("/:id", async (c) => {
     const id = c.req.param("id");
     const ws = workspaces.get(id);
-    if (!ws) return c.json({ code: "UNKNOWN_NOVEL", error: "No such novel in the library." }, 404);
+    if (!ws) return c.json({ code: "UNKNOWN_NOVEL", error: "No such book in the library." }, 404);
     await library.touch(id);
     return c.json(await ws.loadModel());
   });

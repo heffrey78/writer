@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
 import { join, posix } from "node:path";
-import { editFrontMatter, editYaml, indexById, kindByKey, loadBook, numberedName, pieceLevel, slugify, startLevels, uniqueId, V2_KIND, type Book, type BookKind, type LevelDef, type Piece, type Section } from "@writer/core";
+import { editFrontMatter, editYaml, indexById, kindByKey, loadBook, numberedName, pieceLevel, slugify, startLevels, uniqueId, V2_KIND, vocabulary, type Book, type BookKind, type LevelDef, type Piece, type Section } from "@writer/core";
 import { nodeSource } from "@writer/core/node";
 import { parse, stringify } from "yaml";
 import { git } from "./git.ts";
@@ -98,7 +98,7 @@ export class ManuscriptOperations {
     return this.#exclusive(async () => {
       const novel = await this.#load();
       const { id, title: name, writes } = await this.sceneWrites(novel, chapterId, { title, ...(after !== undefined ? { after } : {}) });
-      return { ...(await transaction(this.root, writes, `Manuscript: add ${novel.kind.piece.key} “${name}”`)), id };
+      return { ...(await transaction(this.root, writes, `${content(novel)}: add ${vocabulary(novel.kind).piece.one} “${name}”`)), id };
     });
   }
 
@@ -132,7 +132,7 @@ export class ManuscriptOperations {
   createPart(options: { title: string; after?: string | null }): Promise<OperationResult & { id: string }> {
     return this.#run(async (novel, o) => {
       const level = novel.kind.levels.at(-2);
-      if (!level) throw new OperationError("BAD_REQUEST", `A ${novel.kind.label.toLowerCase()} has no level out from its ${novel.kind.levels.at(-1)!.list}.`);
+      if (!level) throw new OperationError("BAD_REQUEST", `${vocabulary(novel.kind).book.A} has no level out from its ${vocabulary(novel.kind).level(novel.kind.levels.at(-1)!.key).many}.`);
       return this.#createSection(novel, o, level.key, null, options);
     });
   }
@@ -144,7 +144,7 @@ export class ManuscriptOperations {
 
   async #createSection(novel: Book, o: Overlay, levelKey: string, parentId: string | null, { title, after }: { title?: string; after?: string | null }): Promise<{ message: string; id: string }> {
     const level = novel.kind.levels.find((l) => l.key === levelKey);
-    if (!level) throw new OperationError("BAD_REQUEST", `A ${novel.kind.label.toLowerCase()} has no level “${levelKey}”.`);
+    if (!level) throw new OperationError("BAD_REQUEST", `${vocabulary(novel.kind).book.A} has no level “${levelKey}”.`);
     const parent = this.#containerFor(novel, level, parentId);
     const name = level.titled ? required(title, "title") : title?.trim();
     const id = uniqueId(level.prefix, new Set(indexById(novel).keys()));
@@ -152,7 +152,7 @@ export class ManuscriptOperations {
     o.set(`${dir}/_${level.key}.yaml`, stringify({ id, ...(name ? { title: name } : {}), [childList(novel.kind, level)]: [] }, { lineWidth: 0, flowCollectionPadding: false }));
     await this.#insert(o, novel, parent, id, after);
     await this.#renumber(o, novel, parent, new Map([[id, dir]]));
-    return { message: `Manuscript: add ${level.key}${name ? ` “${name}”` : ""}`, id };
+    return { message: `${content(novel)}: add ${vocabulary(novel.kind).level(level.key).one}${name ? ` “${name}”` : ""}`, id };
   }
 
   /** A new title for a piece or section; its file or folder name follows. */
@@ -169,7 +169,7 @@ export class ManuscriptOperations {
         o.set(file, editYaml((await o.read(file))!, [name ? { path: ["title"], value: name } : { path: ["title"], remove: true }]));
         await this.#moveDir(o, dir, rename(dir, slugify(name || item.level.key), ""));
       }
-      return { message: `Manuscript: rename ${kindOf(novel, item)} to “${name || "untitled"}”` };
+      return { message: `${content(novel)}: rename ${kindOf(novel, item)} to “${name || "untitled"}”` };
     });
   }
 
@@ -209,7 +209,7 @@ export class ManuscriptOperations {
         await this.#renumber(o, novel, from, new Map());
       }
       await this.#renumber(o, novel, target, paths);
-      return { message: `Manuscript: move ${described(novel, item)}` };
+      return { message: `${content(novel)}: move ${described(novel, item)}` };
     });
   }
 
@@ -226,7 +226,7 @@ export class ManuscriptOperations {
       const fmEnd = text.length - bodyOf(text).length;
       const body = text.slice(fmEnd);
       const starts = paragraphStarts(body);
-      if (paragraph < 1 || paragraph >= starts.length) throw new OperationError("BAD_REQUEST", `Split between two paragraphs of the ${novel.kind.piece.key}.`);
+      if (paragraph < 1 || paragraph >= starts.length) throw new OperationError("BAD_REQUEST", `Split between two paragraphs of the ${vocabulary(novel.kind).piece.one}.`);
       const cut = starts[paragraph]!;
       const first = text.slice(0, fmEnd) + body.slice(0, cut).replace(/\s*$/, "\n");
       const id = uniqueId(novel.kind.piece.prefix, new Set(indexById(novel).keys()));
@@ -241,7 +241,7 @@ export class ManuscriptOperations {
       const holder: Container = { section: this.#holder(novel, scene.sectionId!) };
       await this.#insert(o, novel, holder, id, sceneId);
       await this.#renumber(o, novel, holder, new Map([[id, path]]));
-      return { message: `Manuscript: split “${scene.title}”, the rest as “${name}”`, id };
+      return { message: `${content(novel)}: split “${scene.title}”, the rest as “${name}”`, id };
     });
   }
 
@@ -255,7 +255,7 @@ export class ManuscriptOperations {
       const chapter = this.#holder(novel, scene.sectionId!);
       const at = chapter.childIds.indexOf(sceneId);
       const next = novel.allPieces.find((s) => s.id === chapter.childIds[at + 1]);
-      if (!next) throw new OperationError("BAD_REQUEST", `“${scene.title}” is the last ${novel.kind.piece.key} of its ${chapter.level}.`);
+      if (!next) throw new OperationError("BAD_REQUEST", `“${scene.title}” is the last ${vocabulary(novel.kind).piece.one} of its ${vocabulary(novel.kind).level(chapter.level).one}.`);
       const firstText = (await o.read(scene.file))!;
       const nextText = (await o.read(next.file))!;
       const union = (a: string[], b: string[]) => [...new Set([...a, ...b])];
@@ -269,7 +269,7 @@ export class ManuscriptOperations {
       await this.#removeFrom(o, novel, { section: chapter }, next.id);
       await this.#retarget(o, novel, next.id, sceneId);
       await this.#renumber(o, novel, { section: chapter }, new Map());
-      return { message: `Manuscript: merge “${next.title}” into “${scene.title}”` };
+      return { message: `${content(novel)}: merge “${next.title}” into “${scene.title}”` };
     });
   }
 
@@ -303,13 +303,13 @@ export class ManuscriptOperations {
         o.set(item.piece.file, null);
         await this.#removeFrom(o, novel, holder, id);
         await this.#renumber(o, novel, holder, new Map());
-        return { message: `Manuscript: delete ${novel.kind.piece.key} “${item.piece.title}”` };
+        return { message: `${content(novel)}: delete ${described(novel, item)}` };
       }
       for (const f of await o.files(item.section.dir)) o.set(f, null);
       const parent = item.section.parentId ? ({ section: this.#section(novel, item.section.parentId) } as Container) : ({ top: true } as Container);
       await this.#removeFrom(o, novel, parent, id);
       await this.#renumber(o, novel, parent, new Map());
-      return { message: `Manuscript: delete ${item.level.key} “${item.section.title ?? "untitled"}”` };
+      return { message: `${content(novel)}: delete ${vocabulary(novel.kind).level(item.level.key).one} “${item.section.title ?? "untitled"}”` };
     });
   }
 
@@ -384,7 +384,7 @@ export class ManuscriptOperations {
       const at2 = previous === undefined ? 0 : current.indexOf(previous) + 1;
       await this.#setList(o, novel, container, [...current.slice(0, at2), id, ...current.slice(at2)]);
       await this.#renumber(o, novel, container, new Map([[id, newPath]]));
-      return transaction(this.root, o.changes(), `Manuscript: restore ${item.kind} “${item.title}”`);
+      return transaction(this.root, o.changes(), `${content(novel)}: restore ${vocabulary(novel.kind).of(item.kind).one} “${item.title}”`);
     });
   }
 
@@ -417,25 +417,25 @@ export class ManuscriptOperations {
     if (piece) return { kind: "piece", piece };
     const section = novel.allSections.find((s) => s.id === id);
     if (section) return { kind: "section", section, level: novel.kind.levels.find((l) => l.key === section.level)! };
-    throw new OperationError("NOT_FOUND", `Nothing in the manuscript has the ID “${id}”.`);
+    throw new OperationError("NOT_FOUND", `Nothing in the ${vocabulary(novel.kind).content.one} has the ID “${id}”.`);
   }
 
   #piece(novel: Book, id: string): Piece {
     const piece = novel.allPieces.find((s) => s.id === id);
-    if (!piece) throw new OperationError("NOT_FOUND", `No ${novel.kind.piece.key} “${id}”.`);
+    if (!piece) throw new OperationError("NOT_FOUND", `No ${vocabulary(novel.kind).piece.one} “${id}”.`);
     return piece;
   }
 
   /** A section of the innermost level: one that holds pieces (a chapter). */
   #holder(novel: Book, id: string): Section {
     const section = novel.allSections.find((s) => s.id === id && s.level === pieceLevel(novel));
-    if (!section) throw new OperationError("NOT_FOUND", `No ${pieceLevel(novel)} “${id}”.`);
+    if (!section) throw new OperationError("NOT_FOUND", `No ${vocabulary(novel.kind).level(pieceLevel(novel)).one} “${id}”.`);
     return section;
   }
 
   #section(novel: Book, id: string): Section {
     const section = novel.allSections.find((s) => s.id === id);
-    if (!section) throw new OperationError("NOT_FOUND", `Nothing in the manuscript has the ID “${id}”.`);
+    if (!section) throw new OperationError("NOT_FOUND", `Nothing in the ${vocabulary(novel.kind).content.one} has the ID “${id}”.`);
     return section;
   }
 
@@ -564,14 +564,17 @@ function within(novel: Book, sectionId: string | undefined, id: string): boolean
 }
 
 /** What an item is, in the kind's words: "scene", "chapter", "part". */
-const kindOf = (novel: Book, item: Item) => (item.kind === "piece" ? novel.kind.piece.key : item.level.key);
+const kindOf = (novel: Book, item: Item) => vocabulary(novel.kind).of(item.kind === "piece" ? novel.kind.piece.key : item.level.key).one;
 
 /** An item as a commit message names it: scene “The Bridge”, chapter, part “Act One”. */
 function described(novel: Book, item: Item): string {
-  if (item.kind === "piece") return `${novel.kind.piece.key} “${item.piece.title}”`;
+  if (item.kind === "piece") return `${kindOf(novel, item)} “${item.piece.title}”`;
   const { title } = item.section;
-  return item.level.titled || title ? `${item.level.key} “${title ?? ""}”` : item.level.key;
+  return item.level.titled || title ? `${kindOf(novel, item)} “${title ?? ""}”` : kindOf(novel, item);
 }
+
+/** A commit message's prefix: the kind's word for all its sections and pieces, "Manuscript". */
+const content = (novel: Book) => vocabulary(novel.kind).content.One;
 
 function required(value: string | undefined, field: string): string {
   if (typeof value !== "string" || !value.trim()) throw new OperationError("BAD_REQUEST", `A ${field} is required.`);

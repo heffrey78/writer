@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import type { Context, Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
+import { vocabulary } from "@writer/core";
 import { body, operation, type Env } from "./bible-routes.ts";
 import { FileError, IMAGES_DIR, MAX_IMAGE_BYTES, servableImage } from "./files.ts";
 import type { Library } from "./library.ts";
@@ -42,7 +43,7 @@ export function imageRoutes(routes: Hono<Env>, library: Library): void {
 
   const upload = bodyLimit({
     maxSize: MAX_IMAGE_BYTES,
-    onError: (c) => c.json({ code: "TOO_LARGE", error: "The image is larger than GitHub's 100 MB limit, so it can't be kept in the novel." }, 413),
+    onError: (c) => c.json({ code: "TOO_LARGE", error: `The image is larger than GitHub's 100 MB limit, so it can't be kept in the ${vocabulary(c.var.ws.kind).book.one}.` }, 413),
   });
 
   routes.put("/:id/bible/entities/:entity/picture", upload, async (c) => {

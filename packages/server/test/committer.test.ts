@@ -1,6 +1,8 @@
 import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { novel } from "@writer/kinds";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { diary } from "../../core/test/kinds.ts";
 import { commitMessage, Committer, createServer, Library, sessionCookie, TEMP_SUFFIX } from "../src/index.ts";
 import { fakeClock, gitIn, novelRepo, sample, scratch } from "./fixtures.ts";
 import { send } from "./http.ts";
@@ -205,29 +207,36 @@ describe("commitMessage", () => {
     const m = commitMessage([
       { status: "M", path: SCENE, before: scene("The Station", "One two."), after: scene("The Station", "One two three four.") },
       { status: "M", path: SCENE2, before: scene("The Bridge", "A b c."), after: scene("The Bridge", "A b c d e f.") },
-    ]);
+    ], novel);
     expect(m.summary).toBe("Draft: The Station, The Bridge (+5 words)");
     expect(m.body).toBe(`M ${SCENE} (+2 words)\nM ${SCENE2} (+3 words)`);
   });
 
   it("names new and removed scenes, bible entries and other files", () => {
-    expect(commitMessage([{ status: "A", path: "manuscript/a/03-dawn.md", after: scene("Dawn", "It was light.") }]).summary).toBe("New scene: Dawn (+3 words)");
-    expect(commitMessage([{ status: "D", path: SCENE, before: scene("The Station", "Gone now.") }]).summary).toBe("Remove scene: The Station (-2 words)");
-    expect(commitMessage([{ status: "M", path: "bible/characters/ada.md", before: entry("Ada"), after: entry("Ada Varn") }]).summary).toBe("Bible: Ada Varn");
-    expect(commitMessage([{ status: "M", path: "manuscript/01-return/_part.yaml" }, { status: "M", path: "novel.yaml" }]).summary).toBe("Update _part.yaml, novel.yaml");
+    expect(commitMessage([{ status: "A", path: "manuscript/a/03-dawn.md", after: scene("Dawn", "It was light.") }], novel).summary).toBe("New scene: Dawn (+3 words)");
+    expect(commitMessage([{ status: "D", path: SCENE, before: scene("The Station", "Gone now.") }], novel).summary).toBe("Remove scene: The Station (-2 words)");
+    expect(commitMessage([{ status: "M", path: "bible/characters/ada.md", before: entry("Ada"), after: entry("Ada Varn") }], novel).summary).toBe("Bible: Ada Varn");
+    expect(commitMessage([{ status: "M", path: "manuscript/01-return/_part.yaml" }, { status: "M", path: "novel.yaml" }], novel).summary).toBe("Update _part.yaml, novel.yaml");
   });
 
   it("combines kinds, and shortens long lists", () => {
     const m = commitMessage([
       ...["A", "B", "C", "D", "E"].map((t, i) => ({ status: "M" as const, path: `manuscript/c/0${i}-x.md`, before: scene(t, "x"), after: scene(t, "x y") })),
       { status: "A", path: "bible/locations/varn.md", after: entry("Varn") },
-    ]);
+    ], novel);
     expect(m.summary).toBe("Draft: A, B, C and 2 more; Bible: Varn (+5 words)");
   });
 
   it("follows renames, and falls back to the file name without a title", () => {
-    const m = commitMessage([{ status: "R", oldPath: "manuscript/c/01-old.md", path: "manuscript/c/02-the-last-rivet.md", before: "no front matter", after: "no front matter either" }]);
+    const m = commitMessage([{ status: "R", oldPath: "manuscript/c/01-old.md", path: "manuscript/c/02-the-last-rivet.md", before: "no front matter", after: "no front matter either" }], novel);
     expect(m.summary).toBe("Draft: the last rivet (+1 word)");
     expect(m.body).toBe("R manuscript/c/01-old.md → manuscript/c/02-the-last-rivet.md (+1 word)");
+  });
+
+  it("says another kind's words, from its folders", () => {
+    expect(commitMessage([{ status: "A", path: "pages/03/02-tuesday.md", after: scene("Tuesday", "Snow.") }], diary).summary).toBe("New day: Tuesday (+1 word)");
+    expect(commitMessage([{ status: "M", path: "index/characters/ada.md", before: entry("Ada"), after: entry("Ada Varn") }], diary).summary).toBe("Index: Ada Varn");
+    expect(commitMessage([{ status: "M", path: "manuscript/a/01-x.md", before: scene("X", "x"), after: scene("X", "x y") }], diary).summary).toBe("Update 01-x.md");
+    expect(commitMessage([], diary).summary).toBe("Update the diary");
   });
 });

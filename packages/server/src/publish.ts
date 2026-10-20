@@ -46,7 +46,7 @@ export async function publish(ws: NovelWorkspace, github: GitHub, { name, descri
   if (remote) {
     // Only a retry of this same publish may go on: never repoint a novel that has a remote.
     const mine = `${new URL(github.webUrl).origin}/${login}/${name}.git`.toLowerCase();
-    if (remote.toLowerCase() !== mine) throw new PublishError("HAS_REMOTE", `This novel is already connected to ${remote}.`);
+    if (remote.toLowerCase() !== mine) throw new PublishError("HAS_REMOTE", `This book is already connected to ${remote}.`);
   } else {
     const res = await github.api("/user/repos", { method: "POST", body: { name, private: priv, ...(description ? { description } : {}) } });
     const body = (await res.json().catch(() => ({}))) as { clone_url?: string; message?: string; errors?: { message?: string }[] };
@@ -62,12 +62,12 @@ export async function publish(ws: NovelWorkspace, github: GitHub, { name, descri
   }
 
   const failed = (message: string, detail?: string) =>
-    new PublishError("PUSH_FAILED", `The repository is on GitHub (${remote}), but sending the novel to it failed. ${message} Then try again: it goes to the same repository.`, detail);
+    new PublishError("PUSH_FAILED", `The repository is on GitHub (${remote}), but sending the book to it failed. ${message} Then try again: it goes to the same repository.`, detail);
   if (ws.syncer) {
     // A sync that started before the remote was added wouldn't push: sync again.
     const synced = await ws.syncer.syncAgain();
     if (synced.error) throw failed(synced.error.message, synced.error.detail);
-    if (synced.state === "local") throw failed("the novel didn't see its new remote.");
+    if (synced.state === "local") throw failed("the book didn't see its new remote.");
   } else {
     const branch = (await g.raw(["symbolic-ref", "--quiet", "--short", "HEAD"])).trim();
     try {

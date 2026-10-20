@@ -111,7 +111,7 @@ describe("a diary: months of days", () => {
     const { ops, load, last } = repo(diary, DIARY);
     const may = (await ops.createSection("month", null, { title: "May" })).id;
     await ops.createScene(may, { title: "Blossom" });
-    expect(last()).toBe("Manuscript: add day “Blossom”");
+    expect(last()).toBe("Pages: add day “Blossom”");
     await ops.move("day_000002", { to: "mon_000002", index: 1 });
     await ops.rename("mon_000001", "Early spring");
     const book = await load();

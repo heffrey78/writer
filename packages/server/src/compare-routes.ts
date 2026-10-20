@@ -1,4 +1,4 @@
-import { loadBook, type Book } from "@writer/core";
+import { loadBook, vocabulary, type Book } from "@writer/core";
 import { compareNovels, compareProse } from "@writer/core/compare";
 import type { Hono } from "hono";
 import type { Env } from "./bible-routes.ts";
@@ -45,7 +45,7 @@ export function compareRoutes(routes: Hono<Env>): void {
       const [before, after] = [await side(c.var.ws, c.req.query("from")), await side(c.var.ws, c.req.query("to"))];
       const id = c.req.param("sceneId");
       const [a, b] = [before.allPieces.find((s) => s.id === id), after.allPieces.find((s) => s.id === id)];
-      if (!a && !b) return c.json({ code: "NOT_FOUND", error: `Neither side has the scene “${id}”.` }, 404);
+      if (!a && !b) return c.json({ code: "NOT_FOUND", error: `Neither side has the ${vocabulary(c.var.ws.kind).piece.one} “${id}”.` }, 404);
       return c.json({ paragraphs: compareProse(a?.body, b?.body) });
     } catch (e) {
       if (!(e instanceof SideError)) throw e;

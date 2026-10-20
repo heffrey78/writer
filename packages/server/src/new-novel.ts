@@ -27,7 +27,7 @@ export interface NewNovel {
 
 export class NeedsIdentity extends Error {
   constructor() {
-    super("git doesn't know your name and email yet, so the novel's history can't be started. Give a name and email for this novel's history.");
+    super("git doesn't know your name and email yet, so the book's history can't be started. Give a name and email for this book's history.");
     this.name = "NeedsIdentity";
   }
 }

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { countWords, editFrontMatter, levelLabel, outerSections, pieceSections, type Book, type PieceStatus, type StatusDef } from "@writer/core";
+import { countWords, editFrontMatter, levelLabel, outerSections, pieceSections, vocabulary, type Book, type PieceStatus, type StatusDef } from "@writer/core";
 import { git } from "./git.ts";
 import { GitHubError, type GitHub, type GitHubRepo } from "./github.ts";
 import type { TextFile } from "./files.ts";
@@ -278,6 +278,11 @@ export class BoardStore {
     return Boolean((await this.#load()).state.project);
   }
 
+  /** What the book's kind calls it, for a message: "novel". */
+  async #book(): Promise<string> {
+    return vocabulary((await this.#deps.novel()).kind).book.one;
+  }
+
   /**
    * Make the novel's project on GitHub, or adopt the one already marked as the novel's, and sync it.
    * The project belongs to the repository's owner and is linked to the repository.
@@ -285,7 +290,7 @@ export class BoardStore {
   async setUp(): Promise<BoardStatus> {
     await this.#run(async () => {
       const { state, repo } = await this.#load();
-      if (!repo) throw new BoardError("NOT_ON_GITHUB", "This novel isn't on GitHub yet. Publish it first.");
+      if (!repo) throw new BoardError("NOT_ON_GITHUB", `This ${await this.#book()} isn't on GitHub yet. Publish it first.`);
       const novel = await this.#deps.novel();
       if (!state.project) {
         const found = await this.#find(repo, novel);
@@ -330,7 +335,7 @@ export class BoardStore {
   async resolve(scene: string, keep: "file" | "board"): Promise<BoardStatus> {
     const { state } = await this.#load();
     const conflict = state.conflicts.find((c) => c.scene === scene);
-    if (!conflict) throw new BoardError("NOT_FOUND", "That scene's status doesn't disagree with the board any more.");
+    if (!conflict) throw new BoardError("NOT_FOUND", `That ${vocabulary((await this.#deps.novel()).kind).piece.one}'s status doesn't disagree with the board any more.`);
     // A conflict's scene always has a last-synced record: the sync that found the conflict made it.
     const base = state.base[scene];
     if (base) base.status = keep === "file" ? conflict.board : conflict.file;
@@ -356,7 +361,7 @@ export class BoardStore {
 
   async #sync(): Promise<void> {
     const { state, repo } = await this.#load();
-    if (!repo) throw new BoardError("NOT_ON_GITHUB", "This novel isn't on GitHub yet. Publish it first.");
+    if (!repo) throw new BoardError("NOT_ON_GITHUB", `This ${await this.#book()} isn't on GitHub yet. Publish it first.`);
     if (!(await this.#deps.onMain())) throw new BoardError("NOT_MAIN", "The board follows the main version: open it to sync the board.");
     const novel = await this.#deps.novel();
     if (!state.project && !state.gone && !this.#searched) {
@@ -369,8 +374,8 @@ export class BoardStore {
       }
     }
     if (!state.project) {
-      if (state.gone) throw new BoardError("GONE", "The novel's board has been deleted on GitHub. Make a new one to carry on.");
-      throw new BoardError("NOT_SET_UP", "This novel has no board on GitHub yet.");
+      if (state.gone) throw new BoardError("GONE", `The ${await this.#book()}'s board has been deleted on GitHub. Make a new one to carry on.`);
+      throw new BoardError("NOT_SET_UP", `This ${await this.#book()} has no board on GitHub yet.`);
     }
 
     const board = await this.#read(state.project.id);
@@ -383,7 +388,7 @@ export class BoardStore {
       state.syncedAt = null;
       state.last = null;
       await this.#save();
-      throw new BoardError("GONE", "The novel's board has been deleted on GitHub. Make a new one to carry on.");
+      throw new BoardError("GONE", `The ${await this.#book()}'s board has been deleted on GitHub. Make a new one to carry on.`);
     }
     state.project = { id: board.id, number: board.number, title: board.title, url: board.url };
 

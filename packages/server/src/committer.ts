@@ -1,5 +1,7 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
+import { kindByKey, kindOf, V2_KIND } from "@writer/core";
+import { nodeSource } from "@writer/core/node";
 import { commitMessage, type FileChange } from "./commit-message.ts";
 import { TEMP_SUFFIX } from "./files.ts";
 import { classifyGitError, git } from "./git.ts";
@@ -208,7 +210,9 @@ export class Committer {
     const changes = await this.#stagedChanges();
     if (!changes.length) return { skipped: "NOTHING" };
 
-    const { summary, body } = commitMessage(changes);
+    // Its kind is one this copy ships: a book of any other kind is never written to.
+    const kind = (await kindOf(nodeSource(this.root))) ?? kindByKey(V2_KIND);
+    const { summary, body } = commitMessage(changes, kind);
     // --no-verify: a background save must not run (or be stopped by) the author's commit hooks.
     await g.raw(["commit", "--quiet", "--no-verify", "-m", summary, "-m", body, ...PATHSPEC]);
     const [hash, date] = (await g.raw(["log", "-1", "--format=%H%n%cI"])).trim().split("\n");

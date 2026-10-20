@@ -20,6 +20,8 @@ export interface Word {
   A: string;
   /** Its short name inside a sentence, or its name if it has none: "bible" for "story bible". */
   short: string;
+  /** Its short name as a title: "Bible". */
+  Short: string;
   /** How many: "1 scene", "3 scenes". */
   count(n: number): string;
 }
@@ -48,7 +50,7 @@ export function word(noun: Noun): Word {
   const one = inSentence(noun.label);
   const many = inSentence(noun.plural);
   const article = noun.article ?? (/^[aeiou]/i.test(noun.label) ? "an" : "a");
-  return { One: noun.label, Many: noun.plural, one, many, a: `${article} ${one}`, A: `${article === "an" ? "An" : "A"} ${one}`, short: noun.short ? inSentence(noun.short) : one, count: (n) => `${n} ${n === 1 ? one : many}` };
+  return { One: noun.label, Many: noun.plural, one, many, a: `${article} ${one}`, A: `${article === "an" ? "An" : "A"} ${one}`, short: noun.short ? inSentence(noun.short) : one, Short: noun.short ?? noun.label, count: (n) => `${n} ${n === 1 ? one : many}` };
 }
 
 const cache = new WeakMap<BookKind, Vocabulary>();
