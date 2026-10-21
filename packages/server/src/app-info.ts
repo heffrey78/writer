@@ -1,6 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { git, gitInstall } from "./git.ts";
+import { gitInstall } from "./git.ts";
+import { gitPort } from "./ports.ts";
 
 /**
  * What the running app is (D9): its version, the Node and git it runs on, the licences it ships, and
@@ -94,8 +95,7 @@ export async function appInfo(updates: UpdateCheck): Promise<AppInfo> {
   const version = process.env.WRITER_APP_VERSION || null;
   let gitVersion: string | null = null;
   try {
-    const { major, minor, patch } = await git().version();
-    gitVersion = `${major}.${minor}.${patch}`;
+    gitVersion = (await gitPort().version()).replace(/^git /, "");
   } catch {
     // No git at all: the app says so where it's needed.
   }

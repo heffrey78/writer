@@ -2,7 +2,7 @@ import { readdir, rmdir, unlink } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { hasGitIdentity, IDENTITY_MESSAGE } from "./committer.ts";
 import { atomicWrite, readBytes, readToolBytes, writableImagePath, writablePath, writableToolPath } from "./files.ts";
-import { git } from "./git.ts";
+import { gitPort } from "./ports.ts";
 
 /** One file an operation writes (new text, or an image's bytes) or deletes (null). */
 export interface FileWrite {
@@ -76,12 +76,8 @@ export async function transaction(root: string, changes: FileWrite[], message: s
   }
 
   const paths = [...new Set(changes.map((c) => c.path))];
-  const g = git(root);
-  await g.raw(["add", "-A", "--", ...paths]);
-  const staged = (await g.raw(["diff", "--cached", "--name-only", "--", ...paths])).trim();
-  if (!staged) return { commit: null, files: paths };
-  await g.raw(["commit", "--quiet", "--no-verify", "-m", message, "--", ...paths]);
-  return { commit: (await g.raw(["rev-parse", "HEAD"])).trim(), files: paths };
+  await gitPort().stage(root, { paths });
+  return { commit: await gitPort().commit(root, message, { paths }), files: paths };
 }
 
 /** Delete a file, and the folders it leaves empty up to the novel's root. */

@@ -1,9 +1,9 @@
 import { compileBook, CompileError, pieceSections } from "@writer/core";
 import { nodeSource } from "@writer/core/node";
-import { commitDate, fileName, isFormat, MEDIA_TYPES, readCover, readPictures, render } from "@writer/export";
+import { fileName, isFormat, MEDIA_TYPES, readCover, readPictures, render } from "@writer/export";
 import type { Hono } from "hono";
 import { body, type Env } from "./bible-routes.ts";
-import { gitPlumbing } from "./git.ts";
+import { gitPort } from "./ports.ts";
 
 /*
  * POST /:id/compile  { format: docx|epub|pdf, preset?, from?, to? } → the file (heffrey78/gh-writer#19)
@@ -33,8 +33,7 @@ export function compileRoutes(routes: Hono<Env>): void {
     }
     const { cover, problem } = format === "docx" ? {} : await readCover(ws.root, novel);
     const { pictures, problems } = await readPictures(ws.root, book);
-    // The commit's date by the server's own git (the app's, D9), which may be the only one there is.
-    const date = await commitDate(ws.root, async (args) => (await gitPlumbing(ws.root, args)).toString("utf8"));
+    const date = await bookDate(ws.root);
     const { bytes, missing } = await render(book, format, { date, cover, pictures });
     return new Response(Buffer.from(bytes), {
       headers: {
@@ -47,4 +46,21 @@ export function compileRoutes(routes: Hono<Env>): void {
       },
     });
   });
+}
+
+/**
+ * The date a compiled book carries (export's commitDate, by the server's own git port): its last
+ * commit's, when nothing in the book has changed since; else now.
+ */
+async function bookDate(root: string): Promise<Date> {
+  const git = gitPort();
+  const changed = await git.status(root).then(
+    (s) => s.length > 0,
+    () => true,
+  );
+  const when = changed ? null : await git.commitInfo(root, "HEAD").then(
+    (c) => c.committed,
+    () => null,
+  );
+  return when ? new Date(when) : new Date();
 }

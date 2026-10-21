@@ -5,7 +5,8 @@
   "type": "module",
   "description": "Local writer server: Hono API on 127.0.0.1, guarded by a per-launch secret.",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./node": "./src/node-ports.ts"
   },
   "dependencies": {
     "@writer/core": "0.1.0",

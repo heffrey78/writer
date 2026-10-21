@@ -4,7 +4,7 @@ import { conversionsOf, knownKind, loadBook, SCHEMA_VERSION, type Conversion } f
 import { nodeSource } from "@writer/core/node";
 import { snapshots } from "@writer/core/snapshots";
 import { readToolBytes, TOOLS_DIR, WORKFLOWS_DIR } from "./files.ts";
-import { git } from "./git.ts";
+import { gitPort } from "./ports.ts";
 import { migrationWrites, overlay } from "./migrate.ts";
 import { DEFAULT_TEMPLATE, TEMPLATES, templateOf } from "./new-book.ts";
 import { OperationError, transaction, type FileWrite, type OperationResult } from "./operations.ts";
@@ -48,11 +48,11 @@ export async function convertBook(root: string, to: string, templates = TEMPLATE
   const result = await transaction(root, writes, `${conversion.label.replace(/…$/, "")}${migration.status === "migrate" ? ` (${migration.message})` : ""}`);
   // What kept the old kind's empty folders in git (.gitkeep, which a book's files don't include), gone
   // with them, in the same commit.
-  const left = (await git(root).raw(["ls-files", "--", book.kind.folders.content, book.kind.folders.codex])).split("\n").filter((f) => f.endsWith("/.gitkeep"));
+  const git = gitPort();
+  const left = (await git.listFiles(root, [book.kind.folders.content, book.kind.folders.codex])).filter((f) => f.endsWith("/.gitkeep"));
   if (result.commit && left.length) {
-    await git(root).raw(["rm", "-q", "--", ...left]);
-    await git(root).raw(["commit", "-q", "--amend", "--no-edit"]);
-    result.commit = (await git(root).raw(["rev-parse", "HEAD"])).trim();
+    await git.remove(root, left);
+    result.commit = await git.amend(root);
   }
   return { ...result, notes: done.notes };
 }

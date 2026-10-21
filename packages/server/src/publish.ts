@@ -1,5 +1,6 @@
 import { kindLabel, STOCK_LABELS, type IssueKind } from "@writer/core";
-import { classifyGitError, git } from "./git.ts";
+import { GitFailure, gitFailure } from "./git-port/port.ts";
+import { gitPort } from "./ports.ts";
 import { GitHubError, type GitHub } from "./github.ts";
 import type { NovelWorkspace } from "./workspace.ts";
 
@@ -41,8 +42,8 @@ export async function publish(ws: NovelWorkspace, github: GitHub, { name, descri
   const login = status.account?.login;
   if (!status.signedIn || !login) throw new GitHubError("NO_SIGN_IN", "Connect Writer to GitHub first.");
 
-  const g = git(ws.root);
-  let remote = (await g.raw(["remote", "get-url", "origin"]).catch(() => "")).trim();
+  const git = gitPort();
+  let remote = (await git.remoteUrl(ws.root, "origin").catch(() => null)) ?? "";
   if (remote) {
     // Only a retry of this same publish may go on: never repoint a novel that has a remote.
     const mine = `${new URL(github.webUrl).origin}/${login}/${name}.git`.toLowerCase();
@@ -57,7 +58,7 @@ export async function publish(ws: NovelWorkspace, github: GitHub, { name, descri
       throw new GitHubError("GITHUB", `GitHub didn't create the repository: ${body.errors?.[0]?.message ?? body.message ?? `HTTP ${res.status}`}`);
     }
     remote = body.clone_url;
-    await g.raw(["remote", "add", "origin", remote]);
+    await git.addRemote(ws.root, "origin", remote);
     await writingLabels(github, login, name, ws.kind.issueKinds);
   }
 
@@ -69,11 +70,12 @@ export async function publish(ws: NovelWorkspace, github: GitHub, { name, descri
     if (synced.error) throw failed(synced.error.message, synced.error.detail);
     if (synced.state === "local") throw failed("the book didn't see its new remote.");
   } else {
-    const branch = (await g.raw(["symbolic-ref", "--quiet", "--short", "HEAD"])).trim();
+    const branch = (await git.currentBranch(ws.root)) ?? "";
     try {
-      await git(ws.root, undefined, undefined, await github.gitAuth(remote)).raw(["push", "--quiet", "--set-upstream", "origin", `HEAD:refs/heads/${branch}`]);
+      const auth = await github.gitAuth(remote);
+      await git.push(ws.root, "origin", [`HEAD:refs/heads/${branch}`], { setUpstream: true, ...(auth ? { auth } : {}) });
     } catch (e) {
-      const failure = classifyGitError(e);
+      const failure = e instanceof GitFailure ? e : gitFailure("GIT", e instanceof Error ? e.message : String(e));
       throw failed(failure.message, failure.detail);
     }
   }

@@ -5,7 +5,7 @@ import { editYaml, kindOf, loadBook, MANIFEST, newId, NOVEL_MANIFEST } from "@wr
 import { nodeSource } from "@writer/core/node";
 import { snapshots } from "@writer/core/snapshots";
 import { hasGitIdentity } from "./committer.ts";
-import { git } from "./git.ts";
+import { gitPort } from "./ports.ts";
 
 /**
  * The templates in this checkout of Writer (or beside the server bundle: WRITER_TEMPLATES), a folder
@@ -70,16 +70,16 @@ export async function writeNewBook(template: string, dest: string, { title, auth
   await writeFile(readme, (await readFile(readme, "utf8")).replace(/^# .*$/m, `# ${title}`));
   for (const [file, text] of snapshots(await loadBook(nodeSource(dest)))) await writeFile(join(dest, file), text);
 
-  const g = git(dest);
-  await g.raw(["init", "-q", "-b", "main"]);
+  const git = gitPort();
+  await git.init(dest, "main");
   if (identity) {
-    await g.raw(["config", "user.name", identity.name]);
-    await g.raw(["config", "user.email", identity.email]);
+    await git.setConfig(dest, "user.name", identity.name);
+    await git.setConfig(dest, "user.email", identity.email);
   } else if (!(await hasGitIdentity(dest))) {
     throw new NeedsIdentity();
   }
-  await g.raw(["add", "-A"]);
-  await g.raw(["commit", "-q", "-m", `Start ${title}`]);
+  await git.stage(dest);
+  await git.commit(dest, `Start ${title}`);
 }
 
 /** Every file under `dir`, as paths relative to it with forward slashes. */

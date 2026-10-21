@@ -17,6 +17,7 @@ function writerServer(): Plugin {
       const { createServer, Library, registerServerModule, sessionCookie } = await import("@writer/server");
       // An entry point like the CLI's: the kinds of book the app ships, and their modules' server halves (D14).
       (await import("@writer/kinds")).registerKinds();
+      (await import("@writer/server/node")).useNodePorts();
       registerServerModule((await import("@writer/module-story-time/server")).storyTimeServer);
       registerServerModule((await import("@writer/module-off-page-events/server")).offPageEventsServer);
       registerServerModule((await import("@writer/module-drafting-board/server")).draftingBoardServer);

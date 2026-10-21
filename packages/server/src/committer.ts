@@ -1,10 +1,9 @@
-import { existsSync } from "node:fs";
-import { resolve } from "node:path";
 import { kindByKey, kindOf, V2_KIND } from "@writer/core";
 import { nodeSource } from "@writer/core/node";
 import { commitMessage, type FileChange } from "./commit-message.ts";
 import { TEMP_SUFFIX } from "./files.ts";
-import { classifyGitError, git } from "./git.ts";
+import { GitFailure, gitFailure, NO_OBJECT, text, type Scope } from "./git-port/port.ts";
+import { gitPort } from "./ports.ts";
 
 export interface CommitterOptions {
   /** Commit after this long without a save (ms). Default 2 minutes. */
@@ -35,38 +34,31 @@ export interface CommitStatus {
 export type CommitResult = { committed: LastCommit } | { skipped: "NOTHING" | BlockedCode };
 
 // Atomic-write temp files are never committed, even if one is left behind by a crash.
-const PATHSPEC = ["--", ".", `:(exclude,glob)**/.*${TEMP_SUFFIX}`];
-const IN_PROGRESS = ["MERGE_HEAD", "REBASE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD", "rebase-merge", "rebase-apply"];
+const BOOK: Scope = { exclude: [`**/.*${TEMP_SUFFIX}`] };
 
 /** Whether a merge, rebase, cherry-pick or revert is under way in the repository holding `root`. */
-export async function operationInProgress(root: string): Promise<boolean> {
-  const g = git(root);
-  const paths = (await g.raw(["rev-parse", ...IN_PROGRESS.flatMap((p) => ["--git-path", p])])).trim().split("\n");
-  if (paths.some((p) => existsSync(resolve(root, p)))) return true;
-  return (await g.raw(["ls-files", "--unmerged", "--", "."])).trim() !== "";
+export function operationInProgress(root: string): Promise<boolean> {
+  return gitPort().inProgress(root);
 }
 
 export const IDENTITY_MESSAGE = "git doesn't know your name and email yet, so your saved work can't be committed to your book's history. Give them under Your name and email (in the ⋯ menu), and it's committed.";
 
 /** The name and email git signs with on this computer (the user's global configuration), if both are set. */
 export async function globalIdentity(): Promise<{ name: string; email: string } | null> {
-  const g = git();
-  const get = async (key: string) => (await g.raw(["config", "--global", "--get", key]).catch(() => "")).trim();
+  const get = async (key: string) => (await gitPort().getConfig(null, key).catch(() => null)) ?? "";
   const [name, email] = [await get("user.name"), await get("user.email")];
   return name && email ? { name, email } : null;
 }
 
 /** Set the name and email git signs with on this computer (the user's global configuration). */
 export async function setGlobalIdentity({ name, email }: { name: string; email: string }): Promise<void> {
-  const g = git();
-  await g.raw(["config", "--global", "user.name", name]);
-  await g.raw(["config", "--global", "user.email", email]);
+  await gitPort().setConfig(null, "user.name", name);
+  await gitPort().setConfig(null, "user.email", email);
 }
 
 /** Whether git has a name and email to commit with (config or GIT_AUTHOR_* / GIT_COMMITTER_*). */
 export async function hasGitIdentity(root: string): Promise<boolean> {
-  const g = git(root);
-  const get = async (key: string) => (await g.raw(["config", "--get", key]).catch(() => "")).trim();
+  const get = async (key: string) => (await gitPort().getConfig(root, key).catch(() => null)) ?? "";
   const env = process.env;
   const name = env.GIT_AUTHOR_NAME || env.GIT_COMMITTER_NAME || (await get("user.name"));
   const email = env.GIT_AUTHOR_EMAIL || env.GIT_COMMITTER_EMAIL || (await get("user.email"));
@@ -190,7 +182,7 @@ export class Committer {
       }
       return result;
     } catch (e) {
-      const failure = classifyGitError(e);
+      const failure = e instanceof GitFailure ? e : gitFailure("GIT", e instanceof Error ? e.message : String(e));
       this.#block("ERROR", `Couldn't commit: ${failure.message}`);
       return { skipped: "ERROR" };
     } finally {
@@ -200,23 +192,23 @@ export class Committer {
   }
 
   async #tryCommit(): Promise<CommitResult> {
-    const g = git(this.root);
+    const git = gitPort();
     if (await operationInProgress(this.root)) {
       return this.#block("MERGE", "A merge or rebase is in progress in this repository; saved work will be committed once it's finished.");
     }
     if (!(await hasGitIdentity(this.root))) return this.#block("IDENTITY", IDENTITY_MESSAGE);
 
-    await g.raw(["add", "-A", ...PATHSPEC]);
+    await git.stage(this.root, BOOK);
     const changes = await this.#stagedChanges();
     if (!changes.length) return { skipped: "NOTHING" };
 
     // Its kind is one this copy ships: a book of any other kind is never written to.
     const kind = (await kindOf(nodeSource(this.root))) ?? kindByKey(V2_KIND);
     const { summary, body } = commitMessage(changes, kind);
-    // --no-verify: a background save must not run (or be stopped by) the author's commit hooks.
-    await g.raw(["commit", "--quiet", "--no-verify", "-m", summary, "-m", body, ...PATHSPEC]);
-    const [hash, date] = (await g.raw(["log", "-1", "--format=%H%n%cI"])).trim().split("\n");
-    return { committed: { hash: hash!, summary, date: date! } };
+    // No hooks: a background save must not run (or be stopped by) the author's commit hooks.
+    await git.commit(this.root, `${summary}\n\n${body}`, BOOK);
+    const { oid, committed } = await git.commitInfo(this.root, "HEAD");
+    return { committed: { hash: oid, summary, date: committed } };
   }
 
   /** Retry a blocked commit after the next quiet period, keeping the work marked as unsaved to git. */
@@ -229,45 +221,21 @@ export class Committer {
 
 
 
+  /** What's staged, with each file's text before and after (by blob, from git's objects). */
   async #stagedChanges(): Promise<FileChange[]> {
-    const g = git(this.root);
-    const out = await g.raw(["diff", "--cached", "--name-status", "-M", "--relative", "-z", ...PATHSPEC]);
-    const fields = out.split("\0").filter(Boolean);
-    // --quiet: no HEAD exits 1 with no output (which simple-git doesn't treat as an error).
-    const hasHead = (await g.raw(["rev-parse", "--verify", "--quiet", "HEAD"]).catch(() => "")).trim() !== "";
-    const show = (spec: string) => g.raw(["show", spec]).catch(() => undefined);
-
-    const changes: FileChange[] = [];
-    for (let i = 0; i < fields.length; ) {
-      const code = fields[i++]![0] as string;
-      if (code === "R") {
-        const oldPath = fields[i++]!;
-        const path = fields[i++]!;
-        changes.push({ status: "R", path, oldPath, before: hasHead ? await show(`HEAD:./${oldPath}`) : undefined, after: await show(`:./${path}`) });
-        continue;
-      }
-      const path = fields[i++]!;
-      const status = code === "A" || code === "D" ? code : "M";
-      changes.push({
-        status,
-        path,
-        before: status !== "A" && hasHead ? await show(`HEAD:./${path}`) : undefined,
-        after: status !== "D" ? await show(`:./${path}`) : undefined,
-      });
-    }
-    return changes;
+    const git = gitPort();
+    const staged = await git.stagedChanges(this.root, BOOK);
+    const blobs = await git.readBlobs(this.root, [...new Set(staged.flatMap((c) => [c.old, c.new]).filter((o) => o !== NO_OBJECT))]);
+    const blob = (oid: string) => (oid === NO_OBJECT ? undefined : ((b) => (b ? text(b) : undefined))(blobs.get(oid)));
+    return staged.map((c): FileChange => {
+      if (c.status === "R") return { status: "R", path: c.path, oldPath: c.from!, before: blob(c.old), after: blob(c.new) };
+      const status = c.status === "A" || c.status === "D" ? c.status : "M";
+      return { status, path: c.path, before: status !== "A" ? blob(c.old) : undefined, after: status !== "D" ? blob(c.new) : undefined };
+    });
   }
 
   async #pendingChanges(): Promise<number> {
-    const out = await git(this.root).raw(["status", "--porcelain", "-z", "--untracked-files=all", ...PATHSPEC]);
-    // A rename entry carries its old path as an extra field.
-    let count = 0;
-    const fields = out.split("\0").filter(Boolean);
-    for (let i = 0; i < fields.length; i++) {
-      count++;
-      if (fields[i]![0] === "R" || fields[i]![0] === "C") i++;
-    }
-    return count;
+    return (await gitPort().status(this.root, BOOK)).length;
   }
 
   #cancelTimers(): void {

@@ -3,8 +3,8 @@ import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { knownKind, knownKinds, MANIFEST, newId, NOVEL_MANIFEST, parseYaml, readManifest, slugify } from "@writer/core";
 import { nodeSource } from "@writer/core/node";
-import type { SimpleGitProgressEvent } from "simple-git";
-import { classifyGitError, cloneUrl, git, repoName, type GitAuthSource } from "./git.ts";
+import { cloneUrl, gitFailure, repoName, type CloneProgress, type GitAuthSource } from "./git-port/port.ts";
+import { gitPort } from "./ports.ts";
 import { NeedsIdentity, TEMPLATES, templateOf, writeNewBook, type NewNovel } from "./new-book.ts";
 
 /** A novel the author has opened or cloned. */
@@ -44,7 +44,7 @@ export class LibraryError extends Error {
 export interface CloneOptions {
   /** Where to clone to. Default: a folder named after the repository in the library's clone directory. */
   into?: string;
-  onProgress?: (e: SimpleGitProgressEvent) => void;
+  onProgress?: (e: CloneProgress) => void;
   signal?: AbortSignal;
   /** Writer's GitHub credentials for the clone URL, if any. */
   auth?: GitAuthSource;
@@ -174,13 +174,7 @@ export class Library {
     if (!info?.isDirectory()) throw new LibraryError("NOT_A_DIRECTORY", `${resolve(dir)} isn't a folder.`);
     const path = await realpath(dir);
 
-    let isRepo: boolean;
-    try {
-      isRepo = await git(path).checkIsRepo();
-    } catch (e) {
-      throw classifyGitError(e);
-    }
-    if (!isRepo) throw new LibraryError("NOT_A_REPO", `${path} isn't a git repository. A book needs one to keep its history and sync with GitHub.`);
+    if (!(await gitPort().isRepo(path))) throw new LibraryError("NOT_A_REPO", `${path} isn't a git repository. A book needs one to keep its history and sync with GitHub.`);
 
     const cover = await coverOf(path);
     if (!cover) throw new LibraryError("NOT_A_NOVEL", `${path} has no ${MANIFEST} or ${NOVEL_MANIFEST}, so it isn't a book Writer can open.`);
@@ -237,15 +231,16 @@ export class Library {
     const url = cloneUrl(repo);
     const dest = resolve(into ? expandHome(into) : join(this.cloneDir, repoName(url)));
     const existing = await readdir(dest).catch(() => undefined);
-    if (existing?.length) throw classifyGitError(new Error(`destination path '${dest}' already exists and is not an empty directory`));
+    if (existing?.length) throw gitFailure("DESTINATION_EXISTS", `destination path '${dest}' already exists and is not an empty directory`);
     const cleanUp = () => (existing ? rm(dest, { recursive: true, force: true }).then(() => mkdir(dest)) : rm(dest, { recursive: true, force: true }));
 
     await mkdir(dirname(dest), { recursive: true });
     try {
-      await git(undefined, onProgress, signal, await auth?.(url)).clone(url, dest);
+      const credentials = await auth?.(url);
+      await gitPort().clone(url, dest, { ...(credentials ? { auth: credentials } : {}), ...(onProgress ? { onProgress } : {}), ...(signal ? { signal } : {}) });
     } catch (e) {
       await cleanUp();
-      throw classifyGitError(e);
+      throw e;
     }
     try {
       return await this.add(dest);
@@ -345,9 +340,9 @@ async function coverOf(path: string): Promise<{ title: string; author?: string; 
 /** https://user:token@host/… → https://host/… (an ssh URL's user is not a secret, and stays). */
 /** The novel's origin remote, without any credentials embedded in it. */
 async function remoteOf(path: string): Promise<string | undefined> {
-  return git(path)
-    .remote(["get-url", "origin"])
-    .then((url) => (url ? withoutCredentials(url.trim()) : undefined))
+  return gitPort()
+    .remoteUrl(path, "origin")
+    .then((url) => (url ? withoutCredentials(url) : undefined))
     .catch(() => undefined);
 }
 
