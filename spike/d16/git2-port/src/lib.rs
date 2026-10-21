@@ -13,6 +13,7 @@ use serde_json::{Value, json};
 use git2::build::CheckoutBuilder;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
+use foreign_types::ForeignType;
 use std::path::Path;
 
 /// A failure with one of the codes the server's GitFailure uses, so the UI can say what to do.
@@ -783,30 +784,34 @@ pub fn call(name: &str, dir: &str, args: &Value) -> Value {
     }
 }
 
-/// Trust the certificates in `dirs` for every https remote: all of them, gathered into one PEM file at
-/// `out`, which libgit2's OpenSSL is then given. Android keeps its trusted roots one per file, named by
-/// OpenSSL's old subject hash, which today's OpenSSL doesn't look up, so pointing it at the folder
-/// trusts nothing. The newest store is Conscrypt's, which Android updates on its own; the system one
-/// is older. Returns how many certificates, and from which folders.
-pub fn trust_certificates_in(dirs: &[&str], out: &Path) -> Result<Value, String> {
+/// Trust the certificates in `dirs` for every https remote, added to libgit2's OpenSSL in memory.
+///
+/// Android keeps its trusted roots one PEM file each, named by OpenSSL's old subject hash, which today's
+/// OpenSSL doesn't look up; and OpenSSL as built for Android (openssl-src) has no stdio, so it can't read
+/// a file or folder of certificates at all. So each certificate is parsed here, from memory, and handed
+/// to libgit2 (GIT_OPT_ADD_SSL_X509_CERT). The newest store is Conscrypt's, which Android updates on its
+/// own; the system one is older. Returns how many were trusted, and from which folders.
+pub fn trust_certificates_in(dirs: &[&str]) -> Result<Value, String> {
     let mut seen = BTreeSet::new();
-    let mut pem = String::new();
     let mut from = vec![];
     for dir in dirs {
         let Ok(entries) = std::fs::read_dir(dir) else { continue };
         let before = seen.len();
         for e in entries.flatten() {
-            let Ok(text) = std::fs::read_to_string(e.path()) else { continue };
-            // A file may hold a description before its PEM block: only the blocks are kept.
-            let mut rest = text.as_str();
-            while let Some(start) = rest.find("-----BEGIN CERTIFICATE-----") {
-                let Some(end) = rest[start..].find("-----END CERTIFICATE-----") else { break };
-                let block = &rest[start..start + end + "-----END CERTIFICATE-----".len()];
-                if seen.insert(block.to_string()) {
-                    pem.push_str(block);
-                    pem.push('\n');
+            let Ok(text) = std::fs::read(e.path()) else { continue };
+            // A file may hold a description after its PEM block: only certificates are read.
+            let Ok(certs) = openssl::x509::X509::stack_from_pem(&text) else { continue };
+            for cert in certs {
+                let Ok(der) = cert.to_der() else { continue };
+                if !seen.insert(der) {
+                    continue;
                 }
-                rest = &rest[start + end..][1..];
+                libgit2_sys::init();
+                // libgit2 takes its own reference to the certificate (X509_STORE_add_cert).
+                let rc = unsafe { libgit2_sys::git_libgit2_opts(libgit2_sys::GIT_OPT_ADD_SSL_X509_CERT as std::ffi::c_int, cert.as_ptr()) };
+                if rc < 0 {
+                    return Err(git2::Error::last_error(rc).message().to_string());
+                }
             }
         }
         if seen.len() > before {
@@ -816,10 +821,5 @@ pub fn trust_certificates_in(dirs: &[&str], out: &Path) -> Result<Value, String>
     if seen.is_empty() {
         return Err(format!("no certificates in {}", dirs.join(", ")));
     }
-    if let Some(parent) = out.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-    }
-    std::fs::write(out, pem).map_err(|e| e.to_string())?;
-    unsafe { git2::opts::set_ssl_cert_file(out.to_string_lossy().as_ref()) }.map_err(|e| e.message().to_string())?;
     Ok(json!({ "certificates": seen.len(), "from": from }))
 }

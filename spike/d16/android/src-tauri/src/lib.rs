@@ -79,14 +79,12 @@ pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
             // The device's own trusted certificates, for libgit2's OpenSSL: Conscrypt's, which Android
-            // keeps up to date, then the system's (git2_port::trust_certificates_in says why a file).
+            // keeps up to date, then the system's, added in memory (git2_port::trust_certificates_in says why).
+            let _ = app;
             #[cfg(target_os = "android")]
-            {
-                let out = app.path().app_cache_dir()?.join("cacerts.pem");
-                let _ = TRUST.set(git2_port::trust_certificates_in(&["/apex/com.android.conscrypt/cacerts", "/system/etc/security/cacerts"], &out).unwrap_or_else(|e| json!({ "error": e })));
-            }
+            let _ = TRUST.set(git2_port::trust_certificates_in(&["/apex/com.android.conscrypt/cacerts", "/system/etc/security/cacerts"]).unwrap_or_else(|e| json!({ "error": e })));
             #[cfg(not(target_os = "android"))]
-            let _ = (app, TRUST.set(json!({ "certificates": "the system's" })));
+            let _ = TRUST.set(json!({ "certificates": "the system's" }));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![git, write_file, read_file, reset, report, reachable, trust, https_probe])
