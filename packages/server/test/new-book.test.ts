@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { validate } from "@writer/core";
 import { nodeSource } from "@writer/core/node";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createServer, DEFAULT_TEMPLATE, Library, sessionCookie, type LibraryEntry } from "../src/index.ts";
+import { createServer, DEFAULT_TEMPLATE, Library, sessionCookie, templateOf, type LibraryEntry } from "../src/index.ts";
 import { gitIn, scratch } from "./fixtures.ts";
 import { send } from "./http.ts";
 
@@ -34,7 +34,7 @@ async function withoutIdentity<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
-beforeAll(() => ({ tmp, fresh, cleanUp } = scratch("new-novel")));
+beforeAll(() => ({ tmp, fresh, cleanUp } = scratch("new-book")));
 
 afterAll(() => cleanUp());
 
@@ -67,6 +67,28 @@ describe("Library.create", () => {
     expect(gitIn(novel.path, "branch", "--show-current").trim()).toBe("main");
     expect(gitIn(novel.path, "log", "--format=%s").trim()).toBe("Start The Salt Road");
     expect(gitIn(novel.path, "status", "--porcelain")).toBe("");
+  });
+
+  it("starts a journal from its own template: book.yaml naming its kind, its folders, IDs of its prefixes (#37)", async () => {
+    const library = await openLibrary();
+    const book = await library.create({ kind: "journal", title: "Days", author: "Jeff Wikstrom" });
+    expect(book).toMatchObject({ title: "Days", path: join(tmp, "novels", "days") });
+    const result = await validate(nodeSource(book.path));
+    expect(result.diagnostics).toEqual([]);
+    expect(result.novel.kind.key).toBe("journal");
+    const yaml = readFileSync(join(book.path, "book.yaml"), "utf8");
+    expect(yaml).toMatch(/^title: Days$/m);
+    expect(yaml).toMatch(/^id: jn_[0-9a-z]{6}$/m);
+    expect(filesIn(book.path)).toEqual(filesIn(templateOf("journal")));
+    expect(filesIn(book.path)).toEqual(expect.arrayContaining(["entries/_order.yaml", "index/people/.gitkeep", "index/relationships.yaml"]));
+    expect(gitIn(book.path, "log", "--format=%s").trim()).toBe("Start Days");
+    expect(gitIn(book.path, "status", "--porcelain")).toBe("");
+  });
+
+  it("refuses a kind it has no template for, leaving nothing behind", async () => {
+    const library = await openLibrary();
+    await expect(library.create({ kind: "almanac", title: "Almanac" })).rejects.toMatchObject({ code: "UNKNOWN_KIND" });
+    expect(await library.list()).toEqual([]);
   });
 
   it("gives every novel its own IDs", async () => {

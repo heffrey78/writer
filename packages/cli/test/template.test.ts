@@ -146,3 +146,24 @@ describe("novel template", () => {
     expect((parse(readFileSync(join(copy, "novel.yaml"), "utf8")) as { id: string }).id).toBe(novel.id);
   });
 });
+
+describe("journal template", () => {
+  const journal = join(repo, "templates/journal");
+
+  it("vendors the novel template's tools, byte for byte, which validate it cleanly", () => {
+    const novelTools = join(template, ".github/gh-writer");
+    const tools = join(journal, ".github/gh-writer");
+    for (const f of ["validate.mjs", "snapshots.mjs", "compile.mjs"]) expect(readFileSync(join(tools, f)).equals(readFileSync(join(novelTools, f))), `${f}: run \`npm run build:template\``).toBe(true);
+    expect(readdirSync(join(tools, "fonts")).sort()).toEqual(readdirSync(join(novelTools, "fonts")).sort());
+    const r = node([join(tools, "validate.mjs"), journal]);
+    expect(r.status, r.stdout).toBe(0);
+    expect(r.stdout).toContain("0 errors, 0 warnings");
+  });
+
+  it("and the sample journal's snapshots are current", () => {
+    for (const dir of [journal, join(repo, "examples/sample-journal")]) {
+      const check = node([join(journal, ".github/gh-writer/snapshots.mjs"), dir, "--check"]);
+      expect(check.status, `${dir}: ${check.stdout} (run \`npm run build:template\`)`).toBe(0);
+    }
+  });
+});

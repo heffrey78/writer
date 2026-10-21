@@ -122,9 +122,11 @@ Each web e2e test starts its own `writer serve` on a temp copy of the sample nov
 
 CI (`.github/workflows/ci.yml`) runs typecheck, unit tests, validation of the sample novel, epubcheck on the sample's EPUB, and every e2e test.
 
-## The novel template's tools
+## The templates and their tools
 
-Novel repositories can't install Writer, so the template carries its tools as single-file esbuild bundles in `templates/novel/.github/gh-writer/`: `validate.mjs`, `snapshots.mjs`, and `compile.mjs` with its fonts. **After changing `core`, `export` or the CLI entry points, run `npm run build:template`**, which rebuilds them and redraws the template's and the sample's diagram snapshots. A test fails if the vendored bundles don't match the source.
+Each kind of book has a template, `templates/<kind>/`: what a new book of it starts as, from the shelf's New (which asks for the kind and lists those the server has templates for) or the CLI. A new book gets fresh IDs for the template's placeholders (`<prefix>_temp…`, of any prefix), its title and author, its diagrams drawn, and a first commit. The server bundle carries `templates/` beside it (`WRITER_TEMPLATES`).
+
+Books can't install Writer, so each template carries its tools as single-file esbuild bundles in `.github/gh-writer/`: `validate.mjs`, `snapshots.mjs`, and `compile.mjs` with its fonts. They know every kind the app ships, so every template has the same bytes: they're built into `templates/novel/` and copied into the others (`scripts/vendor-tools.ts`). **After changing `core`, `export`, a kind, a module's core half or the CLI entry points, run `npm run build:template`**, which rebuilds them and redraws the templates' and the samples' diagram snapshots. A test fails if the vendored bundles don't match the source.
 
 The compiled files must be the same bytes in the app, on the command line and in a novel's GitHub Action. A test compiles a committed copy of the sample both ways, in different time zones, and compares them. Keep anything time-, zone- or platform-dependent out of the output: dates come from the commit, IDs from the novel, zip timestamps are written in UTC, and PDFs are compressed with fflate rather than Node's zlib.
 

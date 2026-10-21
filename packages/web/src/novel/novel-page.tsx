@@ -427,9 +427,7 @@ function EmptyManuscript({ novel }: { novel: Book }) {
   return (
     <div className="p-8">
       <h1 className="text-xl font-semibold">No {w.level(pieceLevel(novel)).many} yet</h1>
-      <p className="mt-2 text-muted">
-        This {w.book.one}'s {w.content.one} is empty.
-      </p>
+      <p className="mt-2 text-muted">Nothing is written in this {w.book.one} yet.</p>
     </div>
   );
 }

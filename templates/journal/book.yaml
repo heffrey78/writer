@@ -1,0 +1,27 @@
+schema_version: 3
+kind: journal
+id: jn_temp1a
+title: Untitled Journal
+author: ""
+# entity_types:            # add your own index types, e.g. books you've read
+#   - key: book
+#     prefix: bk
+#     folder: books
+#     label: Book
+relationship_types:
+  - key: family
+    label: Family of
+    symmetric: true
+  - key: friend
+    label: Friend of
+    symmetric: true
+  - key: works-with
+    label: Works with
+    symmetric: true
+    from_types: [person]
+    to_types: [person]
+  - key: lives-in
+    label: Lives in
+    inverse_label: Home of
+    from_types: [person]
+    to_types: [place]

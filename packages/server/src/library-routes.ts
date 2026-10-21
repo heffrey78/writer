@@ -9,12 +9,13 @@ import type { GitHub } from "./github.ts";
 import { LibraryError, type Library } from "./library.ts";
 
 /**
- * GET    /api/library        { novels, notices, folder, ghWriter }: folder is where new novels and clones go, ~ for home;
+ * GET    /api/library        { novels, notices, folder, ghWriter, kinds }: folder is where new novels and clones go, ~ for home;
+ *                             kinds are the kinds of book New can start ({ key, label }, the Novel first);
  *                             each novel with its cover's version, when it has one; ghWriter, the books in
  *                             gh-writer's library that aren't here, to offer to bring in
  * GET    /api/library/:id/cover  the novel's cover image, for the shelf (without opening the novel)
  * POST   /api/library        { path } → 201 { novel }
- * POST   /api/library/new    { title, author?, path?, identity?: { name, email } } → 201 { novel }
+ * POST   /api/library/new    { kind?, title, author?, path?, identity?: { name, email } } → 201 { novel }: a book of the kind (a novel by default), from its template
  * DELETE /api/library/:id    forget a novel (its folder stays) → 204
  * POST   /api/library/gh-writer  add the books in gh-writer's library that aren't here (#2) → { added, failed }
  * POST   /api/library/clone  { repo, path? } → an event stream: "progress"…, then "done" { novel } or "error"
@@ -30,7 +31,7 @@ export function libraryRoutes(library: Library, github?: GitHub): Hono {
         return coverVersion ? { ...n, coverVersion } : n;
       }),
     );
-    return c.json({ novels, notices: library.notices, folder: tilde(library.cloneDir), ghWriter: await library.ghWriterBooks() });
+    return c.json({ novels, notices: library.notices, folder: tilde(library.cloneDir), ghWriter: await library.ghWriterBooks(), kinds: await library.kinds() });
   });
 
   // Read straight from the folder: opening the novel for this would start syncing every book on the shelf.
@@ -56,14 +57,16 @@ export function libraryRoutes(library: Library, github?: GitHub): Hono {
       !body.title.trim() ||
       !text(body.author) ||
       !text(body.path) ||
+      !text(body.kind) ||
       (identity !== undefined && (typeof identity?.name !== "string" || !identity.name.trim() || typeof identity.email !== "string" || !identity.email.trim()))
     ) {
-      return c.json({ code: "BAD_REQUEST", error: "Send { title, author?, path?, identity?: { name, email } }." }, 400);
+      return c.json({ code: "BAD_REQUEST", error: "Send { kind?, title, author?, path?, identity?: { name, email } }." }, 400);
     }
     const author = (body.author as string | undefined)?.trim();
     const path = (body.path as string | undefined)?.trim();
     try {
       const novel = await library.create({
+        ...(typeof body.kind === "string" ? { kind: body.kind } : {}),
         title: body.title.trim(),
         ...(author ? { author } : {}),
         ...(path ? { into: path } : {}),

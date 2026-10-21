@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { migration, SCHEMA_VERSION, type FileSource, type Migration } from "@writer/core";
 import { nodeSource } from "@writer/core/node";
 import { readToolBytes, TOOLS_DIR } from "./files.ts";
-import { DEFAULT_TEMPLATE } from "./new-novel.ts";
+import { DEFAULT_TEMPLATE } from "./new-book.ts";
 import { transaction, type FileWrite, type OperationResult } from "./operations.ts";
 
 /*

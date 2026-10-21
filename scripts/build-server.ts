@@ -48,6 +48,6 @@ for (const pkg of readdirSync(napi).filter((name) => name === "keyring" || name.
   cpSync(join(napi, pkg), join(out, "node_modules/@napi-rs", pkg), { recursive: true });
 }
 cpSync(web, join(out, "web"), { recursive: true });
-cpSync(join(repo, "templates/novel"), join(out, "template"), { recursive: true });
+cpSync(join(repo, "templates"), join(out, "templates"), { recursive: true });
 cpSync(join(repo, "packages/export/fonts"), join(out, "fonts"), { recursive: true });
 console.log(`Built ${join(out, "writer.mjs")}`);

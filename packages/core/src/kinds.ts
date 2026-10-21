@@ -174,6 +174,9 @@ export function registerKind(kind: BookKind): void {
   registry.set(kind.key, withModules(kind));
 }
 
+/** Every registered kind of book, in the order the entry points registered them (the Novel first). */
+export const knownKinds = (): BookKind[] => [...registry.values()];
+
 /** A registered kind of book, or undefined for one this build doesn't ship. */
 export function knownKind(key: string): BookKind | undefined {
   return registry.get(key);

@@ -74,3 +74,22 @@ test("says so when the folder is taken, and from the palette too", async ({ page
   await expect(page).toHaveTitle("Varn · Writer");
   expect(app.git(join(app.home, "writer", "varn-again"), "log", "--format=%s").trim()).toBe("Start Varn");
 });
+
+test("starts a journal from the shelf's +, of the kind chosen, in its own folders and words (#37)", async ({ page, app }) => {
+  await launch(page, app);
+  await page.getByRole("list", { name: "Books" }).getByRole("button", { name: "New book" }).click();
+  const kinds = dialog(page).getByRole("group", { name: "Kind of book" });
+  await expect(kinds.getByRole("radio", { name: "Novel" })).toBeChecked();
+  await kinds.getByRole("radio", { name: "Journal" }).check();
+  await dialog(page).getByRole("textbox", { name: "Title" }).fill("Days");
+  await expect(dialog(page).getByRole("textbox", { name: "Folder" })).toHaveAttribute("placeholder", "~/writer/days");
+  await axe(page);
+  await dialog(page).getByRole("button", { name: "Create" }).click();
+
+  await expect(page).toHaveTitle("Days · Writer");
+  await expect(page.getByRole("heading", { level: 1, name: "No months yet" })).toBeVisible();
+  await expect(page.getByText("Nothing is written in this journal yet.")).toBeVisible();
+  const dir = join(app.home, "writer", "days");
+  expect(readFileSync(join(dir, "book.yaml"), "utf8")).toMatch(/^kind: journal\n/m);
+  expect(app.git(dir, "log", "--format=%s").trim()).toBe("Start Days");
+});

@@ -4,7 +4,7 @@ export * from "./model.ts";
 export { kindOf, loadBook } from "./load.ts";
 export { carrierOf, carryingField, entriesOf, entryIds, fieldName, itemsOf, itemText, recordEntries, roleOf, storyTimeField, storyTimeValue } from "./fields.ts";
 export { EVENT_FILES_FORMAT, MANIFEST, NOVEL_MANIFEST, readManifest, SCHEMA_VERSION, type Manifest } from "./manifest.ts";
-export { kindByKey, knownKind, levelOf, registerKind, startLevels, V2_KIND, type BookKind, type FieldDef, type ItemProp, type LevelDef, type Noun, type StatusDef } from "./kinds.ts";
+export { kindByKey, knownKind, knownKinds, levelOf, registerKind, startLevels, V2_KIND, type BookKind, type FieldDef, type ItemProp, type LevelDef, type Noun, type StatusDef } from "./kinds.ts";
 export { plural, typePlural, vocabulary, word, type Vocabulary, type Word } from "./vocabulary.ts";
 export { defineModule, moduleFacts, moduleSnapshots, modulesOf, recordType, recordTypesOf, registerModule, storyClock, withModules, type BookModule, type Finding, type ModuleCheck, type ModuleMigration, type ModuleSnapshots, type RecordTypeDef, type StoryClock } from "./modules.ts";
 export { migration, type Migration, type MigrationWrite } from "./migrate.ts";

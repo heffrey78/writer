@@ -1,11 +1,11 @@
 import { mkdir, readdir, readFile, realpath, rename, rm, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
-import { MANIFEST, newId, NOVEL_MANIFEST, parseYaml, readManifest, slugify } from "@writer/core";
+import { knownKind, knownKinds, MANIFEST, newId, NOVEL_MANIFEST, parseYaml, readManifest, slugify } from "@writer/core";
 import { nodeSource } from "@writer/core/node";
 import type { SimpleGitProgressEvent } from "simple-git";
 import { classifyGitError, cloneUrl, git, repoName, type GitAuthSource } from "./git.ts";
-import { DEFAULT_TEMPLATE, NeedsIdentity, writeNewNovel, type NewNovel } from "./new-novel.ts";
+import { NeedsIdentity, TEMPLATES, templateOf, writeNewBook, type NewNovel } from "./new-book.ts";
 
 /** A novel the author has opened or cloned. */
 export interface LibraryEntry {
@@ -29,7 +29,7 @@ export interface LibraryNotice {
   path: string;
 }
 
-export type LibraryErrorCode = "NOT_A_DIRECTORY" | "NOT_A_REPO" | "NOT_A_NOVEL" | "UNKNOWN_NOVEL" | "NOT_EMPTY" | "NEEDS_IDENTITY";
+export type LibraryErrorCode = "NOT_A_DIRECTORY" | "NOT_A_REPO" | "NOT_A_NOVEL" | "UNKNOWN_NOVEL" | "NOT_EMPTY" | "NEEDS_IDENTITY" | "UNKNOWN_KIND";
 
 export class LibraryError extends Error {
   readonly code: LibraryErrorCode;
@@ -89,25 +89,25 @@ export class Library {
   readonly file: string;
   /** Where new novels and clones go unless the author says otherwise. */
   readonly cloneDir: string;
-  /** The template new novels are made from. */
-  readonly templateDir: string;
+  /** The templates new books are made from, a folder each by the kind's key. */
+  readonly templatesDir: string;
   /** What changed behind the author's back: shown once by the UI, kept for the server's lifetime. */
   readonly notices: LibraryNotice[] = [];
   #novels: LibraryEntry[] = [];
   #saving: Promise<void> = Promise.resolve();
 
-  private constructor(file: string, cloneDir: string, templateDir: string) {
+  private constructor(file: string, cloneDir: string, templatesDir: string) {
     this.file = file;
     this.cloneDir = cloneDir;
-    this.templateDir = templateDir;
+    this.templatesDir = templatesDir;
   }
 
   static async open({
     configDir = defaultConfigDir(),
     cloneDir = join(homedir(), "writer"),
-    templateDir = DEFAULT_TEMPLATE,
-  }: { configDir?: string; cloneDir?: string; templateDir?: string } = {}): Promise<Library> {
-    const library = new Library(join(configDir, "library.json"), cloneDir, templateDir);
+    templatesDir = TEMPLATES,
+  }: { configDir?: string; cloneDir?: string; templatesDir?: string } = {}): Promise<Library> {
+    const library = new Library(join(configDir, "library.json"), cloneDir, templatesDir);
     await library.#load();
     await library.list();
     return library;
@@ -263,11 +263,20 @@ export class Library {
     return join(this.cloneDir, slugify(title) || "novel");
   }
 
+  /** The kinds of book it can start, each with a template: their keys and names ("Novel", "Journal"). */
+  async kinds(): Promise<{ key: string; label: string }[]> {
+    const has = await Promise.all(knownKinds().map(async (k) => (await stat(templateOf(k.key, this.templatesDir)).catch(() => undefined))?.isDirectory() ?? false));
+    return knownKinds().flatMap((k, i) => (has[i] ? [{ key: k.key, label: k.label }] : []));
+  }
+
   /**
-   * Start a novel from the template in `into` (default: a folder named after the title in the
-   * clone directory), which must be new or empty, and add it. A failure leaves nothing behind.
+   * Start a book of `kind` (a novel by default) from its kind's template in `into` (default: a folder
+   * named after the title in the clone directory), which must be new or empty, and add it. A failure
+   * leaves nothing behind.
    */
-  async create({ into, ...novel }: NewNovel & { into?: string }): Promise<LibraryEntry> {
+  async create({ into, kind = "novel", ...novel }: NewNovel & { into?: string }): Promise<LibraryEntry> {
+    const template = templateOf(kind, this.templatesDir);
+    if (!knownKind(kind) || !(await stat(template).catch(() => undefined))?.isDirectory()) throw new LibraryError("UNKNOWN_KIND", `Writer can't start a book of the kind “${kind}”.`);
     const dest = resolve(into ? expandHome(into) : this.defaultFolder(novel.title));
     const info = await stat(dest).catch(() => undefined);
     if (info && !info.isDirectory()) throw new LibraryError("NOT_A_DIRECTORY", `${dest} is a file, not a folder. Choose another folder.`);
@@ -277,7 +286,7 @@ export class Library {
 
     await mkdir(dest, { recursive: true });
     try {
-      await writeNewNovel(this.templateDir, dest, novel);
+      await writeNewBook(template, dest, novel);
       return await this.add(dest);
     } catch (e) {
       await cleanUp();

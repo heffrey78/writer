@@ -104,7 +104,7 @@ export function LibraryPage() {
         )}
       </section>
 
-      {adding === "new" && <NewNovelDialog folder={library.data?.folder} authors={library.data?.novels.flatMap((n) => (n.author ? [n.author] : [])) ?? []} onClose={close} />}
+      {adding === "new" && <NewNovelDialog folder={library.data?.folder} authors={library.data?.novels.flatMap((n) => (n.author ? [n.author] : [])) ?? []} kinds={library.data?.kinds ?? []} onClose={close} />}
       {adding === "open" && <OpenFolderDialog onClose={close} initial={params.get("path") ?? undefined} />}
       {adding === "clone" && <CloneDialog folder={library.data?.folder} onClose={close} />}
     </Shell>

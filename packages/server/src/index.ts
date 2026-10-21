@@ -22,7 +22,7 @@ export { commitMessage, type FileChange } from "./commit-message.ts";
 export { Committer, hasGitIdentity, operationInProgress, type BlockedCode, type CommitResult, type CommitStatus, type CommitterOptions, type LastCommit } from "./committer.ts";
 export { atomicWrite, checkPath, FileError, hashText, MAX_FILE_BYTES, TEMP_SUFFIX, type FileErrorCode, type TextFile, type WriteHooks } from "./files.ts";
 export { classifyGitError, cloneUrl, git, GitFailure, type GitErrorCode } from "./git.ts";
-export { DEFAULT_TEMPLATE, writeNewNovel, type NewNovel } from "./new-novel.ts";
+export { DEFAULT_TEMPLATE, TEMPLATES, templateOf, writeNewBook, type NewNovel } from "./new-book.ts";
 export { migrateNovel, migrationWrites } from "./migrate.ts";
 export { ghToken, GitHub, GITHUB_CLIENT_ID, GitHubError, githubRepoOf, keychainStore, memoryStore, SCOPES, unreachable, type AccountStatus, type DeviceCode, type GitHubAccount, type GitHubErrorCode, type GitHubOptions, type GitHubRepo, type PollResult, type RepoSummary, type TokenStore } from "./github.ts";
 export { githubRoutes } from "./github-routes.ts";

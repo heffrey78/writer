@@ -92,6 +92,8 @@ export interface RepoSummary {
 export type DevicePoll = { status: "pending"; interval: number } | { status: "expired" | "denied" | "none" } | { status: "done"; account: GitHubStatus };
 
 export interface NewNovel {
+  /** The kind of book, by its key: a novel by default. */
+  kind?: string;
   title: string;
   author?: string;
   /** The folder; default: one named after the title in the library's folder. */
@@ -405,7 +407,8 @@ export function createApi({ baseUrl = "", headers = {}, fetch = globalThis.fetch
     /** The licence texts the desktop app ships. */
     licenses: async () => (await request<{ licenses: License[] }>("GET", "/api/app/licenses")).data.licenses,
     /** The library, its notices, and the folder new novels and clones go in (~ for home). */
-    library: async () => (await request<{ novels: LibraryEntry[]; notices: LibraryNotice[]; folder: string; ghWriter: { path: string; title: string }[] }>("GET", "/api/library")).data,
+    library: async () =>
+      (await request<{ novels: LibraryEntry[]; notices: LibraryNotice[]; folder: string; ghWriter: { path: string; title: string }[]; kinds: { key: string; label: string }[] }>("GET", "/api/library")).data,
     /** Bring the books in gh-writer's library into this one (#2): their folders, not copies. */
     importGhWriter: async () => (await request<{ added: LibraryEntry[]; failed: { path: string; error: string }[] }>("POST", "/api/library/gh-writer")).data,
     /** Start a novel from the template. Rejects with NEEDS_IDENTITY when git doesn't know the author: send `identity` then. */

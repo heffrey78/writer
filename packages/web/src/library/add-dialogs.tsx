@@ -30,11 +30,13 @@ function useOpenAdded(onClose: () => void) {
 }
 
 /**
- * Start a novel: a title, an author, and where it goes (by default a folder named after the title in
- * the library's folder). If git doesn't know the author yet, ask for a name and email for its history.
+ * Start a book: its kind (a novel, a journal), a title, an author, and where it goes (by default a
+ * folder named after the title in the library's folder). If git doesn't know the author yet, ask for
+ * a name and email for its history.
  */
-export function NewNovelDialog({ folder, authors, onClose }: { folder: string | undefined; authors: string[]; onClose: () => void }) {
+export function NewNovelDialog({ folder, authors, kinds, onClose }: { folder: string | undefined; authors: string[]; kinds: { key: string; label: string }[]; onClose: () => void }) {
   const opened = useOpenAdded(onClose);
+  const [kind, setKind] = useState(kinds[0]?.key ?? "novel");
   const [title, setTitle] = useState("");
   const [author, setAuthor] = useState(authors[0] ?? "");
   const [path, setPath] = useState("");
@@ -43,6 +45,7 @@ export function NewNovelDialog({ folder, authors, onClose }: { folder: string | 
   const create = useMutation({
     mutationFn: () =>
       api.createNovel({
+        kind,
         title: title.trim(),
         ...(author.trim() ? { author: author.trim() } : {}),
         ...(path.trim() ? { path: path.trim() } : {}),
@@ -60,14 +63,27 @@ export function NewNovelDialog({ folder, authors, onClose }: { folder: string | 
     e.preventDefault();
     if (ready) create.mutate();
   };
-  const where = folder ? `${folder}/${slugify(title) || "novel"}` : undefined;
+  const where = folder ? `${folder}/${slugify(title) || kind}` : undefined;
   const failed = create.isError && !(create.error instanceof ApiError && create.error.code === "NEEDS_IDENTITY");
 
   return (
     <Modal title="New book" onClose={onClose}>
       <form onSubmit={submit} className="grid gap-3">
+        {kinds.length > 1 && (
+          <fieldset className="grid gap-1.5 text-sm">
+            <legend className="mb-1 font-medium">Kind of book</legend>
+            <div className="flex flex-wrap gap-4">
+              {kinds.map((k) => (
+                <label key={k.key} className="flex items-center gap-2">
+                  <input type="radio" name="kind" value={k.key} checked={kind === k.key} onChange={() => setKind(k.key)} />
+                  {k.label}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+        )}
         <Field label="Title" value={title} onChange={(e) => setTitle(e.target.value)} required autoFocus />
-        <Field label="Author" value={author} onChange={(e) => setAuthor(e.target.value)} hint="Optional. Shown on the cover and in novel.yaml." />
+        <Field label="Author" value={author} onChange={(e) => setAuthor(e.target.value)} hint="Optional. Shown on the cover and in the book's settings." />
         <Field
           label="Folder"
           value={path}
@@ -79,7 +95,7 @@ export function NewNovelDialog({ folder, authors, onClose }: { folder: string | 
         {askingIdentity && (
           <fieldset className="grid gap-3 rounded-md border border-rule p-3">
             <legend className="px-1 text-sm font-medium">Who's writing?</legend>
-            <p className="text-sm text-muted">git records a name and email with every change to the novel, and doesn't know yours yet. They are kept with this novel only.</p>
+            <p className="text-sm text-muted">git records a name and email with every change to the book, and doesn't know yours yet. They are kept with this book only.</p>
             <Field label="Name" value={identity.name} onChange={(e) => setIdentity({ ...identity, name: e.target.value })} required autoFocus />
             <Field label="Email" type="email" value={identity.email} onChange={(e) => setIdentity({ ...identity, email: e.target.value })} required />
           </fieldset>
