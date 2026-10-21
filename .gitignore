@@ -11,3 +11,4 @@ packages/desktop/arch/*.deb
 packages/desktop/arch/*.pkg.tar.zst
 packages/desktop/arch/src/
 packages/desktop/arch/pkg/
+spike/d16/git2-port/target/

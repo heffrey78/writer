@@ -1,0 +1,13 @@
+[package]
+name = "git2-port"
+version = "0.1.0"
+edition = "2024"
+description = "D16 spike (#45): the git operations Writer's server uses, over libgit2, answering JSON requests on stdin."
+publish = false
+
+[dependencies]
+# libgit2 built from source, as an Android build would need; https for github.com.
+git2 = { version = "0.21", default-features = false, features = ["vendored-libgit2", "https"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+base64 = "0.22"
