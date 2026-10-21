@@ -1,5 +1,6 @@
 import { fileURLToPath } from "node:url";
-import { compileBook, entriesOf, kindByKey, layoutOf, loadBook, memorySource, PLAIN_LAYOUT, reservedPrefixes, schemaFor, validate, validateBook, vocabulary, withModules } from "@writer/core";
+import { compileBook, entriesOf, graphTypes, kindByKey, layoutOf, loadBook, locationProfile, memorySource, PLAIN_LAYOUT, reservedPrefixes, schemaFor, validate, validateBook, vocabulary, withModules } from "@writer/core";
+import { graphAt } from "@writer/core/diagrams";
 import { nodeSource } from "@writer/core/node";
 import { storyTimeline } from "@writer/module-story-time/core";
 import { describe, expect, it } from "vitest";
@@ -41,6 +42,13 @@ describe("the Journal kind", () => {
     // Its entries in the order they happened: the calendar's.
     expect(storyTimeline(book).items.map((i) => (i.kind === "scene" ? i.scene.id : ""))).toEqual(book.pieces.map((p) => p.id));
     expect(schemaFor("month", book.kind)).toMatchObject({ title: "_month.yaml", required: ["id", "title", "entries"] });
+  });
+
+  it("draws its people on the graph, and says who comes to a place", async () => {
+    const book = await loadBook(nodeSource(SAMPLE));
+    expect(graphTypes(book)).toEqual(["person"]);
+    expect(graphAt(book, undefined).nodes.map((n) => n.label)).toEqual(["Mira Hale", "Tomas Vey"]);
+    expect(locationProfile(book, "pl_5p1t00").visitors.map((v) => v.name)).toEqual(["Mira Hale"]);
   });
 
   it("compiles plainly: its months headed by their names, its year by its own", async () => {

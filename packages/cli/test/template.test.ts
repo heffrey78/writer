@@ -147,23 +147,27 @@ describe("novel template", () => {
   });
 });
 
-describe("journal template", () => {
-  const journal = join(repo, "templates/journal");
+// Each kind's template vendors the novel template's tools; its sample book's snapshots are drawn with them.
+describe.each([
+  ["journal", "examples/sample-journal"],
+  ["campaign", "examples/sample-campaign"],
+])("%s template", (kind, sample) => {
+  const dir = join(repo, "templates", kind);
 
   it("vendors the novel template's tools, byte for byte, which validate it cleanly", () => {
     const novelTools = join(template, ".github/gh-writer");
-    const tools = join(journal, ".github/gh-writer");
+    const tools = join(dir, ".github/gh-writer");
     for (const f of ["validate.mjs", "snapshots.mjs", "compile.mjs"]) expect(readFileSync(join(tools, f)).equals(readFileSync(join(novelTools, f))), `${f}: run \`npm run build:template\``).toBe(true);
     expect(readdirSync(join(tools, "fonts")).sort()).toEqual(readdirSync(join(novelTools, "fonts")).sort());
-    const r = node([join(tools, "validate.mjs"), journal]);
+    const r = node([join(tools, "validate.mjs"), dir]);
     expect(r.status, r.stdout).toBe(0);
     expect(r.stdout).toContain("0 errors, 0 warnings");
   });
 
-  it("and the sample journal's snapshots are current", () => {
-    for (const dir of [journal, join(repo, "examples/sample-journal")]) {
-      const check = node([join(journal, ".github/gh-writer/snapshots.mjs"), dir, "--check"]);
-      expect(check.status, `${dir}: ${check.stdout} (run \`npm run build:template\`)`).toBe(0);
+  it("and its sample book's snapshots are current", () => {
+    for (const book of [dir, join(repo, sample)]) {
+      const check = node([join(dir, ".github/gh-writer/snapshots.mjs"), book, "--check"]);
+      expect(check.status, `${book}: ${check.stdout} (run \`npm run build:template\`)`).toBe(0);
     }
   });
 });

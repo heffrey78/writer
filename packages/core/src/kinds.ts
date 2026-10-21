@@ -150,6 +150,8 @@ export interface BookKind extends Noun {
   compileLayout?: string;
   /** What a book's issues are about: a label kind/<key> each. */
   issueKinds: readonly IssueKind[];
+  /** The entry types the relationship graph shows until it's filtered, by key: a campaign's factions with its people. Without it, its types that are people. */
+  graphTypes?: readonly string[];
   /** The modules its books use, by id (D14): each adds its fields after the kind's own, its checks and its records. */
   modules?: readonly string[];
   /**

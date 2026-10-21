@@ -1,0 +1,5 @@
+relationships:
+  - {id: rel_k1aya0, from: pc_k1th00, to: pc_aya000, type: allied}
+  - {id: rel_ma7w01, from: npc_ma7ra1, to: fac_watch0, type: member-of, until: ses_tw0002}
+  - {id: rel_ma7t02, from: npc_ma7ra1, to: fac_t1de00, type: member-of, since: ses_tw0002}
+  - {id: rel_v0sst0, from: npc_v0ss01, to: fac_t1de00, type: member-of}

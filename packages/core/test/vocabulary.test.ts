@@ -1,6 +1,6 @@
 import { novel } from "@writer/kinds";
 import { describe, expect, it } from "vitest";
-import { vocabulary, word } from "../src/index.ts";
+import { typesInSentence, vocabulary, word } from "../src/index.ts";
 import { diary } from "./kinds.ts";
 
 /** The words on screen (#22): each kind's own, in the forms sentences need. */
@@ -26,5 +26,11 @@ describe("a kind's words", () => {
     expect(word({ label: "NPC", plural: "NPCs", article: "an" })).toMatchObject({ one: "NPC", many: "NPCs", a: "an NPC" });
     expect(word({ label: "Unit", plural: "Units", article: "a" }).a).toBe("a unit");
     expect(word({ label: "Hour", plural: "Hours", article: "an" }).a).toBe("an hour");
+  });
+
+  it("list entry types in a sentence, for what there's none of yet", () => {
+    expect(typesInSentence([{ label: "Character" }])).toBe("characters");
+    expect(typesInSentence([{ label: "NPC", plural: "NPCs" }, { label: "Player character" }, { label: "Faction" }])).toBe("NPCs, player characters or factions");
+    expect(typesInSentence([])).toBe("entries");
   });
 });

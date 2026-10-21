@@ -52,6 +52,12 @@ export function carrierOf(kind: BookKind, piece: Piece): string | undefined {
   return f ? entryIds(f, piece.fields[f.key])[0] : undefined;
 }
 
+/** The entry types whose entries are people, or places (`is` on the type): a novel's characters and locations, a campaign's NPCs and player characters. */
+export const typesThatAre = (book: Book, is: "person" | "place") => book.entityTypes.filter((t) => t.is === is).map((t) => t.key);
+
+/** The entry types the relationship graph shows until it's filtered: the kind's `graphTypes`, else its people's. */
+export const graphTypes = (book: Book) => (book.kind.graphTypes ? book.entityTypes.filter((t) => book.kind.graphTypes!.includes(t.key)).map((t) => t.key) : typesThatAre(book, "person"));
+
 /**
  * The entries a piece's fields name, in the kind's field order, each once: of one entry type
  * (`type`: its fields of that type, and those of the book's own types its own-types field names),

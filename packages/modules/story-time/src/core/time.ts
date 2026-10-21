@@ -1,4 +1,4 @@
-import { entriesOf, recordEntries, recordType, recordTypesOf, storyTimeValue, word, type Book, type BookKind, type FieldDef, type ModuleRecord, type Piece, type RecordTypeDef, type StoryTime, type Word } from "@writer/core";
+import { entriesOf, recordEntries, recordType, recordTypesOf, storyTimeValue, typesThatAre, word, type Book, type BookKind, type FieldDef, type ModuleRecord, type Piece, type RecordTypeDef, type StoryTime, type Word } from "@writer/core";
 
 /*
  * Story time (D14, #30): when each piece happens, a day of the story or a date, and how long it lasts,
@@ -149,9 +149,6 @@ export function storyTimeline(novel: Book): StoryTimeline {
   items.sort((a, b) => Number(b.at.dated) - Number(a.at.dated) || a.at.start - b.at.start || reading(a) - reading(b) || itemId(a).localeCompare(itemId(b)));
   return { items, undatedScenes, undatedRecords };
 }
-
-/** The entry types whose entries are people, or places (`is` on the type): who can't be in two places at once, and where. */
-export const typesThatAre = (book: Book, is: "person" | "place") => book.entityTypes.filter((t) => t.is === is).map((t) => t.key);
 
 /**
  * Who is where in an item: the people a piece's fields name (its point of view too) and the places,

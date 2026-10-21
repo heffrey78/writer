@@ -1,0 +1,19 @@
+schema_version: 3
+kind: campaign
+id: cmp_dr0wnb
+title: The Drowned Bell
+author: Writer sample
+calendar:
+  start: 1490-03-12
+relationship_types:
+  - key: allied
+    label: Allied with
+    symmetric: true
+  - key: rival
+    label: Rival of
+    symmetric: true
+  - key: member-of
+    label: Member of
+    inverse_label: Has member
+    from_types: [npc, pc]
+    to_types: [faction]

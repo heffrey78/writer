@@ -1,5 +1,5 @@
 import { relationshipStyle, type SeriesSlot } from "./palette.ts";
-import { carrierOf, countWords, entriesOf, entryIds, itemsOf, mentions, relationshipsAt, levelLabel, sectionById, sectionsAt, type Section, type Entity, type Book, type ItemProp, type Relationship, type Piece } from "./index.ts";
+import { carrierOf, countWords, entriesOf, entryIds, itemsOf, mentions, relationshipsAt, levelLabel, sectionById, sectionsAt, graphTypes, type Section, type Entity, type Book, type ItemProp, type Relationship, type Piece } from "./index.ts";
 
 /*
  * The data behind the base's diagrams: the relationship graph, how each entry is in each piece
@@ -118,12 +118,12 @@ function presentInFiltered(novel: Book, f: GraphFilter): Set<string> | undefined
 }
 
 /**
- * The relationship graph at a scene: entities of the filter's types (and present where the scene
+ * The relationship graph at a scene: entities of the filter's types (graphTypes, unless it says) (and present where the scene
  * filters say) as nodes, at their saved positions or laid out around them, and the relationships
  * of the filter's types holding at `sceneId` between two shown entities as edges, styled by type.
  */
 export function graphAt(novel: Book, sceneId: string | undefined, filter: GraphFilter = {}): GraphView {
-  const types = filter.types ?? ["character"];
+  const types = filter.types ?? graphTypes(novel);
   const present = presentInFiltered(novel, filter);
   const entities = novel.entities.filter((e) => types.includes(e.type) && (!present || present.has(e.id))).sort((a, b) => a.name.localeCompare(b.name));
   const shown = new Set(entities.map((e) => e.id));

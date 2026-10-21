@@ -1,4 +1,4 @@
-import { backlinks, pieceSections, roleOf, vocabulary, type Book } from "@writer/core";
+import { backlinks, graphTypes, pieceSections, roleOf, typesInSentence, vocabulary, type Book } from "@writer/core";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 import { api } from "../api.ts";
@@ -29,7 +29,7 @@ type Speed = keyof typeof SPEEDS;
 type Editing = { kind: "add"; from: string; to?: string } | { kind: "edge" | "change" | "end"; id: string } | { kind: "entry" };
 
 /**
- * Who is connected to whom, at a point in the story: entities as nodes (characters, unless the
+ * Who is connected to whom, at a point in the story: entities as nodes (the kind's graphTypes, unless the
  * filters say otherwise), the relationships holding at the chosen scene as edges. The slider (or the
  * scene picker) moves through the book. Filters narrow it to entity types, relationship types, a
  * plotline, or who is present in a range of scenes. Selecting a node brings out its relationships and
@@ -64,7 +64,8 @@ export function GraphPage({ novelId, novel }: { novelId: string; novel: Book }) 
 
   const go = (sceneId: string | undefined) => sceneId && set({ at: sceneId });
 
-  const types = filter.types ?? ["character"];
+  const shown = graphTypes(novel);
+  const types = filter.types ?? shown;
   const relTypes = filter.relationshipTypes ?? novel.relationshipTypes.map((t) => t.key);
   const toggle = (key: "types" | "rel", all: string[], current: string[], value: string, defaults: string[]) => {
     const next = current.includes(value) ? current.filter((v) => v !== value) : [...current, value];
@@ -157,15 +158,15 @@ export function GraphPage({ novelId, novel }: { novelId: string; novel: Book }) 
                 step={1}
                 value={index}
                 onChange={(e) => go(scenes[Number(e.target.value)]?.id)}
-                aria-valuetext={`Scene ${index + 1} of ${scenes.length}: ${scene.title}${chapter ? `, in ${chapterTitle(novel, chapter)}` : ""}`}
+                aria-valuetext={`${w.piece.One} ${index + 1} of ${scenes.length}: ${scene.title}${chapter ? `, in ${chapterTitle(novel, chapter)}` : ""}`}
                 className="accent-[var(--ghw-accent)]"
               />
               <p className="text-xs text-muted" aria-hidden>
-                Scene {index + 1} of {scenes.length}
+                {w.piece.One} {index + 1} of {scenes.length}
                 {chapter && ` · ${chapterTitle(novel, chapter)}`}
               </p>
             </div>
-            <Picker label="Scene" items={sceneList} value={scene.id} onChange={go} className="w-64" />
+            <Picker label={w.piece.One} items={sceneList} value={scene.id} onChange={go} className="w-64" />
             <div className="flex items-end gap-2">
               <Button ref={playButton} aria-pressed={playing} onClick={play} title="Space, on the slider">
                 {playing ? "Pause" : "Play"}
@@ -184,7 +185,7 @@ export function GraphPage({ novelId, novel }: { novelId: string; novel: Book }) 
             </p>
           </div>
         ) : (
-          <p className="text-muted">The manuscript has no scenes yet: the graph shows relationships that hold from the start.</p>
+          <p className="text-muted">The {w.content.one} has no {w.piece.many} yet: the graph shows relationships that hold from the start.</p>
         )}
         <details className="rounded-md border border-rule px-3 py-2 text-sm" open={filtered || undefined}>
           <summary className="cursor-pointer font-medium">Filters{filtered ? " (on)" : ""}</summary>
@@ -193,7 +194,7 @@ export function GraphPage({ novelId, novel }: { novelId: string; novel: Book }) 
               <legend className="mb-1 text-xs font-semibold text-muted">Show</legend>
               {novel.entityTypes.map((t) => (
                 <label key={t.key} className="flex items-center gap-2">
-                  <input type="checkbox" checked={types.includes(t.key)} onChange={() => toggle("types", novel.entityTypes.map((x) => x.key), types, t.key, ["character"])} />
+                  <input type="checkbox" checked={types.includes(t.key)} onChange={() => toggle("types", novel.entityTypes.map((x) => x.key), types, t.key, shown)} />
                   {typePlural(t)}
                 </label>
               ))}
@@ -263,7 +264,7 @@ export function GraphPage({ novelId, novel }: { novelId: string; novel: Book }) 
               onEdgeOpen={(relId) => setEditing({ kind: "edge", id: relId })}
             />
           ) : (
-            <p className="p-6 text-muted">{filtered ? "Nothing matches these filters." : `No characters yet. Add some in the ${w.codex.one} to see how they relate.`}</p>
+            <p className="p-6 text-muted">{filtered ? "Nothing matches these filters." : `No ${typesInSentence(novel.entityTypes.filter((t) => shown.includes(t.key)))} yet. Add some in the ${w.codex.one} to see how they relate.`}</p>
           )}
         </div>
         <section aria-labelledby={`${id}-list`} className="grid content-start gap-2 text-sm lg:overflow-y-auto">

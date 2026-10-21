@@ -85,6 +85,21 @@ describe("Library.create", () => {
     expect(gitIn(book.path, "status", "--porcelain")).toBe("");
   });
 
+  it("starts a campaign from its own template: an arc with a first session, a codex folder for each type (#41)", async () => {
+    const library = await openLibrary();
+    const book = await library.create({ kind: "campaign", title: "The Drowned Coast" });
+    const result = await validate(nodeSource(book.path));
+    expect(result.diagnostics).toEqual([]);
+    expect(result.novel.kind.key).toBe("campaign");
+    expect(result.novel.pieces.map((p) => [p.title, p.status])).toEqual([["Session 1", "planned"]]);
+    expect(readFileSync(join(book.path, "book.yaml"), "utf8")).toMatch(/^id: cmp_[0-9a-z]{6}$/m);
+    expect(filesIn(book.path)).toEqual(filesIn(templateOf("campaign")));
+    expect(filesIn(book.path)).toEqual(expect.arrayContaining(["sessions/_order.yaml", "codex/npcs/.gitkeep", "codex/player-characters/.gitkeep", "codex/quests/.gitkeep"]));
+    for (const file of filesIn(book.path).filter((f) => !f.startsWith(".github/"))) {
+      expect(readFileSync(join(book.path, file), "utf8"), file).not.toMatch(/_temp1a\b/);
+    }
+  });
+
   it("refuses a kind it has no template for, leaving nothing behind", async () => {
     const library = await openLibrary();
     await expect(library.create({ kind: "almanac", title: "Almanac" })).rejects.toMatchObject({ code: "UNKNOWN_KIND" });

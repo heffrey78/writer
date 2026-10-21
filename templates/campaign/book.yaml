@@ -1,0 +1,36 @@
+schema_version: 3
+kind: campaign
+id: cmp_temp1a
+title: Untitled Campaign
+author: ""
+# calendar:                # the world's calendar: the date of day 1
+#   start: 1490-03-12
+relationship_types:
+  - key: allied
+    label: Allied with
+    symmetric: true
+  - key: rival
+    label: Rival of
+    symmetric: true
+  - key: member-of
+    label: Member of
+    inverse_label: Has member
+    from_types: [npc, pc]
+    to_types: [faction]
+  - key: serves
+    label: Serves
+    inverse_label: Served by
+    from_types: [npc, pc]
+  - key: owns
+    label: Owns
+    inverse_label: Owned by
+    to_types: [item]
+  - key: located-in
+    label: Located in
+    inverse_label: Holds
+    to_types: [location]
+  - key: gives
+    label: Gives the quest
+    inverse_label: Given by
+    from_types: [npc]
+    to_types: [quest]

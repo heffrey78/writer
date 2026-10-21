@@ -1,4 +1,4 @@
-import { entriesOf } from "./fields.ts";
+import { entriesOf, typesThatAre } from "./fields.ts";
 import type { Book, Piece } from "./model.ts";
 import { storyClock } from "./modules.ts";
 
@@ -23,7 +23,7 @@ export function tally(novel: Book, ids: Iterable<string>[]): Tally[] {
 }
 
 export interface LocationProfile {
-  /** Who's in its scenes (point of view or characters), by how often. */
+  /** Who's in its scenes (the people: a novel's characters, a campaign's NPCs and player characters), by how often. */
   visitors: Tally[];
   /** The scenes set there, in reading order. */
   scenes: Piece[];
@@ -31,10 +31,11 @@ export interface LocationProfile {
 }
 
 export function locationProfile(novel: Book, id: string): LocationProfile {
-  const scenes = novel.pieces.filter((s) => s.locations.includes(id));
+  const scenes = novel.pieces.filter((s) => entriesOf(novel, s).includes(id));
   // The story time they span, where the book keeps one.
   const span = storyClock(novel)?.span(novel, scenes);
-  return { visitors: tally(novel, scenes.map((s) => entriesOf(novel, s, "character"))), scenes, ...(span ? { span } : {}) };
+  const people = typesThatAre(novel, "person");
+  return { visitors: tally(novel, scenes.map((s) => people.flatMap((t) => entriesOf(novel, s, t)))), scenes, ...(span ? { span } : {}) };
 }
 
 export interface ThemeProfile {

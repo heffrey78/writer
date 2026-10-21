@@ -1,5 +1,5 @@
 import { DEFAULT_GAP, presentIn } from "./diagrams.ts";
-import { entryIds } from "./fields.ts";
+import { entryIds, typesThatAre } from "./fields.ts";
 import type { Book, Piece, Relationship } from "./model.ts";
 import { moduleFacts } from "./modules.ts";
 import { vocabulary } from "./vocabulary.ts";
@@ -31,7 +31,7 @@ export function sceneFacts(novel: Book, sceneId: string): string[] {
 
   // People (the entries of types that are people, a novel's characters): first seen here, or back after a long absence.
   const present = scenes.map((s) => presentIn(novel, s));
-  const people = new Set(novel.entityTypes.filter((t) => t.is === "person").map((t) => t.key));
+  const people = new Set(typesThatAre(novel, "person"));
   const characters = [...present[at]!].filter((id) => people.has(novel.entities.find((e) => e.id === id)?.type ?? ""));
   const first = characters.filter((id) => !present.slice(0, at).some((p) => p.has(id)));
   if (first.length) facts.push(`First appearance of ${list(first)}.`);

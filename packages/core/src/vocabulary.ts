@@ -59,6 +59,12 @@ export const plural = (label: string) => (/(s|x|ch|sh)$/i.test(label) ? `${label
 /** An entry type's label for a list of its entries: its own plural ("People"), else its label's ("Characters"). */
 export const typePlural = (type: { label: string; plural?: string }) => type.plural ?? plural(type.label);
 
+/** Entry types' plurals in a sentence, for what is missing: "characters", "NPCs, player characters or factions"; "entries" for none. */
+export function typesInSentence(types: readonly { label: string; plural?: string }[]): string {
+  const said = types.map((t) => inSentence(typePlural(t)));
+  return said.length > 1 ? `${said.slice(0, -1).join(", ")} or ${said.at(-1)}` : (said[0] ?? "entries");
+}
+
 const cache = new WeakMap<BookKind, Vocabulary>();
 
 /** The kind's words. */

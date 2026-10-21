@@ -1,4 +1,4 @@
-import { entryPresence, locationProfile, themeProfile, vocabulary, type Entity, type Book, type Piece, type Tally, type Word } from "@writer/core";
+import { entryPresence, locationProfile, themeProfile, typesInSentence, typesThatAre, vocabulary, type Entity, type Book, type Piece, type Tally, type Word } from "@writer/core";
 import { Fragment, useMemo } from "react";
 import { Link } from "react-router";
 import { moduleProfileSections } from "../modules.tsx";
@@ -8,7 +8,7 @@ import { ProfileSection } from "./profile.tsx";
 import { StripHeader, StripRow } from "./strip.tsx";
 
 /*
- * The parts of a profile shaped by its type (heffrey78/gh-writer#161): who comes to a location and when, a theme's
+ * The parts of a profile shaped by its type (heffrey78/gh-writer#161): who comes to a place (a type that `is` one) and when, a theme's
  * strength scene by scene, and a module's type's sections (a plotline's beats). A character's are its
  * strip and arcs, shared with every type.
  */
@@ -16,7 +16,7 @@ import { StripHeader, StripRow } from "./strip.tsx";
 export const LINK = "text-accent underline decoration-accent/35 underline-offset-[3px] hover:decoration-accent";
 
 export function TypeSections({ novelId, novel, entity, workspace }: { novelId: string; novel: Book; entity: Entity; workspace: Workspace }) {
-  if (entity.type === "location") return <LocationSection novelId={novelId} novel={novel} entity={entity} />;
+  if (typesThatAre(novel, "place").includes(entity.type)) return <LocationSection novelId={novelId} novel={novel} entity={entity} />;
   if (entity.type === "theme") return <ThemeSection novel={novel} entity={entity} />;
   // A type a module brings has its sections from the module (a plotline's beats).
   const sections = moduleProfileSections(novel.kind, entity.type);
@@ -52,7 +52,7 @@ function LocationSection({ novelId, novel, entity }: { novelId: string; novel: B
   const w = vocabulary(novel.kind);
   return (
     <ProfileSection title="Who comes here">
-      {p.visitors.length ? <Tallied novelId={novelId} tally={p.visitors} unit={w.piece} /> : <p className="text-sm text-muted">No one yet: no {w.piece.one} set here has characters.</p>}
+      {p.visitors.length ? <Tallied novelId={novelId} tally={p.visitors} unit={w.piece} /> : <p className="text-sm text-muted">No one yet: no {w.piece.one} set here has {typesInSentence(novel.entityTypes.filter((t) => t.is === "person"))}.</p>}
       {p.span && <p className="text-sm">Story time: {p.span.from === p.span.to ? p.span.from : `${p.span.from} to ${p.span.to}`}.</p>}
     </ProfileSection>
   );
