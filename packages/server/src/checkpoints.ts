@@ -3,7 +3,8 @@ import { nodeSource } from "@writer/core/node";
 import type { Committer } from "./committer.ts";
 import { atomicWrite, writablePath } from "./files.ts";
 import { commitSource } from "./git-source.ts";
-import { git } from "./git.ts";
+import { text } from "./git-port/port.ts";
+import { gitPort } from "./ports.ts";
 
 /** Checkpoints are annotated tags under this prefix; sync fetches and pushes them. */
 export const CHECKPOINT_PREFIX = "refs/tags/checkpoint/";
@@ -82,31 +83,21 @@ export class Checkpoints {
 
   /** Newest first: tag names start with a time that only goes up (see #create). */
   async list(): Promise<Checkpoint[]> {
-    const out = await git(this.root).raw([
-      "for-each-ref",
-      "--sort=-refname",
-      "--format=%(refname)%00%(creatordate:iso-strict)%00%(*objectname)%00%(objectname)%00%(contents)%1e",
-      CHECKPOINT_PREFIX,
-    ]);
-    return out
-      .split("\x1e")
-      .map((r) => r.replace(/^\n/, ""))
-      .filter(Boolean)
-      .map((record) => {
-        const [ref, date, peeled, object, contents = ""] = record.split("\0");
-        const [subject = "", ...rest] = contents.trim().split("\n");
-        const trailer = (key: string) => rest.map((l) => new RegExp(`^${key}: *(.*)$`).exec(l)?.[1]).find((v) => v !== undefined);
-        return {
-          id: ref!.slice(CHECKPOINT_PREFIX.length),
-          name: subject,
-          date: date!,
-          words: Number(trailer(WORDS_TRAILER) ?? 0),
-          auto: trailer(AUTO_TRAILER) === "auto",
-          ...(trailer(VERSION_TRAILER) ? { branch: trailer(VERSION_TRAILER)! } : {}),
-          // A lightweight tag (made by hand) points at the commit itself.
-          commit: peeled || object!,
-        };
-      });
+    const tags = await gitPort().tags(this.root, CHECKPOINT_PREFIX.slice("refs/tags/".length));
+    return tags.reverse().map((tag) => {
+      const [subject = "", ...rest] = tag.message.trim().split("\n");
+      const trailer = (key: string) => rest.map((l) => new RegExp(`^${key}: *(.*)$`).exec(l)?.[1]).find((v) => v !== undefined);
+      return {
+        id: tag.name.slice(CHECKPOINT_PREFIX.length - "refs/tags/".length),
+        name: subject,
+        date: tag.date ?? "",
+        words: Number(trailer(WORDS_TRAILER) ?? 0),
+        auto: trailer(AUTO_TRAILER) === "auto",
+        ...(trailer(VERSION_TRAILER) ? { branch: trailer(VERSION_TRAILER)! } : {}),
+        // A lightweight tag (made by hand) points at the commit itself.
+        commit: tag.commit,
+      };
+    });
   }
 
   async get(id: string): Promise<Checkpoint> {
@@ -136,33 +127,32 @@ export class Checkpoints {
       const scene = sceneId === undefined ? undefined : await this.#sceneAt(tag, sceneId, kind);
       const what = scene ? `“${scene.title}”` : `the ${w.content.one}`;
       const undo = await this.#create(`Before restoring ${what} from “${checkpoint.name}”`, true);
-      const g = git(this.root);
+      const git = gitPort();
 
       let paths: string[];
       if (scene) {
         const target = (await this.#currentScenePath(sceneId!)) ?? scene.path;
         // The same checks as a save: a plain path inside the novel, no symlinks.
         await atomicWrite(await writablePath(this.root, target, scene.content), scene.content);
-        await g.raw(["add", "--", target]);
+        await git.stage(this.root, { paths: [target] });
         paths = [target];
       } else {
         // Paths in neither the checkpoint nor the work tree would be an error for git.
         paths = [];
         // The whole book, for a restore: its sections and pieces, and its codex.
         for (const p of [kind.folders.content, kind.folders.codex]) {
-          const atCheckpoint = (await g.raw(["ls-tree", "--name-only", tag, "--", p])).trim();
-          const now = (await g.raw(["ls-files", "--", p])).trim();
+          const atCheckpoint = (await git.listTree(this.root, tag, p)).length > 0;
+          const now = (await git.listFiles(this.root, [p])).length > 0;
           if (atCheckpoint || now) paths.push(p);
         }
         // Removes what the checkpoint didn't have, in the index and the work tree.
-        if (paths.length) await g.raw(["restore", `--source=${tag}`, "--staged", "--worktree", "--", ...paths]);
+        if (paths.length) await git.restore(this.root, tag, paths);
       }
 
-      const files = paths.length ? (await g.raw(["diff", "--cached", "--name-only", "--relative", "--", ...paths])).split("\n").filter(Boolean) : [];
+      const files = paths.length ? (await git.stagedChanges(this.root, { paths })).map((c) => c.path) : [];
       if (!files.length) return { undo, commit: null, files };
       const message = `Restore ${scene ? `${w.piece.one} ${what}` : what} from checkpoint “${checkpoint.name}”`;
-      await g.raw(["commit", "--quiet", "--no-verify", "-m", message, "--", ...paths]);
-      return { undo, commit: (await g.raw(["rev-parse", "HEAD"])).trim(), files };
+      return { undo, commit: await git.commit(this.root, message, { paths }), files };
     });
   }
 
@@ -183,17 +173,17 @@ export class Checkpoints {
       }
     }
     const words = commit === undefined ? await this.#words() : wordsIn(await loadBook(await commitSource(this.root, commit)));
-    const g = git(this.root);
+    const git = gitPort();
     // A second after the newest checkpoint at the latest, so names sort in the order they were made even
     // within one second (a restore right after a checkpoint) or after the clock steps back.
-    const stamps = (await g.raw(["tag", "--list", "checkpoint/*"])).split("\n").map((t) => STAMP.exec(t.slice("checkpoint/".length))?.[0]);
+    const stamps = (await git.tags(this.root, "checkpoint/")).map((t) => STAMP.exec(t.name.slice("checkpoint/".length))?.[0]);
     const newest = stamps.filter((s) => s !== undefined).sort().at(-1);
     let at = this.#now();
     if (newest && stamp(at) <= newest) at = new Date(parseStamp(newest).getTime() + 1000);
     const tag = `checkpoint/${stamp(at)}-${slug(name)}`;
-    const made = branch ?? (await g.raw(["symbolic-ref", "--quiet", "--short", "HEAD"]).catch(() => "")).trim();
+    const made = branch ?? (await git.currentBranch(this.root).catch(() => null)) ?? "";
     const trailers = [`${WORDS_TRAILER}: ${words}`, ...(auto ? [`${AUTO_TRAILER}: auto`] : []), ...(made ? [`${VERSION_TRAILER}: ${made}`] : [])];
-    await g.raw(["tag", "--annotate", "-m", name, "-m", trailers.join("\n"), tag, commit ?? "HEAD"]);
+    await git.tag(this.root, tag, `${name}\n\n${trailers.join("\n")}`, commit ?? "HEAD");
     this.#onCreate();
     return this.get(tag.slice("checkpoint/".length));
   }
@@ -211,10 +201,10 @@ export class Checkpoints {
   }
 
   async #sceneAt(tag: string, sceneId: string, kind: BookKind): Promise<{ path: string; title: string; content: string }> {
-    const g = git(this.root);
-    const files = (await g.raw(["ls-tree", "-r", "-z", "--name-only", tag, "--", kind.folders.content])).split("\0").filter((f) => f.endsWith(".md"));
+    const git = gitPort();
+    const files = (await git.listTree(this.root, tag, kind.folders.content)).map((e) => e.path).filter((f) => f.endsWith(".md"));
     for (const path of files) {
-      const content = await g.raw(["show", `${tag}:./${path}`]);
+      const content = text((await git.readFile(this.root, tag, path)) ?? new Uint8Array());
       const { data } = parseMarkdown(content, path);
       const fm = (data ?? {}) as { id?: unknown; title?: unknown };
       if (fm.id === sceneId) return { path, title: typeof fm.title === "string" ? fm.title : sceneId, content };

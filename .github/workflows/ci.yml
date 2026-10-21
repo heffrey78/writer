@@ -48,6 +48,24 @@ jobs:
           unzip -q epubcheck.zip
           java -jar epubcheck-5.4.0/epubcheck.jar dist/sample/the-bridge-at-varn.epub
 
+  # The git port over libgit2 (D16), as Android runs it: built, and held to the same contract as git.
+  git2-port:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: packages/git2-port
+      - run: npm ci
+      - run: cargo build --release && cargo test --release --lib
+        working-directory: packages/git2-port
+      - name: The contract suite, against git and libgit2
+        run: npx vitest run packages/server/test/git-port.test.ts
+
   e2e:
     runs-on: ubuntu-24.04
     steps:

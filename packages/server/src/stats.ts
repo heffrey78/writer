@@ -3,7 +3,8 @@ import { join } from "node:path";
 import { countWords, parseMarkdown, wordChange, writingDays, type CommitWords } from "@writer/core";
 import type { Hono } from "hono";
 import { body, operation, type Env } from "./bible-routes.ts";
-import { gitPlumbing } from "./git.ts";
+import { NO_OBJECT, text, type Change as GitChange } from "./git-port/port.ts";
+import { gitPort } from "./ports.ts";
 
 /*
  * The novel's writing history (heffrey78/gh-writer#20, D8): for every commit reachable from HEAD that changed scenes,
@@ -15,7 +16,6 @@ import { gitPlumbing } from "./git.ts";
 /** Bumped when the counting changes, so cached results from an older method are worked out again. */
 const METHOD = 1;
 const CACHE = "gh-writer/stats.json";
-const EMPTY = "0".repeat(40);
 
 interface Cache {
   method: number;
@@ -34,12 +34,11 @@ const isPiece = (content: string, path: string) => path.startsWith(`${content}/`
 
 /** What each commit since the start did to the pieces in the `content` folder (the kind's), oldest first. */
 export async function writingHistory(root: string, content: string): Promise<CommitWords[]> {
-  const log = await gitPlumbing(root, ["log", "--reverse", "--no-merges", "--root", "-M", "--raw", "-z", "--no-abbrev", "--relative", "--format=%x01%H%x00%aI", "HEAD", "--", content]).catch(
-    // No commits yet.
-    () => Buffer.alloc(0),
-  );
-  const commits = parseLog(log.toString("utf8"), content);
-  const cacheFile = join(await gitDir(root), CACHE);
+  const git = gitPort();
+  // No commits yet: no history.
+  const log = await git.history(root, content).catch(() => []);
+  const commits = log.map((c) => ({ commit: c.oid, date: c.authored, changes: pieceChanges(c.files, content) }));
+  const cacheFile = join(await git.gitDir(root), CACHE);
   const cache = await readCache(cacheFile);
 
   const todo = commits.filter((c) => !cache.commits[c.commit]);
@@ -71,11 +70,17 @@ export async function writingHistory(root: string, content: string): Promise<Com
  * last commit (or is new), word-diffed against it. What the history will say once it's committed.
  */
 export async function uncommittedChange(root: string, content: string): Promise<{ added: number; removed: number }> {
-  const changed = (await gitPlumbing(root, ["diff", "--name-only", "-z", "--relative", "HEAD", "--", content]).catch(() => Buffer.alloc(0))).toString().split("\0");
-  const untracked = (await gitPlumbing(root, ["ls-files", "--others", "--exclude-standard", "-z", "--", content]).catch(() => Buffer.alloc(0))).toString().split("\0");
-  const paths = [...new Set([...changed, ...untracked])].filter((p) => isPiece(content, p));
+  const git = gitPort();
+  // Changed since HEAD, staged or not, and new: as git status sees the content folder.
+  const changed = await git.status(root, { paths: [content] }).catch(() => []);
+  const paths = [...new Set(changed.map((e) => e.path))].filter((p) => isPiece(content, p));
   if (!paths.length) return { added: 0, removed: 0 };
-  const before = await readBlobs(root, paths.map((p) => `HEAD:./${p}`));
+  const at = new Map<string, string>();
+  for (const path of paths) {
+    const bytes = await git.readFile(root, "HEAD", path).catch(() => null);
+    if (bytes) at.set(`HEAD:./${path}`, text(bytes));
+  }
+  const before = at;
   const body = (text: string | undefined, path: string) => (text === undefined ? undefined : /^---\r?\n/.test(text) ? parseMarkdown(text, path).body : text);
   let added = 0;
   let removed = 0;
@@ -89,57 +94,30 @@ export async function uncommittedChange(root: string, content: string): Promise<
 }
 
 /** git log's records: each commit's hash, author date and the scene files it changed. */
-function parseLog(out: string, content: string): { commit: string; date: string; changes: Change[] }[] {
-  const commits: { commit: string; date: string; changes: Change[] }[] = [];
-  for (const record of out.split("\x01").slice(1)) {
-    const fields = record.split("\0");
-    const [commit, date] = [fields[0]!, fields[1]!];
-    const changes: Change[] = [];
-    for (let i = 2; i < fields.length; i++) {
-      const header = fields[i]!.replace(/^\n/, "");
-      if (!header.startsWith(":")) continue;
-      const [, , before, after, status = ""] = header.slice(1).split(" ");
-      const copied = status.startsWith("R") || status.startsWith("C");
-      const from = fields[++i]!;
-      const to = copied ? fields[++i]! : from;
-      // A piece moved in or out of the content folder counts as added or removed; within it, as itself.
-      // A copy leaves its source where it was: only the new file is new.
-      const [was, now] = [isPiece(content, from), isPiece(content, to)];
-      if (!was && !now) continue;
-      changes.push({
-        path: now ? to : from,
-        ...(was && before !== EMPTY && !status.startsWith("C") ? { before } : {}),
-        ...(now && after !== EMPTY ? { after } : {}),
-      });
-    }
-    commits.push({ commit, date, changes });
+/**
+ * A commit's changes to pieces, with their blobs before and after. A piece moved in or out of the
+ * content folder counts as added or removed; within it, as itself. A copy leaves its source where it
+ * was: only the new file is new.
+ */
+function pieceChanges(files: GitChange[], content: string): Change[] {
+  const changes: Change[] = [];
+  for (const f of files) {
+    const [from, to] = [f.from ?? f.path, f.path];
+    const [was, now] = [isPiece(content, from), isPiece(content, to)];
+    if (!was && !now) continue;
+    changes.push({
+      path: now ? to : from,
+      ...(was && f.old !== NO_OBJECT && f.status !== "C" ? { before: f.old } : {}),
+      ...(now && f.new !== NO_OBJECT ? { after: f.new } : {}),
+    });
   }
-  return commits;
+  return changes;
 }
 
-/** Blobs' texts by the name asked for (an object ID, or rev:path), with one git process; a missing one is left out. */
+/** Blobs' texts by object ID, from git's objects; a missing one is left out. */
 async function readBlobs(root: string, oids: string[]): Promise<Map<string, string>> {
-  const out = new Map<string, string>();
-  if (!oids.length) return out;
-  const data = await gitPlumbing(root, ["cat-file", "--batch"], { input: `${oids.join("\n")}\n` });
-  let at = 0;
-  for (const oid of oids) {
-    const header = data.indexOf(0x0a, at);
-    // "<oid> <type> <size>", or "<name> missing" (the name may hold spaces: read from the end).
-    const fields = data.subarray(at, header).toString().split(" ");
-    const size = fields.at(-1);
-    if (size === "missing" || fields.length < 3) {
-      at = header + 1;
-      continue;
-    }
-    out.set(oid, data.subarray(header + 1, header + 1 + Number(size)).toString("utf8"));
-    at = header + 1 + Number(size) + 1;
-  }
-  return out;
-}
-
-async function gitDir(root: string): Promise<string> {
-  return (await gitPlumbing(root, ["rev-parse", "--absolute-git-dir"])).toString().trim();
+  const blobs = await gitPort().readBlobs(root, oids);
+  return new Map([...blobs].map(([oid, bytes]) => [oid, text(bytes)]));
 }
 
 async function readCache(file: string): Promise<Cache> {

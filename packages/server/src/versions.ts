@@ -7,7 +7,7 @@ import { operationInProgress, type Committer } from "./committer.ts";
 import { commitMerge, ConflictError, openConflicts, prepareMerge, type Conflicts, type FileResolution, type PreparedMerge } from "./conflicts.ts";
 import { atomicWrite, writablePath } from "./files.ts";
 import { commitSource } from "./git-source.ts";
-import { git, gitPlumbing } from "./git.ts";
+import { gitPort } from "./ports.ts";
 
 /*
  * Alternate versions of a novel (heffrey78/gh-writer#17, D7): a different ending, a cut subplot, written alongside the
@@ -141,7 +141,7 @@ export class Versions {
     const histories = new Map<string, Set<string>>();
     const history = async (commit: string) => {
       let set = histories.get(commit);
-      if (!set) histories.set(commit, (set = new Set((await gitPlumbing(this.root, ["rev-list", commit])).toString().split("\n"))));
+      if (!set) histories.set(commit, (set = new Set(await gitPort().ancestors(this.root, commit))));
       return set;
     };
     for (const checkpoint of checkpoints) {
@@ -179,15 +179,15 @@ export class Versions {
     const clean = name.replace(/\s+/g, " ").trim();
     if (!clean || clean.length > 100) return Promise.reject(new VersionError("BAD_NAME", "Give the version a name of 1 to 100 characters."));
     return this.#change(async () => {
-      const g = git(this.root);
+      const git = gitPort();
       const taken = new Set((await this.list()).map((v) => v.id));
       const base = slug(clean, "version");
       let id = base;
       for (let n = 2; taken.has(id) || id === "main"; n++) id = `${base}-${n}`;
       const branch = `${VERSION_PREFIX}${id}`;
       const start = from === undefined ? "HEAD" : (await this.#checkpoints.get(from)).commit;
-      await g.raw(["switch", "--quiet", "--no-track", "-c", branch, start]);
-      await g.raw(["config", `branch.${branch}.description`, clean]);
+      await git.createBranch(this.root, branch, start);
+      await git.setConfig(this.root, `branch.${branch}.description`, clean);
       return this.#get(id);
     });
   }
@@ -197,13 +197,13 @@ export class Versions {
     return this.#change(async () => {
       const version = await this.#get(id);
       if (version.current) return version;
-      const g = git(this.root);
+      const git = gitPort();
       const branch = await this.#branch(version);
       if (version.remoteOnly) {
         const remote = await this.#remote();
-        await g.raw(["switch", "--quiet", "--track", "-c", branch, `${remote}/${branch}`]);
+        await git.createBranch(this.root, branch, `${remote}/${branch}`, { track: true });
       } else {
-        await g.raw(["switch", "--quiet", branch]);
+        await git.switchBranch(this.root, branch);
       }
       return this.#get(id);
     });
@@ -218,13 +218,13 @@ export class Versions {
     return this.#change(async () => {
       const version = await this.#get(id);
       if (version.main) throw new VersionError("MAIN", "The main version can't be discarded.");
-      const g = git(this.root);
+      const git = gitPort();
       const branch = await this.#branch(version);
       const checkpoint = await this.#checkpoints.keep(`Discarded version “${version.name}”`, version.commit, await this.#branch(version));
-      if (version.current) await g.raw(["switch", "--quiet", await this.mainBranch()]);
-      if (!version.remoteOnly) await g.raw(["branch", "--quiet", "-D", branch]);
+      if (version.current) await git.switchBranch(this.root, await this.mainBranch());
+      if (!version.remoteOnly) await git.deleteBranch(this.root, branch);
       const remote = await this.#remote();
-      if (remote && (await g.raw(["rev-parse", "--verify", "--quiet", `refs/remotes/${remote}/${branch}`]).catch(() => "")).trim()) {
+      if (remote && (await git.resolve(this.root, `refs/remotes/${remote}/${branch}`))) {
         await this.#setDiscarded([...new Set([...(await this.#discarded()), branch])]);
       }
       return { checkpoint, current: (await this.current()) ?? "main" };
@@ -241,17 +241,15 @@ export class Versions {
     return this.#change(async () => {
       const version = await this.#get(id);
       if (version.main) throw new VersionError("MAIN", "The main version is the one other versions are adopted into.");
-      const g = git(this.root);
+      const git = gitPort();
       const main = await this.mainBranch();
-      const checkpoint = await this.#checkpoints.keep(`Before adopting “${version.name}”`, (await g.raw(["rev-parse", main])).trim(), main);
-      if (!(await this.#get("main")).current) await g.raw(["switch", "--quiet", main]);
-      // Answered by the exit code alone, which simple-git doesn't report: plumbing rejects on a non-zero exit.
-      const isAncestor = (a: string, b: string) => gitPlumbing(this.root, ["merge-base", "--is-ancestor", a, b]).then(() => true, () => false);
-      if (await isAncestor(version.commit, "HEAD")) return { checkpoint, commit: null };
-      if (await isAncestor("HEAD", version.commit)) {
+      const checkpoint = await this.#checkpoints.keep(`Before adopting “${version.name}”`, (await git.resolve(this.root, main))!, main);
+      if (!(await this.#get("main")).current) await git.switchBranch(this.root, main);
+      if (await git.isAncestor(this.root, version.commit, "HEAD")) return { checkpoint, commit: null };
+      if (await git.isAncestor(this.root, "HEAD", version.commit)) {
         // Nothing changed in the main version meanwhile: it simply becomes the version.
-        await g.raw(["merge", "--ff-only", "--quiet", version.commit]);
-        return { checkpoint, commit: (await g.raw(["rev-parse", "HEAD"])).trim() };
+        await git.fastForward(this.root, version.commit);
+        return { checkpoint, commit: await git.resolve(this.root, "HEAD") };
       }
       const prepared = await prepareMerge(this.root, version.commit);
       const conflicts = openConflicts(prepared);
@@ -294,8 +292,8 @@ export class Versions {
       if (!scene) throw new VersionError("NOT_FOUND", `“${version.name}” has no ${vocabulary(there.kind).piece.one} “${sceneId}”.`);
       const content = (await source.read(scene.file))!;
       const here = await loadBook(nodeSource(this.root));
-      const g = git(this.root);
-      const undo = await this.#checkpoints.keep(`Before bringing “${scene.title}” from “${version.name}”`, (await g.raw(["rev-parse", "HEAD"])).trim());
+      const git = gitPort();
+      const undo = await this.#checkpoints.keep(`Before bringing “${scene.title}” from “${version.name}”`, (await git.resolve(this.root, "HEAD"))!);
 
       const existing = here.allPieces.find((s) => s.id === sceneId);
       const files: string[] = [];
@@ -318,11 +316,10 @@ export class Versions {
         await atomicWrite(await writablePath(this.root, chapter.file, yaml), yaml);
         files.push(path, chapter.file);
       }
-      await g.raw(["add", "--", ...files]);
-      const changed = (await g.raw(["diff", "--cached", "--name-only", "--relative", "--", ...files])).split("\n").filter(Boolean);
+      await git.stage(this.root, { paths: files });
+      const changed = (await git.stagedChanges(this.root, { paths: files })).map((c) => c.path);
       if (!changed.length) return { undo, commit: null, files: [] };
-      await g.raw(["commit", "--quiet", "--no-verify", "-m", `Bring “${scene.title}” from version “${version.name}”`, "--", ...files]);
-      return { undo, commit: (await g.raw(["rev-parse", "HEAD"])).trim(), files: changed };
+      return { undo, commit: await git.commit(this.root, `Bring “${scene.title}” from version “${version.name}”`, { paths: files }), files: changed };
     });
   }
 
@@ -333,20 +330,17 @@ export class Versions {
 
   /** The open branch, branches here and on the remote, their names and the main one: three git commands. */
   async #state(): Promise<RepoState> {
-    const g = git(this.root);
+    const git = gitPort();
     const [head, refs, config] = await Promise.all([
-      g.raw(["symbolic-ref", "--quiet", "--short", "HEAD"]).catch(() => ""),
-      g.raw(["for-each-ref", "--format=%(refname)%00%(objectname)%00%(committerdate:iso-strict)%00%(symref)", "refs/heads/", "refs/remotes/"]),
-      g.raw(["config", "--get-regexp", "^(branch\\..*\\.(description|remote)|remote\\..*\\.url)$"]).catch(() => ""),
+      git.currentBranch(this.root).catch(() => null),
+      git.refs(this.root, ["refs/heads/", "refs/remotes/"]),
+      git.listConfig(this.root).catch(() => [] as [string, string][]),
     ]);
-    const current = head.trim() || undefined;
+    const current = head ?? undefined;
     const descriptions = new Map<string, string>();
     const branchRemotes = new Map<string, string>();
     const remotes: string[] = [];
-    for (const line of config.split("\n").filter(Boolean)) {
-      const space = line.indexOf(" ");
-      const key = line.slice(0, space);
-      const value = line.slice(space + 1);
+    for (const [key, value] of config) {
       // Branch names may hold dots: the key is branch.<name>.<setting>.
       const branch = /^branch\.(.+)\.(description|remote)$/i.exec(key);
       if (branch?.[2] === "description") descriptions.set(branch[1]!, value);
@@ -360,8 +354,8 @@ export class Versions {
     const local = new Map<string, { commit: string; date: string }>();
     const onRemote = new Map<string, { commit: string; date: string }>();
     let remoteHead: string | undefined;
-    for (const line of refs.split("\n").filter(Boolean)) {
-      const [ref, commit, date, symref] = line.split("\0") as [string, string, string, string];
+    for (const { name: ref, oid, date: when, symref: target } of refs) {
+      const [commit, date, symref] = [oid ?? "", when ?? "", target ?? ""];
       if (ref.startsWith("refs/heads/")) local.set(ref.slice("refs/heads/".length), { commit, date });
       else if (remote && ref.startsWith(`refs/remotes/${remote}/`)) {
         const name = ref.slice(`refs/remotes/${remote}/`.length);
@@ -456,7 +450,7 @@ const gitDirs = new Map<string, string>();
 
 async function gitDir(root: string): Promise<string> {
   let dir = gitDirs.get(root);
-  if (!dir) gitDirs.set(root, (dir = (await git(root).raw(["rev-parse", "--absolute-git-dir"])).trim()));
+  if (!dir) gitDirs.set(root, (dir = await gitPort().gitDir(root)));
   return dir;
 }
 

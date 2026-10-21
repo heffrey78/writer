@@ -1,7 +1,8 @@
 import { CHECKPOINT_PREFIX } from "./checkpoints.ts";
 import { operationInProgress, type Committer } from "./committer.ts";
 import { commitMerge, ConflictError, openConflicts, prepareMerge, type Conflicts, type FileResolution, type PreparedMerge } from "./conflicts.ts";
-import { classifyGitError, git, GitFailure, type GitAuthSource } from "./git.ts";
+import { GitFailure, gitFailure, type GitAuth, type GitAuthSource } from "./git-port/port.ts";
+import { gitPort } from "./ports.ts";
 import { discardedVersions, setDiscardedVersions, VERSION_PREFIX } from "./versions.ts";
 
 export interface SyncerOptions {
@@ -265,14 +266,14 @@ export class Syncer {
     this.#target = target;
     if (!target) return { kind: "local" };
     // Network steps can be cut short by close(); the work-tree step can't, so it never stops halfway.
-    const url = (await git(this.root).raw(["remote", "get-url", target.remote]).catch(() => "")).trim();
+    const url = (await gitPort().remoteUrl(this.root, target.remote).catch(() => null)) ?? "";
     const auth = url ? await this.#auth?.(url) : undefined;
-    const remote = git(this.root, undefined, signal, auth);
+    const remote: Transfer = { signal, ...(auth ? { auth } : {}) };
     await this.#committer?.commit();
     try {
       return await this.#exchange(target, remote);
     } catch (e) {
-      const failure = classifyGitError(e);
+      const failure = asFailure(e);
       if (failure.code === "AUTH" && (auth || this.#signInRefused?.(url))) {
         if (auth) this.#onAuthRefused?.();
         throw new GitFailure("AUTH", "GitHub didn't accept Writer's sign-in for this repository: it may have been revoked, or your account can't push to it. Connect to GitHub again, or check your access.", failure.detail);
@@ -281,11 +282,11 @@ export class Syncer {
     }
   }
 
-  async #exchange(target: Target, remote: ReturnType<typeof git>): Promise<Outcome> {
-
+  async #exchange(target: Target, remote: Transfer): Promise<Outcome> {
+    const git = gitPort();
     for (let attempt = 1; ; attempt++) {
       // The configured refspecs are named because naming any refspec replaces them.
-      await remote.raw(["fetch", "--quiet", target.remote, ...target.fetch, FETCH_CHECKPOINTS]);
+      await git.fetch(this.root, target.remote, [...target.fetch, FETCH_CHECKPOINTS], remote);
       await this.#pruneVersions(target, remote);
       const conflict = await this.#exclusive(() => this.#integrate(target));
       if (conflict) return { kind: "conflict", files: conflict };
@@ -296,13 +297,13 @@ export class Syncer {
       if (!ahead && !pushTags && !deletes.length) return { kind: "ok" };
       try {
         const refs = [`HEAD:${target.mergeRef}`, ...(pushTags ? [PUSH_CHECKPOINTS] : []), ...deletes.map((b) => `:refs/heads/${b}`)];
-        await remote.raw(["push", "--quiet", ...(target.upstream ? [] : ["--set-upstream"]), target.remote, ...refs]);
+        await git.push(this.root, target.remote, refs, { ...remote, setUpstream: !target.upstream });
         target.upstream = true;
         this.#tagsPushed = tags;
         if (deletes.length) await setDiscardedVersions(this.root, []);
         return { kind: "ok" };
       } catch (e) {
-        const failure = classifyGitError(e);
+        const failure = asFailure(e);
         // The remote moved during the sync: bring its changes in and push again.
         if (failure.code !== "REJECTED" || attempt >= PUSH_ATTEMPTS) throw failure;
       }
@@ -311,7 +312,7 @@ export class Syncer {
 
   /** Bring the remote's changes into the work tree. Returns the conflicting files, if any (nothing touched then). */
   async #integrate(target: Target): Promise<string[] | undefined> {
-    const g = git(this.root);
+    const git = gitPort();
     // Work saved while fetching.
     await this.#committer?.commit();
     if (await operationInProgress(this.root)) {
@@ -320,7 +321,7 @@ export class Syncer {
     const { ahead, behind } = await this.#counts(target);
     if (!behind) return undefined;
     if (!ahead) {
-      await g.raw(["merge", "--ff-only", "--quiet", target.tracking]);
+      await git.fastForward(this.root, target.tracking);
       return undefined;
     }
     // Merge in memory first, so that a conflict leaves the work tree (and the editor) untouched.
@@ -332,15 +333,8 @@ export class Syncer {
       await commitMerge(this.root, prepared, {}, mergeMessage(target.remote, prepared, "merged paragraph by paragraph"));
       return undefined;
     }
-    try {
-      await g.raw(["rebase", "--quiet", "--no-verify", target.tracking]);
-    } catch (e) {
-      // A clean merge of the tips can still conflict commit by commit: merge the tips instead.
-      const unmerged = (await g.raw(["diff", "--name-only", "--diff-filter=U"]).catch(() => "")).split("\n").filter(Boolean);
-      await g.raw(["rebase", "--abort"]).catch(() => {});
-      if (!unmerged.length) throw e;
-      await commitMerge(this.root, prepared, {}, mergeMessage(target.remote, prepared, "merged"));
-    }
+    // A clean merge of the tips can still conflict commit by commit (the rebase undoes itself): merge the tips instead.
+    if ((await git.rebase(this.root, target.tracking)).conflicts.length) await commitMerge(this.root, prepared, {}, mergeMessage(target.remote, prepared, "merged"));
     return undefined;
   }
 
@@ -348,12 +342,11 @@ export class Syncer {
   async #versionDeletes(target: Target): Promise<string[]> {
     const discarded = await discardedVersions(this.root);
     if (!discarded.length) return [];
-    const g = git(this.root);
     const onRemote: string[] = [];
     for (const branch of discarded) {
       // The open version is never deleted from under the author (it was opened again since).
       if (branch === target.branch) continue;
-      if ((await g.raw(["rev-parse", "--verify", "--quiet", `refs/remotes/${target.remote}/${branch}`]).catch(() => "")).trim()) onRemote.push(branch);
+      if (await gitPort().resolve(this.root, `refs/remotes/${target.remote}/${branch}`)) onRemote.push(branch);
     }
     if (!onRemote.length) await setDiscardedVersions(this.root, []);
     return onRemote;
@@ -363,36 +356,34 @@ export class Syncer {
    * Forget versions deleted on the remote (discarded on another computer). A fetch of the version
    * branches alone, so pruning can't touch checkpoints made here and not yet pushed.
    */
-  async #pruneVersions(target: Target, remote: ReturnType<typeof git>): Promise<void> {
+  async #pruneVersions(target: Target, remote: Transfer): Promise<void> {
     const tracking = `refs/remotes/${target.remote}/${VERSION_PREFIX}`;
-    const any = (await git(this.root).raw(["for-each-ref", "--count=1", "--format=%(refname)", tracking]).catch(() => "")).trim();
-    if (any) await remote.raw(["fetch", "--quiet", "--prune", target.remote, `+refs/heads/${VERSION_PREFIX}*:${tracking}*`]);
+    const any = (await gitPort().refs(this.root, [tracking]).catch(() => [])).length > 0;
+    if (any) await gitPort().fetch(this.root, target.remote, [`+refs/heads/${VERSION_PREFIX}*:${tracking}*`], { ...remote, prune: true });
   }
 
   async #resolveTarget(): Promise<Target | null> {
-    const g = git(this.root);
-    const get = async (...args: string[]) => (await g.raw(args).catch(() => "")).trim();
-    const branch = await get("symbolic-ref", "--quiet", "--short", "HEAD");
+    const git = gitPort();
+    const branch = await git.currentBranch(this.root).catch(() => null);
     if (!branch) throw new SyncFailure("DETACHED", "This copy isn't on a branch (detached HEAD), so it can't sync. Check out a branch first.");
-    const remotes = (await get("remote")).split("\n").filter(Boolean);
-    const configured = await get("config", "--get", `branch.${branch}.remote`);
+    const config = await git.listConfig(this.root).catch(() => [] as [string, string][]);
+    const get = (key: string) => config.findLast(([k]) => k === key)?.[1] ?? "";
+    const remotes = [...new Set(config.map(([k]) => /^remote\.(.+)\.url$/.exec(k)?.[1]).filter((r): r is string => r !== undefined))];
+    const configured = get(`branch.${branch}.remote`);
     const remote = remotes.includes(configured) ? configured : remotes.includes("origin") ? "origin" : remotes.length === 1 ? remotes[0]! : "";
     if (!remote) return null;
-    const upstream = remote === configured && (await get("config", "--get", `branch.${branch}.merge`)) !== "";
-    const mergeRef = (upstream && (await get("config", "--get", `branch.${branch}.merge`))) || `refs/heads/${branch}`;
-    const configuredFetch = (await get("config", "--get-all", `remote.${remote}.fetch`)).split("\n").filter(Boolean);
+    const upstream = remote === configured && get(`branch.${branch}.merge`) !== "";
+    const mergeRef = (upstream && get(`branch.${branch}.merge`)) || `refs/heads/${branch}`;
+    const configuredFetch = config.filter(([k]) => k === `remote.${remote}.fetch`).map(([, v]) => v);
     const fetch = configuredFetch.length ? configuredFetch : [`+refs/heads/*:refs/remotes/${remote}/*`];
     return { remote, branch, mergeRef, tracking: `refs/remotes/${remote}/${mergeRef.replace(/^refs\/heads\//, "")}`, upstream, fetch };
   }
 
   async #counts(target: Target): Promise<{ ahead: number; behind: number }> {
-    const g = git(this.root);
-    // --quiet: a missing ref exits 1 with no output (which simple-git doesn't treat as an error).
-    const tracked = (await g.raw(["rev-parse", "--verify", "--quiet", target.tracking]).catch(() => "")).trim() !== "";
+    const git = gitPort();
     // Nothing on the remote yet: every local commit is ahead.
-    if (!tracked) return { ahead: Number((await g.raw(["rev-list", "--count", "HEAD"])).trim()), behind: 0 };
-    const [ahead, behind] = (await g.raw(["rev-list", "--left-right", "--count", `HEAD...${target.tracking}`])).trim().split(/\s+/).map(Number);
-    return { ahead: ahead ?? 0, behind: behind ?? 0 };
+    if (!(await git.resolve(this.root, target.tracking))) return { ahead: await git.count(this.root, "HEAD"), behind: 0 };
+    return git.aheadBehind(this.root, "HEAD", target.tracking);
   }
 
   #offline(): boolean {
@@ -406,7 +397,7 @@ export class Syncer {
 
   #failure(e: unknown): Outcome {
     if (e instanceof SyncFailure) return { kind: "failed", state: "error", error: { code: e.code, message: e.message } };
-    const failure = classifyGitError(e);
+    const failure = asFailure(e);
     const state = failure.code === "NETWORK" ? "offline" : failure.code === "AUTH" || failure.code === "SCOPE" ? "needs-sign-in" : "error";
     return { kind: "failed", state, error: { code: failure.code, message: failure.message, ...(failure.detail ? { detail: failure.detail } : {}) } };
   }
@@ -414,6 +405,17 @@ export class Syncer {
   #changed(): void {
     for (const listener of this.#listeners) listener();
   }
+}
+
+/** What a sync's fetches and pushes carry: Writer's token for the remote, and the signal that stops them. */
+interface Transfer {
+  auth?: GitAuth;
+  signal: AbortSignal;
+}
+
+/** A failure as the port reports it; anything else (a bug, a file error) as git's own failure. */
+function asFailure(e: unknown): GitFailure {
+  return e instanceof GitFailure ? e : gitFailure("GIT", e instanceof Error ? e.message : String(e));
 }
 
 /** "Merge changes from origin", with each file git couldn't merge and how it was settled. */

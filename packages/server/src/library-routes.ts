@@ -6,7 +6,7 @@ import { nodeSource } from "@writer/core/node";
 import { Hono, type Context } from "hono";
 import { streamSSE } from "hono/streaming";
 import { FileError, imageVersion, servableImage } from "./files.ts";
-import { classifyGitError, GitFailure } from "./git.ts";
+import { GitFailure, gitFailure } from "./git-port/port.ts";
 import type { GitHub } from "./github.ts";
 import { LibraryError, type Library } from "./library.ts";
 
@@ -138,7 +138,7 @@ async function jsonBody(c: Context): Promise<Record<string, unknown> | undefined
 
 function describe(e: unknown): { code: string; error: string; detail?: string } {
   if (e instanceof LibraryError) return { code: e.code, error: e.message };
-  const failure = e instanceof GitFailure ? e : classifyGitError(e);
+  const failure = e instanceof GitFailure ? e : gitFailure("GIT", e instanceof Error ? e.message : String(e));
   return { code: failure.code, error: failure.message, ...(failure.detail ? { detail: failure.detail } : {}) };
 }
 

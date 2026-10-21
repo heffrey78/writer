@@ -11,7 +11,7 @@ import { ManuscriptOperations } from "./manuscript.ts";
 import { Committer, type CommitStatus, type CommitterOptions } from "./committer.ts";
 import { atomicWrite, FileError, hashText, IMAGES_DIR, imageVersion, isVisible, readText, servableImage, sniffImage, writableImagePath, writablePath, type TextFile, type WriteHooks } from "./files.ts";
 import type { Library } from "./library.ts";
-import { git } from "./git.ts";
+import { gitPort } from "./ports.ts";
 import { githubRepoOf, type GitHub, type GitHubRepo } from "./github.ts";
 import { IssueStore } from "./issues.ts";
 import { Syncer, type SyncerOptions, type SyncStatus } from "./sync.ts";
@@ -148,7 +148,7 @@ export class NovelWorkspace {
   /** The GitHub repository the novel's remote (origin, or the one it syncs with) is, if it's on GitHub. */
   async githubRepo(): Promise<GitHubRepo | null> {
     const remote = (this.syncer ? (await this.syncer.status()).remote : null) ?? "origin";
-    const url = (await git(this.root).raw(["remote", "get-url", remote]).catch(() => "")).trim();
+    const url = (await gitPort().remoteUrl(this.root, remote).catch(() => null)) ?? "";
     return url ? githubRepoOf(url, this.#github?.webUrl) : null;
   }
 

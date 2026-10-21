@@ -2,7 +2,8 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { entityLabel, entityOfLabel, issueKindOf, kindByKey, passageIssueBody, V2_KIND, vocabulary, type BookKind, type Book } from "@writer/core";
-import { git } from "./git.ts";
+import { text as decode } from "./git-port/port.ts";
+import { gitPort } from "./ports.ts";
 import { GitHubError, unreachable, type GitHub, type GitHubRepo } from "./github.ts";
 
 /*
@@ -409,11 +410,12 @@ export class IssueStore {
 
   /** The scene file on GitHub at the latest commit that has it, at the passage's first line if found there. */
   async #permalink(repo: GitHubRepo, path: string, quote: string): Promise<{ commit: string; link: string } | undefined> {
-    const g = git(this.root);
-    const commit = (await g.raw(["log", "-1", "--format=%H", "--", path])).trim();
+    const git = gitPort();
+    const commit = (await git.log(this.root, { path, limit: 1 }).catch(() => []))[0]?.oid;
     if (!commit) return undefined;
-    const inRepo = `${(await g.raw(["rev-parse", "--show-prefix"])).trim()}${path}`;
-    const text = await g.raw(["show", `${commit}:${inRepo}`]).catch(() => "");
+    const inRepo = `${await git.prefix(this.root)}${path}`;
+    const bytes = await git.readFile(this.root, commit, path).catch(() => null);
+    const text = bytes ? decode(bytes) : "";
     const first = quote.trim().split("\n")[0]!.slice(0, 80);
     const line = first ? text.split("\n").findIndex((l) => l.includes(first)) + 1 : 0;
     const file = inRepo.split("/").map(encodeURIComponent).join("/");
@@ -752,8 +754,8 @@ export class IssueStore {
   }
 }
 
-async function gitDir(root: string): Promise<string> {
-  return (await git(root).raw(["rev-parse", "--absolute-git-dir"])).trim();
+function gitDir(root: string): Promise<string> {
+  return gitPort().gitDir(root);
 }
 
 const apiPath = (repo: GitHubRepo) => `/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}`;

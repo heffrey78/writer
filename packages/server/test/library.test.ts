@@ -6,7 +6,8 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { classifyGitError, cloneUrl, createServer, expandHome, GitFailure, Library, LibraryError, sessionCookie, type LibraryEntry } from "../src/index.ts";
+import { classifyGitError } from "../src/git.ts";
+import { cloneUrl, createServer, expandHome, GitFailure, Library, LibraryError, sessionCookie, type LibraryEntry } from "../src/index.ts";
 import { gitIn, novelRepo as novelRepoIn, sample, scratch } from "./fixtures.ts";
 import { send, sseEvents } from "./http.ts";
 

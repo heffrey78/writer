@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import type { GitAuth } from "./git.ts";
+import type { GitAuth } from "./git-port/port.ts";
 
 /*
  * The author's GitHub connection (D5): an OAuth App's device flow, or the gh CLI's account, with the

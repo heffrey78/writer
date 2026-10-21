@@ -435,3 +435,79 @@ describe.each(PORTS)("the git port with GitHub: %s", (_, p) => {
     expect(await code(p.push(b, "origin", ["HEAD:refs/heads/main"], { auth: { ...auth, token: "gho_noworkflow" } }))).toBe("SCOPE");
   });
 });
+
+/** Both adapters on the same repository (or identical copies of it) must give the same answers, down to object IDs. */
+describe.runIf(rust)("git and libgit2 agree", () => {
+  const other = rust!;
+  /** A repository with history, branches, tags and a rename, made with git; the book in a folder of it. */
+  async function fixture(): Promise<string> {
+    const dir = await started(nodeGitPort, "agree");
+    await nodeGitPort.tag(dir, "checkpoint/one", "One\n\nwords: 6");
+    await nodeGitPort.createBranch(dir, "writer-version/alt", "HEAD");
+    write(dir, "book/a.md", prose("one", "two (alt)", "three"));
+    await nodeGitPort.stage(dir);
+    await nodeGitPort.commit(dir, "Alt");
+    await nodeGitPort.switchBranch(dir, "main");
+    move(dir, "book/c.md", "book/moved/c.md");
+    write(dir, "book/a.md", prose("one (main)", "two", "three"));
+    write(dir, "book/b.md", prose("B (main)", "bee", "buzz"));
+    await nodeGitPort.stage(dir);
+    await nodeGitPort.commit(dir, "Main");
+    write(dir, "book/new.md", "Untracked.\n");
+    write(dir, "book/b.md", "Changed, not staged.\n");
+    return dir;
+  }
+
+  it("reading the same repository, from its top and from the book's folder", async () => {
+    const repo = await fixture();
+    const answers = async (p: GitPort, dir: string, at: string) => ({
+      prefix: await p.prefix(dir),
+      branch: await p.currentBranch(dir),
+      refs: await p.refs(dir, ["refs/"]),
+      tags: await p.tags(dir),
+      status: await p.status(dir),
+      log: await p.log(dir),
+      fileLog: await p.log(dir, { path: `${at}a.md` }),
+      history: await p.history(dir),
+      tree: await p.listTree(dir, "HEAD"),
+      file: text((await p.readFile(dir, "writer-version/alt", `${at}a.md`))!),
+      count: await p.count(dir, "HEAD"),
+      ancestors: await p.ancestors(dir, "HEAD"),
+      aheadBehind: await p.aheadBehind(dir, "main", "writer-version/alt"),
+      base: await p.mergeBase(dir, "main", "writer-version/alt"),
+      head: await p.commitInfo(dir, "HEAD"),
+      config: await p.getConfig(dir, "user.name"),
+      inProgress: await p.inProgress(dir),
+    });
+    for (const [dir, at] of [[repo, "book/"], [join(repo, "book"), ""]] as const) expect(await answers(other, dir, at)).toEqual(await answers(nodeGitPort, dir, at));
+  });
+
+  it("merging: the same conflicts, and once the app has settled them the same tree", async () => {
+    const dir = await fixture();
+    const settle = async (p: GitPort) => {
+      const m = await p.mergeTrees(dir, "main", "writer-version/alt");
+      const tree = await p.buildTree(dir, m.tree, m.conflicts.map((path) => ({ path, content: `settled ${path}\n` })));
+      return { conflicts: m.conflicts, tree };
+    };
+    expect(await settle(other)).toEqual(await settle(nodeGitPort));
+  });
+
+  it("writing to copies of it: the same trees, statuses and files after the same steps", async () => {
+    const original = await fixture();
+    const steps = async (p: GitPort, name: string) => {
+      const dir = fresh(name);
+      execFileSync("cp", ["-r", original, dir]);
+      const book = join(dir, "book");
+      await p.stage(book, { exclude: ["**/.*.writer-tmp"] });
+      const staged = await p.stagedChanges(book);
+      await p.commit(book, "Everything");
+      await p.restore(dir, "checkpoint/one", ["book"]);
+      const restored = await p.status(dir);
+      await p.stage(dir);
+      await p.commit(dir, "Restored");
+      const rebased = await p.rebase(dir, "writer-version/alt");
+      return { staged, restored, rebased, tree: (await p.commitInfo(dir, "HEAD")).tree, files: await p.listTree(dir, "HEAD") };
+    };
+    expect(await steps(other, "copy-libgit2")).toEqual(await steps(nodeGitPort, "copy-git"));
+  });
+});

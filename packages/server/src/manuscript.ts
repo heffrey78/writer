@@ -4,7 +4,8 @@ import { join, posix } from "node:path";
 import { editFrontMatter, editYaml, indexById, kindByKey, loadBook, numberedName, pieceLevel, slugify, startLevels, uniqueId, V2_KIND, vocabulary, type Book, type BookKind, type LevelDef, type Piece, type Section } from "@writer/core";
 import { nodeSource } from "@writer/core/node";
 import { parse, stringify } from "yaml";
-import { git } from "./git.ts";
+import { text as decode } from "./git-port/port.ts";
+import { gitPort } from "./ports.ts";
 import { overlay } from "./migrate.ts";
 import { OperationError, transaction, type FileWrite, type OperationResult } from "./operations.ts";
 
@@ -354,15 +355,12 @@ export class ManuscriptOperations {
   /** Pieces and sections deleted from the manuscript, newest first, that aren't back already. */
   async recentlyDeleted(limit = 30): Promise<DeletedItem[]> {
     const kind = await this.#kind();
-    const g = git(this.root);
-    const log = await g.raw(["log", "--diff-filter=D", "--name-only", "--relative", "--format=%x1e%H%x1f%cI", "-n", "200", "--", kind.folders.content]).catch(() => "");
+    const log = await gitPort().deletions(this.root, kind.folders.content, 200).catch(() => []);
     const present = new Set(indexById(await this.#load()).keys());
     const sectionFile = new RegExp(`/_(${kind.levels.map((l) => l.key).join("|")})\\.yaml$`);
     const out: DeletedItem[] = [];
-    for (const record of log.split("\x1e").filter((r) => r.trim())) {
-      const [head, ...files] = record.trim().split("\n");
-      const [commit, date] = head!.split("\x1f") as [string, string];
-      const deleted = files.filter(Boolean);
+    for (const { oid: commit, committed: date, files } of log) {
+      const deleted = files;
       const containers = deleted.filter((f) => sectionFile.test(f)).map((f) => posix.dirname(f));
       // A section's own files are part of it; the outermost sections are the items.
       const tops = containers.filter((d) => !containers.some((other) => other !== d && d.startsWith(`${other}/`)));
@@ -409,7 +407,7 @@ export class ManuscriptOperations {
 
       // Its files, back under the container's current folder.
       const destDir = this.#dir(novel, container);
-      const files = isPiece ? [item.path] : (await git(this.root).raw(["ls-tree", "-r", "--name-only", before, "--", `./${item.path}`])).split("\n").filter(Boolean);
+      const files = isPiece ? [item.path] : (await gitPort().listTree(this.root, before, item.path)).map((e) => e.path);
       const taken = new Set((await o.files(destDir)).map((f) => f.slice(destDir.length + 1).split("/")[0]!));
       const base = posix.basename(item.path);
       let name = base;
@@ -447,7 +445,8 @@ export class ManuscriptOperations {
   }
 
   async #show(rev: string, path: string): Promise<string | undefined> {
-    return git(this.root).raw(["show", `${rev}:./${path}`]).catch(() => undefined);
+    const bytes = await gitPort().readFile(this.root, rev, path).catch(() => null);
+    return bytes ? decode(bytes) : undefined;
   }
 
   #find(novel: Book, id: string): Item {

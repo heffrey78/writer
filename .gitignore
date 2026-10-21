@@ -14,3 +14,4 @@ packages/desktop/arch/pkg/
 spike/d16/git2-port/target/
 spike/d16/android/src-tauri/target/
 spike/d16/android/src-tauri/gen/
+packages/git2-port/target/

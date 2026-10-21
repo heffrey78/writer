@@ -50,7 +50,7 @@ export class FileError extends Error {
   }
 }
 
-export function hashText(content: string | Buffer): string {
+export function hashText(content: string | Uint8Array): string {
   return createHash("sha256").update(content).digest("hex");
 }
 

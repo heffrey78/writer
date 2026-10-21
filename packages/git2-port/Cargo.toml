@@ -1,0 +1,29 @@
+[package]
+name = "git2-port"
+version = "0.1.0"
+edition = "2024"
+description = "Writer's git port over libgit2 (D16): the operations the server needs, for Android, and for the contract suite on the desktop."
+publish = false
+
+[dependencies]
+# libgit2 built from source, as an Android build would need; https for github.com.
+git2 = { version = "0.21", default-features = false, features = ["vendored-libgit2", "https"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+base64 = "0.22"
+# For trusting certificates in memory (trust_certificates_in): the same libgit2 and OpenSSL git2 links.
+libgit2-sys = { version = "0.18", default-features = false, features = ["https"] }
+openssl = "0.10"
+foreign-types = "0.3"
+
+[lib]
+name = "git2_port"
+path = "src/lib.rs"
+
+[[bin]]
+name = "git2-port"
+path = "src/main.rs"
+
+[features]
+# For Android: OpenSSL built from source for the target, as no system one is there.
+vendored-openssl = ["git2/vendored-openssl", "openssl/vendored"]

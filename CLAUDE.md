@@ -39,7 +39,7 @@ Inherited from gh-writer; [DEVELOPER.md](DEVELOPER.md) has the details, the desk
 
 ```
 web (React) ── client (API, autosave) ──HTTP──► server (Hono, 127.0.0.1, per-launch secret) ── core (format, model)
-                                                  ├── git (system or bundled portable git, simple-git)
+                                                  ├── git port (system or bundled portable git; libgit2 on Android)
                                                   ├── GitHub (REST, device-flow sign-in)
                                                   └── export (DOCX, EPUB, PDF)
 cli (serve, validate, snapshots, compile, migrate)    desktop (Tauri 2 shell running the server bundle on bundled Node + git)
@@ -56,7 +56,7 @@ Extensibility (D14, proposed): three layers, all shipped in the app.
 
 The base never imports a module or a kind. There are no run-time third-party plugins.
 
-New server code keeps `node:` APIs at its edges, and calls git only through operations the git port (`spike/d16/port.ts`) has or could have, so splitting it into an engine behind ports stays cheap (D16).
+New server code keeps `node:` APIs at its edges, and calls git only through the git port (`gitPort()`; a new operation goes in the port, both adapters and its contract suite together), so splitting it into an engine behind ports stays cheap (D16).
 
 ## Stack and commands
 

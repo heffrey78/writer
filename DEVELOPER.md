@@ -20,7 +20,7 @@ Writer is a local-first web app (decision [D2](https://github.com/heffrey78/gh-w
 
 ```
 browser ── web (React) ── client (API, autosave) ──HTTP──► server (Hono) ── core (format, model)
-                                                             │  ├── git (system git, simple-git)
+                                                             │  ├── git (the git port: system git, or libgit2)
                                                              │  ├── GitHub (REST API, device-flow sign-in)
                                                              │  └── export (DOCX, EPUB, PDF)
 cli ── serve / validate / snapshots / compile ───────────────┘
@@ -40,6 +40,7 @@ The novel itself is the source of truth: plain Markdown and YAML files ([format 
 | [`export`](packages/export) | DOCX (hand-written WordprocessingML), EPUB 3 and PDF (pdfkit, with Liberation Serif) from a compiled book; zipped with fflate. |
 | [`cli`](packages/cli) | `writer serve`, `validate`, `snapshots`, `compile`, `migrate` and `new-id`, and the entry points bundled into novel repositories. |
 | [`desktop`](packages/desktop) | The desktop app: a Tauri shell that runs the server bundle on its own Node and git, and opens a window on it. |
+| [`git2-port`](packages/git2-port) | The git port over libgit2, in Rust (D16): the same operations as the server's git, for Android, where there's no git binary. A stdio binary for the contract suite on the desktop. |
 | [`kinds`](packages/kinds) | The kinds of book the app ships, as data (D14, D15): the Novel's levels, ID prefixes, folders, built-in entry types, statuses, issue kinds, its scenes' fields (each field's type is how the schema, the validator, the Scene card, the outline, comparisons and mentions read it), the modules it uses and its words on screen. See *Kinds and modules*. |
 
 Other folders:
@@ -124,7 +125,13 @@ Run `npx playwright install chromium` in `packages/editor` once before the first
 
 Each web e2e test starts its own `writer serve` on a temp copy of the sample novel (`packages/web/e2e/fixtures.ts`), with a fake GitHub (`packages/server/test/fake-github.ts`) that serves the REST API, the device flow and git over HTTP. Most views also run an [axe](https://github.com/dequelabs/axe-core) audit, many in both light and dark themes; new UI should too. Performance benchmarks (`*.performance.spec.ts`) run after the rest, one at a time.
 
-CI (`.github/workflows/ci.yml`) runs typecheck, unit tests, validation of the sample novel, epubcheck on the sample's EPUB, and every e2e test.
+CI (`.github/workflows/ci.yml`) runs typecheck, unit tests, validation of the sample novel, epubcheck on the sample's EPUB, every e2e test, and the git port's contract suite against libgit2.
+
+### The git port
+
+The server reaches git only through its git port (D16; `packages/server/src/git-port/port.ts`), so that its logic can run where there's no git binary. Each entry point gives the server its ports (`useNodePorts()` on Node: the CLI, the web dev server and the tests); code asks for `gitPort()`. On Node the port runs git itself (`git-port/node.ts`, the only code that does; `test/git-boundary.test.ts` checks). On Android it's libgit2 (`packages/git2-port`). Paths are relative to the book's folder, which may sit inside a larger repository.
+
+`packages/server/test/git-port.test.ts` is the port's contract: what any adapter must do, including a sync with a conflict through the fake GitHub. It runs git's adapter always, and libgit2's too where it's built, then both on the same repositories, expecting the same answers down to object IDs. To include libgit2: `cargo build --release` in `packages/git2-port` (Rust 1.85 or later, a C compiler and CMake; libgit2 is built from source), then run the suite. A new git operation goes in the port, both adapters and the suite together.
 
 ## The templates and their tools
 

@@ -28,10 +28,10 @@ const orNull = async (p: Promise<string>) => (await p.catch(() => "")).trim() ||
 /** `-- <paths> :(exclude,glob)<pattern>`: the folder (or `paths` in it), less what's excluded. */
 const pathspec = ({ paths, exclude = [] }: Scope = {}) => ["--", ...(paths?.length ? paths : ["."]), ...exclude.map((g) => `:(exclude,glob)${g}`)];
 
-/** With Writer's token for a remote, as the server runs fetch, push and clone. */
-async function withAuth(dir: string | undefined, auth: GitAuth | undefined, args: string[]): Promise<void> {
+/** With Writer's token for a remote, as the server runs fetch, push and clone; `signal` stops it. */
+async function withAuth(dir: string | undefined, auth: GitAuth | undefined, args: string[], signal?: AbortSignal): Promise<void> {
   try {
-    await git(dir, undefined, undefined, auth).raw(args);
+    await git(dir, undefined, signal, auth).raw(args);
   } catch (e) {
     throw failure(e);
   }
@@ -287,7 +287,7 @@ export const nodeGitPort: GitPort = {
     }
   },
 
-  fetch: (dir, remote, refspecs, { prune = false, auth } = {}) => withAuth(dir, auth, ["fetch", "--quiet", ...(prune ? ["--prune"] : []), remote, ...refspecs]),
-  push: (dir, remote, refspecs, { setUpstream = false, auth } = {}) => withAuth(dir, auth, ["push", "--quiet", ...(setUpstream ? ["--set-upstream"] : []), remote, ...refspecs]),
+  fetch: (dir, remote, refspecs, { prune = false, auth, signal } = {}) => withAuth(dir, auth, ["fetch", "--quiet", ...(prune ? ["--prune"] : []), remote, ...refspecs], signal),
+  push: (dir, remote, refspecs, { setUpstream = false, auth, signal } = {}) => withAuth(dir, auth, ["push", "--quiet", ...(setUpstream ? ["--set-upstream"] : []), remote, ...refspecs], signal),
 };
 
