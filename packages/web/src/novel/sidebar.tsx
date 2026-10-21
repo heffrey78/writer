@@ -4,7 +4,7 @@ import { Dialog } from "radix-ui";
 import { useEffect, useId, useState, type ReactNode } from "react";
 import { NavLink, useLocation } from "react-router";
 import { create } from "zustand";
-import { plural } from "../bible/types.ts";
+import { typePlural } from "@writer/core";
 import { useCommands } from "../commands.ts";
 import { moduleStoryMapTabs, moduleViews } from "../modules.tsx";
 import { cn } from "../ui/cn.ts";
@@ -166,7 +166,7 @@ function Expanded({ novelId, novel, workspace, current, onGitHub, toggle }: { no
                   <ul aria-label={`${vocabulary(novel.kind).codex.One} types`} className="mt-0.5 grid gap-0.5 pl-8 text-xs text-muted">
                     {novel.entityTypes.map((t) => (
                       <li key={t.key} className="flex justify-between pr-2">
-                        <span>{plural(t.label)}</span>
+                        <span>{typePlural(t)}</span>
                         <span className="tabular-nums">{novel.entities.filter((e) => e.type === t.key).length}</span>
                       </li>
                     ))}

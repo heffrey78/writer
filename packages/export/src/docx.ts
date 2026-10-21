@@ -65,7 +65,7 @@ export function toDocx(book: CompiledBook, { date = new Date(0), pictures = new 
     if (chapter.part) {
       pageBreak();
       body.push(p("PartHeading", runs([{ text: chapter.part.heading }])));
-      if (chapter.part.title) body.push(p("PartTitle", runs([{ text: chapter.part.title }])));
+      if (chapter.part.title && chapter.part.title !== chapter.part.heading) body.push(p("PartTitle", runs([{ text: chapter.part.title }])));
     }
     pageBreak();
     body.push(p("Heading1", runs([{ text: chapter.heading }])));

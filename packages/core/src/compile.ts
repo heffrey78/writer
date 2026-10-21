@@ -45,7 +45,7 @@ export interface CompiledChapter {
   /** Its number in the whole book (a range keeps the numbers), and its heading as the preset has it. */
   number: number;
   heading: string;
-  /** The part it opens, when it's the first chapter of one: its heading as the layout has it ("Part One"). */
+  /** The part it opens, when it's the first chapter of one: its heading as the layout has it ("Part One"), which may be its title. */
   part?: { id: string; title: string; number: number; heading: string };
   blocks: Block[];
 }
@@ -91,8 +91,8 @@ export interface CompileLayout {
   label: string;
   /** A chapter's heading (a section of the innermost level): "Chapter Four: The Flood". */
   heading(view: { preset: CompilePreset; number: number; title: string | undefined; level: Word }): string;
-  /** A part's heading (a section of the level outside it): "Part One". */
-  partHeading(view: { number: number; level: Word }): string;
+  /** A part's heading (a section of the level outside it): "Part One". Its title follows it, unless it's the heading. */
+  partHeading(view: { number: number; title: string | undefined; level: Word }): string;
   /** The title page's contact lines (top left) and word count (top right). */
   titlePage(view: { preset: CompilePreset; author: string; words: number }): { contact: string[]; wordCount: string | undefined };
   /** What the running header says before the page number: "Vale / BRIDGE AT VARN / ". */
@@ -109,7 +109,7 @@ export const PLAIN_LAYOUT: CompileLayout = {
   key: "plain",
   label: "Plain",
   heading: ({ preset, number, title, level }) => (title && preset.chapter_heading !== "number" ? title : `${level.One} ${number}`),
-  partHeading: ({ number, level }) => `${level.One} ${number}`,
+  partHeading: ({ number, title, level }) => title || `${level.One} ${number}`,
   titlePage: ({ preset, words }) => ({ contact: preset.title_page?.contact ?? [], wordCount: preset.word_count === "exact" ? `${words.toLocaleString("en-US")} words` : undefined }),
   runningHead: () => "",
   spacing: 1.5,
@@ -182,7 +182,7 @@ export async function compileBook(novel: Book, source: Pick<FileSource, "read">,
       id: chapter.id,
       number: i + 1,
       heading: layout.heading({ preset, number: i + 1, title: chapter.title, level: w.level(chapter.level) }),
-      ...(opensPart ? { part: { id: part.id, title: part.title ?? "", number: part.number, heading: layout.partHeading({ number: part.number, level: w.level(part.level) }) } } : {}),
+      ...(opensPart ? { part: { id: part.id, title: part.title ?? "", number: part.number, heading: layout.partHeading({ number: part.number, title: part.title, level: w.level(part.level) }) } } : {}),
       blocks,
     });
   }

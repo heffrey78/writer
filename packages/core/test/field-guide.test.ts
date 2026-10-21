@@ -73,8 +73,8 @@ describe("a field guide", () => {
   it("compiles, its families as the book's chapters, in the plain layout", async () => {
     const compiled = await compileBook(book, nodeSource(SAMPLE));
     expect(compiled.title).toBe("Birds of the Varn Estuary");
-    // In the plain layout, in its words: families by their titles, habitats as their parts.
-    expect(compiled.chapters.map((c) => [c.heading, c.part?.heading])).toEqual([["Waders", "Habitat 1"], ["Warblers", "Habitat 2"]]);
+    // In the plain layout: families by their titles, and the habitats they open, as parts, by theirs.
+    expect(compiled.chapters.map((c) => [c.heading, c.part?.heading])).toEqual([["Waders", "Mudflats"], ["Warblers", "Reedbeds"]]);
     expect(compiled).toMatchObject({ runningHead: "", spacing: 1.5, titlePage: { contact: [], wordCount: undefined } });
     expect(compiled.end).toBeUndefined();
     expect(compiled.words).toBeGreaterThan(40);

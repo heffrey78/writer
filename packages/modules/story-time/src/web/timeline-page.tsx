@@ -78,8 +78,8 @@ export function TimelinePage({ novelId, novel }: { novelId: string; novel: Book 
       </div>
       <DayOne novelId={novelId} novel={novel} />
       <p className="text-sm text-muted">
-        Left to right in story time, evenly spaced; the time between neighbours is above them. Below, the scenes in reading order: each line joins a scene's place in the book to its place in
-        time, and a <span className="font-medium text-warn">flashback</span>'s runs back across the others.
+        Left to right in story time, evenly spaced; the time between neighbours is above them. Below, the {w.piece.many} in reading order: each line joins {w.piece.a}&apos;s place in the book to its
+        place in time, and a <span className="font-medium text-warn">flashback</span>&apos;s runs back across the others.
       </p>
 
       <div className="max-w-full overflow-x-auto rounded-lg border border-rule">
@@ -169,7 +169,7 @@ export function TimelinePage({ novelId, novel }: { novelId: string; novel: Book 
           <h2 id="undated-heading" className="font-semibold">
             Not on the timeline
           </h2>
-          <p className="text-muted">These have no time yet: give a scene one in its details.</p>
+          <p className="text-muted">These have no time yet: give {w.piece.a} one in its details.</p>
           <ul className="grid gap-1">
             {t.undated.map((s) => (
               <li key={s.id}>

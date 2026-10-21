@@ -1,6 +1,6 @@
 import type { IssueLabel, IssueList, IssuesStatus, Milestone } from "@writer/client";
 import { entityLabel, entityOfLabel, issueKindOf, kindLabel, STOCK_LABELS, type IssueKind, type Book } from "@writer/core";
-import { plural } from "../bible/types.ts";
+import { typePlural } from "@writer/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { X } from "lucide-react";
 import { useId, useState } from "react";
@@ -93,7 +93,7 @@ export function labelChoices(meta: Pick<IssueList, "labels" | "issues"> | undefi
     novel.entities
       .filter((e) => e.type === t.key)
       .sort((a, b) => a.name.localeCompare(b.name))
-      .map((e) => ({ ...entityLabel(novel, e), group: plural(t.label) })),
+      .map((e) => ({ ...entityLabel(novel, e), group: typePlural(t) })),
   );
   const others = pickableLabels(meta)
     // An entry's label is offered as the entry (above), under its current name.

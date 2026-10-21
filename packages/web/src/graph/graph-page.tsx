@@ -5,7 +5,7 @@ import { api } from "../api.ts";
 import { sceneItems } from "../bible/pickers.ts";
 import { NewEntryDialog } from "../bible/new-entry.tsx";
 import { AddRelationshipDialog, RelationshipAtSceneDialog } from "../bible/relationships.tsx";
-import { plural } from "../bible/types.ts";
+import { typePlural } from "@writer/core";
 import { chapterTitle } from "../novel/navigation.tsx";
 import { useNotice } from "../novel/notice.tsx";
 import { useTheme } from "../theme.ts";
@@ -194,7 +194,7 @@ export function GraphPage({ novelId, novel }: { novelId: string; novel: Book }) 
               {novel.entityTypes.map((t) => (
                 <label key={t.key} className="flex items-center gap-2">
                   <input type="checkbox" checked={types.includes(t.key)} onChange={() => toggle("types", novel.entityTypes.map((x) => x.key), types, t.key, ["character"])} />
-                  {plural(t.label)}
+                  {typePlural(t)}
                 </label>
               ))}
             </fieldset>

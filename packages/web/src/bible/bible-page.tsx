@@ -1,4 +1,4 @@
-import { entryPresences, vocabulary, word, type Entity, type EntryPresence, type Book, type Vocabulary } from "@writer/core";
+import { entryPresences, typePlural, vocabulary, word, type Entity, type EntryPresence, type Book, type Vocabulary } from "@writer/core";
 import { Plus, Search } from "lucide-react";
 import { Fragment, useEffect, useId, useMemo, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
@@ -10,7 +10,7 @@ import { NewTypeDialog } from "./new-entry.tsx";
 import { RelationshipTypes } from "./relationship-types.tsx";
 import { markWords } from "./strip.tsx";
 import { useBookKind, useWords } from "../novel/kind.ts";
-import { entriesByType, matches, plural } from "./types.ts";
+import { entriesByType, matches } from "./types.ts";
 import { PAGE } from "../ui/page.ts";
 import { cn } from "../ui/cn.ts";
 
@@ -113,7 +113,7 @@ export function BiblePage({ novelId, novel, over }: { novelId: string; novel: Bo
           <section key={type.key} aria-labelledby={`type-${type.key}`} className="grid gap-2">
             <div className="flex items-center justify-between gap-2">
               <h2 id={`type-${type.key}`} className="font-semibold">
-                {plural(type.label)} <span className="text-sm font-normal text-muted">{entries.length}</span>
+                {typePlural(type)} <span className="text-sm font-normal text-muted">{entries.length}</span>
               </h2>
               <Button size="sm" variant="ghost" onClick={() => add(type.key)} aria-label={`New ${type.label.toLowerCase()}`}>
                 <Plus className="size-4" aria-hidden /> New
@@ -128,7 +128,7 @@ export function BiblePage({ novelId, novel, over }: { novelId: string; novel: Bo
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-muted">No {plural(type.label).toLowerCase()} yet.</p>
+              <p className="text-sm text-muted">No {typePlural(type).toLowerCase()} yet.</p>
             )}
           </section>
         ),

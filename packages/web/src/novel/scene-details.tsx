@@ -6,7 +6,7 @@ import { DropdownMenu } from "radix-ui";
 import { Fragment, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useParams } from "react-router";
 import { create, useStore } from "zustand";
-import { plural } from "../bible/types.ts";
+import { typePlural } from "@writer/core";
 import { MENU_ITEM } from "../layout.tsx";
 import { moduleDayToDate } from "../modules.tsx";
 import { Button } from "../ui/button.tsx";
@@ -266,7 +266,7 @@ export function SceneDetails({
         const chosen = list(f.key)
           .map((r, i) => ({ id: refId(r), i }))
           .filter(({ id }) => (novel.entities.find((e) => e.id === id)?.type ?? novel.entityTypes.find((x) => id.startsWith(`${x.prefix}_`))?.key) === type.key);
-        const label = plural(type.label);
+        const label = typePlural(type);
         return {
           key: `type:${type.key}`,
           label,

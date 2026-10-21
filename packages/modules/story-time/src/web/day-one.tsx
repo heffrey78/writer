@@ -121,14 +121,14 @@ function DayOneEditor({ novelId, novel, place }: { novelId: string; novel: Book;
       </p>
       {dated.length > 0 && (
         <Picker
-          label="Or the day of a scene"
+          label={`Or the day of ${vocabulary(novel.kind).piece.a}`}
           items={dated.map(({ scene, at }) => ({ value: scene.id, label: `${scene.title} (${readDate(at.slice(0, 10))})` }))}
           value={undefined}
           onChange={(v) => {
             const chosen = dated.find((d) => d.scene.id === v);
             if (chosen) void run(chosen.at.slice(0, 10));
           }}
-          placeholder="Choose a dated scene…"
+          placeholder={`Choose a dated ${vocabulary(novel.kind).piece.one}…`}
           className="max-w-sm"
         />
       )}

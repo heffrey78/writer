@@ -1,4 +1,4 @@
-import { carryingField, defineModule, plural, roleOf, vocabulary, word, type Book, type BookModule, type Entity, type EntityTypeDef, type FieldDef } from "@writer/core";
+import { carryingField, defineModule, roleOf, typePlural, vocabulary, word, type Book, type BookModule, type Entity, type EntityTypeDef, type FieldDef } from "@writer/core";
 import { DEFAULT_GAP, gaps, gridKey, presence, type Presence, type PresenceMatrix } from "@writer/core/diagrams";
 import { gridSvg, shadedOf, type Dot } from "@writer/core/snapshots";
 
@@ -67,10 +67,10 @@ export function sortRows(m: PresenceMatrix, order: RowOrder): Entity[] {
 // ——— Its diagrams ———
 
 /** A type's entries in a sentence: "characters", and an acronym as it is ("NPCs"). */
-const many = (t: EntityTypeDef) => word({ label: t.label, plural: plural(t.label) }).many;
+const many = (t: EntityTypeDef) => word({ label: t.label, plural: typePlural(t) }).many;
 
 /** A presence diagram's title: "Characters by scene". */
-export const presenceTitle = (book: Book, t: EntityTypeDef) => `${plural(t.label)} by ${vocabulary(book.kind).piece.one}`;
+export const presenceTitle = (book: Book, t: EntityTypeDef) => `${typePlural(t)} by ${vocabulary(book.kind).piece.one}`;
 
 /** A presence diagram's file name, in the book's diagrams/ folder and as the app exports it: "presence-characters.svg". */
 export const presenceFile = (t: EntityTypeDef) => `presence-${t.folder}.svg`;

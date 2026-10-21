@@ -17,21 +17,27 @@ export interface EntityTypeDef {
   prefix: string;
   folder: string;
   label: string;
+  /** Its label for a list of its entries, where adding an s won't do: "People". Default: plural(label). */
+  plural?: string;
   color?: string;
   builtin: boolean;
   /** What its entries are, where a feature needs to know: people (who can't be in two places at once) or places. */
   is?: "person" | "place";
+  /** Prefixes its entries' IDs may still have from before the book was of its kind: a journal's people, once a novel's characters (char). */
+  formerPrefixes?: readonly string[];
 }
 
-/** Prefixes a book's own entry types may not use: its kind's, its modules' records' and every kind's records'. */
+/** Prefixes a book's own entry types may not use: its kind's (former ones too), its modules' records' and every kind's records'. */
 export function reservedPrefixes(kind: BookKind): ReadonlySet<string> {
   return new Set([
     kind.prefix,
-    ...kind.levels.map((l) => l.prefix),
+    ...(kind.formerPrefixes ?? []),
+    ...kind.levels.flatMap((l) => [l.prefix, ...(l.formerPrefixes ?? [])]),
     kind.piece.prefix,
+    ...(kind.piece.formerPrefixes ?? []),
     ...Object.values(RECORD_PREFIXES),
     ...recordTypesOf(kind).map((t) => t.prefix),
-    ...kind.entityTypes.map((t) => t.prefix),
+    ...kind.entityTypes.flatMap((t) => [t.prefix, ...(t.formerPrefixes ?? [])]),
   ]);
 }
 

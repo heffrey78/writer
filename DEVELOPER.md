@@ -51,7 +51,7 @@ Other folders:
 
 ## Kinds and modules
 
-A kind of book is data in `packages/kinds` (D14, D15). A module is a first-party feature that some kinds use and others don't, in `packages/modules/<name>` (`@writer/module-<name>`), with a core half, a web half and a server half where it needs them, under subpath exports. A kind lists its modules by id, in `modules`.
+A kind of book is data in `packages/kinds` (D14, D15): the Novel, and the Journal (#5; `examples/sample-journal` is one). A module is a first-party feature that some kinds use and others don't, in `packages/modules/<name>` (`@writer/module-<name>`), with a core half, a web half and a server half where it needs them, under subpath exports. A kind lists its modules by id, in `modules`.
 
 The base never imports a kind or a module: `packages/core/test/boundary.test.ts` fails if any file of the base packages does, except the app's entry points, which register what the app ships:
 

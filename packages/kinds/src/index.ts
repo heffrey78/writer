@@ -6,12 +6,13 @@ import { draftingBoard } from "@writer/module-drafting-board/core";
 import { manuscriptFormat } from "@writer/module-manuscript-format/core";
 import { offPageEvents } from "@writer/module-off-page-events/core";
 import { storyTime } from "@writer/module-story-time/core";
+import { journal } from "./journal.ts";
 import { novel } from "./novel.ts";
 
-export { novel };
+export { journal, novel };
 
-/** Every kind of book the app ships. */
-export const KINDS: readonly BookKind[] = [novel];
+/** Every kind of book the app ships: the Novel first. */
+export const KINDS: readonly BookKind[] = [novel, journal];
 
 /** The core halves of the modules the shipped kinds use (D14), from packages/modules. */
 export const MODULES: readonly BookModule[] = [pointOfView, plotlines, presenceModule, storyTime, offPageEvents, draftingBoard, manuscriptFormat];

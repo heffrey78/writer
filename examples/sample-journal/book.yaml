@@ -1,0 +1,14 @@
+schema_version: 3
+kind: journal
+id: jn_d1ary0
+title: A Year at the Estuary
+author: Writer sample
+relationship_types:
+  - key: friend
+    label: Friend of
+    symmetric: true
+  - key: works-with
+    label: Works with
+    symmetric: true
+    from_types: [person]
+    to_types: [person]

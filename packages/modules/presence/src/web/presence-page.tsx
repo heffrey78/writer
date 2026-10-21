@@ -1,4 +1,4 @@
-import { fieldName, outerSections, pieceSections, plural, roleOf, type Entity, type Vocabulary, type Book, type FieldDef, type ItemProp, type Piece, type YamlEdit } from "@writer/core";
+import { fieldName, outerSections, pieceSections, roleOf, typePlural, type Entity, type Vocabulary, type Book, type FieldDef, type ItemProp, type Piece, type YamlEdit } from "@writer/core";
 import { chapterTitle, DEFAULT_GAP, gaps, gridKey, presence, zoomed, type Gap, type Presence } from "@writer/core/diagrams";
 import { Popover } from "radix-ui";
 import { useId, useMemo, useState } from "react";
@@ -61,7 +61,10 @@ export function PresencePage({ novelId, novel, workspace }: { novelId: string; n
   const typeDef = types.find((t) => t.key === type);
   const zoom = params.get("zoom") ?? undefined;
   const size = readSize(params.get("size"));
-  const label = novel.entityTypes.find((t) => t.key === type)?.label ?? type;
+  const def = novel.entityTypes.find((t) => t.key === type);
+  const label = def?.label ?? type;
+  /** The type's entries, as a list is named: "Characters", "People". */
+  const many = typePlural(def ?? { label });
   const order: RowOrder = (["first", "total", "name"] as const).find((o) => o === params.get("sort")) ?? "first";
   const threshold = readGap(params.get("gap")) ?? DEFAULT_GAP;
   // Absences are found in the whole book (one can cross the zoom's edge); the grid shows the zoom.
@@ -84,7 +87,7 @@ export function PresencePage({ novelId, novel, workspace }: { novelId: string; n
   const list = listFieldOf(novel, type);
   const carrying = carryingFieldOf(novel, type);
   // What the legend calls the list: the book's own types' entries are listed as, e.g., "artifacts".
-  const listName = !list || list.type.kind === "own-entities" ? plural(label).toLowerCase() : fieldName(list).toLowerCase();
+  const listName = !list || list.type.kind === "own-entities" ? many.toLowerCase() : fieldName(list).toLowerCase();
   const sceneEdit = useSceneEdit(novelId, workspace);
   const [editing, setEditing] = useState<{ row: string; scene: string; el: HTMLElement }>();
 
@@ -123,7 +126,7 @@ export function PresencePage({ novelId, novel, workspace }: { novelId: string; n
           <select value={type} onChange={(e) => setParams({ type: e.target.value === first ? undefined : e.target.value })} className="h-8 rounded-md border border-rule bg-raised px-2 font-normal">
             {types.map((t) => (
               <option key={t.key} value={t.key}>
-                {plural(t.label)}
+                {typePlural(t)}
               </option>
             ))}
           </select>
@@ -176,13 +179,13 @@ export function PresencePage({ novelId, novel, workspace }: { novelId: string; n
       {!typeDef ? (
         <p className="text-muted">Nothing here lists entries yet.</p>
       ) : !m.rows.length || !m.scenes.length ? (
-        <p className="text-muted">{!m.rows.length ? `No ${plural(label).toLowerCase()} yet.` : `The ${w.content.one} has no ${w.piece.many} yet.`}</p>
+        <p className="text-muted">{!m.rows.length ? `No ${many.toLowerCase()} yet.` : `The ${w.content.one} has no ${w.piece.many} yet.`}</p>
       ) : (
         <SceneGrid
           novelId={novelId}
           novel={novel}
           workspace={workspace}
-          label={`${plural(label)} by ${w.piece.one}`}
+          label={`${many} by ${w.piece.one}`}
           rowHeading={label}
           rows={rows}
           scenes={m.scenes}
@@ -215,7 +218,7 @@ export function PresencePage({ novelId, novel, workspace }: { novelId: string; n
             </ul>
           ) : (
             <p className="text-muted">
-              No {plural(label).toLowerCase()} away for more than {amount(threshold, w.piece)}.
+              No {many.toLowerCase()} away for more than {amount(threshold, w.piece)}.
             </p>
           )}
         </section>

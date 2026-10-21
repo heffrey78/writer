@@ -56,6 +56,9 @@ export function word(noun: Noun): Word {
 /** A name in the plural, for a list of what it names: "Characters", "Witnesses", "Diaries". */
 export const plural = (label: string) => (/(s|x|ch|sh)$/i.test(label) ? `${label}es` : /[^aeiou]y$/i.test(label) ? `${label.slice(0, -1)}ies` : `${label}s`);
 
+/** An entry type's label for a list of its entries: its own plural ("People"), else its label's ("Characters"). */
+export const typePlural = (type: { label: string; plural?: string }) => type.plural ?? plural(type.label);
+
 const cache = new WeakMap<BookKind, Vocabulary>();
 
 /** The kind's words. */

@@ -261,7 +261,7 @@ export function toPdf(book: CompiledBook, { date = new Date(0), fonts = defaultF
     if (chapter.part) {
       newPage(third);
       centred(chapter.part.heading);
-      if (chapter.part.title) centred(chapter.part.title);
+      if (chapter.part.title && chapter.part.title !== chapter.part.heading) centred(chapter.part.title);
     }
     section(chapter.heading, chapter.blocks);
   }

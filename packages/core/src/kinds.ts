@@ -39,6 +39,8 @@ export interface LevelDef extends Noun {
   optional?: boolean;
   /** Whether its sections must have a title, as a part must and a chapter needn't. */
   titled?: boolean;
+  /** Prefixes its sections' IDs may still have from before the book was of this kind: a journal's months, once a novel's chapters (ch). */
+  formerPrefixes?: readonly string[];
 }
 
 /**
@@ -119,10 +121,16 @@ export interface BookKind extends Noun {
   key: string;
   /** The book's own ID prefix. */
   prefix: string;
+  /**
+   * Prefixes the book's own ID may still have from before it was of this kind (a journal kept as a
+   * novel: nv). IDs never change, so a book converted to the kind keeps its records' IDs: each level,
+   * the piece and each entry type may name its former prefixes too. New IDs never use them.
+   */
+  formerPrefixes?: readonly string[];
   /** The levels of sections, outermost first. */
   levels: readonly LevelDef[];
-  /** The writing unit: one file of prose. */
-  piece: Noun & { key: string; prefix: string; list: string };
+  /** The writing unit: one file of prose (formerPrefixes as a level's). */
+  piece: Noun & { key: string; prefix: string; list: string; formerPrefixes?: readonly string[] };
   /** The words for what isn't a level or the piece: all the sections and pieces, the codex, and an entity of it. */
   words: { content: Noun; codex: Noun; entity: Noun };
   folders: {

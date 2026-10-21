@@ -69,7 +69,9 @@ export function toEpub(book: CompiledBook, { date = new Date(0), cover, pictures
     if (chapter.part) {
       inPart = true;
       const name = chapter.part.heading;
-      add({ id: `part-${chapter.part.number}`, title: chapter.part.title ? `${name}: ${chapter.part.title}` : name, toc: true, level: 0, body: `<section epub:type="part" class="part"><h1>${xml(name)}</h1>${chapter.part.title ? `<p class="part-title">${xml(chapter.part.title)}</p>` : ""}</section>` });
+      // Its title after its heading, unless the heading is its title (the plain layout's).
+      const title = chapter.part.title !== name ? chapter.part.title : "";
+      add({ id: `part-${chapter.part.number}`, title: title ? `${name}: ${title}` : name, toc: true, level: 0, body: `<section epub:type="part" class="part"><h1>${xml(name)}</h1>${title ? `<p class="part-title">${xml(title)}</p>` : ""}</section>` });
     }
     add({ id: `chapter-${String(chapter.number).padStart(3, "0")}`, title: chapter.heading, toc: true, level: inPart ? 1 : 0, body: `<section epub:type="chapter"><h2>${xml(chapter.heading)}</h2>${blocks(chapter.blocks)}</section>` });
   }

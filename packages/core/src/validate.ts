@@ -67,6 +67,9 @@ export function validateBook(novel: Book): Diagnostic[] {
   const recordTypes = recordTypesOf(kind);
   const recordPrefix = (r: RecordRef) =>
     r.kind === "book" ? kind.prefix : r.kind === "piece" ? kind.piece.prefix : r.kind === "section" ? kind.levels.find((l) => l.key === r.level)?.prefix : (RECORD_PREFIXES[r.kind as keyof typeof RECORD_PREFIXES] ?? recordTypes.find((t) => t.key === r.kind)?.prefix);
+  /** Prefixes a record's ID may still have from before its book was of this kind (a journal kept as a novel's sc_). */
+  const formerPrefixes = (r: RecordRef): readonly string[] =>
+    (r.kind === "book" ? kind.formerPrefixes : r.kind === "piece" ? kind.piece.formerPrefixes : r.kind === "section" ? kind.levels.find((l) => l.key === r.level)?.formerPrefixes : r.kind === "entity" ? typeByKey.get(r.type!)?.formerPrefixes : undefined) ?? [];
   /** What a mention in prose may name: any entry, or a module's record that may be mentioned (an off-page event). */
   const MENTIONABLE = ["*entity", ...recordTypes.filter((t) => t.mentionable).map((t) => t.key)];
   /** What a record is, in the kind's words: "scene", "chapter", "novel", an entry's type, "event". */
@@ -82,7 +85,7 @@ export function validateBook(novel: Book): Diagnostic[] {
     }
     const expected = r.kind === "entity" ? typeByKey.get(r.type!)?.prefix : recordPrefix(r);
     const actual = idPrefix(r.id);
-    if (expected && actual && actual !== expected) {
+    if (expected && actual && actual !== expected && !formerPrefixes(r).includes(actual)) {
       push("error", "E_ID_PREFIX", r.file, `${describe(r)} ID ${r.id} should start with "${expected}_"`);
     }
   }

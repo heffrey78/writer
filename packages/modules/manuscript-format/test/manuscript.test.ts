@@ -26,7 +26,8 @@ describe("manuscript format", () => {
     const novel = await loadBook(nodeSource(sample), plain);
     const book = await compileBook(novel, nodeSource(sample));
     expect(book.chapters.map((c) => c.heading).slice(0, 2)).toEqual(["Arrival", "Old Debts"]);
-    expect(book.chapters[0]!.part?.heading).toBe("Part 1");
+    // A part with a title is headed by it.
+    expect(book.chapters[0]!.part?.heading).toBe("Return");
     expect(book).toMatchObject({ runningHead: "", spacing: 1.5, titlePage: { contact: [], wordCount: undefined } });
     expect(book.end).toBeUndefined();
   });
