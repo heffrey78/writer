@@ -782,3 +782,44 @@ pub fn call(name: &str, dir: &str, args: &Value) -> Value {
         Err(f) => json!({ "err": { "code": f.code, "message": f.message } }),
     }
 }
+
+/// Trust the certificates in `dirs` for every https remote: all of them, gathered into one PEM file at
+/// `out`, which libgit2's OpenSSL is then given. Android keeps its trusted roots one per file, named by
+/// OpenSSL's old subject hash, which today's OpenSSL doesn't look up, so pointing it at the folder
+/// trusts nothing. The newest store is Conscrypt's, which Android updates on its own; the system one
+/// is older. Returns how many certificates, and from which folders.
+pub fn trust_certificates_in(dirs: &[&str], out: &Path) -> Result<Value, String> {
+    let mut seen = BTreeSet::new();
+    let mut pem = String::new();
+    let mut from = vec![];
+    for dir in dirs {
+        let Ok(entries) = std::fs::read_dir(dir) else { continue };
+        let before = seen.len();
+        for e in entries.flatten() {
+            let Ok(text) = std::fs::read_to_string(e.path()) else { continue };
+            // A file may hold a description before its PEM block: only the blocks are kept.
+            let mut rest = text.as_str();
+            while let Some(start) = rest.find("-----BEGIN CERTIFICATE-----") {
+                let Some(end) = rest[start..].find("-----END CERTIFICATE-----") else { break };
+                let block = &rest[start..start + end + "-----END CERTIFICATE-----".len()];
+                if seen.insert(block.to_string()) {
+                    pem.push_str(block);
+                    pem.push('\n');
+                }
+                rest = &rest[start + end..][1..];
+            }
+        }
+        if seen.len() > before {
+            from.push(*dir);
+        }
+    }
+    if seen.is_empty() {
+        return Err(format!("no certificates in {}", dirs.join(", ")));
+    }
+    if let Some(parent) = out.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    std::fs::write(out, pem).map_err(|e| e.to_string())?;
+    unsafe { git2::opts::set_ssl_cert_file(out.to_string_lossy().as_ref()) }.map_err(|e| e.message().to_string())?;
+    Ok(json!({ "certificates": seen.len(), "from": from }))
+}

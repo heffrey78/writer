@@ -142,11 +142,17 @@ async function roundTrip() {
 }
 
 async function https() {
-  await step("https: libgit2 lists a GitHub repository's refs", () => invoke("https_probe", { url: HTTPS_LIST }));
+  const trust = await invoke("trust");
+  log(`Trusted for https: ${JSON.stringify(trust)}`);
+  steps.push({ name: "certificates trusted", ok: !trust?.error, ms: 0, detail: trust });
+  // Each tried on its own: one failing doesn't hide the other.
+  let ok = true;
+  await step("https: libgit2 lists a GitHub repository's refs", () => invoke("https_probe", { url: HTTPS_LIST })).catch(() => (ok = false));
   await step("https: libgit2 clones from github.com", async () => {
     await git("clone", "hello", { url: HTTPS_CLONE });
     return (await git("log", "hello", { limit: 1 }))[0]?.summary;
-  });
+  }).catch(() => (ok = false));
+  if (!ok || trust?.error) throw new Error("https");
 }
 
 async function run() {

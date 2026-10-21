@@ -50,6 +50,14 @@ async fn report(app: tauri::AppHandle, json: String) -> Result<String, String> {
     Ok(path.to_string_lossy().to_string())
 }
 
+/// The certificates libgit2 trusts for https, as set up when the app started.
+static TRUST: std::sync::OnceLock<Value> = std::sync::OnceLock::new();
+
+#[tauri::command]
+async fn trust() -> Value {
+    TRUST.get().cloned().unwrap_or(Value::Null)
+}
+
 /// Whether something answers on this device's 127.0.0.1:`port`: the PC's fake GitHub, through adb reverse.
 #[tauri::command]
 async fn reachable(port: u16) -> bool {
@@ -68,14 +76,20 @@ async fn https_probe(url: String) -> Result<Value, String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // Android keeps its trusted certificates in a folder named by subject hash, as OpenSSL reads them:
-    // libgit2's own OpenSSL is told where, once, for every https remote.
-    #[cfg(target_os = "android")]
-    unsafe {
-        git2::opts::set_ssl_cert_dir("/system/etc/security/cacerts").expect("libgit2 couldn't be told where the certificates are");
-    }
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![git, write_file, read_file, reset, report, reachable, https_probe])
+        .setup(|app| {
+            // The device's own trusted certificates, for libgit2's OpenSSL: Conscrypt's, which Android
+            // keeps up to date, then the system's (git2_port::trust_certificates_in says why a file).
+            #[cfg(target_os = "android")]
+            {
+                let out = app.path().app_cache_dir()?.join("cacerts.pem");
+                let _ = TRUST.set(git2_port::trust_certificates_in(&["/apex/com.android.conscrypt/cacerts", "/system/etc/security/cacerts"], &out).unwrap_or_else(|e| json!({ "error": e })));
+            }
+            #[cfg(not(target_os = "android"))]
+            let _ = (app, TRUST.set(json!({ "certificates": "the system's" })));
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![git, write_file, read_file, reset, report, reachable, trust, https_probe])
         .run(tauri::generate_context!())
         .expect("the spike app couldn't start");
 }
