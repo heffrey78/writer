@@ -588,6 +588,8 @@ export function createApi({ baseUrl = "", headers = {}, fetch = globalThis.fetch
       promote: (id: string, note: string, chapter: string, { keep }: { keep: boolean }) =>
         request<OperationResult & { id: string; file: string }>("POST", `/api/novels/${encodeURIComponent(id)}/notes/${encodeURIComponent(note)}/promote`, { chapter, keep }).then((r) => r.data),
     },
+    /** Make the book a book of the kind `to` (#39), one commit; `notes` say what it did that the writer should know. */
+    convert: async (id: string, to: string) => (await request<OperationResult & { notes: string[] }>("POST", `/api/novels/${encodeURIComponent(id)}/convert`, { to })).data,
     /** Move the book to format `to` (the newest by default: D11, D15), one commit; `migrated` false when it was already. */
     migrate: async (id: string, to?: number) => (await request<OperationResult & { migrated: boolean }>("POST", `/api/novels/${encodeURIComponent(id)}/migrate`, to === undefined ? undefined : { to })).data,
   };

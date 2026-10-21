@@ -90,10 +90,18 @@ async function resolveInside(root: string, path: string): Promise<string> {
 /** The novel's vendored tools (the novel template's .github/gh-writer/), which a format migration refreshes (D11). */
 export const TOOLS_DIR = ".github/gh-writer";
 
-/** Check that a path is one of the novel's vendored tools, and return its full path. Only migrations write these. */
+/** Where a book's GitHub workflows are: its kind's template's, which a conversion to another kind replaces. */
+export const WORKFLOWS_DIR = ".github/workflows";
+
+/**
+ * Check that a path is one of the book's generated files, and return its full path: its vendored tools,
+ * its template's workflows, or a diagram snapshot (diagrams/*.svg). Only migrations and conversions
+ * write these.
+ */
 export async function writableToolPath(root: string, path: string): Promise<string> {
-  if (!path.startsWith(`${TOOLS_DIR}/`)) throw new FileError("NOT_WRITABLE", `Not one of the book's tools: "${path}"`);
-  checkPath(path.slice(TOOLS_DIR.length + 1));
+  const dir = [TOOLS_DIR, WORKFLOWS_DIR].find((d) => path.startsWith(`${d}/`)) ?? (/^diagrams\/[^/]+\.svg$/.test(path) ? "diagrams" : undefined);
+  if (!dir) throw new FileError("NOT_WRITABLE", `Not one of the book's tools: "${path}"`);
+  checkPath(path.slice(dir.length + 1));
   return resolveChecked(root, path);
 }
 

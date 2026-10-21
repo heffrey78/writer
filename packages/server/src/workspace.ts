@@ -63,6 +63,8 @@ export class NovelWorkspace {
   readonly issues: IssueStore | undefined;
   /** What the kind's modules keep for the book (the drafting board's store), by module id. */
   readonly modules: ReadonlyMap<string, ModuleService>;
+  /** The kind it was opened as: a book made another kind since (#39) is opened afresh, with that kind's modules. */
+  readonly openedAs: string;
   /** Resolves when the workspace stops: event streams end then. */
   readonly stopped: Promise<void>;
   #stop!: () => void;
@@ -108,6 +110,7 @@ export class NovelWorkspace {
     this.bible = new BibleOperations(root, (fn) => this.exclusive(fn));
     this.manuscript = new ManuscriptOperations(root, (fn) => this.exclusive(fn), () => this.kind);
     this.issues = github ? new IssueStore(root, github, () => this.githubRepo(), async () => (await this.loadModel()).novel, () => this.kind) : undefined;
+    this.openedAs = this.kind.key;
     this.modules = moduleServices(this.kind, this);
     // Issues and the modules' services (a board that's set up) are brought up to date with each sync
     // with GitHub, so a change on github.com shows within one cycle.
@@ -421,7 +424,8 @@ export class Workspaces {
     const entry = this.#library.get(id);
     if (!entry) return undefined;
     let ws = this.#open.get(id);
-    if (ws?.root !== entry.path) {
+    // Opened afresh for another folder, or once the book is another kind: its modules are the new kind's.
+    if (ws?.root !== entry.path || ws.openedAs !== ws.kind.key) {
       void ws?.close();
       ws = new NovelWorkspace(entry.path, this.#options);
       this.#open.set(id, ws);

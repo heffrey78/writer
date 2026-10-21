@@ -14,7 +14,7 @@ describe("the Journal kind", () => {
     const kind = kindByKey("journal");
     expect(kind).toBe(withModules(journal));
     expect(kind.modules).toEqual(["presence", "story-time", "daily"]);
-    expect(kind.fields.map((f) => f.key)).toEqual(["when", "people", "places", "events", "values"]);
+    expect(kind.fields.map((f) => f.key)).toEqual(["when", "people", "places", "events", "entities", "values"]);
     expect(layoutOf(kind)).toBe(PLAIN_LAYOUT);
   });
 

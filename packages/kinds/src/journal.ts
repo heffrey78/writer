@@ -37,6 +37,7 @@ export const journal: BookKind = {
     { key: "people", label: "People", role: "there", type: { kind: "entities", entityType: "person" }, mentionAdds: true, outline: { column: true, filter: true }, snapshot: true },
     { key: "places", label: "Places", role: "here", type: { kind: "entities", entityType: "place" }, mentionAdds: true, lanes: true, marks: { present: "here" } },
     { key: "events", label: "Events", role: "happened", type: { kind: "entities", entityType: "event" }, mentionAdds: true },
+    { key: "entities", label: "Also in it", role: "there", type: { kind: "own-entities" }, mentionAdds: true },
     {
       key: "values",
       label: "Values",
@@ -46,13 +47,16 @@ export const journal: BookKind = {
       type: {
         kind: "entities",
         entityType: "value",
-        item: [{ key: "strength", label: "Strength", kind: "scale", min: 1, max: 3, labels: { "1": "faint", "2": "medium", "3": "strong" }, options: { "1": "1 (faint)", "2": "2", "3": "3 (strong)" } }],
+        item: [
+          { key: "strength", label: "Strength", kind: "scale", min: 1, max: 3, labels: { "1": "faint", "2": "medium", "3": "strong" }, options: { "1": "1 (faint)", "2": "2", "3": "3 (strong)" } },
+          { key: "note", label: "Note", kind: "text", onCard: false },
+        ],
       },
     },
   ],
   // An entry's date first on its card, then who, where and what.
   modules: ["presence", "story-time", "daily"],
-  fieldOrder: ["when", "people", "places", "events", "values"],
+  fieldOrder: ["when", "people", "places", "events", "entities", "values"],
   issueKinds: [
     { key: "follow-up", label: "Follow up", color: "0075ca", description: "Something to come back to" },
     { key: "fact", label: "Fact", color: "fbca04", description: "Something to check" },

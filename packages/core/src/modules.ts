@@ -44,6 +44,8 @@ export interface BookModule {
   clock?: StoryClock;
   /** Compile layouts a kind may name (BookKind.compileLayout): standard manuscript format. */
   layouts?: readonly CompileLayout[];
+  /** What a book of the kind can be made instead (a novel kept as a journal, a Journal): one commit each. */
+  conversions?: readonly Conversion[];
   /** What moving a novel to a newer format does to its files (format 2 gives each off-page event a file of its own). */
   migrations?: readonly ModuleMigration[];
 }
@@ -80,6 +82,25 @@ export interface RecordTypeDef {
   /** A list of them in one YAML file of the codex, as format v1 kept events: each item's `body` key is its note. */
   list?: { file: string; key: string; body: string; schema: object };
 }
+
+/**
+ * Making a book of one kind into another (#39): the writes that do it, on the book as format 3 has it,
+ * or why it can't be. IDs never change, so the kind it becomes names the old kind's prefixes as its
+ * former ones. The base runs it in one commit, and redraws the book's diagrams and puts the new kind's
+ * tools in it.
+ */
+export interface Conversion {
+  /** The kind it makes the book, by its key: "journal". */
+  to: string;
+  /** Its command: "Make this book a journal…". */
+  label: string;
+  /** What it does, said before the writer agrees. */
+  says: string;
+  run(source: FileSource, book: Book): Promise<{ writes: { path: string; content: string | null }[]; notes: string[] } | { refused: string }>;
+}
+
+/** The conversions a book of the kind may have: its modules'. */
+export const conversionsOf = (kind: BookKind): Conversion[] => modulesOf(kind).flatMap((m) => m.conversions ?? []);
 
 /**
  * A module's step in moving a novel to format `format` (its files as format 1 or 2 have them): the

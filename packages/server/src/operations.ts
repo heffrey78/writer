@@ -10,7 +10,7 @@ export interface FileWrite {
   content: string | Uint8Array | null;
   /** The hash the caller read: the change is refused if the file is different now. Null: must not exist. Omitted: not checked. */
   base?: string | null;
-  /** One of the novel's vendored tools (.github/gh-writer/), written only by a format migration. */
+  /** One of the book's generated files (its tools in .github/gh-writer/, workflows, diagram snapshots), written only by a migration or conversion. */
   tool?: true;
 }
 

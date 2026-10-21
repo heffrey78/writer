@@ -378,3 +378,16 @@ describe("a book of a kind that isn't a novel (#35)", () => {
     expect(run(main, "validate", guide)).toMatchObject({ code: 1, out: expect.stringContaining("E_UNKNOWN_KIND") });
   });
 });
+
+describe("writer convert (#39)", () => {
+  it("makes a journal kept as a novel a journal, in one commit, and says what it dated", async () => {
+    const { journalAsNovel } = await import("../../modules/to-journal/test/fixture.ts");
+    const book = journalAsNovel(join(tmp, "journal-as-novel"));
+    const r = run(main, "convert", book, "--to", "journal");
+    expect(r.code, r.out + r.err).toBe(0);
+    expect(r.out).toMatch(/^Made a journal, in commit [0-9a-f]{7} \(\d+ files\)\.\n {2}“Tuesday, 10\/20\/2026” dated 2026-10-20 from its title\.\n$/);
+    expect(run(main, "validate", book)).toMatchObject({ code: 0, out: expect.stringContaining("0 errors, 0 warnings") });
+    expect(run(main, "convert", book, "--to", "journal")).toMatchObject({ code: 1, err: expect.stringContaining("can't be made a journal") });
+    expect(run(main, "convert", book)).toMatchObject({ code: 1, err: expect.stringContaining("--to journal") });
+  });
+});

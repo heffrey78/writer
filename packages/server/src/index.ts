@@ -24,6 +24,7 @@ export { atomicWrite, checkPath, FileError, hashText, MAX_FILE_BYTES, TEMP_SUFFI
 export { classifyGitError, cloneUrl, git, GitFailure, type GitErrorCode } from "./git.ts";
 export { DEFAULT_TEMPLATE, TEMPLATES, templateOf, writeNewBook, type NewNovel } from "./new-book.ts";
 export { migrateNovel, migrationWrites } from "./migrate.ts";
+export { conversionsFor, convertBook } from "./convert.ts";
 export { ghToken, GitHub, GITHUB_CLIENT_ID, GitHubError, githubRepoOf, keychainStore, memoryStore, SCOPES, unreachable, type AccountStatus, type DeviceCode, type GitHubAccount, type GitHubErrorCode, type GitHubOptions, type GitHubRepo, type PollResult, type RepoSummary, type TokenStore } from "./github.ts";
 export { githubRoutes } from "./github-routes.ts";
 export { publish, PublishError, type PublishErrorCode, type PublishOptions } from "./publish.ts";

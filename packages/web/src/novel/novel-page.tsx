@@ -19,6 +19,7 @@ import { useNewNote } from "../notes/new-note.tsx";
 import { NotesPage } from "../notes/notes-page.tsx";
 import { NotesLeftDialog } from "../notes/notes-left.tsx";
 import { useNewFormat } from "./new-format.tsx";
+import { convertedNotes, useConversions } from "./convert.tsx";
 import { BookKindContext, useWords } from "./kind.ts";
 import { EntryOver, NoteOver, RecordOver } from "./item-modals.tsx";
 import { cn } from "../ui/cn.ts";
@@ -174,11 +175,19 @@ export function NovelPage() {
   const versions = useVersions(novelId, { enabled: novel.isSuccess });
   const switchVersion = useSwitchVersion(novelId, workspace);
   const newFormat = useNewFormat(novelId, model);
+  const conversions = useConversions(novelId, model);
+  // A book just made another kind: what the conversion said, once.
+  useEffect(() => {
+    if (!model) return;
+    const notes = convertedNotes();
+    if (notes) useNotice.getState().show({ message: `It's ${vocabulary(model.kind).book.a} now.${notes.length ? ` ${notes.join(" ")}` : ""}` });
+  }, [model?.kind.key]); // eslint-disable-line react-hooks/exhaustive-deps
   const w = model && vocabulary(model.kind);
   useCommands(
     (): Command[] => [
       { id: "novel.syncNow", title: "Sync now", group: "Sync", run: () => syncNow.mutate() },
       ...newFormat.commands,
+      ...conversions.commands,
       ...(conflict ? [{ id: "novel.resolve", title: "Resolve sync conflicts", group: "Sync", run: () => setResolving(true) }] : []),
       { id: "novel.drafts", title: "Drafts: versions and checkpoints", group: "Drafts", keywords: ["alternate", "ending", "try", "history", "restore"], run: () => useDrafts.getState().set(true) },
       { id: "novel.checkpoints", title: "Checkpoints: make or restore one", group: "Drafts", run: () => useDrafts.getState().set(true) },
@@ -219,7 +228,7 @@ export function NovelPage() {
         }),
       ]),
     ],
-    [model, conflict, novelId, navigate, repo, versions.data, switchVersion.mutate, newFormat.commands.length],
+    [model, conflict, novelId, navigate, repo, versions.data, switchVersion.mutate, newFormat.commands.length, conversions.commands.length],
   );
 
   const heading = workspace && novel.data && (
@@ -342,6 +351,7 @@ export function NovelPage() {
         <NoticeBar />
         <NotesLeftDialog />
         {newFormat.dialog}
+        {conversions.dialog}
       </Shell>
     </BookKindContext.Provider>
   );

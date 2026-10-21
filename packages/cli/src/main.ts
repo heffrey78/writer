@@ -8,6 +8,7 @@ import { offPageEventsServer } from "@writer/module-off-page-events/server";
 import { storyTimeServer } from "@writer/module-story-time/server";
 import { registerServerModule } from "@writer/server";
 import { runCompile } from "./compile-command.ts";
+import { runConvert } from "./convert-command.ts";
 import { runMigrate } from "./migrate-command.ts";
 import { runServe } from "./serve-command.ts";
 import { runSnapshots } from "./snapshots-command.ts";
@@ -38,6 +39,8 @@ Commands:
       --out <dir>           Where the files go (default: compiled/ in the novel)
   migrate [dir]             Move a novel to the newest format, as one commit (and update its
                             tools in .github/gh-writer/)
+  convert [dir] --to <kind> Make a book another kind, as one commit: a novel kept as a journal
+                            a journal ("--to journal"), every ID kept
   new-id <prefix>           Print a new random ID, e.g. "writer new-id char"
 
 Options:
@@ -101,6 +104,12 @@ async function main(argv: string[]): Promise<number> {
     }
     case "migrate":
       return runMigrate(rest[0] ?? ".");
+    case "convert":
+      if (!values.to) {
+        console.error("convert needs the kind of book to make it: --to journal");
+        return 1;
+      }
+      return runConvert(rest[0] ?? ".", values.to);
     case "new-id": {
       const prefix = rest[0];
       if (!prefix || !/^[a-z]{2,8}$/.test(prefix)) {
