@@ -134,7 +134,7 @@ export function OpenFolderDialog({ onClose, initial }: { onClose: () => void; in
   return (
     <Modal title="Open a folder" onClose={onClose}>
       <form onSubmit={submit} className="grid gap-3">
-        <Field label="Folder" placeholder="~/novels/my-novel" value={path} onChange={(e) => setPath(e.target.value)} hint="A git repository holding novel.yaml." required autoFocus />
+        <Field label="Folder" placeholder="~/writer/my-book" value={path} onChange={(e) => setPath(e.target.value)} hint="A git repository holding a book: its book.yaml, or a gh-writer novel's novel.yaml." required autoFocus />
         <ChooseFolder title="A book's folder" onChosen={setPath} />
         {add.isError && <ErrorAlert title="Couldn't open that folder">{add.error.message}</ErrorAlert>}
         <div className="flex justify-end gap-2">
