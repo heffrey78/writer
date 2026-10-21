@@ -1,8 +1,5 @@
-import { randomUUID } from "node:crypto";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
 import { carrierOf, carryingField, countWords, editFrontMatter, levelLabel, outerSections, pieceSections, vocabulary, type Book, type PieceStatus, type StatusDef } from "@writer/core";
-import { gitPort, GitHubError, type GitHub, type GitHubRepo, type ModuleService, type TextFile, type WriteResult } from "@writer/server";
+import { filesPort, gitPort, GitHubError, type GitHub, type GitHubRepo, type ModuleService, type TextFile, type WriteResult } from "@writer/server";
 
 /*
  * The drafting board (heffrey78/gh-writer#11, D8): the main version's scenes mirrored to a GitHub Project, one draft
@@ -665,10 +662,8 @@ export class BoardStore implements ModuleService {
     const repo = await this.#repo();
     const key = repo ? `${repo.owner}/${repo.name}` : "";
     if (this.#state && this.#state.repo === key) return { state: this.#state, repo };
-    this.#file ??= join(await gitPort().gitDir(this.root), "gh-writer", "board.json");
-    const saved = await readFile(this.#file, "utf8")
-      .then((t) => JSON.parse(t) as State)
-      .catch(() => undefined);
+    this.#file ??= filesPort().join(await gitPort().gitDir(this.root), "gh-writer", "board.json");
+    const saved = (await filesPort().read(this.#file).then((b) => (b === undefined ? undefined : (JSON.parse(new TextDecoder().decode(b)) as State))).catch(() => undefined));
     const fresh: State = { repo: key, project: null, gone: false, base: {}, conflicts: [], syncedAt: null, last: null };
     this.#state = saved && saved.repo === key ? { ...fresh, ...saved } : fresh;
     return { state: this.#state, repo };
@@ -678,10 +673,7 @@ export class BoardStore implements ModuleService {
   #save(): Promise<void> {
     this.#saving = this.#saving.catch(() => {}).then(async () => {
       if (!this.#state || !this.#file) return;
-      await mkdir(dirname(this.#file), { recursive: true });
-      const tmp = `${this.#file}.${process.pid}.${randomUUID()}.tmp`;
-      await writeFile(tmp, JSON.stringify(this.#state));
-      await rename(tmp, this.#file);
+      await filesPort().write(this.#file, JSON.stringify(this.#state));
     });
     return this.#saving;
   }

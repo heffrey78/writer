@@ -89,7 +89,7 @@ export async function createServer({ library, token = newToken(), port = 0, shut
 
   const url = `http://${HOST}:${boundPort}`;
   const launchUrlFor = (path: string) => `${url}${path}?${TOKEN_PARAM}=${token}`;
-  const prepare = (id: string) => void workspaces.get(id)?.loadModel().catch(() => {});
+  const prepare = (id: string) => void workspaces.get(id).then((ws) => ws?.loadModel()).catch(() => {});
   return { app, url, launchUrl: launchUrlFor("/"), launchUrlFor, prepare, library, github, port: boundPort, token, close };
 }
 

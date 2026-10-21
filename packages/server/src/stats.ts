@@ -1,10 +1,8 @@
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import { countWords, parseMarkdown, wordChange, writingDays, type CommitWords } from "@writer/core";
 import type { Hono } from "hono";
 import { body, operation, type Env } from "./bible-routes.ts";
 import { NO_OBJECT, text, type Change as GitChange } from "./git-port/port.ts";
-import { gitPort } from "./ports.ts";
+import { filesPort, gitPort } from "./ports.ts";
 
 /*
  * The novel's writing history (heffrey78/gh-writer#20, D8): for every commit reachable from HEAD that changed scenes,
@@ -38,7 +36,7 @@ export async function writingHistory(root: string, content: string): Promise<Com
   // No commits yet: no history.
   const log = await git.history(root, content).catch(() => []);
   const commits = log.map((c) => ({ commit: c.oid, date: c.authored, changes: pieceChanges(c.files, content) }));
-  const cacheFile = join(await git.gitDir(root), CACHE);
+  const cacheFile = filesPort().join(await git.gitDir(root), CACHE);
   const cache = await readCache(cacheFile);
 
   const todo = commits.filter((c) => !cache.commits[c.commit]);
@@ -85,7 +83,7 @@ export async function uncommittedChange(root: string, content: string): Promise<
   let added = 0;
   let removed = 0;
   for (const path of paths) {
-    const now = await readFile(join(root, path), "utf8").catch(() => undefined);
+    const now = await filesPort().read(filesPort().join(root, path)).then((b) => (b === undefined ? undefined : text(b)));
     const change = wordChange(body(before.get(`HEAD:./${path}`), path), body(now, path));
     added += change.added;
     removed += change.removed;
@@ -122,7 +120,7 @@ async function readBlobs(root: string, oids: string[]): Promise<Map<string, stri
 
 async function readCache(file: string): Promise<Cache> {
   try {
-    const cache = JSON.parse(await readFile(file, "utf8")) as Cache;
+    const cache = JSON.parse(text((await filesPort().read(file)) ?? new Uint8Array())) as Cache;
     if (cache.method === METHOD && cache.commits && typeof cache.commits === "object") return cache;
   } catch {
     // None yet, or unreadable: worked out again.
@@ -131,11 +129,8 @@ async function readCache(file: string): Promise<Cache> {
 }
 
 async function writeCache(file: string, cache: Cache): Promise<void> {
-  await mkdir(join(file, ".."), { recursive: true });
-  // Another request may be writing it too: each writes a whole file of its own, then renames.
-  const temp = `${file}.${process.pid}.${Math.random().toString(36).slice(2)}`;
-  await writeFile(temp, JSON.stringify(cache));
-  await rename(temp, file);
+  // Another request may be writing it too: each writes a whole file of its own, then renames (the port's write).
+  await filesPort().write(file, JSON.stringify(cache));
 }
 
 /**

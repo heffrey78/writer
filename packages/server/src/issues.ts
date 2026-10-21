@@ -1,9 +1,6 @@
-import { randomUUID } from "node:crypto";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
 import { entityLabel, entityOfLabel, issueKindOf, kindByKey, passageIssueBody, V2_KIND, vocabulary, type BookKind, type Book } from "@writer/core";
 import { text as decode } from "./git-port/port.ts";
-import { gitPort } from "./ports.ts";
+import { filesPort, gitPort } from "./ports.ts";
 import { GitHubError, unreachable, type GitHub, type GitHubRepo } from "./github.ts";
 
 /*
@@ -250,7 +247,7 @@ export class IssueStore {
     const fields = { ...clean(input), title: input.title.trim() } as IssueInput & { title: string };
     await this.#ensureKnown(input.labels);
     // Marked from the first try: if GitHub makes it but its answer is lost, the resend finds it.
-    const marker = randomUUID();
+    const marker = crypto.randomUUID();
     const sent = await this.#direct(() => this.#send(repo, "/issues", "POST", { ...fields, body: withMarker(fields.body, marker) }));
     if (sent) return this.#upsert(fromIssue(sent as GhIssue), []);
     const key = this.#cache!.nextKey--;
@@ -462,7 +459,7 @@ export class IssueStore {
   /** Queue a change, make it in the cache now, and try to send the queue. Resolves to the issue it touches. */
   async #queue(change: QueuedChange["change"], description: string, number: number): Promise<Issue> {
     const cache = this.#cache!;
-    const q: QueuedChange = { id: randomUUID(), description, at: new Date().toISOString(), change };
+    const q: QueuedChange = { id: crypto.randomUUID(), description, at: new Date().toISOString(), change };
     cache.outbox.push(q);
     this.#applyLocal(q);
     this.#updateStatus();
@@ -729,10 +726,8 @@ export class IssueStore {
     const key = repo ? `${repo.owner}/${repo.name}` : "";
     this.#status = { ...this.#status, repo };
     if (this.#cache && this.#cache.repo === key) return this.#cache;
-    this.#file ??= join(await gitDir(this.root), "gh-writer", "issues.json");
-    const saved = await readFile(this.#file, "utf8")
-      .then((t) => JSON.parse(t) as Cache)
-      .catch(() => undefined);
+    this.#file ??= filesPort().join(await gitDir(this.root), "gh-writer", "issues.json");
+    const saved = (await filesPort().read(this.#file).then((b) => (b === undefined ? undefined : (JSON.parse(new TextDecoder().decode(b)) as Cache))).catch(() => undefined));
     const fresh: Cache = { repo: key, refreshedAt: null, since: null, etags: {}, issues: [], labels: [], milestones: [], outbox: [], renumbered: {}, nextKey: -1 };
     this.#cache = saved && saved.repo === key ? { ...fresh, ...saved } : fresh;
     this.#status = { repo, refreshedAt: this.#cache.refreshedAt, queued: 0, failed: [] };
@@ -745,10 +740,7 @@ export class IssueStore {
     // A write that failed doesn't stop the next one.
     this.#saving = this.#saving.catch(() => {}).then(async () => {
       if (!this.#cache || !this.#file) return;
-      await mkdir(dirname(this.#file), { recursive: true });
-      const tmp = `${this.#file}.${process.pid}.${randomUUID()}.tmp`;
-      await writeFile(tmp, JSON.stringify(this.#cache));
-      await rename(tmp, this.#file);
+      await filesPort().write(this.#file, JSON.stringify(this.#cache));
     });
     return this.#saving;
   }

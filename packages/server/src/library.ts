@@ -1,10 +1,8 @@
-import { mkdir, readdir, readFile, realpath, rename, rm, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { basename, dirname, join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { knownKind, knownKinds, MANIFEST, newId, NOVEL_MANIFEST, parseYaml, readManifest, slugify } from "@writer/core";
-import { nodeSource } from "@writer/core/node";
 import { cloneUrl, gitFailure, repoName, type CloneProgress, type GitAuthSource } from "./git-port/port.ts";
-import { gitPort } from "./ports.ts";
+import { bookSource, filesPort, gitPort } from "./ports.ts";
 import { NeedsIdentity, TEMPLATES, templateOf, writeNewBook, type NewNovel } from "./new-book.ts";
 
 /** A novel the author has opened or cloned. */
@@ -115,7 +113,7 @@ export class Library {
 
   /** Every novel whose folder still exists, most recently opened first. */
   async list(): Promise<LibraryEntry[]> {
-    const present = await Promise.all(this.#novels.map(async (n) => (await stat(n.path).catch(() => undefined))?.isDirectory() ?? false));
+    const present = await Promise.all(this.#novels.map(async (n) => (await filesPort().stat(n.path).catch(() => undefined))?.kind === "dir"));
     const gone = this.#novels.filter((_, i) => !present[i]);
     if (gone.length) {
       for (const n of gone) {
@@ -139,7 +137,7 @@ export class Library {
     if (!configDir) return [];
     let theirs: { path?: unknown; title?: unknown }[];
     try {
-      theirs = (JSON.parse(await readFile(join(configDir, "library.json"), "utf8")) as { novels?: { path?: unknown; title?: unknown }[] }).novels ?? [];
+      theirs = (JSON.parse(decoder.decode(await filesPort().read(join(configDir, "library.json")))) as { novels?: { path?: unknown; title?: unknown }[] }).novels ?? [];
     } catch {
       return [];
     }
@@ -170,9 +168,12 @@ export class Library {
   /** Check that `dir` is a git repository holding a book (book.yaml, or novel.yaml for a novel in format 1 or 2), and add it (or refresh its entry). */
   async add(folder: string): Promise<LibraryEntry> {
     const dir = expandHome(folder);
-    const info = await stat(dir).catch(() => undefined);
-    if (!info?.isDirectory()) throw new LibraryError("NOT_A_DIRECTORY", `${resolve(dir)} isn't a folder.`);
-    const path = await realpath(dir);
+    const info = await filesPort().stat(dir).catch(() => undefined);
+    // A symlink to a folder is one too: what it leads to is checked.
+    const real = info && (await filesPort().real(dir));
+    const kind = info?.kind === "symlink" && real ? (await filesPort().stat(real))?.kind : info?.kind;
+    if (kind !== "dir" || !real) throw new LibraryError("NOT_A_DIRECTORY", `${resolve(dir)} isn't a folder.`);
+    const path = real;
 
     if (!(await gitPort().isRepo(path))) throw new LibraryError("NOT_A_REPO", `${path} isn't a git repository. A book needs one to keep its history and sync with GitHub.`);
 
@@ -230,11 +231,12 @@ export class Library {
   async clone(repo: string, { into, onProgress, signal, auth }: CloneOptions = {}): Promise<LibraryEntry> {
     const url = cloneUrl(repo);
     const dest = resolve(into ? expandHome(into) : join(this.cloneDir, repoName(url)));
-    const existing = await readdir(dest).catch(() => undefined);
+    const files = filesPort();
+    const existing = (await files.stat(dest))?.kind === "dir" ? await files.list(dest) : undefined;
     if (existing?.length) throw gitFailure("DESTINATION_EXISTS", `destination path '${dest}' already exists and is not an empty directory`);
-    const cleanUp = () => (existing ? rm(dest, { recursive: true, force: true }).then(() => mkdir(dest)) : rm(dest, { recursive: true, force: true }));
+    const cleanUp = () => files.removeTree(dest).then(() => (existing ? files.makeDir(dest) : undefined));
 
-    await mkdir(dirname(dest), { recursive: true });
+    await files.makeDir(files.dirname(dest));
     try {
       const credentials = await auth?.(url);
       await gitPort().clone(url, dest, { ...(credentials ? { auth: credentials } : {}), ...(onProgress ? { onProgress } : {}), ...(signal ? { signal } : {}) });
@@ -260,7 +262,7 @@ export class Library {
 
   /** The kinds of book it can start, each with a template: their keys and names ("Novel", "Journal"). */
   async kinds(): Promise<{ key: string; label: string }[]> {
-    const has = await Promise.all(knownKinds().map(async (k) => (await stat(templateOf(k.key, this.templatesDir)).catch(() => undefined))?.isDirectory() ?? false));
+    const has = await Promise.all(knownKinds().map(async (k) => (await filesPort().stat(templateOf(k.key, this.templatesDir)).catch(() => undefined))?.kind === "dir"));
     return knownKinds().flatMap((k, i) => (has[i] ? [{ key: k.key, label: k.label }] : []));
   }
 
@@ -271,15 +273,16 @@ export class Library {
    */
   async create({ into, kind = "novel", ...novel }: NewNovel & { into?: string }): Promise<LibraryEntry> {
     const template = templateOf(kind, this.templatesDir);
-    if (!knownKind(kind) || !(await stat(template).catch(() => undefined))?.isDirectory()) throw new LibraryError("UNKNOWN_KIND", `Writer can't start a book of the kind “${kind}”.`);
+    const files = filesPort();
+    if (!knownKind(kind) || (await files.stat(template).catch(() => undefined))?.kind !== "dir") throw new LibraryError("UNKNOWN_KIND", `Writer can't start a book of the kind “${kind}”.`);
     const dest = resolve(into ? expandHome(into) : this.defaultFolder(novel.title));
-    const info = await stat(dest).catch(() => undefined);
-    if (info && !info.isDirectory()) throw new LibraryError("NOT_A_DIRECTORY", `${dest} is a file, not a folder. Choose another folder.`);
-    const existing = info && (await readdir(dest));
+    const info = await files.stat(dest).catch(() => undefined);
+    if (info && info.kind !== "dir") throw new LibraryError("NOT_A_DIRECTORY", `${dest} is a file, not a folder. Choose another folder.`);
+    const existing = info && (await files.list(dest));
     if (existing?.length) throw new LibraryError("NOT_EMPTY", `${dest} already exists and isn't empty. Choose another folder, or a new name.`);
-    const cleanUp = () => (existing ? rm(dest, { recursive: true, force: true }).then(() => mkdir(dest)) : rm(dest, { recursive: true, force: true }));
+    const cleanUp = () => files.removeTree(dest).then(() => (existing ? files.makeDir(dest) : undefined));
 
-    await mkdir(dest, { recursive: true });
+    await files.makeDir(dest);
     try {
       await writeNewBook(template, dest, novel);
       return await this.add(dest);
@@ -291,19 +294,15 @@ export class Library {
   }
 
   async #load(): Promise<void> {
-    let text: string;
-    try {
-      text = await readFile(this.file, "utf8");
-    } catch (e) {
-      if ((e as NodeJS.ErrnoException).code === "ENOENT") return;
-      throw e;
-    }
+    const bytes = await filesPort().read(this.file);
+    if (bytes === undefined) return;
+    const text = decoder.decode(bytes);
     try {
       const data = JSON.parse(text) as LibraryFile;
       this.#novels = Array.isArray(data.novels) ? data.novels.filter(isEntry) : [];
     } catch {
       const backup = `${this.file}.unreadable-${Date.now()}`;
-      await rename(this.file, backup);
+      await filesPort().rename(this.file, backup);
       this.notices.push({ code: "UNREADABLE", path: backup, message: `The library file couldn't be read, so the library starts empty. The old file is at ${backup}.` });
     }
   }
@@ -314,10 +313,7 @@ export class Library {
     this.#saving = this.#saving
       .catch(() => {})
       .then(async () => {
-        await mkdir(dirname(this.file), { recursive: true });
-        const tmp = `${this.file}.${process.pid}.tmp`;
-        await writeFile(tmp, `${JSON.stringify(data, null, 2)}\n`);
-        await rename(tmp, this.file);
+        await filesPort().write(this.file, `${JSON.stringify(data, null, 2)}\n`);
       });
     return this.#saving;
   }
@@ -328,7 +324,7 @@ export class Library {
  * (the folder's name without one), the author and the cover image's path. Undefined without a manifest.
  */
 async function coverOf(path: string): Promise<{ title: string; author?: string; cover?: string } | undefined> {
-  const manifest = await readManifest(nodeSource(path));
+  const manifest = await readManifest(bookSource(path));
   if (!manifest) return undefined;
   const data = parseYaml(manifest.text, manifest.file).data as { title?: unknown; author?: unknown; cover?: unknown } | undefined;
   const title = typeof data?.title === "string" && data.title.trim() ? data.title.trim() : basename(path);
@@ -365,3 +361,5 @@ export function expandHome(path: string): string {
   if (p.startsWith("~/") || p.startsWith("~\\")) return join(homedir(), p.slice(2));
   return p;
 }
+
+const decoder = new TextDecoder();

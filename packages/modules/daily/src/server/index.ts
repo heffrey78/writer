@@ -1,6 +1,5 @@
 import { loadBook, storyTimeField, vocabulary } from "@writer/core";
-import { nodeSource } from "@writer/core/node";
-import { body, operation, OperationError, type ServerModule } from "@writer/server";
+import { body, bookSource, operation, OperationError, type ServerModule } from "@writer/server";
 import { entryOn, entryTitle, isDay, placeOf } from "../core/index.ts";
 
 /**
@@ -18,7 +17,7 @@ export const dailyServer: ServerModule = {
       return operation(c, async () => {
         if (!isDay(day)) throw new OperationError("BAD_REQUEST", "A day is a date, YYYY-MM-DD.");
         const ws = c.var.ws;
-        const book = await loadBook(nodeSource(ws.root), ws.kind);
+        const book = await loadBook(bookSource(ws.root), ws.kind);
         const there = entryOn(book, day);
         if (there) return { id: there.id, file: there.file, made: false };
         const time = storyTimeField(book.kind);

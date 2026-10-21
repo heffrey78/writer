@@ -1,14 +1,13 @@
-import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { sep } from "node:path";
 import { kindOf } from "@writer/core";
-import { nodeSource } from "@writer/core/node";
 import { Hono, type Context } from "hono";
 import { streamSSE } from "hono/streaming";
 import { FileError, imageVersion, servableImage } from "./files.ts";
 import { GitFailure, gitFailure } from "./git-port/port.ts";
 import type { GitHub } from "./github.ts";
 import { LibraryError, type Library } from "./library.ts";
+import { bookSource, filesPort } from "./ports.ts";
 
 /**
  * GET    /api/library        { novels, notices, folder, ghWriter, kinds }: folder is where new novels and clones go, ~ for home;
@@ -32,7 +31,7 @@ export function libraryRoutes(library: Library, github?: GitHub): Hono {
       (await library.list()).map(async (n) => {
         const coverVersion = await imageVersion(n.path, n.cover);
         // Its kind's modules, for what they offer on its tile (Today's entry): read from its manifest.
-        const kind = await kindOf(nodeSource(n.path)).catch(() => undefined);
+        const kind = await kindOf(bookSource(n.path)).catch(() => undefined);
         return { ...n, ...(coverVersion ? { coverVersion } : {}), ...(kind ? { kind: kind.key, modules: [...(kind.modules ?? [])] } : {}) };
       }),
     );
@@ -46,7 +45,9 @@ export function libraryRoutes(library: Library, github?: GitHub): Hono {
     try {
       const image = await servableImage(entry.path, entry.cover);
       if (!image) return c.json({ code: "NOT_FOUND", error: `No image "${entry.cover}".` }, 404);
-      return new Response(await readFile(image.full), { headers: { "content-type": image.type, "cache-control": "no-cache", "x-content-type-options": "nosniff" } });
+      const bytes = await filesPort().read(image.full);
+      if (!bytes) return c.json({ code: "NOT_FOUND", error: `No image "${entry.cover}".` }, 404);
+      return new Response(bytes as Uint8Array<ArrayBuffer>, { headers: { "content-type": image.type, "cache-control": "no-cache", "x-content-type-options": "nosniff" } });
     } catch (e) {
       if (!(e instanceof FileError)) throw e;
       return c.json({ code: e.code, error: e.message }, 400);

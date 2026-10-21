@@ -1,11 +1,8 @@
-import { existsSync } from "node:fs";
-import { readdir, readFile } from "node:fs/promises";
-import { join, posix } from "node:path";
+import { dirnameOf, nameOf } from "./book-paths.ts";
 import { editFrontMatter, editYaml, indexById, kindByKey, loadBook, numberedName, pieceLevel, slugify, startLevels, uniqueId, V2_KIND, vocabulary, type Book, type BookKind, type LevelDef, type Piece, type Section } from "@writer/core";
-import { nodeSource } from "@writer/core/node";
 import { parse, stringify } from "yaml";
 import { text as decode } from "./git-port/port.ts";
-import { gitPort } from "./ports.ts";
+import { bookSource, filesPort, gitPort } from "./ports.ts";
 import { overlay } from "./migrate.ts";
 import { OperationError, transaction, type FileWrite, type OperationResult } from "./operations.ts";
 
@@ -37,7 +34,8 @@ class Overlay {
 
   async read(path: string): Promise<string | null> {
     if (this.writes.has(path)) return this.writes.get(path)!;
-    return readFile(join(this.root, path), "utf8").catch(() => null);
+    const bytes = await filesPort().read(filesPort().join(this.root, path));
+    return bytes === undefined ? null : new TextDecoder().decode(bytes);
   }
 
   set(path: string, content: string | null): void {
@@ -48,10 +46,10 @@ class Overlay {
   async files(dir: string): Promise<string[]> {
     const out = new Set<string>();
     const walk = async (d: string): Promise<void> => {
-      for (const e of await readdir(join(this.root, d), { withFileTypes: true }).catch(() => [])) {
-        const p = posix.join(d, e.name);
-        if (e.isDirectory()) await walk(p);
-        else if (!e.name.startsWith(".")) out.add(p);
+      for (const e of await filesPort().list(filesPort().join(this.root, d))) {
+        const p = d ? `${d}/${e.path}` : e.path;
+        if (e.kind === "dir") await walk(p);
+        else if (!e.path.startsWith(".")) out.add(p);
       }
     };
     await walk(dir);
@@ -72,8 +70,12 @@ class Overlay {
   }
 
   /** The net changes: a file created and then moved on within the operation was never there. */
-  changes(): FileWrite[] {
-    return [...this.writes].filter(([path, content]) => content !== null || existsSync(join(this.root, path))).map(([path, content]) => ({ path, content }));
+  async changes(): Promise<FileWrite[]> {
+    const out: FileWrite[] = [];
+    for (const [path, content] of this.writes) {
+      if (content !== null || (await filesPort().stat(filesPort().join(this.root, path)))) out.push({ path, content });
+    }
+    return out;
   }
 }
 
@@ -124,7 +126,7 @@ export class ManuscriptOperations {
     o.set(path, `---\n${stringify({ id, title: name, ...(synopsis ? { synopsis } : {}), status, ...rest }, { lineWidth: 0 })}---\n${novel.kind.piece.template ?? ""}`);
     await this.#insert(o, novel, { section: chapter }, id, after);
     await this.#renumber(o, novel, { section: chapter }, new Map([[id, path]]));
-    const writes = o.changes();
+    const writes = await o.changes();
     // Where it is once numbered.
     const file = writes.find((w) => typeof w.content === "string" && w.path.endsWith(".md") && w.content.startsWith(`---\nid: ${id}\n`))!.path;
     return { id, title: name, file, writes };
@@ -140,7 +142,7 @@ export class ManuscriptOperations {
     return this.#exclusive(async () => {
       const o = new Overlay(this.root);
       // The book as it will be: each step reads what the ones before it made.
-      const load = () => loadBook(overlay(nodeSource(this.root), [...o.writes].map(([p, content]) => ({ path: p, content }))), this.#kindOf());
+      const load = () => loadBook(overlay(bookSource(this.root), [...o.writes].map(([p, content]) => ({ path: p, content }))), this.#kindOf());
       let novel = await load();
       const levels = novel.kind.levels.slice(novel.kind.levels.findIndex((l) => l.key === novel.levels[0]));
       if (path.length !== levels.length) throw new OperationError("BAD_REQUEST", `A ${vocabulary(novel.kind).piece.one} here is in ${levels.length} section${levels.length === 1 ? "" : "s"}, not ${path.length}.`);
@@ -237,11 +239,11 @@ export class ManuscriptOperations {
       if (!sameContainer(from, target)) {
         const dir = this.#dir(novel, target);
         if (item.kind === "piece") {
-          const dest = `${dir}/${posix.basename(item.piece.file)}`;
+          const dest = `${dir}/${nameOf(item.piece.file)}`;
           await o.move([[item.piece.file, dest]]);
           paths.set(id, dest);
         } else {
-          const dest = `${dir}/${posix.basename(item.section.dir)}`;
+          const dest = `${dir}/${nameOf(item.section.dir)}`;
           await this.#moveDir(o, item.section.dir, dest);
           paths.set(id, dest);
         }
@@ -274,7 +276,7 @@ export class ManuscriptOperations {
       const keep = Object.fromEntries(
         Object.entries(parse(text.slice(0, fmEnd).replace(/^\uFEFF?---\r?\n/, "").replace(/---[ \t]*\r?\n?$/, "")) ?? {}).filter(([k]) => kept.includes(k)),
       );
-      const path = `${posix.dirname(scene.file)}/${slugify(name)}.md`;
+      const path = `${dirnameOf(scene.file)}/${slugify(name)}.md`;
       o.set(scene.file, first);
       o.set(path, `---\n${stringify({ id, title: name, ...keep }, { lineWidth: 0 })}---\n${body.slice(cut)}`);
       const holder: Container = { section: this.#holder(novel, scene.sectionId!) };
@@ -361,7 +363,7 @@ export class ManuscriptOperations {
     const out: DeletedItem[] = [];
     for (const { oid: commit, committed: date, files } of log) {
       const deleted = files;
-      const containers = deleted.filter((f) => sectionFile.test(f)).map((f) => posix.dirname(f));
+      const containers = deleted.filter((f) => sectionFile.test(f)).map((f) => dirnameOf(f));
       // A section's own files are part of it; the outermost sections are the items.
       const tops = containers.filter((d) => !containers.some((other) => other !== d && d.startsWith(`${other}/`)));
       for (const dir of tops) {
@@ -373,7 +375,7 @@ export class ManuscriptOperations {
         const text = (await this.#show(`${commit}^`, file)) ?? "";
         const fm = /^\uFEFF?---\r?\n([\s\S]*?)\r?\n---/.exec(text)?.[1];
         const data = (fm ? parse(fm) : null) as { id?: string; title?: string } | null;
-        if (data?.id && !present.has(data.id)) out.push({ commit, date, kind: kind.piece.key, id: data.id, title: data.title ?? posix.basename(file), path: file });
+        if (data?.id && !present.has(data.id)) out.push({ commit, date, kind: kind.piece.key, id: data.id, title: data.title ?? nameOf(file), path: file });
       }
       if (out.length >= limit) break;
     }
@@ -392,7 +394,7 @@ export class ManuscriptOperations {
       const isPiece = item.kind === kind.piece.key;
       const at = kind.levels.findIndex((l) => l.key === item.kind);
       // Where it was: its old container (by ID), and the sibling it followed.
-      const parentDir = posix.dirname(item.path);
+      const parentDir = dirnameOf(item.path);
       const parentLevel = isPiece ? kind.levels.at(-1)! : parentDir === kind.folders.content ? undefined : kind.levels[at - 1];
       const parentFile = parentLevel ? `${parentDir}/_${parentLevel.key}.yaml` : orderPath(kind);
       const oldParent = (parse((await this.#show(before, parentFile)) ?? "") ?? {}) as Record<string, unknown>;
@@ -409,7 +411,7 @@ export class ManuscriptOperations {
       const destDir = this.#dir(novel, container);
       const files = isPiece ? [item.path] : (await gitPort().listTree(this.root, before, item.path)).map((e) => e.path);
       const taken = new Set((await o.files(destDir)).map((f) => f.slice(destDir.length + 1).split("/")[0]!));
-      const base = posix.basename(item.path);
+      const base = nameOf(item.path);
       let name = base;
       for (let n = 2; taken.has(name); n++) name = isPiece ? base.replace(/\.md$/, `-${n}.md`) : `${base}-${n}`;
       const newPath = `${destDir}/${name}`;
@@ -420,7 +422,7 @@ export class ManuscriptOperations {
       const at2 = previous === undefined ? 0 : current.indexOf(previous) + 1;
       await this.#setList(o, novel, container, [...current.slice(0, at2), id, ...current.slice(at2)]);
       await this.#renumber(o, novel, container, new Map([[id, newPath]]));
-      return transaction(this.root, o.changes(), `${content(novel)}: restore ${vocabulary(novel.kind).of(item.kind).one} “${item.title}”`);
+      return transaction(this.root, await o.changes(), `${content(novel)}: restore ${vocabulary(novel.kind).of(item.kind).one} “${item.title}”`);
     });
   }
 
@@ -431,7 +433,7 @@ export class ManuscriptOperations {
       const novel = await this.#load();
       const o = new Overlay(this.root);
       const { message, ...rest } = await fn(novel, o);
-      return { ...(await transaction(this.root, o.changes(), message)), ...(rest as Omit<T, "message">) };
+      return { ...(await transaction(this.root, await o.changes(), message)), ...(rest as Omit<T, "message">) };
     });
   }
 
@@ -441,7 +443,7 @@ export class ManuscriptOperations {
   }
 
   #load(): Promise<Book> {
-    return loadBook(nodeSource(this.root), this.#kindOf());
+    return loadBook(bookSource(this.root), this.#kindOf());
   }
 
   async #show(rev: string, path: string): Promise<string | undefined> {
@@ -553,7 +555,7 @@ export class ManuscriptOperations {
       const path = current(id);
       if (!path) return;
       const isFile = path.endsWith(".md");
-      const base = posix.basename(path, isFile ? ".md" : "");
+      const base = nameOf(path, isFile ? ".md" : "");
       const slug = base.replace(/^\d+-/, "") || "untitled";
       const wanted = `${this.#dir(novel, c)}/${numberedName(i, list.length, slug)}${isFile ? ".md" : ""}`;
       if (wanted !== path) (isFile ? fileMoves : dirMoves).push([path, wanted]);
@@ -622,9 +624,9 @@ const sameContainer = (a: Container, b: Container) => ("top" in a && "top" in b)
 
 /** `path` with a new slug, keeping its number prefix: 03-old.md → 03-new.md. */
 function rename(path: string, slug: string, ext: string): string {
-  const base = posix.basename(path, ext);
+  const base = nameOf(path, ext);
   const number = /^(\d+)-/.exec(base)?.[1];
-  return `${posix.dirname(path)}/${number ? `${number}-` : ""}${slug}${ext}`;
+  return `${dirnameOf(path)}/${number ? `${number}-` : ""}${slug}${ext}`;
 }
 
 /** The body after front matter. */

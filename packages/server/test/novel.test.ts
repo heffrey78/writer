@@ -339,8 +339,12 @@ describe("atomic writes", () => {
     const file = join(root, SCENE);
     const original = readFileSync(file, "utf8");
     const files = fileURLToPath(new URL("../src/files.ts", import.meta.url));
+    const ports = fileURLToPath(new URL("../src/node-ports.ts", import.meta.url));
+    // An entry point of its own: it gives the server its ports on Node first.
     const script = `
       import { atomicWrite } from ${JSON.stringify(files)};
+      import { useNodePorts } from ${JSON.stringify(ports)};
+      useNodePorts();
       await atomicWrite(${JSON.stringify(file)}, "NEW CONTENT\\n", { beforeRename: () => process.kill(process.pid, "SIGKILL") });
     `;
     const r = spawnSync("node", ["--input-type=module", "-e", script], { encoding: "utf8" });

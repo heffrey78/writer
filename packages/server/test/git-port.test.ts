@@ -130,8 +130,8 @@ describe.each(PORTS)("the git port: %s", (_, p) => {
     write(repo, "outside.md", "Not the book's.\n");
     write(dir, "a.md", prose("one!", "two", "three"));
     write(dir, "new.md", "New.\n");
-    write(dir, ".new.md.writer-tmp", "Half written.\n");
-    const temp = { exclude: ["**/.*.writer-tmp"] };
+    write(dir, ".new.md.ghw-tmp", "Half written.\n");
+    const temp = { exclude: ["**/.*.ghw-tmp"] };
     expect((await p.status(dir, temp)).map((e) => [e.path, e.x, e.y])).toEqual([
       ["a.md", " ", "M"],
       ["new.md", "?", "?"],
@@ -141,7 +141,7 @@ describe.each(PORTS)("the git port: %s", (_, p) => {
     await p.stage(dir, temp);
     expect((await p.stagedChanges(dir, temp)).map((c) => c.path)).toEqual(["a.md", "new.md"]);
     expect(await p.commit(dir, "In the book", temp)).not.toBeNull();
-    expect((await p.status(repo)).map((e) => e.path)).toEqual([".new.md.writer-tmp", "outside.md"].map((f) => (f === "outside.md" ? f : `book/${f}`)).sort());
+    expect((await p.status(repo)).map((e) => e.path)).toEqual([".new.md.ghw-tmp", "outside.md"].map((f) => (f === "outside.md" ? f : `book/${f}`)).sort());
     expect(text((await p.readFile(dir, "HEAD", "new.md"))!)).toBe("New.\n");
     expect((await p.listTree(dir, "HEAD")).map((e) => e.path)).toEqual(["a.md", "b.md", "c.md", "new.md"]);
     expect((await p.log(dir, { path: "new.md" })).map((c) => c.summary)).toEqual(["In the book"]);
@@ -498,7 +498,7 @@ describe.runIf(rust)("git and libgit2 agree", () => {
       const dir = fresh(name);
       execFileSync("cp", ["-r", original, dir]);
       const book = join(dir, "book");
-      await p.stage(book, { exclude: ["**/.*.writer-tmp"] });
+      await p.stage(book, { exclude: ["**/.*.ghw-tmp"] });
       const staged = await p.stagedChanges(book);
       await p.commit(book, "Everything");
       await p.restore(dir, "checkpoint/one", ["book"]);

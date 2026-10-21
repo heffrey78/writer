@@ -1,13 +1,10 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import { editYaml, loadBook, pieceLevel, vocabulary } from "@writer/core";
-import { nodeSource } from "@writer/core/node";
 import { slug, wordsIn, type Checkpoint, type Checkpoints } from "./checkpoints.ts";
 import { operationInProgress, type Committer } from "./committer.ts";
 import { commitMerge, ConflictError, openConflicts, prepareMerge, type Conflicts, type FileResolution, type PreparedMerge } from "./conflicts.ts";
 import { atomicWrite, writablePath } from "./files.ts";
 import { commitSource } from "./git-source.ts";
-import { gitPort } from "./ports.ts";
+import { bookSource, filesPort, gitPort } from "./ports.ts";
 
 /*
  * Alternate versions of a novel (heffrey78/gh-writer#17, D7): a different ending, a cut subplot, written alongside the
@@ -291,7 +288,7 @@ export class Versions {
       const scene = there.allPieces.find((s) => s.id === sceneId);
       if (!scene) throw new VersionError("NOT_FOUND", `“${version.name}” has no ${vocabulary(there.kind).piece.one} “${sceneId}”.`);
       const content = (await source.read(scene.file))!;
-      const here = await loadBook(nodeSource(this.root));
+      const here = await loadBook(bookSource(this.root));
       const git = gitPort();
       const undo = await this.#checkpoints.keep(`Before bringing “${scene.title}” from “${version.name}”`, (await git.resolve(this.root, "HEAD"))!);
 
@@ -305,14 +302,14 @@ export class Versions {
         const section = vocabulary(here.kind).level(pieceLevel(here));
         if (!chapter) throw new VersionError("NOT_HERE", `“${scene.title}” is in ${section.a} this version doesn't have: adopt the whole version, or add the ${section.one} first.`);
         let path = `${chapter.dir}/${scene.file.split("/").at(-1)}`;
-        for (let n = 2; await readFile(join(this.root, path)).then(() => true, () => false); n++) path = `${chapter.dir}/${scene.file.split("/").at(-1)!.replace(/\.md$/, `-${n}.md`)}`;
+        for (let n = 2; (await filesPort().stat(filesPort().join(this.root, path))) !== undefined; n++) path = `${chapter.dir}/${scene.file.split("/").at(-1)!.replace(/\.md$/, `-${n}.md`)}`;
         await atomicWrite(await writablePath(this.root, path, content), content);
         // After the scene it follows in the other version, if that's here; else first, or last.
         const order = there.allSections.find((c) => c.id === chapter.id)?.childIds ?? [];
         const before = order.slice(0, order.indexOf(sceneId)).reverse().find((s) => chapter.childIds.includes(s));
         const scenes = [...chapter.childIds];
         scenes.splice(before ? scenes.indexOf(before) + 1 : order.indexOf(sceneId) === 0 ? 0 : scenes.length, 0, sceneId);
-        const yaml = editYaml(await readFile(join(this.root, chapter.file), "utf8"), [{ path: ["scenes"], value: scenes }]);
+        const yaml = editYaml(new TextDecoder().decode((await filesPort().read(filesPort().join(this.root, chapter.file))) ?? new Uint8Array()), [{ path: ["scenes"], value: scenes }]);
         await atomicWrite(await writablePath(this.root, chapter.file, yaml), yaml);
         files.push(path, chapter.file);
       }
@@ -456,7 +453,8 @@ async function gitDir(root: string): Promise<string> {
 
 /** Branches of versions discarded here, still to be deleted on the remote. */
 export async function discardedVersions(root: string): Promise<string[]> {
-  const text = await readFile(join(await gitDir(root), DISCARDED), "utf8").catch(() => "[]");
+  const bytes = await filesPort().read(filesPort().join(await gitDir(root), DISCARDED));
+  const text = bytes === undefined ? "[]" : new TextDecoder().decode(bytes);
   try {
     const list = JSON.parse(text) as unknown;
     return Array.isArray(list) ? list.filter((b): b is string => typeof b === "string" && b.startsWith(VERSION_PREFIX)) : [];
@@ -466,7 +464,5 @@ export async function discardedVersions(root: string): Promise<string[]> {
 }
 
 export async function setDiscardedVersions(root: string, branches: string[]): Promise<void> {
-  const file = join(await gitDir(root), DISCARDED);
-  await mkdir(join(file, ".."), { recursive: true });
-  await writeFile(file, `${JSON.stringify(branches)}\n`);
+  await filesPort().write(filesPort().join(await gitDir(root), DISCARDED), `${JSON.stringify(branches)}\n`);
 }

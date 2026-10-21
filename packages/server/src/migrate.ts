@@ -1,10 +1,8 @@
-import { readdir, readFile } from "node:fs/promises";
-import { join } from "node:path";
 import { migration, SCHEMA_VERSION, type FileSource, type Migration } from "@writer/core";
-import { nodeSource } from "@writer/core/node";
-import { readToolBytes, TOOLS_DIR } from "./files.ts";
+import { filesUnder, readToolBytes, sameBytes, TOOLS_DIR } from "./files.ts";
 import { DEFAULT_TEMPLATE } from "./new-book.ts";
 import { transaction, type FileWrite, type OperationResult } from "./operations.ts";
+import { bookSource, filesPort } from "./ports.ts";
 
 /*
  * Moving a book to a newer format (D11, D15) as one commit: core's migration of its files, and the
@@ -13,7 +11,7 @@ import { transaction, type FileWrite, type OperationResult } from "./operations.
 
 /** What migrating the book at `root` to format `to` would write, with the tools from `templateDir` where the book has them. */
 export async function migrationWrites(root: string, templateDir = DEFAULT_TEMPLATE, to = SCHEMA_VERSION): Promise<{ migration: Migration; writes: FileWrite[] }> {
-  const m = await migration(nodeSource(root), to);
+  const m = await migration(bookSource(root), to);
   if (m.status !== "migrate") return { migration: m, writes: [] };
   return { migration: m, writes: [...m.writes, ...(await toolWrites(root, templateDir))] };
 }
@@ -55,23 +53,16 @@ export function overlay(base: FileSource, writes: FileWrite[]): FileSource {
 
 /** The template's tools that differ from the novel's, for a novel that carries tools at all. */
 async function toolWrites(root: string, templateDir: string): Promise<FileWrite[]> {
-  const theirs = await listFiles(join(root, TOOLS_DIR));
+  const files = filesPort();
+  const theirs = await filesUnder(files.join(root, TOOLS_DIR));
   if (!theirs.length) return [];
   const writes: FileWrite[] = [];
-  for (const name of await listFiles(join(templateDir, TOOLS_DIR))) {
+  for (const name of await filesUnder(files.join(templateDir, TOOLS_DIR))) {
     const path = `${TOOLS_DIR}/${name}`;
-    const bytes = await readFile(join(templateDir, TOOLS_DIR, name));
+    const bytes = (await files.read(files.join(templateDir, TOOLS_DIR, name)))!;
     const current = await readToolBytes(root, path);
-    if (!current || !current.bytes.equals(bytes)) writes.push({ path, content: new Uint8Array(bytes), tool: true });
+    if (!current || !sameBytes(current.bytes, bytes)) writes.push({ path, content: new Uint8Array(bytes), tool: true });
   }
   return writes;
 }
 
-/** Files under `dir`, as paths relative to it, sorted; none if it isn't there. */
-async function listFiles(dir: string): Promise<string[]> {
-  const entries = await readdir(dir, { recursive: true, withFileTypes: true }).catch(() => []);
-  return entries
-    .filter((e) => e.isFile())
-    .map((e) => join(e.parentPath, e.name).slice(dir.length + 1).split("\\").join("/"))
-    .sort();
-}

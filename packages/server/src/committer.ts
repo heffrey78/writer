@@ -1,9 +1,8 @@
 import { kindByKey, kindOf, V2_KIND } from "@writer/core";
-import { nodeSource } from "@writer/core/node";
 import { commitMessage, type FileChange } from "./commit-message.ts";
 import { TEMP_SUFFIX } from "./files.ts";
 import { GitFailure, gitFailure, NO_OBJECT, text, type Scope } from "./git-port/port.ts";
-import { gitPort } from "./ports.ts";
+import { bookSource, gitPort } from "./ports.ts";
 
 export interface CommitterOptions {
   /** Commit after this long without a save (ms). Default 2 minutes. */
@@ -203,7 +202,7 @@ export class Committer {
     if (!changes.length) return { skipped: "NOTHING" };
 
     // Its kind is one this copy ships: a book of any other kind is never written to.
-    const kind = (await kindOf(nodeSource(this.root))) ?? kindByKey(V2_KIND);
+    const kind = (await kindOf(bookSource(this.root))) ?? kindByKey(V2_KIND);
     const { summary, body } = commitMessage(changes, kind);
     // No hooks: a background save must not run (or be stopped by) the author's commit hooks.
     await git.commit(this.root, `${summary}\n\n${body}`, BOOK);

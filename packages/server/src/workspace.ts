@@ -1,9 +1,4 @@
-import { readFileSync } from "node:fs";
-import { readdir, readFile, unlink } from "node:fs/promises";
-import { join, relative, sep } from "node:path";
 import { EVENT_FILES_FORMAT, kindByKey, knownKind, loadBook, MANIFEST, parseYaml, picturePath, pictures, readManifest, SCHEMA_VERSION, slugify, uniqueFileName, V2_KIND, type BookKind, type FileSource, type Book } from "@writer/core";
-import { nodeSource } from "@writer/core/node";
-import { watch, type FSWatcher } from "chokidar";
 import { BibleOperations } from "./bible.ts";
 import { moduleServices, type ModuleService } from "./modules.ts";
 import { Checkpoints } from "./checkpoints.ts";
@@ -11,7 +6,7 @@ import { ManuscriptOperations } from "./manuscript.ts";
 import { Committer, type CommitStatus, type CommitterOptions } from "./committer.ts";
 import { atomicWrite, FileError, hashText, IMAGES_DIR, imageVersion, isVisible, readText, servableImage, sniffImage, writableImagePath, writablePath, type TextFile, type WriteHooks } from "./files.ts";
 import type { Library } from "./library.ts";
-import { gitPort } from "./ports.ts";
+import { bookSource, filesPort, gitPort } from "./ports.ts";
 import { githubRepoOf, type GitHub, type GitHubRepo } from "./github.ts";
 import { IssueStore } from "./issues.ts";
 import { Syncer, type SyncerOptions, type SyncStatus } from "./sync.ts";
@@ -72,8 +67,9 @@ export class NovelWorkspace {
   /** path → hash of what the server last wrote there: a watcher event with that hash is an echo. */
   #written = new Map<string, string>();
   #listeners = new Set<(e: FileEvent) => void>();
-  #watcher?: FSWatcher;
+  #unwatch?: () => Promise<void>;
   #ready?: Promise<void>;
+  #kind: BookKind;
   /** Writes under way, and the exclusive task (sync, restore) that new writes wait for. */
   #writing = 0;
   #drained?: () => void;
@@ -83,8 +79,19 @@ export class NovelWorkspace {
   /** Pictures the prose stopped naming, their files deleted: kept so a save that names one again (an Undo) brings it back. */
   #dropped = new Map<string, { full: string; bytes: Uint8Array }>();
 
-  constructor(root: string, { commit = {}, sync = {}, github }: WorkspaceOptions = {}) {
+  /** The book in `root`, its kind read first (`kind` is kept, and read again when its manifest changes). */
+  static async open(root: string, options: WorkspaceOptions = {}): Promise<NovelWorkspace> {
+    return new NovelWorkspace(root, await readKind(root), options);
+  }
+
+  /** The book in `root`, of `kind` as just read from its manifest. */
+  static made(root: string, kind: BookKind, options: WorkspaceOptions = {}): NovelWorkspace {
+    return new NovelWorkspace(root, kind, options);
+  }
+
+  private constructor(root: string, kind: BookKind, { commit = {}, sync = {}, github }: WorkspaceOptions = {}) {
     this.root = root;
+    this.#kind = kind;
     this.#github = github;
     this.committer = commit === false ? undefined : new Committer(root, commit);
     this.syncer =
@@ -181,7 +188,7 @@ export class NovelWorkspace {
    * of book it doesn't ship. Written by it, the book would be written wrong (D11, D15). Undefined otherwise.
    */
   async tooNew(): Promise<string | undefined> {
-    const manifest = await readManifest(nodeSource(this.root));
+    const manifest = await readManifest(bookSource(this.root));
     if (!manifest) return undefined;
     if (manifest.version > SCHEMA_VERSION) return `This book is in format v${manifest.version}, newer than this copy of Writer reads (v${SCHEMA_VERSION}). Update Writer to change it.`;
     if (manifest.file !== MANIFEST && manifest.version > EVENT_FILES_FORMAT) return `This book's ${manifest.file} says format v${manifest.version}, which keeps a book's settings in ${MANIFEST}. Fix that to change it.`;
@@ -199,30 +206,19 @@ export class NovelWorkspace {
    * written to such a book (tooNew).
    */
   get kind(): BookKind {
-    const text = (() => {
-      try {
-        return readFileSync(join(this.root, MANIFEST), "utf8");
-      } catch {
-        return undefined;
-      }
-    })();
-    const key = text === undefined ? undefined : (parseYaml(text, MANIFEST).data as { kind?: unknown } | undefined)?.kind;
-    return (typeof key === "string" ? knownKind(key) : undefined) ?? kindByKey(V2_KIND);
+    return this.#kind;
   }
 
   async loadModel(): Promise<{ novel: Book; files: Record<string, string>; images: Record<string, string> }> {
     const files: Record<string, string> = {};
-    const disk = nodeSource(this.root);
+    const disk = bookSource(this.root);
     const source: FileSource = {
       list: (dir) => disk.list(dir),
       read: async (path) => {
-        const bytes = await readFile(join(this.root, path)).catch((e: NodeJS.ErrnoException) => {
-          if (e.code === "ENOENT" || e.code === "ENOTDIR" || e.code === "EISDIR") return undefined;
-          throw e;
-        });
+        const bytes = await filesPort().read(filesPort().join(this.root, path));
         if (bytes === undefined) return undefined;
         files[path] = hashText(bytes);
-        return bytes.toString("utf8");
+        return decoder.decode(bytes);
       },
     };
     const novel = await loadBook(source);
@@ -278,7 +274,7 @@ export class NovelWorkspace {
     return this.#locked(IMAGES_DIR, () => this.#shared(async () => {
       const format = sniffImage(bytes);
       if (!format) throw new FileError("NOT_IMAGE", "That isn't a JPEG or PNG image.");
-      const names = await readdir(join(this.root, IMAGES_DIR)).catch(() => [] as string[]);
+      const names = (await filesPort().list(filesPort().join(this.root, IMAGES_DIR))).map((e) => e.path);
       // A dropped picture's name stays taken, so an Undo can bring it back.
       const taken = new Set([...names, ...[...this.#dropped.keys()].map((p) => p.slice(IMAGES_DIR.length + 1))]);
       const path = `${IMAGES_DIR}/${uniqueFileName(name.trim() ? slugify(name) : "picture", format.ext, taken)}`;
@@ -306,14 +302,14 @@ export class NovelWorkspace {
     }
     const gone = [...was].filter((p) => !now.has(p) && p.startsWith(`${IMAGES_DIR}/`));
     if (!gone.length) return;
-    const novel = await loadBook(nodeSource(this.root));
+    const novel = await loadBook(bookSource(this.root));
     const kept = new Set<string | undefined>([novel.config?.cover, ...novel.entities.map((e) => e.image)]);
     for (const scene of novel.allPieces) for (const p of pictures(scene.body)) kept.add(picturePath(p.src));
     for (const picture of gone.filter((p) => !kept.has(p))) {
       const image = await servableImage(this.root, picture).catch(() => undefined);
-      const bytes = image && (await readFile(image.full).catch(() => undefined));
+      const bytes = image && (await filesPort().read(image.full));
       if (!image || !bytes) continue;
-      await unlink(image.full);
+      await filesPort().remove(image.full);
       this.#dropped.set(picture, { full: image.full, bytes });
       // A few at most: enough for the Undo history of a session.
       if (this.#dropped.size > 20) this.#dropped.delete(this.#dropped.keys().next().value!);
@@ -339,7 +335,7 @@ export class NovelWorkspace {
     await this.#watch();
     return () => {
       this.#listeners.delete(listener);
-      if (!this.#listeners.size) void this.#unwatch();
+      if (!this.#listeners.size) void this.#stopWatching();
     };
   }
 
@@ -353,47 +349,37 @@ export class NovelWorkspace {
   async close(): Promise<void> {
     this.stop();
     await this.syncer?.close();
-    await Promise.all([this.#unwatch(), this.committer?.close()]);
+    await Promise.all([this.#stopWatching(), this.committer?.close()]);
   }
 
   #watch(): Promise<void> {
-    if (this.#ready) return this.#ready;
-    const watcher = watch(this.root, {
-      ignoreInitial: true,
-      ignored: (abs) => {
-        const rel = this.#relative(abs);
-        return rel !== "" && !isVisible(rel);
-      },
-    });
-    this.#watcher = watcher;
-    for (const type of ["add", "change", "unlink"] as const) {
-      watcher.on(type, (abs: string) => void this.#onChange(type, this.#relative(abs)));
-    }
-    this.#ready = new Promise((resolve) => watcher.once("ready", () => resolve()));
+    this.#ready ??= filesPort()
+      .watch(this.root, (path) => !isVisible(path), (type, path) => void this.#onChange(type, path))
+      .then((stop) => void (this.#unwatch = stop));
     return this.#ready;
   }
 
-  async #unwatch(): Promise<void> {
-    const watcher = this.#watcher;
-    this.#watcher = undefined;
+  async #stopWatching(): Promise<void> {
+    const ready = this.#ready;
     this.#ready = undefined;
-    await watcher?.close();
+    await ready;
+    const stop = this.#unwatch;
+    this.#unwatch = undefined;
+    await stop?.();
   }
 
   async #onChange(type: FileEvent["type"], path: string): Promise<void> {
     let hash: string | null = null;
+    // A hand edit of the manifest may make the book another kind (opened afresh as it, Workspaces.get).
+    if (path === MANIFEST) this.#kind = await readKind(this.root);
     if (type !== "unlink") {
-      const bytes = await readFile(join(this.root, path)).catch(() => undefined);
+      const bytes = await filesPort().read(filesPort().join(this.root, path));
       if (bytes === undefined) return; // gone again; its unlink follows
       hash = hashText(bytes);
       if (this.#written.get(path) === hash) return;
     }
     this.#written.delete(path);
     for (const listener of this.#listeners) listener({ type, path, hash });
-  }
-
-  #relative(abs: string): string {
-    return relative(this.root, abs).split(sep).join("/");
   }
 
   #locked<T>(path: string, task: () => Promise<T>): Promise<T> {
@@ -420,14 +406,16 @@ export class Workspaces {
   }
 
   /** The workspace for a library novel, or undefined if there is no such novel. */
-  get(id: string): NovelWorkspace | undefined {
+  async get(id: string): Promise<NovelWorkspace | undefined> {
     const entry = this.#library.get(id);
     if (!entry) return undefined;
+    const kind = await readKind(entry.path);
+    // Looked up after the read, and made with nothing awaited, so two requests at once share one.
     let ws = this.#open.get(id);
     // Opened afresh for another folder, or once the book is another kind: its modules are the new kind's.
-    if (ws?.root !== entry.path || ws.openedAs !== ws.kind.key) {
+    if (ws?.root !== entry.path || ws.openedAs !== kind.key) {
       void ws?.close();
-      ws = new NovelWorkspace(entry.path, this.#options);
+      ws = NovelWorkspace.made(entry.path, kind, this.#options);
       this.#open.set(id, ws);
     }
     return ws;
@@ -451,4 +439,17 @@ export class Workspaces {
     await Promise.all([...this.#open.values()].map((ws) => ws.close()));
     this.#open.clear();
   }
+}
+
+const decoder = new TextDecoder();
+
+/**
+ * A book's kind, from its manifest alone, without reading the rest: book.yaml's `kind`, or a novel for a
+ * book in format 1 or 2. A kind this build doesn't ship reads as a novel here; nothing is written to
+ * such a book (tooNew).
+ */
+export async function readKind(root: string): Promise<BookKind> {
+  const bytes = await filesPort().read(filesPort().join(root, MANIFEST));
+  const key = bytes === undefined ? undefined : (parseYaml(decoder.decode(bytes), MANIFEST).data as { kind?: unknown } | undefined)?.kind;
+  return (typeof key === "string" ? knownKind(key) : undefined) ?? kindByKey(V2_KIND);
 }

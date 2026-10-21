@@ -1,3 +1,5 @@
+import type { FileSource } from "@writer/core";
+import { portSource, type FilesPort } from "./files-port/port.ts";
 import type { GitPort } from "./git-port/port.ts";
 
 /**
@@ -7,6 +9,7 @@ import type { GitPort } from "./git-port/port.ts";
  */
 export interface Ports {
   git: GitPort;
+  files: FilesPort;
 }
 
 let ports: Ports | undefined;
@@ -15,7 +18,20 @@ export function setPorts(p: Ports): void {
   ports = p;
 }
 
-export function gitPort(): GitPort {
+function given(): Ports {
   if (!ports) throw new Error("The server has no ports: its entry point calls setPorts (or useNodePorts) first.");
-  return ports.git;
+  return ports;
+}
+
+export function gitPort(): GitPort {
+  return given().git;
+}
+
+export function filesPort(): FilesPort {
+  return given().files;
+}
+
+/** A book's files as core's loader reads them, through the files port. */
+export function bookSource(root: string): FileSource {
+  return portSource(filesPort(), root);
 }

@@ -1,8 +1,7 @@
-import { readdir, rmdir, unlink } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { parentOf } from "./book-paths.ts";
 import { hasGitIdentity, IDENTITY_MESSAGE } from "./committer.ts";
 import { atomicWrite, readBytes, readToolBytes, writableImagePath, writablePath, writableToolPath } from "./files.ts";
-import { gitPort } from "./ports.ts";
+import { filesPort, gitPort } from "./ports.ts";
 
 /** One file an operation writes (new text, or an image's bytes) or deletes (null). */
 export interface FileWrite {
@@ -47,7 +46,7 @@ export async function transaction(root: string, changes: FileWrite[], message: s
   if (!(await hasGitIdentity(root))) throw new OperationError("BLOCKED", IDENTITY_MESSAGE);
 
   // What's there now, for the base checks and to put back: as bytes, since images are among them.
-  const before = new Map<string, Buffer | null>();
+  const before = new Map<string, Uint8Array | null>();
   for (const change of changes) {
     const current = change.tool ? await readToolBytes(root, change.path) : await readBytes(root, change.path);
     if (change.base !== undefined && (current?.hash ?? null) !== change.base) {
@@ -70,7 +69,7 @@ export async function transaction(root: string, changes: FileWrite[], message: s
     for (const path of done.reverse()) {
       const old = before.get(path)!;
       if (old === null) await remove(root, path).catch(() => {});
-      else await atomicWrite(join(root, path), old).catch(() => {});
+      else await atomicWrite(filesPort().join(root, path), old).catch(() => {});
     }
     throw e;
   }
@@ -82,12 +81,9 @@ export async function transaction(root: string, changes: FileWrite[], message: s
 
 /** Delete a file, and the folders it leaves empty up to the novel's root. */
 async function remove(root: string, path: string): Promise<void> {
-  await unlink(join(root, path)).catch((e: NodeJS.ErrnoException) => {
-    if (e.code !== "ENOENT") throw e;
-  });
-  for (let dir = dirname(path); dir !== "." && dir !== ""; dir = dirname(dir)) {
-    const full = join(root, dir);
-    if ((await readdir(full).catch(() => ["?"])).length) break;
-    await rmdir(full).catch(() => {});
+  const files = filesPort();
+  await files.remove(files.join(root, path));
+  for (let dir = parentOf(path); dir !== ""; dir = parentOf(dir)) {
+    if (!(await files.removeEmptyDir(files.join(root, dir)))) break;
   }
 }

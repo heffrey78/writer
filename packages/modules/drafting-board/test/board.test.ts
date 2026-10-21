@@ -56,8 +56,8 @@ afterEach(async () => {
 });
 
 /** An open book's workspace, with its board: the module's service. */
-const workspace = (root = dir) => {
-  const ws = new NovelWorkspace(root, { commit: false, sync: false, github });
+const workspace = async (root = dir) => {
+  const ws = await NovelWorkspace.open(root, { commit: false, sync: false, github });
   open.push(ws);
   return Object.assign(ws, { board: ws.module<BoardStore>("drafting-board") });
 };
@@ -74,7 +74,7 @@ const ok = (status: BoardStatus) => {
 
 describe("setting up the board", () => {
   it("makes a project linked to the repository, marked as the novel's, with a card per scene and its fields", async () => {
-    const board = workspace().board!;
+    const board = (await workspace()).board!;
     expect(await board.isSetUp()).toBe(false);
     const status = ok(await board.setUp());
     const p = project();
@@ -97,7 +97,7 @@ describe("setting up the board", () => {
   it("keeps the status in a field of its own when GitHub won't change the project's Status field", async () => {
     fake.projects.lockStatus = true;
     try {
-      const ws = workspace();
+      const ws = await workspace();
       ok(await ws.board!.setUp());
       expect(project().fields.find((f) => f.name === "Status")!.options!.map((o) => o.name)).toEqual(["Todo", "In Progress", "Done"]);
       expect(value("sc_br1dg3", "Scene status")).toBe("Drafted");
@@ -110,11 +110,11 @@ describe("setting up the board", () => {
   });
 
   it("adopts the novel's project when another clone made it, rather than making another", async () => {
-    ok(await workspace().board!.setUp());
+    ok(await (await workspace()).board!.setUp());
     const other = fresh("clone");
     gitIn(dir, "clone", "-q", dir, other);
     gitIn(other, "remote", "set-url", "origin", `${fake.url}/ada/${name}.git`);
-    const board = workspace(other).board!;
+    const board = (await workspace(other)).board!;
     const status = ok(await board.sync());
     expect(status.project?.number).toBe(project().number);
     expect(fake.projects.all.filter((p) => p.repositories.includes(`ada/${name}`))).toHaveLength(1);
@@ -123,20 +123,20 @@ describe("setting up the board", () => {
 
   it("says when the novel isn't on GitHub, or the sign-in can't use Projects", async () => {
     gitIn(dir, "remote", "remove", "origin");
-    await expect(workspace().board!.setUp()).rejects.toMatchObject({ code: "NOT_ON_GITHUB" });
+    await expect((await workspace()).board!.setUp()).rejects.toMatchObject({ code: "NOT_ON_GITHUB" });
 
     gitIn(dir, "remote", "add", "origin", `${fake.url}/ada/${name}.git`);
     fake.users.set("gho_board_narrow", { login: "ada", scopes: ["repo", "workflow", "read:user"] });
     const store = memoryStore();
     await store.set("gho_board_narrow");
     github = new GitHub({ clientId: fake.clientId, webUrl: fake.url, apiUrl: fake.url, store, gh: async () => undefined });
-    const board = workspace().board!;
+    const board = (await workspace()).board!;
     await expect(board.setUp()).rejects.toMatchObject({ code: "NEEDS_SCOPE" });
     expect((await board.status()).error?.code).toBe("NEEDS_SCOPE");
   });
 
   it("waits, and says why, before a board is set up or while another version is open", async () => {
-    const ws = workspace();
+    const ws = await workspace();
     expect((await ws.board!.sync()).error?.code).toBe("NOT_SET_UP");
     ok(await ws.board!.setUp());
     await ws.versions.start("Darker ending");
@@ -149,7 +149,7 @@ const stationWords = () => countWords(readFileSync(join(dir, STATION), "utf8").r
 
 describe("syncing", () => {
   it("takes a card moved on the board into the scene's file, keeping the rest of it byte for byte", async () => {
-    const ws = workspace();
+    const ws = await workspace();
     ok(await ws.board!.setUp());
     const before = readFileSync(join(dir, BRIDGE), "utf8");
     fake.projects.set(project(), item("sc_br1dg3"), "Status", "Revised");
@@ -162,7 +162,7 @@ describe("syncing", () => {
   });
 
   it("tells open editors of the change, as of one made outside the app", async () => {
-    const ws = workspace();
+    const ws = await workspace();
     ok(await ws.board!.setUp());
     const events: string[] = [];
     await ws.subscribe((e) => events.push(`${e.type} ${e.path}`));
@@ -172,7 +172,7 @@ describe("syncing", () => {
   });
 
   it("takes a status changed in the file to the board, and keeps words, POV and order in step", async () => {
-    const ws = workspace();
+    const ws = await workspace();
     ok(await ws.board!.setUp());
     setStatusIn(STATION, "final");
     writeFileSync(join(dir, STATION), `${readFileSync(join(dir, STATION), "utf8")}\nFour more words here.\n`);
@@ -185,7 +185,7 @@ describe("syncing", () => {
   });
 
   it("puts back board edits to the fields the files own, and says so", async () => {
-    const ws = workspace();
+    const ws = await workspace();
     ok(await ws.board!.setUp());
     fake.projects.set(project(), item("sc_5tat1n"), "Words", 12);
     fake.projects.set(project(), item("sc_5tat1n"), "POV", "Ben Varn");
@@ -196,7 +196,7 @@ describe("syncing", () => {
   });
 
   it("keeps a status changed on both sides as a conflict, writes neither, and settles it the author's way", async () => {
-    const ws = workspace();
+    const ws = await workspace();
     ok(await ws.board!.setUp());
     const before = readFileSync(join(dir, BRIDGE), "utf8");
     setStatusIn(BRIDGE, "final");
@@ -225,18 +225,18 @@ describe("syncing", () => {
   });
 
   it("treats every difference as a conflict on a fresh clone, which knows no last-synced status", async () => {
-    ok(await workspace().board!.setUp());
+    ok(await (await workspace()).board!.setUp());
     fake.projects.set(project(), item("sc_br1dg3"), "Status", "Final");
     const other = fresh("clone");
     gitIn(dir, "clone", "-q", dir, other);
     gitIn(other, "remote", "set-url", "origin", `${fake.url}/ada/${name}.git`);
-    const board = workspace(other).board!;
+    const board = (await workspace(other)).board!;
     expect(ok(await board.sync()).conflicts).toEqual([{ scene: "sc_br1dg3", title: "Walking the Span", file: "drafted", board: "final" }]);
     expect(ok(await board.sync()).conflicts).toHaveLength(1);
   });
 
   it("adds a card for a new scene, removes the card of a deleted one, and leaves cards it didn't make alone", async () => {
-    const ws = workspace();
+    const ws = await workspace();
     ok(await ws.board!.setUp());
     const p = project();
     p.items.push({ id: "PVTI_mine", type: "DRAFT_ISSUE", content: { id: "DI_mine", title: "Buy a map of Varn", body: "" }, values: {}, isArchived: false, updatedAt: fake.now() });
@@ -254,7 +254,7 @@ describe("syncing", () => {
   });
 
   it("loses nothing when the project is deleted on GitHub, says so, and makes a new one when asked", async () => {
-    const ws = workspace();
+    const ws = await workspace();
     ok(await ws.board!.setUp());
     const head = gitIn(dir, "rev-parse", "HEAD");
     const status = gitIn(dir, "status", "--porcelain");
@@ -270,7 +270,7 @@ describe("syncing", () => {
   });
 
   it("keeps the board as it was while GitHub can't be reached, and catches up after", async () => {
-    const ws = workspace();
+    const ws = await workspace();
     ok(await ws.board!.setUp());
     setStatusIn(STATION, "revised");
     offline = true;
@@ -282,7 +282,7 @@ describe("syncing", () => {
   });
 
   it("sends its changes in a few batched requests, not one per field", async () => {
-    const ws = workspace();
+    const ws = await workspace();
     const before = fake.projects.operations.length;
     ok(await ws.board!.setUp());
     // Find, create, describe, the Status options, five fields, read, the cards, then their values.
@@ -326,7 +326,7 @@ describe("timing", () => {
     // Its upstream, without fetching here: the fake GitHub's git wants the sign-in, which the syncer has.
     gitIn(dir, "config", "branch.main.remote", "origin");
     gitIn(dir, "config", "branch.main.merge", "refs/heads/main");
-    const ws = new NovelWorkspace(dir, { commit: false, sync: { intervalMs: 0 }, github });
+    const ws = await NovelWorkspace.open(dir, { commit: false, sync: { intervalMs: 0 }, github });
     open.push(ws);
     ok(await ws.module<BoardStore>("drafting-board")!.setUp());
     fake.projects.set(project(), item("sc_br1dg3"), "Status", "Revised");
@@ -338,7 +338,7 @@ describe("timing", () => {
 describe("a kind without the module", () => {
   it("has no board kept, and no board routes", async () => {
     const diary = diaryRepo(fresh("diary"));
-    expect(workspace(diary).modules.has("drafting-board")).toBe(false);
+    expect((await workspace(diary)).modules.has("drafting-board")).toBe(false);
     const library = await Library.open({ configDir: fresh("config") });
     const book = await library.add(diary);
     const server = await createServer({ library, token: "t", github, sync: false, commit: false });

@@ -1,10 +1,10 @@
-import { readFile } from "node:fs/promises";
 import type { Context, Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { vocabulary } from "@writer/core";
 import { body, operation, type Env } from "./bible-routes.ts";
 import { FileError, IMAGES_DIR, MAX_IMAGE_BYTES, servableImage } from "./files.ts";
 import type { Library } from "./library.ts";
+import { filesPort } from "./ports.ts";
 
 /*
  * Pictures (heffrey78/gh-writer#168, heffrey78/gh-writer#203): the bible's portraits, the book's cover and the prose's pictures, in images/.
@@ -34,7 +34,10 @@ export function imageRoutes(routes: Hono<Env>, library: Library): void {
       const etag = `"${image.size.toString(36)}-${Math.round(image.mtimeMs).toString(36)}"`;
       const headers = { etag, "cache-control": "no-cache", "x-content-type-options": "nosniff" };
       if (c.req.header("if-none-match") === etag) return new Response(null, { status: 304, headers });
-      return new Response(await readFile(image.full), { headers: { ...headers, "content-type": image.type, "content-length": String(image.size) } });
+      // Gone since it was found: as if it had never been.
+      const bytes = await filesPort().read(image.full);
+      if (!bytes) return c.json({ code: "NOT_FOUND", error: `No image "${path}".` }, 404);
+      return new Response(bytes as Uint8Array<ArrayBuffer>, { headers: { ...headers, "content-type": image.type, "content-length": String(image.size) } });
     } catch (e) {
       if (!(e instanceof FileError)) throw e;
       return c.json({ code: e.code, error: e.message }, e.code === "TOO_LARGE" ? 413 : 400);

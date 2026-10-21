@@ -34,7 +34,7 @@ describe("a diary's index", () => {
 describe("a diary's pages", () => {
   it("let a picture go with the last day that names it", async () => {
     const dir = diaryRepo(fresh("diary"));
-    const ws = new NovelWorkspace(dir, { commit: false, sync: false });
+    const ws = await NovelWorkspace.open(dir, { commit: false, sync: false });
     try {
       const read = () => readFileSync(join(dir, MONDAY), "utf8");
       const { path } = await ws.addPicture("The view", jpeg());

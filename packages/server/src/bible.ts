@@ -1,5 +1,3 @@
-import { readdir, readFile } from "node:fs/promises";
-import { join } from "node:path";
 import {
   backlinks,
   editFrontMatter,
@@ -22,12 +20,12 @@ import {
   type SeriesSlot,
   type YamlEdit,
 } from "@writer/core";
-import { nodeSource } from "@writer/core/node";
 import { parse, stringify } from "yaml";
 import { hashText, IMAGES_DIR, MAX_IMAGE_BYTES, sniffImage } from "./files.ts";
 import type { ManuscriptOperations } from "./manuscript.ts";
 import { migrateNovel, migrationWrites, overlay } from "./migrate.ts";
 import { OperationError, transaction, type FileWrite, type OperationResult } from "./operations.ts";
+import { bookSource, filesPort } from "./ports.ts";
 
 /** What an entity's front matter holds, apart from its ID. */
 export interface EntityFields {
@@ -457,7 +455,7 @@ export class BibleOperations {
       if (migration.status === "migrate" && !migrate) {
         throw new OperationError("NEEDS_MIGRATION", needs, { from: migration.from, to: migration.to });
       }
-      const source = overlay(nodeSource(this.root), moved);
+      const source = overlay(bookSource(this.root), moved);
       const { writes, message, extra } = await fn(await loadBook(source), (path) => source.read(path), new Set(moved.map((w) => w.path)));
       // A file the change writes again (one the migration made) is written once, as the change has it.
       const again = new Set(writes.map((w) => w.path));
@@ -592,17 +590,18 @@ export class BibleOperations {
 
   /** images/<slug><ext>, with a suffix if another file has the name; `replacing` (the picture it takes over) doesn't count. */
   async #imagePath(slug: string, ext: string, replacing: string | undefined): Promise<string> {
-    const names = await readdir(join(this.root, IMAGES_DIR)).catch(() => [] as string[]);
+    const names = (await filesPort().list(filesPort().join(this.root, IMAGES_DIR))).map((e) => e.path);
     const taken = new Set(names.filter((n) => `${IMAGES_DIR}/${n}` !== replacing));
     return `${IMAGES_DIR}/${uniqueFileName(slug, ext, taken)}`;
   }
 
   #run<T>(fn: (novel: Book) => Promise<T>): Promise<T> {
-    return this.#exclusive(async () => fn(await loadBook(nodeSource(this.root))));
+    return this.#exclusive(async () => fn(await loadBook(bookSource(this.root))));
   }
 
   async #read(path: string): Promise<string> {
-    return readFile(join(this.root, path), "utf8").catch(() => "");
+    const bytes = await filesPort().read(filesPort().join(this.root, path));
+    return bytes === undefined ? "" : new TextDecoder().decode(bytes);
   }
 
   #find(novel: Book, id: string): { index: number; relationship: Relationship } {

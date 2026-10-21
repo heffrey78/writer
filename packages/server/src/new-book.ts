@@ -1,11 +1,10 @@
-import { copyFile, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, join, relative } from "node:path";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { editYaml, kindOf, loadBook, MANIFEST, newId, NOVEL_MANIFEST } from "@writer/core";
-import { nodeSource } from "@writer/core/node";
 import { snapshots } from "@writer/core/snapshots";
 import { hasGitIdentity } from "./committer.ts";
-import { gitPort } from "./ports.ts";
+import { filesUnder } from "./files.ts";
+import { bookSource, filesPort, gitPort } from "./ports.ts";
 
 /**
  * The templates in this checkout of Writer (or beside the server bundle: WRITER_TEMPLATES), a folder
@@ -52,23 +51,28 @@ export async function writeNewBook(template: string, dest: string, { title, auth
     return ids.get(id)!;
   };
   // Its story files: the manifest, and the kind's folders.
-  const kind = await kindOf({ read: (path) => readFile(join(template, path), "utf8").catch(() => undefined) });
+  const files = filesPort();
+  const text = async (path: string) => {
+    const bytes = await files.read(path);
+    return bytes === undefined ? undefined : decoder.decode(bytes);
+  };
+  const kind = await kindOf({ read: (path) => text(files.join(template, path)) });
   const roots = [MANIFEST, NOVEL_MANIFEST, ...(kind ? [kind.folders.content, kind.folders.codex, kind.folders.notes].map((f) => `${f}/`) : []), "diagrams/"];
 
-  for (const file of await files(template)) {
-    const to = join(dest, file);
-    await mkdir(dirname(to), { recursive: true });
+  for (const file of await filesUnder(template)) {
+    const to = files.join(dest, file);
+    await files.makeDir(files.dirname(to));
     if (!STORY_FILE.test(file) || !roots.some((r) => file === r || file.startsWith(r))) {
-      await copyFile(join(template, file), to);
+      await files.copy(files.join(template, file), to);
       continue;
     }
-    let text = (await readFile(join(template, file), "utf8")).replace(TEMPLATE_ID, (id, prefix: string) => fresh(id, prefix));
-    if (file === NOVEL_MANIFEST || file === MANIFEST) text = editYaml(text, [{ path: ["title"], value: title }, ...(author ? [{ path: ["author"], value: author }] : [])]);
-    await writeFile(to, text);
+    let content = (await text(files.join(template, file)))!.replace(TEMPLATE_ID, (id, prefix: string) => fresh(id, prefix));
+    if (file === NOVEL_MANIFEST || file === MANIFEST) content = editYaml(content, [{ path: ["title"], value: title }, ...(author ? [{ path: ["author"], value: author }] : [])]);
+    await files.write(to, content);
   }
-  const readme = join(dest, "README.md");
-  await writeFile(readme, (await readFile(readme, "utf8")).replace(/^# .*$/m, `# ${title}`));
-  for (const [file, text] of snapshots(await loadBook(nodeSource(dest)))) await writeFile(join(dest, file), text);
+  const readme = files.join(dest, "README.md");
+  await files.write(readme, (await text(readme))!.replace(/^# .*$/m, `# ${title}`));
+  for (const [file, content] of snapshots(await loadBook(bookSource(dest)))) await files.write(files.join(dest, file), content);
 
   const git = gitPort();
   await git.init(dest, "main");
@@ -82,11 +86,4 @@ export async function writeNewBook(template: string, dest: string, { title, auth
   await git.commit(dest, `Start ${title}`);
 }
 
-/** Every file under `dir`, as paths relative to it with forward slashes. */
-async function files(dir: string): Promise<string[]> {
-  const entries = await readdir(dir, { recursive: true, withFileTypes: true });
-  return entries
-    .filter((e) => e.isFile())
-    .map((e) => relative(dir, join(e.parentPath, e.name)).split("\\").join("/"))
-    .sort();
-}
+const decoder = new TextDecoder();

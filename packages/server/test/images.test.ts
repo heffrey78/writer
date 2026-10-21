@@ -179,8 +179,8 @@ describe("a picture in the prose (heffrey78/gh-writer#203)", () => {
   const STATION = "manuscript/01-return/01-arrival/01-the-station.md";
   const BRIDGE = "manuscript/01-return/01-arrival/02-the-bridge.md";
   let ws: NovelWorkspace;
-  beforeEach(() => {
-    ws = new NovelWorkspace(dir, { commit: false, sync: false });
+  beforeEach(async () => {
+    ws = await NovelWorkspace.open(dir, { commit: false, sync: false });
   });
   const save = async (path: string, edit: (text: string) => string) => {
     const result = await ws.write(path, edit(read(path)), hash(path));
@@ -190,7 +190,7 @@ describe("a picture in the prose (heffrey78/gh-writer#203)", () => {
   const without = (path: string, line: string) => save(path, (t) => t.replace(`\n\n${line}\n`, "\n"));
 
   it("is saved under a name from its description, with a suffix if taken, and committed with the scene that names it", async () => {
-    const committed = new NovelWorkspace(dir, { commit: { quietMs: 60_000 }, sync: false });
+    const committed = await NovelWorkspace.open(dir, { commit: { quietMs: 60_000 }, sync: false });
     try {
       const before = commits();
       const { path } = await committed.addPicture("A map of Varn", jpeg());

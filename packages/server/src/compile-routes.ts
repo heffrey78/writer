@@ -1,9 +1,8 @@
 import { compileBook, CompileError, pieceSections } from "@writer/core";
-import { nodeSource } from "@writer/core/node";
 import { fileName, isFormat, MEDIA_TYPES, readCover, readPictures, render } from "@writer/export";
 import type { Hono } from "hono";
 import { body, type Env } from "./bible-routes.ts";
-import { gitPort } from "./ports.ts";
+import { bookSource, gitPort } from "./ports.ts";
 
 /*
  * POST /:id/compile  { format: docx|epub|pdf, preset?, from?, to? } → the file (heffrey78/gh-writer#19)
@@ -26,7 +25,7 @@ export function compileRoutes(routes: Hono<Env>): void {
     const { novel } = await ws.loadModel();
     let book;
     try {
-      book = await compileBook(novel, nodeSource(ws.root), { ...(text("preset") ? { preset: text("preset")! } : {}), ...(text("from") ? { from: text("from")! } : {}), ...(text("to") ? { to: text("to")! } : {}) });
+      book = await compileBook(novel, bookSource(ws.root), { ...(text("preset") ? { preset: text("preset")! } : {}), ...(text("from") ? { from: text("from")! } : {}), ...(text("to") ? { to: text("to")! } : {}) });
     } catch (e) {
       if (e instanceof CompileError) return c.json({ code: "BAD_REQUEST", error: e.message }, 400);
       throw e;

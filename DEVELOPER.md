@@ -131,6 +131,8 @@ CI (`.github/workflows/ci.yml`) runs typecheck, unit tests, validation of the sa
 
 The server reaches git only through its git port (D16; `packages/server/src/git-port/port.ts`), so that its logic can run where there's no git binary. Each entry point gives the server its ports (`useNodePorts()` on Node: the CLI, the web dev server and the tests); code asks for `gitPort()`. On Node the port runs git itself (`git-port/node.ts`, the only code that does; `test/git-boundary.test.ts` checks). On Android it's libgit2 (`packages/git2-port`). Paths are relative to the book's folder, which may sit inside a larger repository.
 
+The server reaches the disk through its files port in the same way (`files-port/port.ts`, `filesPort()`; `bookSource(root)` gives core's loader a book's files). Its adapters are node:fs with chokidar (`files-port/node.ts`) and memory (`files-port/memory.ts`, for tests), held to `test/files-port.test.ts`. The port is primitives: an atomic write (temp file, flushed, renamed, folder flushed), reads, listings, stat, watch. The rules stay in the server (`files.ts`): which paths a book may have, no symlinks leading out of it, writes refused when the file changed underneath.
+
 `packages/server/test/git-port.test.ts` is the port's contract: what any adapter must do, including a sync with a conflict through the fake GitHub. It runs git's adapter always, and libgit2's too where it's built, then both on the same repositories, expecting the same answers down to object IDs. To include libgit2: `cargo build --release` in `packages/git2-port` (Rust 1.85 or later, a C compiler and CMake; libgit2 is built from source), then run the suite. A new git operation goes in the port, both adapters and the suite together.
 
 ## The templates and their tools

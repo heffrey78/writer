@@ -1,10 +1,7 @@
-import { readdir, readFile } from "node:fs/promises";
-import { join } from "node:path";
 import { conversionsOf, knownKind, loadBook, SCHEMA_VERSION, type Conversion } from "@writer/core";
-import { nodeSource } from "@writer/core/node";
 import { snapshots } from "@writer/core/snapshots";
-import { readToolBytes, TOOLS_DIR, WORKFLOWS_DIR } from "./files.ts";
-import { gitPort } from "./ports.ts";
+import { filesUnder, readToolBytes, sameBytes, TOOLS_DIR, WORKFLOWS_DIR } from "./files.ts";
+import { bookSource, filesPort, gitPort } from "./ports.ts";
 import { migrationWrites, overlay } from "./migrate.ts";
 import { DEFAULT_TEMPLATE, TEMPLATES, templateOf } from "./new-book.ts";
 import { OperationError, transaction, type FileWrite, type OperationResult } from "./operations.ts";
@@ -18,7 +15,7 @@ import { OperationError, transaction, type FileWrite, type OperationResult } fro
 
 /** The conversions a book can have, as its commands offer them. */
 export async function conversionsFor(root: string): Promise<Conversion[]> {
-  return conversionsOf((await loadBook(nodeSource(root))).kind);
+  return conversionsOf((await loadBook(bookSource(root))).kind);
 }
 
 /** Make the book at `root` a book of the kind `to`, in one commit; the notes say what it did that the writer should know. */
@@ -27,7 +24,7 @@ export async function convertBook(root: string, to: string, templates = TEMPLATE
   // On the book as format 3 has it: book.yaml, naming its kind.
   const { migration, writes: moved } = await migrationWrites(root, DEFAULT_TEMPLATE, SCHEMA_VERSION);
   if (migration.status === "refused") throw new OperationError("BAD_REQUEST", migration.reason);
-  const before = overlay(nodeSource(root), moved);
+  const before = overlay(bookSource(root), moved);
   const book = await loadBook(before);
   const conversion = conversionsOf(book.kind).find((c) => c.to === to);
   if (!conversion) throw new OperationError("BAD_REQUEST", `${book.kind.label} can't be made a ${knownKind(to)!.label.toLowerCase()}.`);
@@ -36,12 +33,12 @@ export async function convertBook(root: string, to: string, templates = TEMPLATE
 
   const writes: FileWrite[] = [...moved.filter((w) => !done.writes.some((d) => d.path === w.path)), ...done.writes];
   // Its diagrams, as the new kind draws them.
-  const after = await loadBook(overlay(nodeSource(root), writes));
+  const after = await loadBook(overlay(bookSource(root), writes));
   const drawn = snapshots(after);
-  for (const [path, content] of drawn) if ((await overlay(nodeSource(root), writes).read(path)) !== content) writes.push({ path, content, ...(path.endsWith(".svg") ? { tool: true as const } : {}) });
-  for (const e of await readdir(join(root, "diagrams")).catch(() => [])) {
-    const path = `diagrams/${e}`;
-    if (e.endsWith(".svg") && !drawn.has(path)) writes.push({ path, content: null, tool: true });
+  for (const [path, content] of drawn) if ((await overlay(bookSource(root), writes).read(path)) !== content) writes.push({ path, content, ...(path.endsWith(".svg") ? { tool: true as const } : {}) });
+  for (const e of await filesPort().list(filesPort().join(root, "diagrams"))) {
+    const path = `diagrams/${e.path}`;
+    if (e.path.endsWith(".svg") && !drawn.has(path)) writes.push({ path, content: null, tool: true });
   }
   // The new kind's tools and workflows, and none left of the old kind's that it hasn't.
   writes.push(...(await kindFiles(root, templateOf(book.kind.key, templates), templateOf(to, templates))));
@@ -57,24 +54,19 @@ export async function convertBook(root: string, to: string, templates = TEMPLATE
   return { ...result, notes: done.notes };
 }
 
-/** Files under `dir`, as paths relative to it; none if it isn't there. */
-async function filesIn(dir: string): Promise<string[]> {
-  const entries = await readdir(dir, { recursive: true, withFileTypes: true }).catch(() => []);
-  return entries.filter((e) => e.isFile()).map((e) => join(e.parentPath, e.name).slice(dir.length + 1).split("\\").join("/"));
-}
-
 async function kindFiles(root: string, from: string, to: string): Promise<FileWrite[]> {
   const writes: FileWrite[] = [];
   for (const dir of [TOOLS_DIR, WORKFLOWS_DIR]) {
-    const theirs = new Set(await filesIn(join(to, dir)));
+    const files = filesPort();
+    const theirs = new Set(await filesUnder(files.join(to, dir)));
     for (const name of theirs) {
       const path = `${dir}/${name}`;
-      const bytes = await readFile(join(to, dir, name));
+      const bytes = (await files.read(files.join(to, dir, name)))!;
       const current = await readToolBytes(root, path).catch(() => undefined);
-      if (!current || !current.bytes.equals(bytes)) writes.push({ path, content: new Uint8Array(bytes), tool: true });
+      if (!current || !sameBytes(current.bytes, bytes)) writes.push({ path, content: new Uint8Array(bytes), tool: true });
     }
     // What the old kind's template brought that the new one hasn't: an author's own workflows stay.
-    for (const name of await filesIn(join(from, dir))) if (!theirs.has(name) && (await readToolBytes(root, `${dir}/${name}`).catch(() => undefined))) writes.push({ path: `${dir}/${name}`, content: null, tool: true });
+    for (const name of await filesUnder(files.join(from, dir))) if (!theirs.has(name) && (await readToolBytes(root, `${dir}/${name}`).catch(() => undefined))) writes.push({ path: `${dir}/${name}`, content: null, tool: true });
   }
   return writes;
 }

@@ -1,10 +1,9 @@
 import { countWords, kindOf, loadBook, parseMarkdown, vocabulary, type Book, type BookKind } from "@writer/core";
-import { nodeSource } from "@writer/core/node";
 import type { Committer } from "./committer.ts";
 import { atomicWrite, writablePath } from "./files.ts";
 import { commitSource } from "./git-source.ts";
 import { text } from "./git-port/port.ts";
-import { gitPort } from "./ports.ts";
+import { bookSource, gitPort } from "./ports.ts";
 
 /** Checkpoints are annotated tags under this prefix; sync fetches and pushes them. */
 export const CHECKPOINT_PREFIX = "refs/tags/checkpoint/";
@@ -190,12 +189,12 @@ export class Checkpoints {
 
   /** Manuscript words in the work tree, which matches HEAD once saved work is committed. */
   async #words(): Promise<number> {
-    return wordsIn(await loadBook(nodeSource(this.root)));
+    return wordsIn(await loadBook(bookSource(this.root)));
   }
 
   /** The book's kind, for its folders and words. */
   async #kind(): Promise<BookKind> {
-    const kind = await kindOf(nodeSource(this.root));
+    const kind = await kindOf(bookSource(this.root));
     if (!kind) throw new Error("This copy of Writer doesn't know this kind of book, so it can't restore it.");
     return kind;
   }
@@ -213,7 +212,7 @@ export class Checkpoints {
   }
 
   async #currentScenePath(sceneId: string): Promise<string | undefined> {
-    const novel = await loadBook(nodeSource(this.root));
+    const novel = await loadBook(bookSource(this.root));
     return novel.allPieces.find((s) => s.id === sceneId)?.file;
   }
 }

@@ -226,7 +226,7 @@ describe("offline", () => {
 describe("in the workspace", () => {
   it("holds writes while bringing remote changes in", async () => {
     const a = clone();
-    const ws = new NovelWorkspace(a, { commit: false, sync: false });
+    const ws = await NovelWorkspace.open(a, { commit: false, sync: false });
     const { hash } = (await ws.read(SCENE))!;
     let release!: () => void;
     const exclusive = ws.exclusive(() => new Promise<void>((resolve) => (release = resolve)));
@@ -243,7 +243,7 @@ describe("in the workspace", () => {
 
   it("waits for a write under way before running alone", async () => {
     const a = clone();
-    const ws = new NovelWorkspace(a, { commit: false, sync: false });
+    const ws = await NovelWorkspace.open(a, { commit: false, sync: false });
     const { hash } = (await ws.read(SCENE))!;
     let landed!: () => void;
     const hook = new Promise<void>((resolve) => (landed = resolve));
