@@ -37,7 +37,10 @@ export function journalAsNovel(dir: string, files = JOURNAL_AS_NOVEL): string {
   }
   const git = (...args: string[]) => execFileSync("git", ["-C", dir, ...args], { stdio: "ignore" });
   git("init", "-q", "-b", "main");
+  // Its own name and email, for the conversion's commit too: CI's git knows nobody.
+  git("config", "user.name", "Test Author");
+  git("config", "user.email", "author@example.com");
   git("add", "-A");
-  git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "Start");
+  git("commit", "-qm", "Start");
   return dir;
 }
