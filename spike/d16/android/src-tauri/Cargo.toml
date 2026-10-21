@@ -1,0 +1,30 @@
+[package]
+name = "d16-android"
+version = "0.1.0"
+description = "D16 spike (#46): the git port called in process from a webview on Android"
+edition = "2024"
+publish = false
+
+[lib]
+name = "d16_android_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.7", features = [] }
+
+[dependencies]
+tauri = { version = "2.12", features = [] }
+serde_json = "1"
+git2 = { version = "0.21", default-features = false }
+git2-port = { path = "../../git2-port" }
+
+# No system OpenSSL on Android: built from source for the target.
+[target.'cfg(target_os = "android")'.dependencies]
+git2-port = { path = "../../git2-port", features = ["vendored-openssl"] }
+
+# `tauri android build --debug` uses this profile: optimized and stripped, so the APK is a download
+# a phone can take, and still signed with the debug key for sideloading.
+[profile.dev]
+opt-level = "s"
+debug = false
+strip = true

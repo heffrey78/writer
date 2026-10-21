@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Writer D16 spike</title>
+    <style>
+      :root { color-scheme: light dark; --ink: #1d1d1f; --paper: #fafaf7; --ok: #1b7a3c; --bad: #b3261e; }
+      @media (prefers-color-scheme: dark) { :root { --ink: #ececec; --paper: #1c1c1e; --ok: #6fd08c; --bad: #ff8a80; } }
+      body { margin: 0; padding: 16px; background: var(--paper); color: var(--ink); font: 15px/1.5 system-ui, sans-serif; }
+      h1 { font-size: 20px; margin: 0 0 8px; }
+      #status { font-weight: 600; }
+      #status.ok { color: var(--ok); }
+      #status.bad { color: var(--bad); }
+      button { font: inherit; padding: 8px 14px; }
+      pre { white-space: pre-wrap; font: 13px/1.4 ui-monospace, monospace; }
+    </style>
+  </head>
+  <body>
+    <h1>Writer's git port, in process</h1>
+    <p>A sync round trip through libgit2, called from this page. <span id="status" role="status">Running…</span></p>
+    <p><button id="again" type="button" disabled>Run again</button></p>
+    <pre id="log" aria-live="polite"></pre>
+    <script src="scenario.js"></script>
+  </body>
+</html>
