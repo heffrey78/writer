@@ -30,6 +30,8 @@ Commands:
       --sync-every <min>    Sync with GitHub every <min> minutes (default 5; 0: only on demand)
       --sidecar             For the desktop app: print {url, token, launchUrl} as one JSON line,
                             with messages on stderr, and stop when stdin closes
+      --engine-in-page      Run the app's engine in the page, as on Android, with git and the
+                            disk reached through this server (for testing)
   validate [dir] [--json]   Check a novel repository (default: current directory)
   snapshots [dir] [--check] Write the diagram snapshots (diagrams/*.svg, diagrams/README.md);
                             with --check, only report whether they're current (exit 1 if not)
@@ -67,6 +69,7 @@ async function main(argv: string[]): Promise<number> {
       "sync-every": { type: "string" },
       open: { type: "boolean", default: true },
       sidecar: { type: "boolean" },
+      "engine-in-page": { type: "boolean" },
       help: { type: "boolean", short: "h" },
       version: { type: "boolean", short: "v" },
     },
@@ -94,7 +97,7 @@ async function main(argv: string[]): Promise<number> {
         console.error(`--sync-every needs a number of minutes from 0 to 1440, not "${values["sync-every"]}"`);
         return 1;
       }
-      return runServe(rest[0], { port, open: values.open && !values.sidecar, sidecar: values.sidecar ?? false, ...(syncEvery !== undefined ? { syncEvery } : {}) });
+      return runServe(rest[0], { port, open: values.open && !values.sidecar, sidecar: values.sidecar ?? false, engineInPage: values["engine-in-page"] ?? false, ...(syncEvery !== undefined ? { syncEvery } : {}) });
     }
     case "validate":
       return runValidate(rest[0] ?? ".", { json: values.json });

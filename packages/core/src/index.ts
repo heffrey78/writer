@@ -9,7 +9,7 @@ export { plural, typePlural, typesInSentence, vocabulary, word, type Vocabulary,
 export { conversionsOf, defineModule, moduleFacts, moduleSnapshots, modulesOf, recordType, recordTypesOf, registerModule, storyClock, withModules, type BookModule, type Conversion, type Finding, type ModuleCheck, type ModuleMigration, type ModuleSnapshots, type RecordTypeDef, type StoryClock } from "./modules.ts";
 export { migration, type Migration, type MigrationWrite } from "./migrate.ts";
 export { parseMarkdown, parseYaml } from "./parse.ts";
-export { checkSchema, schemaFor, SCHEMAS, type SchemaKind } from "./schemas.ts";
+export { AJV_OPTIONS, checkSchema, schemaFingerprint, schemaFor, SCHEMAS, schemasOf, useCompiledSchemas, type SchemaKind } from "./schemas.ts";
 export { joinPath, memorySource, type DirEntry, type FileSource } from "./source.ts";
 export { hardWrappedLines, RULES, sortDiagnostics, unreadable, validate, validateBook, type ValidationResult } from "./validate.ts";
 export { countText, countWords, markdownWords, proseText, wordList } from "./words.ts";

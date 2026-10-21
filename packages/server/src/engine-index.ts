@@ -39,3 +39,4 @@ export { createEngine, type EngineOptions } from "./engine.ts";
 export { memoryFilesPort } from "./files-port/memory.ts";
 export { portSource, type FileEventType, type FileInfo, type FileKind, type FilesPort, type ListEntry } from "./files-port/port.ts";
 export { readKind } from "./workspace.ts";
+export { encode, decode, httpChannel, remoteFetch, remoteFilesPort, remoteGitPort, remoteHost, remoteTokenStore, type HostFacts, type PortChannel, type RemoteFailure } from "./remote-ports.ts";

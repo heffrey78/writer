@@ -235,8 +235,12 @@ test("makes a new entry from a picker, and lists custom types in groups of their
 test("lists the built-in details first, then custom types by name", async ({ page, app }) => {
   await open(page, app);
   const id = new URL(page.url()).pathname.split("/")[2]!;
-  const r = await page.request.post(`${app.url}/api/novels/${id}/bible/entity-types`, { data: { key: "prize", prefix: "prz", label: "Prize" }, headers: { origin: app.url } });
-  expect(r.status()).toBe(201);
+  // From the page, as the app asks: the engine may be in it (#51).
+  const status = await page.evaluate(
+    async (url) => (await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ key: "prize", prefix: "prz", label: "Prize" }) })).status,
+    `/api/novels/${id}/bible/entity-types`,
+  );
+  expect(status).toBe(201);
   await page.reload();
   await expect(page.getByRole("textbox", { name: "Chapter text" })).toBeFocused();
   await palette(page, "show the scene's details");

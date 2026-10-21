@@ -39,7 +39,7 @@ describe("the engine", () => {
     // Its own sources, as the bundle took them: none uses Node's globals.
     const ours = Object.keys(result.metafile.inputs).filter((f) => f.startsWith("packages/"));
     expect(ours.length).toBeGreaterThan(50);
-    const globals = ours.filter((f) => /\b(process\.(env|platform|pid|versions|cwd)|Buffer\.(from|alloc|byteLength|concat))\b/.test(readFileSync(join(repo, f), "utf8")));
+    const globals = ours.filter((f) => /\b(process\.(env|platform|pid|versions|cwd)|Buffer\.(from|alloc|byteLength|concat))\b|[a-z]\.unref\(\)/.test(readFileSync(join(repo, f), "utf8")));
     expect(globals).toEqual([]);
   }, 60_000);
 });

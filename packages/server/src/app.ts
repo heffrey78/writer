@@ -1,6 +1,9 @@
 import { Hono } from "hono";
 import { appInfo, licenses, UpdateCheck } from "./app-info.ts";
 import { compileRoutes } from "./compile-routes.ts";
+import { memoryStore } from "./github.ts";
+import { bridgeRoutes } from "./node-bridge.ts";
+import { keychainStore } from "./node-host.ts";
 import { createEngine } from "./engine.ts";
 import { gitInstall } from "./git.ts";
 import type { GitHub } from "./github.ts";
@@ -18,13 +21,15 @@ export interface AppOptions {
   github: GitHub;
   /** The built web app's folder (packages/web/dist). Without it, a placeholder page answers. */
   web?: string;
+  /** The engine in the page (#51): the bridge to this host's ports at /bridge in place of the API. */
+  engineInPage?: { syncMs?: number; stopped?: AbortSignal };
 }
 
 /**
  * The Node host's app: the engine's API (engine.ts) behind the security middleware, with what only the
  * host has: its health and git, the app's version and licences, compiling, and the built web app.
  */
-export function createApp({ token, port, library, workspaces, github, web }: AppOptions): Hono {
+export function createApp({ token, port, library, workspaces, github, web, engineInPage }: AppOptions): Hono {
   const app = new Hono();
   app.use(security({ token, port, publicPaths: new Set(["/api/session"]) }));
 
@@ -36,10 +41,11 @@ export function createApp({ token, port, library, workspaces, github, web }: App
   app.get("/api/app", async (c) => c.json(await appInfo(updates)));
   app.get("/api/app/licenses", async (c) => c.json({ licenses: await licenses() }));
 
-  app.route("/", createEngine({ library, workspaces, github, novelRoutes: compileRoutes }));
+  if (engineInPage) app.route("/bridge", bridgeRoutes({ store: process.env.WRITER_TOKEN_STORE === "memory" ? memoryStore() : keychainStore(), ...engineInPage }));
+  else app.route("/", createEngine({ library, workspaces, github, novelRoutes: compileRoutes }));
 
   if (web) {
-    app.route("/", webRoutes(web));
+    app.route("/", webRoutes(web, engineInPage ? { engine: "/bridge" } : {}));
     return app;
   }
 

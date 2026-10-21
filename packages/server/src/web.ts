@@ -40,7 +40,8 @@ export const CONTENT_SECURITY_POLICY = [
  * The built web app (packages/web/dist): hashed files under /assets/ cached for good, other files at
  * the top as they are, and index.html for every other path outside /api, where the app routes itself.
  */
-export function webRoutes(dir: string): Hono {
+/** `engine`: the bridge a page that runs the engine itself reaches its host by (#51), told it by a meta tag. */
+export function webRoutes(dir: string, { engine }: { engine?: string } = {}): Hono {
   const routes = new Hono();
   const index = join(dir, "index.html");
 
@@ -59,14 +60,14 @@ export function webRoutes(dir: string): Hono {
       // A missing build file is an error, not a page of the app.
       if (path.startsWith("/assets/") || extname(path)) return c.text("Not found", 404);
     }
-    return page(c, index);
+    return page(c, index, engine);
   });
 
   return routes;
 }
 
-async function page(c: Context, index: string): Promise<Response> {
-  const html = await readFile(index, "utf8");
+async function page(c: Context, index: string, engine?: string): Promise<Response> {
+  const html = (await readFile(index, "utf8")).replace("<head>", engine ? `<head><meta name="writer-engine" content="${engine}">` : "<head>");
   c.header("Content-Security-Policy", CONTENT_SECURITY_POLICY);
   c.header("Cache-Control", "no-cache");
   c.header("Referrer-Policy", "no-referrer");

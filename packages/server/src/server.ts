@@ -27,6 +27,8 @@ export interface ServerOptions {
   sync?: SyncerOptions | false;
   /** The built web app's folder (packages/web/dist), served at every path outside /api. */
   web?: string;
+  /** The engine in the page, as on Android (#51): this server serves the app and the ports' bridge, not the API. */
+  engineInPage?: boolean;
   /** The GitHub connection. Default: from the environment (githubFromEnv), the token in the OS keychain. */
   github?: GitHub;
 }
@@ -56,11 +58,14 @@ export interface RunningServer {
 const HOST = "127.0.0.1";
 
 /** Starts the server on 127.0.0.1 only. */
-export async function createServer({ library, token = newToken(), port = 0, shutdownTimeout = 10_000, commit, sync, web, github = githubFromEnv() }: ServerOptions = {}): Promise<RunningServer> {
+export async function createServer({ library, token = newToken(), port = 0, shutdownTimeout = 10_000, commit, sync, web, engineInPage = false, github = githubFromEnv() }: ServerOptions = {}): Promise<RunningServer> {
   library ??= await Library.open();
   let boundPort = port;
   const workspaces = new Workspaces(library, { ...(commit !== undefined ? { commit } : {}), ...(sync !== undefined ? { sync } : {}), github });
-  const app = createApp({ token, port: () => boundPort, library, workspaces, github, ...(web ? { web } : {}) });
+  const syncMs = sync === false ? 0 : sync?.intervalMs;
+  // Closing ends the bridge's event streams too (the engine in the page's).
+  const stopping = new AbortController();
+  const app = createApp({ token, port: () => boundPort, library, workspaces, github, ...(web ? { web } : {}), ...(engineInPage ? { engineInPage: { stopped: stopping.signal, ...(syncMs !== undefined ? { syncMs } : {}) } } : {}) });
   const server = createHttpServer(getRequestListener(app.fetch));
 
   await new Promise<void>((resolve, reject) => {
@@ -86,6 +91,7 @@ export async function createServer({ library, token = newToken(), port = 0, shut
       server.closeIdleConnections();
       // Event streams never end on their own; writes in flight finish as ordinary requests.
       workspaces.stop();
+      stopping.abort();
     }));
 
   const url = `http://${HOST}:${boundPort}`;

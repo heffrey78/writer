@@ -1,0 +1,51 @@
+{
+  "novel": {
+    "fingerprint": "d0dbf9fee239f20e",
+    "exports": {
+      "novel": "v0",
+      "manuscript-order": "v1",
+      "scene": "v2",
+      "entity": "v3",
+      "relationships": "v4",
+      "note": "v5",
+      "layouts": "v6",
+      "compile": "v7",
+      "book": "v8",
+      "part": "v9",
+      "chapter": "v10",
+      "event": "v11",
+      "event-list": "v12"
+    }
+  },
+  "journal": {
+    "fingerprint": "cab3da29f898f5e9",
+    "exports": {
+      "novel": "v0",
+      "manuscript-order": "v1",
+      "scene": "v2",
+      "entity": "v3",
+      "relationships": "v4",
+      "note": "v5",
+      "layouts": "v6",
+      "compile": "v7",
+      "book": "v8",
+      "year": "v9",
+      "month": "v10"
+    }
+  },
+  "campaign": {
+    "fingerprint": "df841ad3ab52a901",
+    "exports": {
+      "novel": "v0",
+      "manuscript-order": "v1",
+      "scene": "v2",
+      "entity": "v3",
+      "relationships": "v4",
+      "note": "v5",
+      "layouts": "v6",
+      "compile": "v7",
+      "book": "v8",
+      "arc": "v9"
+    }
+  }
+}

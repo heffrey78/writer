@@ -3,6 +3,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { memoryFilesPort } from "../src/files-port/memory.ts";
 import { nodeFilesPort } from "../src/files-port/node.ts";
 import { portSource, TEMP_SUFFIX, type FileEventType, type FilesPort } from "../src/files-port/port.ts";
+import { remoteFilesPort } from "../src/remote-ports.ts";
+import { startBridge } from "./bridge.ts";
 import { scratch } from "./fixtures.ts";
 
 /** The files port's contract (D16): what the server needs of a disk, whichever it is: Node's, or memory. */
@@ -22,7 +24,18 @@ const ADAPTERS: [string, () => { files: FilesPort; root: string }][] = [
     },
   ],
   ["memory", () => ({ files: memoryFilesPort(), root: "/books/book" })],
+  // The disk's, from a page: through the remote ports to a Node bridge (#51).
+  [
+    "bridge",
+    () => {
+      const root = fresh("bridged");
+      mkdirSync(root);
+      return { files: remoteFilesPort(bridge.channel), root };
+    },
+  ],
 ];
+const bridge = await startBridge();
+afterAll(() => bridge.close());
 const decode = (b: Uint8Array | undefined) => (b === undefined ? undefined : new TextDecoder().decode(b));
 
 describe.each(ADAPTERS)("the files port: %s", (_, make) => {
@@ -40,7 +53,8 @@ describe.each(ADAPTERS)("the files port: %s", (_, make) => {
     expect(await files.stat(files.join(root, "nothing"))).toBeUndefined();
   });
 
-  it("puts the new file in place only after its temp file is whole: a failure before leaves the old one", async () => {
+  // A test's write hook stays on its side of a bridge.
+  it.skipIf(_ === "bridge")("puts the new file in place only after its temp file is whole: a failure before leaves the old one", async () => {
     const { files, root } = make();
     const path = files.join(root, "a.md");
     await files.write(path, "Old.\n");

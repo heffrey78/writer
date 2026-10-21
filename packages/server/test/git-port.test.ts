@@ -6,6 +6,8 @@ import { nodeGitPort } from "../src/git-port/node.ts";
 import { GitFailure, NO_OBJECT, text, type GitPort } from "../src/git-port/port.ts";
 import { fakeGitHub, type FakeGitHub } from "./fake-github.ts";
 import { scratch } from "./fixtures.ts";
+import { remoteGitPort } from "../src/remote-ports.ts";
+import { startBridge } from "./bridge.ts";
 import { built, rustGitPort } from "./rust-git-port.ts";
 
 /**
@@ -16,7 +18,10 @@ import { built, rustGitPort } from "./rust-git-port.ts";
 // libgit2's, where it's built (`cargo build --release` in packages/git2-port; CI's git2-port job builds it).
 const rust = built() ? rustGitPort() : undefined;
 /** Each adapter, by name. */
-export const PORTS: [string, GitPort][] = [["git", nodeGitPort], ...(rust ? [["libgit2", rust] as [string, GitPort]] : [])];
+// git's, from a page: through the remote ports to a Node bridge (#51).
+const bridge = await startBridge();
+afterAll(() => bridge.close());
+export const PORTS: [string, GitPort][] = [["git", nodeGitPort], ["bridge", remoteGitPort(bridge.channel)], ...(rust ? [["libgit2", rust] as [string, GitPort]] : [])];
 afterAll(() => rust?.close());
 
 let fresh: (name: string) => string;

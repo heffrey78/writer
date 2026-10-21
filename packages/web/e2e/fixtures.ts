@@ -126,9 +126,11 @@ export async function launch(page: Page, app: App, path = "/") {
   await expect(page).not.toHaveURL(/token=/);
 }
 
-export const test = base.extend<{ app: App; csp: void; entry: string }>({
+export const test = base.extend<{ app: App; csp: void; entry: string; serveArgs: string[] }>({
   // The script `writer serve` runs: the CLI, or one that registers test kinds first.
   entry: [cli, { option: true }],
+  // More for every `writer serve` the test starts: --engine-in-page, for the engine in the page (#51).
+  serveArgs: [[], { option: true }],
   // Every test fails on a Content Security Policy violation: the page must work within its own policy.
   csp: [
     async ({ page }, use) => {
@@ -139,7 +141,7 @@ export const test = base.extend<{ app: App; csp: void; entry: string }>({
     },
     { auto: true },
   ],
-  app: async ({ entry }, use, testInfo) => {
+  app: async ({ entry, serveArgs }, use, testInfo) => {
     const home = mkdtempSync(join(tmpdir(), "writer-web-"));
     writeFileSync(join(home, ".gitconfig"), "[user]\n\tname = Test Author\n\temail = author@example.com\n[init]\n\tdefaultBranch = main\n");
     const github = await fakeGitHub({ gitRoot: join(home, "github") });
@@ -188,7 +190,7 @@ export const test = base.extend<{ app: App; csp: void; entry: string }>({
       },
       restart: async (...args) => {
         await stop(child);
-        const started = await serve(entry, args, env, (s) => (log += s));
+        const started = await serve(entry, [...args, ...serveArgs], env, (s) => (log += s));
         child = started.child;
         app.launchUrl = started.launchUrl;
         app.url = new URL(started.launchUrl).origin;
@@ -196,7 +198,7 @@ export const test = base.extend<{ app: App; csp: void; entry: string }>({
       stop: () => stop(child),
       kill: () => stop(child, "SIGKILL"),
       serveAnother: async (args, extra = {}) => {
-        const started = await serve(entry, args, { ...env, ...extra }, (s) => (log += `[another] ${s}`));
+        const started = await serve(entry, [...args, ...serveArgs], { ...env, ...extra }, (s) => (log += `[another] ${s}`));
         others.push(started.child);
         return { launchUrl: started.launchUrl, url: new URL(started.launchUrl).origin, stop: () => stop(started.child), kill: () => stop(started.child, "SIGKILL") };
       },

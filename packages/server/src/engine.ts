@@ -5,6 +5,7 @@ import type { GitHub } from "./github.ts";
 import { libraryRoutes } from "./library-routes.ts";
 import type { Library } from "./library.ts";
 import { novelRoutes, type NovelRoutesExtra } from "./novel-routes.ts";
+import { filesPort, gitPort, host } from "./ports.ts";
 import type { Workspaces } from "./workspace.ts";
 
 /**
@@ -24,6 +25,19 @@ export interface EngineOptions {
 
 export function createEngine({ library, workspaces, github, novelRoutes: extra }: EngineOptions): Hono {
   const app = new Hono();
+  // What a host doesn't answer itself (Node's app.ts does, first): that it's up, and what it is.
+  // Up while its host answers: a page's engine is nothing without its ports.
+  app.get("/api/health", async (c) => {
+    const answering = await filesPort()
+      .stat(host().configDir())
+      .then(
+        () => true,
+        () => false,
+      );
+    return answering ? c.json({ status: "ok" }) : c.json({ status: "unreachable" }, 503);
+  });
+  app.get("/api/app", async (c) => c.json({ desktop: false, version: null, node: null, git: { version: await gitPort().version().catch(() => null), bundled: false }, update: null }));
+  app.get("/api/app/licenses", (c) => c.json({ licenses: [] }));
   // Who git signs as (heffrey78/gh-writer#186): the name and email set on this computer, and one from the GitHub account.
   app.get("/api/identity", async (c) =>
     c.json({ identity: await globalIdentity(), suggestion: (await github.suggestedIdentity().catch(() => undefined)) ?? null }),

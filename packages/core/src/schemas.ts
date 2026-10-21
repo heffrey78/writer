@@ -132,13 +132,44 @@ const schemaNames = (bookKind: BookKind) => [
   ...recordTypesOf(bookKind).flatMap((t) => (t.list ? [t.key, `${t.key}-list`] : [t.key])),
 ];
 
+/** How every schema is compiled, here and ahead of time (scripts/compile-schemas.ts). */
+export const AJV_OPTIONS = { allErrors: true, strict: true, strictRequired: false, allowUnionTypes: true } as const;
+
+/** A kind's schemas, by name, and the common one they refer to: what its validators are compiled from. */
+export function schemasOf(bookKind: BookKind): { common: object; schemas: [string, object][] } {
+  return { common, schemas: schemaNames(bookKind).map((name) => [name, schemaFor(name, bookKind)]) };
+}
+
+/** A fingerprint of a kind's schemas (FNV-1a, 64-bit): validators compiled ahead of time for it are used only while it matches. */
+export function schemaFingerprint(bookKind: BookKind): string {
+  const text = JSON.stringify(schemasOf(bookKind));
+  let h = 0xcbf29ce484222325n;
+  for (let i = 0; i < text.length; i++) h = BigInt.asUintN(64, (h ^ BigInt(text.charCodeAt(i))) * 0x100000001b3n);
+  return h.toString(16).padStart(16, "0");
+}
+
+/** Validators compiled ahead of time, by kind, where code can't be compiled at run time (a page's CSP: the engine in a browser, #51). */
+const ahead = new Map<string, { fingerprint: string; validators: Record<string, ValidateFunction> }>();
+
+/** Give the validators compiled ahead of time for a kind (@writer/kinds/compiled-schemas does it for the shipped kinds). */
+export function useCompiledSchemas(kindKey: string, fingerprint: string, validators: Record<string, ValidateFunction>): void {
+  ahead.set(kindKey, { fingerprint, validators });
+  compiled.delete(kindKey);
+}
+
 /** The compiled schemas, for each kind of book: one Ajv each, since the schemas share their $ids. */
 const compiled = new Map<string, Map<string, ValidateFunction>>();
 
 function validators(bookKind: BookKind): Map<string, ValidateFunction> {
   const done = compiled.get(bookKind.key);
   if (done) return done;
-  const ajv = new Ajv2020.default({ allErrors: true, strict: true, strictRequired: false, allowUnionTypes: true });
+  const given = ahead.get(bookKind.key);
+  if (given && given.fingerprint === schemaFingerprint(bookKind)) {
+    const map = new Map(Object.entries(given.validators));
+    compiled.set(bookKind.key, map);
+    return map;
+  }
+  const ajv = new Ajv2020.default(AJV_OPTIONS);
   ajv.addSchema(common);
   const map = new Map<string, ValidateFunction>();
   for (const name of schemaNames(bookKind)) map.set(name, ajv.compile(schemaFor(name, bookKind)));

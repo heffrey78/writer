@@ -50,7 +50,9 @@ test("the desktop app quitting: flushAll() has what was just typed on disk when 
   expect(read(here, BRIDGE)).toMatch(/ Typed as the app quits\.\n$/);
 });
 
-test("draft, close the tab and quit, reopen: all the work is there and committed", async ({ page, app, context }) => {
+test("draft, close the tab and quit, reopen: all the work is there and committed", async ({ page, app, context }, testInfo) => {
+  // With the engine in the page (#51), closing the tab closes Writer itself: Android's case, in #54.
+  test.skip(testInfo.project.name.startsWith("engine-in-page"), "the page is the engine: closing it is the app being killed (#54)");
   const { here } = machines(app);
   await app.restart(here);
   await openNovel(page, app.launchUrl);

@@ -5,10 +5,12 @@
   "type": "module",
   "description": "The kinds of book Writer ships, as data the base reads (D14, D15): the Novel first.",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./compiled-schemas": "./src/compiled-schemas.ts"
   },
   "dependencies": {
     "@writer/core": "0.1.0",
+    "ajv": "^8.20.0",
     "@writer/module-daily": "0.1.0",
     "@writer/module-drafting-board": "0.1.0",
     "@writer/module-manuscript-format": "0.1.0",

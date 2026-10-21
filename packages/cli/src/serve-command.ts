@@ -18,6 +18,8 @@ export interface ServeOptions {
    * so the server goes with the app however the app goes (and on Windows there's no SIGTERM to send).
    */
   sidecar?: boolean;
+  /** The engine in the page, as on Android, its ports through this server (#51). */
+  engineInPage?: boolean;
 }
 
 /**
@@ -25,7 +27,7 @@ export interface ServeOptions {
  * and return the exit code. `dir`, or the current directory when it holds a novel, is added to the
  * library and opened.
  */
-export async function runServe(dir: string | undefined, { port = 0, open = true, syncEvery, sidecar = false }: ServeOptions = {}, out: (s: string) => void = console.log): Promise<number> {
+export async function runServe(dir: string | undefined, { port = 0, open = true, syncEvery, sidecar = false, engineInPage = false }: ServeOptions = {}, out: (s: string) => void = console.log): Promise<number> {
   const say = sidecar ? (s: string) => console.error(s) : out;
   const fail = (message: string) => {
     if (sidecar) out(JSON.stringify({ error: message }));
@@ -52,7 +54,7 @@ export async function runServe(dir: string | undefined, { port = 0, open = true,
 
     const web = webApp();
     if (!web) say("The web app isn't built yet: run `npm run build` first. Serving the API only.");
-    server = await createServer({ library, port, ...(web ? { web } : {}), ...(syncEvery !== undefined ? { sync: { intervalMs: syncEvery * 60_000 } } : {}) });
+    server = await createServer({ library, port, engineInPage, ...(web ? { web } : {}), ...(syncEvery !== undefined ? { sync: { intervalMs: syncEvery * 60_000 } } : {}) });
     launchUrl = novel ? server.launchUrlFor(`/novels/${novel.id}`) : server.launchUrl;
     if (novel) server.prepare(novel.id);
     say(novel ? `Writer is serving ${novel.title} (${novel.path})` : `Writer is serving your library (${library.file})`);

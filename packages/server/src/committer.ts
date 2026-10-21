@@ -66,7 +66,8 @@ export async function hasGitIdentity(root: string): Promise<boolean> {
 
 const realSchedule = (fn: () => void, ms: number) => {
   const timer = setTimeout(fn, ms);
-  timer.unref();
+  // Node's timers hold the process open; a browser's are numbers.
+  (timer as { unref?: () => void }).unref?.();
   return () => clearTimeout(timer);
 };
 

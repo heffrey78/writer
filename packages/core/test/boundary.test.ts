@@ -22,6 +22,8 @@ const ENTRY_POINTS = new Set([
   "packages/cli/src/snapshots-standalone.ts",
   "packages/editor/playground/main.tsx",
   "packages/web/src/main.tsx",
+  // The engine in the page (#51): the server's half, as the CLI's main.ts registers it.
+  "packages/web/src/engine/in-page.ts",
 ]);
 
 /** The specifiers a file imports, statically or dynamically, and those it re-exports. */

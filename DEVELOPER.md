@@ -133,6 +133,8 @@ The server's logic is an engine (D16): `@writer/server/engine` (`packages/server
 
 Compiling stays on Node for now: `@writer/export` reads its fonts from disk and uses `node:zlib`.
 
+The engine can run in the page, as on Android: `writer serve --engine-in-page` serves the app and a bridge to its ports (`node-bridge.ts`, at /bridge) in place of the API. The page starts the engine with remote ports over the bridge (`remote-ports.ts`: a call names the port and the operation; bytes travel as base64), registers a service worker (`packages/web/public/engine-sw.js`) that hands every request to `/api/` to it, pictures and event streams included, and renders once the worker controls the page. The page's Content Security Policy forbids compiling the schemas there, so the shipped kinds' validators are compiled ahead of time (`scripts/compile-schemas.ts`, into `packages/kinds/generated` by `npm run build:template`; a test fails when they're stale). The writing view's e2e specs run this way too (the `engine-in-page-*` projects).
+
 ### The git port
 
 The server reaches git only through its git port (D16; `packages/server/src/git-port/port.ts`), so that its logic can run where there's no git binary. Each entry point gives the server its ports (`useNodePorts()` on Node: the CLI, the web dev server and the tests); code asks for `gitPort()`. On Node the port runs git itself (`git-port/node.ts`, the only code that does; `test/git-boundary.test.ts` checks). On Android it's libgit2 (`packages/git2-port`). Paths are relative to the book's folder, which may sit inside a larger repository.
