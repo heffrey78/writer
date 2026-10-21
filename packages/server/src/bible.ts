@@ -55,6 +55,8 @@ export interface NoteFields {
   tags?: string[] | null;
   /** The scenes it belongs to (heffrey78/gh-writer#222); taking a scene off takes its pin too. */
   scenes?: string[] | null;
+  /** On a new note: the scenes, of its own, it's pinned in, taking the pin from the note pinned there before. */
+  pinned?: string[];
   note?: string | null;
 }
 
@@ -322,16 +324,26 @@ export class BibleOperations {
       const title = required(fields.title, "title");
       const id = uniqueId(RECORD_PREFIXES.note, new Set(indexById(novel).keys()));
       const file = this.#noteFileName(novel, title);
+      const pinned = fields.pinned ?? [];
+      if (pinned.some((s) => !fields.scenes?.includes(s))) throw new OperationError("BAD_REQUEST", `A note is pinned only in ${vocabulary(novel.kind).piece.many} it's on.`);
       const front = editYaml("", [
         { path: ["id"], value: id },
         { path: ["title"], value: title },
         ...(fields.tags?.length ? [{ path: ["tags"], value: fields.tags }] : []),
         ...(fields.scenes?.length ? [{ path: ["scenes"], value: this.#checkScenes(novel, fields.scenes) }] : []),
+        ...(pinned.length ? [{ path: ["pinned"], value: pinned }] : []),
         // Local date and time to the second, so a day's notes still list newest first.
         { path: ["created"], value: localDateTime(new Date()) },
       ]);
       const content = withProse(`---\n${front}---\n`, fields.note ?? "");
-      return { ...(await transaction(this.root, [{ path: file, content, base: null }], `Notes: add “${title}”`)), id, file };
+      // A scene has one pinned note: the one there before is unpinned in the same commit.
+      const unpinned: FileWrite[] = [];
+      for (const other of novel.notes.filter((n) => n.pinned.some((s) => pinned.includes(s)))) {
+        const text = await this.#read(other.file);
+        const pins = other.pinned.filter((s) => !pinned.includes(s));
+        unpinned.push({ path: other.file, content: editFrontMatter(text, [pins.length ? { path: ["pinned"], value: pins } : { path: ["pinned"], remove: true }]), base: hashText(text) });
+      }
+      return { ...(await transaction(this.root, [{ path: file, content, base: null }, ...unpinned], `Notes: add “${title}”`)), id, file };
     });
   }
 

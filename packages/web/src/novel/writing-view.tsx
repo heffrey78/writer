@@ -176,6 +176,7 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
   const shownRecord = entryShown === undefined ? undefined : novel.moduleRecords.find((r) => r.id === entryShown);
   const recordShown = shownRecord && recordType(novel.kind, shownRecord.type);
   const focusMode = useWritingModes((m) => m.focus);
+  const quickNote = novel.kind.piece.quickNote;
   useCommands(
     () => [
       {
@@ -199,8 +200,23 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
           useSceneNotes.getState().request();
         },
       },
+      // The kind's quick note, made at once on the open piece: a campaign's Note from the table.
+      ...(quickNote
+        ? [
+            {
+              id: "writing.quickNote",
+              title: quickNote.command,
+              group: "Notes",
+              keywords: ["note", "jot", "pinned", w.piece.one],
+              run: () => {
+                sidebar.show("notes");
+                useSceneNotes.getState().request({ title: quickNote.title });
+              },
+            },
+          ]
+        : []),
     ],
-    [sidebar.open, sidebar.toggle, sidebar.show, w],
+    [sidebar.open, sidebar.toggle, sidebar.show, w, quickNote],
   );
   const toText = () => {
     if (editor && !editor.isDestroyed) editor.commands.focus(null, { scrollIntoView: false });

@@ -130,7 +130,19 @@ export interface BookKind extends Noun {
   /** The levels of sections, outermost first. */
   levels: readonly LevelDef[];
   /** The writing unit: one file of prose (formerPrefixes as a level's). */
-  piece: Noun & { key: string; prefix: string; list: string; formerPrefixes?: readonly string[] };
+  piece: Noun & {
+    key: string;
+    prefix: string;
+    list: string;
+    formerPrefixes?: readonly string[];
+    /** The Markdown a new piece starts with, as the editor writes it: a campaign's session prep. Without it, a new piece is empty. */
+    template?: string;
+    /**
+     * A note the palette makes on the open piece in one action, pinned there with the caret in it:
+     * `command` is what the palette calls it, and the note is titled `title`: the piece's title.
+     */
+    quickNote?: { command: string; title: string };
+  };
   /** The words for what isn't a level or the piece: all the sections and pieces, the codex, and an entity of it. */
   words: { content: Noun; codex: Noun; entity: Noun };
   folders: {

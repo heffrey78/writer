@@ -53,7 +53,12 @@ export function fakeClock() {
 
 /** A git repository holding a copy of the sample novel, committed. */
 export function novelRepo(dir: string): string {
-  cpSync(sample, dir, { recursive: true });
+  return bookRepo(dir, sample);
+}
+
+/** A git repository holding a copy of a sample book (`source`: examples/sample-campaign), committed. */
+export function bookRepo(dir: string, source: string): string {
+  cpSync(source, dir, { recursive: true });
   gitIn(dir, "init", "-q");
   gitIn(dir, "add", "-A");
   gitIn(dir, "commit", "-qm", "Start");

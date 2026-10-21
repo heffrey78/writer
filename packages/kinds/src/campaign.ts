@@ -13,7 +13,16 @@ export const campaign: BookKind = {
   plural: "Campaigns",
   prefix: "cmp",
   levels: [{ key: "arc", label: "Arc", plural: "Arcs", article: "an", prefix: "arc", list: "arcs", titled: true }],
-  piece: { key: "session", label: "Session", plural: "Sessions", prefix: "ses", list: "sessions" },
+  piece: {
+    key: "session",
+    label: "Session",
+    plural: "Sessions",
+    prefix: "ses",
+    list: "sessions",
+    // Prep as many game masters do it, then a place for what happened.
+    template: "## Strong start\n\n## Scenes\n\n## Secrets and clues\n\n## NPCs\n\n## Locations\n\n## Treasure\n\n## At the table\n",
+    quickNote: { command: "Note from the table", title: "At the table" },
+  },
   words: {
     content: { label: "Campaign", plural: "Campaigns" },
     codex: { label: "Codex", plural: "Codices" },

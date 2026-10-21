@@ -264,6 +264,8 @@ export interface NoteFields {
   tags?: string[] | null;
   /** The scenes it belongs to (heffrey78/gh-writer#222). */
   scenes?: string[] | null;
+  /** On a new note: the scenes, of its own, it's pinned in. */
+  pinned?: string[];
   note?: string | null;
 }
 

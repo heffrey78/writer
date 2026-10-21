@@ -119,7 +119,8 @@ export class ManuscriptOperations {
     const path = `${chapter.dir}/${slugify(name)}.md`;
     // In a piece's usual order: ID, title, synopsis and status, then the rest.
     const { synopsis, status = novel.kind.statuses[0]!.key, ...rest } = front;
-    o.set(path, `---\n${stringify({ id, title: name, ...(synopsis ? { synopsis } : {}), status, ...rest }, { lineWidth: 0 })}---\n`);
+    // A new piece starts with its kind's template, where it has one.
+    o.set(path, `---\n${stringify({ id, title: name, ...(synopsis ? { synopsis } : {}), status, ...rest }, { lineWidth: 0 })}---\n${novel.kind.piece.template ?? ""}`);
     await this.#insert(o, novel, { section: chapter }, id, after);
     await this.#renumber(o, novel, { section: chapter }, new Map([[id, path]]));
     const writes = o.changes();

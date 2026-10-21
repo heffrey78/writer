@@ -16,8 +16,15 @@ import { Button } from "../ui/button.tsx";
 import { cn } from "../ui/cn.ts";
 import { Picker } from "../ui/picker.tsx";
 
-/** A new note asked for on the open scene (the palette's New note on this scene), until the tab takes it up. */
-export const useSceneNotes = create<{ pending: boolean; request: () => void }>((set) => ({ pending: false, request: () => set({ pending: true }) }));
+/**
+ * A new note asked for on the open scene, until the tab takes it up: from the palette's New note on
+ * this scene, asking for its title, or its kind's quick note (a campaign's Note from the table), made
+ * at once, pinned, titled `title`: the scene's title.
+ */
+export const useSceneNotes = create<{ pending: false | { title?: string }; request: (quick?: { title: string }) => void }>((set) => ({
+  pending: false,
+  request: (quick) => set({ pending: quick ?? {} }),
+}));
 
 type Spell = { service: SpellService; onAddWord: (w: string) => void } | undefined;
 
@@ -43,8 +50,9 @@ export function SceneNotes({ novelId, novel, workspace, scene, spell }: { novelI
   useEffect(() => {
     if (!pending) return;
     useSceneNotes.setState({ pending: false });
-    setAdding(true);
-  }, [pending]);
+    if (pending.title) void make(`${pending.title}: ${scene.title}`, true);
+    else setAdding(true);
+  }, [pending]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Notes not on this scene yet: those on none first, then those on others.
   const others = useMemo(() => {
@@ -76,12 +84,15 @@ export function SceneNotes({ novelId, novel, workspace, scene, spell }: { novelI
       setBusy(false);
     }
   };
-  const create_ = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!title.trim() || busy) return;
+  /** A new note on this scene, opened with the caret in its prose; pinned, it takes the pin here. */
+  const make = async (noteTitle: string, pin = false) => {
+    if (busy) return;
     setBusy(true);
     try {
-      const { id } = await api.notes.create(novelId, { title: title.trim(), scenes: [scene.id] });
+      const pinnedBefore = novel.notes.find((n) => n.pinned.includes(scene.id));
+      const { id } = await api.notes.create(novelId, { title: noteTitle, scenes: [scene.id], ...(pin ? { pinned: [scene.id] } : {}) });
+      // The server unpinned the note pinned here before: an open copy follows.
+      if (pin && pinnedBefore) await workspace.fileChanged({ type: "change", path: pinnedBefore.file, hash: null });
       await refresh();
       setTitle("");
       setAdding(false);
@@ -92,6 +103,10 @@ export function SceneNotes({ novelId, novel, workspace, scene, spell }: { novelI
     } finally {
       setBusy(false);
     }
+  };
+  const create_ = async (e: FormEvent) => {
+    e.preventDefault();
+    if (title.trim()) await make(title.trim());
   };
 
   return (

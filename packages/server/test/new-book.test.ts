@@ -92,6 +92,8 @@ describe("Library.create", () => {
     expect(result.diagnostics).toEqual([]);
     expect(result.novel.kind.key).toBe("campaign");
     expect(result.novel.pieces.map((p) => [p.title, p.status])).toEqual([["Session 1", "planned"]]);
+    // Its first session starts with the prep, as every new one does (#42).
+    expect(readFileSync(join(book.path, "sessions/01-the-first-arc/01-session-1.md"), "utf8")).toMatch(/^---\n[\s\S]*\n---\n## Strong start\n\n## Scenes\n[\s\S]*## At the table\n$/);
     expect(readFileSync(join(book.path, "book.yaml"), "utf8")).toMatch(/^id: cmp_[0-9a-z]{6}$/m);
     expect(filesIn(book.path)).toEqual(filesIn(templateOf("campaign")));
     expect(filesIn(book.path)).toEqual(expect.arrayContaining(["sessions/_order.yaml", "codex/npcs/.gitkeep", "codex/player-characters/.gitkeep", "codex/quests/.gitkeep"]));
