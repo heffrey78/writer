@@ -1,8 +1,8 @@
-# D16 spike: Writer's git over libgit2 (desktop phase)
+# D16 spike: Writer's git over libgit2
 
-Task #45, for decision D16 (#12) and requirement #8 (Android). The question: can a Rust git port (libgit2 through the `git2` crate) do everything Writer's server asks of git, with the same results, so that the server's logic can become an engine that Android hosts without Node or a git binary?
+Tasks #45 (desktop) and #46 (Android), for decision D16 (#12) and requirement #8 (Android). The question: can a Rust git port (libgit2 through the `git2` crate) do everything Writer's server asks of git, with the same results, so that the server's logic can become an engine that Android hosts without Node or a git binary?
 
-This is the desktop phase. Nothing ran on Android: the Android toolchain isn't on the development machine yet, and that phase is the next step.
+In short: on the desktop, libgit2 agrees with git on everything the app asks of it. On an Android phone, a webview called the same Rust in process and ran a whole sync round trip, with a conflict, in tens of milliseconds a step, and reached github.com over HTTPS trusting the phone's own certificates.
 
 ## What was built
 
@@ -16,6 +16,7 @@ All of it is under `spike/d16/`, outside the app. No production code changed.
 | `rust-port.ts` | The port over that binary. |
 | `contract.test.ts` | One contract suite, run against both ports, then both run on the same repositories (or identical copies) and compared answer for answer. Syncs go through the fake GitHub's git over HTTP, with Writer's token. |
 | `bench.ts` | Timings over a large book. |
+| `android/` | A Tauri 2 Android app whose page calls the port in process (*On Android*, below). |
 
 To run them: `cargo build --release` in `spike/d16/git2-port`, then `npx vitest run --config spike/d16/vitest.config.ts`, and `node spike/d16/bench.ts`.
 
@@ -109,10 +110,50 @@ One D16 risk didn't apply: **the app doesn't depend on git's conflict markers or
 
 A rough size: the port and its Node adapter, about 380 lines (written here); moving the server onto the port, one task per area (committer, sync and conflicts, versions and checkpoints, history and stats, library and publish), each with its tests green; the Rust adapter, about 800 lines (written here), plus Tauri commands.
 
+## On Android
+
+`spike/d16/android/` is a Tauri 2 app. Its Rust has one command, `git(op, dir, args)`, that calls the port library (`git2-port/src/lib.rs`) in process, plus a few for files. Its page (`page/scenario.js`) runs the round trip in JavaScript through `invoke()`, as an engine in the webview would:
+1. It clones a book twice.
+2. A writes, makes a checkpoint and syncs. B writes the same paragraph, and B's push is refused.
+3. B fetches and merges in memory, gets the conflict, settles it, commits the merge and syncs.
+4. A syncs and has the settled text.
+
+Then it times what the app does most often, and reaches github.com over HTTPS. With a PC attached, it uses the PC's fake GitHub through `adb reverse` (`run.ts`). On its own, it makes a remote on the device with the same book: 150 scenes and 61 commits.
+
+**Building it.** `build.sh` builds an arm64 APK with the Android SDK, NDK 27.2 and OpenJDK 17 from a Unity 6 install (read only), and Rust 1.99.1 with the Android target from a rustup in its own folder. Two things needed working around:
+- Unity's SDK carries no accepted licences, so Gradle can't fetch anything. The project compiles against platform 36, which the SDK has, and targets 34.
+- The generated Gradle task calls the Tauri CLI by a bare name, so `build.sh` gives it the full path.
+
+The APK is 19 MB, debug-signed for sideloading. The Rust library is 12 MB optimized and stripped, and holds libgit2, OpenSSL and Tauri.
+
+**On a Pixel 10 Pro, Android 17** (WebView: Chrome 155), installed from the APK, with no PC attached. Every step passed:
+
+| Step | Phone, ms | This PC, ms |
+|---|---:|---:|
+| clone the book (150 scenes, 61 commits) | 17 | 9 |
+| A writes, commits, makes a checkpoint and syncs | 83 | 7 |
+| B writes the same paragraph, commits, and is refused | 57 | 4 |
+| B fetches and merges in memory | 44 | 13 |
+| B commits the settled merge and syncs | 55 | 8 |
+| A syncs and has the settled text | 59 | 11 |
+| status | 13 | 1 |
+| open: tree and every blob at HEAD | 28 | 3 |
+| a scene's history | 8 | 4 |
+| stats: every commit's changes | 27 | 9 |
+| save: a scene staged and committed | 46 | 3 |
+| https: list a GitHub repository's refs | 374 | |
+| https: clone a small repository from github.com | 1453 | 292 |
+
+The PC column is the same page script, run in Node against the stdio binary. The phone column includes each `invoke()` from the page to the Rust and back. Nothing the app does on a save or a sync takes as long as a tenth of a second.
+
+**HTTPS took three tries, and the third is the way to do it.** OpenSSL as built for Android (openssl-src) has no stdio, so it can't read a certificate file or folder at all. Android also names its certificates by OpenSSL's old subject hash, so pointing OpenSSL at the folder would find nothing even if it could read it. So at start the app reads each certificate from Android's stores itself and hands it to libgit2 in memory (`GIT_OPT_ADD_SSL_X509_CERT`, in `trust_certificates_in`). It reads Conscrypt's store first (`/apex/com.android.conscrypt/cacerts`, which Android updates on its own), then the system's. On the Pixel: 120 certificates, all from Conscrypt. A certificate a user adds to the phone themselves isn't in either folder, so it wouldn't be trusted this way.
+
+**Not run on the phone:** a push with Writer's token over HTTPS to a real repository (the desktop phase covered token pushes, over HTTP to the fake GitHub), and the round trip through `adb reverse` to the PC's fake GitHub (`run.ts`; it needs a phone on USB).
+
 ## Not checked yet
 
-- **Android itself.** It needs a JDK, the Android SDK, NDK, an emulator and Rust's Android targets. Then a Tauri Android app calling this Rust in process, and the same sync round trip against the fake GitHub from the emulator.
-- **HTTPS on Android.** The build here links the system's OpenSSL. Android needs `vendored-openssl`, or libgit2 built against another TLS library. To try first in the Android phase.
+- **Unsaved text when Android kills the app**, which #8 asks for. That's the engine's and the files port's, not git's.
+- **A push to github.com from the phone**, with Writer's token over HTTPS.
 - **SSH remotes.** Built without SSH, since Writer's own sign-in is HTTPS with a token. A book cloned over SSH on the desktop would need HTTPS on Android.
 - **Books in a subfolder of a larger repository.** The app supports them (`--relative`, `rev-parse --show-prefix`). The port takes paths from the repository's top, so the engine would add and strip the prefix. Not exercised.
 - **gitoxide** (pure Rust), as D16 names it, wasn't tried. libgit2 did everything asked, so there was no need.
@@ -124,6 +165,7 @@ A rough size: the port and its Node adapter, about 380 lines (written here); mov
 1. The git port is defined by what the app needs, as in `port.ts`, not by git's commands. Each operation has a contract test that both adapters pass.
 2. The port returns the server's error codes. Pattern-matching git's output stays inside the Node adapter.
 3. The contract suite runs in CI against both adapters, so they can't drift apart. That needs Rust in CI, which a job of its own can have.
-4. Use libgit2 through `git2` on Android, as proposed. It did everything the app needs, and agreed with git on every answer checked.
+4. Use libgit2 through `git2` on Android, as proposed. It did everything the app needs, agreed with git on every answer checked, and ran the round trip on a phone.
+5. On Android, the engine trusts the device's certificates by handing them to libgit2 in memory, as `trust_certificates_in` does. OpenSSL there can't read them from files.
 
-Then the Android phase: the toolchain, a Tauri Android app calling the port in process, and the round trip on an emulator.
+D16's validation criteria asked for the round trip on an Android emulator. It ran on a real phone instead, against a remote on the phone, plus a clone from github.com. The engine's own tests against in-memory ports are part of the split, not of this spike.
