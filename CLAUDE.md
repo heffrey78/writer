@@ -14,7 +14,7 @@ The plan lives in this repository's issues (see *Project tracking*). Its order:
 4. The Journal kind, the first proof of the base (#5).
 5. Roadmap: Campaign (#6), Non-fiction (#7), Android (#8, D16 #12).
 
-D13–D15 are accepted (2026-10-18). D16 (Android) is **Proposed** until a spike confirms it: don't build on a proposed decision as if it were settled, and point it out when work depends on one.
+D13–D15 are accepted (2026-10-18), and D16 (2026-10-21, amended from its spike: docs/architecture/d16-spike.md). Don't build on a proposed decision as if it were settled, and point it out when work depends on one.
 
 ## gh-writer is the reference
 
@@ -56,7 +56,7 @@ Extensibility (D14, proposed): three layers, all shipped in the app.
 
 The base never imports a module or a kind. There are no run-time third-party plugins.
 
-New server code keeps `node:` APIs at its edges, so splitting it into an engine behind ports stays cheap (D16, proposed).
+New server code keeps `node:` APIs at its edges, and calls git only through operations the git port (`spike/d16/port.ts`) has or could have, so splitting it into an engine behind ports stays cheap (D16).
 
 ## Stack and commands
 
