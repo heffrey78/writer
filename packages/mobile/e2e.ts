@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { _android, expect, type AndroidDevice, type Page } from "@playwright/test";
+import { _android, expect as baseExpect, type AndroidDevice, type Page } from "@playwright/test";
 import { fakeGitHub } from "../server/test/fake-github.ts";
 
 /**
@@ -23,6 +23,8 @@ const repo = fileURLToPath(new URL("../../", import.meta.url));
 const adb = (...args: string[]) => execFileSync(ADB, args, { encoding: "utf8" });
 /** A shell command in the app's own folder on the device. */
 const inApp = (command: string, input?: string) => execFileSync(ADB, ["shell", `run-as ${PACKAGE} sh -c '${command}'`], { encoding: "utf8", ...(input !== undefined ? { input } : {}) });
+// A phone, or the emulator, is slower than this computer.
+const expect = baseExpect.configure({ timeout: 20_000 });
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 const tmp = mkdtempSync(join(tmpdir(), "writer-mobile-"));
@@ -68,7 +70,6 @@ try {
   [android] = await _android.devices();
   if (!android) throw new Error("Playwright sees no Android device.");
   const page: Page = await (await android.webView({ pkg: PACKAGE }, { timeout: 30_000 })).page();
-  expect.configure({ timeout: 20_000 });
 
   await expect(page.getByRole("heading", { level: 1, name: "Your books" })).toBeVisible();
   await expect(page.getByText("No books yet. Start one, or clone one from GitHub.")).toBeVisible();
@@ -148,6 +149,35 @@ try {
   for (let i = 0; i < 80 && !taken; i++, await sleep(250)) taken = inApp("grep -l \"A line from the desktop.\" books/*/README.md || true").trim();
   if (!taken) throw new Error("The change from GitHub didn't arrive.");
   step("synced: a change made elsewhere arrived");
+
+  // Typing, then the app killed before the autosave lands; opened again, the text is there and saved.
+  const todaysEntry = async (p: Page) => {
+    await p.goto("http://tauri.localhost/");
+    await p.getByRole("list", { name: "Books" }).getByRole("link", { name: /Days/ }).click();
+    await p.keyboard.press("Control+k");
+    const palette = p.getByRole("dialog", { name: "Command palette" });
+    await palette.getByRole("combobox").fill("today's entry");
+    await palette.getByRole("option", { name: "Today's entry" }).click();
+    return p.getByRole("textbox", { name: "Entry text" });
+  };
+  await (await todaysEntry(page)).click();
+  await page.keyboard.press("Control+End");
+  await page.keyboard.type(" Typed as Android closed the app.");
+  // Killed past the editor's pause (300 ms), well inside the autosave interval (2 s). A backgrounded
+  // app that Android kills has had its page hidden first, which hands the editor's text on at once.
+  await sleep(1000);
+  adb("shell", "am", "force-stop", PACKAGE);
+  if (inApp("grep -rl \"closed the app\" books/days/entries || true").trim()) throw new Error("The text was saved before the app was killed: nothing to recover.");
+  // Playwright lets go of the killed app's webview before it's asked for the new one's.
+  const killed = android;
+  await expect.poll(() => killed.webViews().length).toBe(0);
+  adb("shell", "monkey", "-p", PACKAGE, "-c", "android.intent.category.LAUNCHER", "1");
+  const again: Page = await (await android.webView({ pkg: PACKAGE }, { timeout: 30_000 })).page();
+  await expect(await todaysEntry(again)).toContainText("Typed as Android closed the app.");
+  let recovered = "";
+  for (let i = 0; i < 40 && !recovered; i++, await sleep(250)) recovered = inApp("grep -rl \"Typed as Android closed the app.\" books/days/entries || true").trim();
+  if (!recovered) throw new Error("The recovered text wasn't saved.");
+  step("killed mid-sentence: reopened, the text was there and saved");
 
   console.log(`\nAll ${steps.length} steps passed on ${device.split("\t")[0]}.`);
 } catch (e) {

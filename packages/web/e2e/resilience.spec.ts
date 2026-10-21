@@ -51,7 +51,7 @@ test("the desktop app quitting: flushAll() has what was just typed on disk when 
 });
 
 test("draft, close the tab and quit, reopen: all the work is there and committed", async ({ page, app, context }, testInfo) => {
-  // With the engine in the page (#51), closing the tab closes Writer itself: Android's case, in #54.
+  // With the engine in the page (#51), closing the tab closes Writer itself: Android's case, the test above.
   test.skip(testInfo.project.name.startsWith("engine-in-page"), "the page is the engine: closing it is the app being killed (#54)");
   const { here } = machines(app);
   await app.restart(here);
@@ -69,6 +69,26 @@ test("draft, close the tab and quit, reopen: all the work is there and committed
   const reopened = await context.newPage();
   await openNovel(reopened, app.launchUrl);
   await expect(text(reopened)).toContainText("Drafted just before closing.");
+});
+
+test("with the engine in the page, the page closed mid-autosave (Android killing the app): reopened, what wasn't saved is there and saves", async ({ page, app, context }, testInfo) => {
+  test.skip(!testInfo.project.name.startsWith("engine-in-page"), "the page is the engine only in the engine-in-page projects (#51)");
+  const { here } = machines(app);
+  await app.restart(here);
+  await openNovel(page, app.launchUrl);
+  await typeAtEnd(page, " Typed as Android closed the app.");
+  // Closed past the editor's pause (300 ms) but inside the autosave interval (2 s): the engine goes
+  // with the page, so the save never happens.
+  await page.waitForTimeout(1000);
+  await page.close({ runBeforeUnload: false });
+  await new Promise((r) => setTimeout(r, 2500));
+  expect(read(here, BRIDGE)).not.toContain("Typed as Android closed the app.");
+
+  // Opened again, as the app is: the text comes back, and is saved.
+  const reopened = await context.newPage();
+  await openNovel(reopened, app.launchUrl);
+  await expect(text(reopened)).toContainText("Typed as Android closed the app.");
+  await expect.poll(() => read(here, BRIDGE), { timeout: 10_000 }).toMatch(/ Typed as Android closed the app\.\n$/);
 });
 
 test("a crash loses at most the text typed within the autosave interval, and the tab brings even that back", async ({ page, app }) => {

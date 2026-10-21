@@ -49,11 +49,14 @@ import { useGitHubRepo } from "../github/repo.ts";
 import { IssuePage } from "../issues/issue-page.tsx";
 import { IssuesPage } from "../issues/issues-page.tsx";
 import { WritingView } from "./writing-view.tsx";
+import { keptText } from "../engine/kept.ts";
+import { engineInPage } from "../platform.ts";
 
 // React Flow comes with the graph, loaded when it's first opened.
 const GraphPage = lazy(() => import("../graph/graph-page.tsx").then((m) => ({ default: m.GraphPage })));
 
 /** A novel's workspace: the manuscript on the left, the editor on the right, save and sync state on top. */
+
 export function NovelPage() {
   const { novelId = "" } = useParams();
   // The open chapter or scene, for the tree.
@@ -82,7 +85,7 @@ export function NovelPage() {
   latest.current.novel = novel.data?.novel;
 
   useEffect(() => {
-    const ws = createWorkspace({ api, novelId, onModelSaved: () => void queryClient.invalidateQueries({ queryKey: keys.novel(novelId) }) });
+    const ws = createWorkspace({ api, novelId, ...(engineInPage ? { storage: keptText() ?? null } : {}), onModelSaved: () => void queryClient.invalidateQueries({ queryKey: keys.novel(novelId) }) });
     const detach = ws.autosave.attach(window);
     const unflush = flushOnQuit(() => ws.flush());
     const show = useNotice.getState().show;

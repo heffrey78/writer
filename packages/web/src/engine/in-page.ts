@@ -5,6 +5,7 @@ import { draftingBoardServer } from "@writer/module-drafting-board/server";
 import { offPageEventsServer } from "@writer/module-off-page-events/server";
 import { storyTimeServer } from "@writer/module-story-time/server";
 import { Channel, invoke } from "@tauri-apps/api/core";
+import { keepTextWith } from "./kept.ts";
 import {
   createEngine,
   git2GitPort,
@@ -38,7 +39,12 @@ export async function startEngine(channel: PortChannel, git: GitPort = remoteGit
   useCompiledKindSchemas();
   for (const module of [storyTimeServer, offPageEventsServer, draftingBoardServer, dailyServer]) registerServerModule(module);
   const host = await remoteHost(channel);
-  setPorts({ git, files: remoteFilesPort(channel), host });
+  const files = remoteFilesPort(channel);
+  setPorts({ git, files, host });
+  // Unsaved text, kept on the host's disk rather than the page's storage (kept.ts says why).
+  const unsaved = files.join(host.configDir(), "unsaved.json");
+  const before = await files.read(unsaved);
+  keepTextWith(before ? (JSON.parse(new TextDecoder().decode(before)) as Record<string, string>) : {}, (all) => files.write(unsaved, JSON.stringify(all)));
   const env = host.env();
   const github = new GitHub({
     clientId: env.WRITER_GITHUB_CLIENT_ID || GITHUB_CLIENT_ID,
