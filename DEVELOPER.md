@@ -127,6 +127,12 @@ Each web e2e test starts its own `writer serve` on a temp copy of the sample nov
 
 CI (`.github/workflows/ci.yml`) runs typecheck, unit tests, validation of the sample novel, epubcheck on the sample's EPUB, every e2e test, and the git port's contract suite against libgit2.
 
+### The engine and its hosts
+
+The server's logic is an engine (D16): `@writer/server/engine` (`packages/server/src/engine-index.ts`, and `createEngine` in `engine.ts`), the API over the writer's library and books, with nothing of Node in it. A host gives it ports first (`setPorts`: git, files, and the host's facts: its environment, its folders, how paths are written there), then a library, its workspaces and a GitHub connection. On Node, `useNodePorts()` gives git itself, the disk and `node-host.ts` (the platform's folders, the OS keychain, the gh CLI), and `app.ts` wraps the engine with the session check, the app's own routes, compiling and the built web app. In a browser or on Android, the client calls the engine's `fetch` in process. `test/engine.test.ts` bundles the engine for a browser with esbuild (any `node:` import fails it, and Node's globals are looked for), and runs it on in-memory ports. Modules' server halves import from `@writer/server/engine`, never `@writer/server`.
+
+Compiling stays on Node for now: `@writer/export` reads its fonts from disk and uses `node:zlib`.
+
 ### The git port
 
 The server reaches git only through its git port (D16; `packages/server/src/git-port/port.ts`), so that its logic can run where there's no git binary. Each entry point gives the server its ports (`useNodePorts()` on Node: the CLI, the web dev server and the tests); code asks for `gitPort()`. On Node the port runs git itself (`git-port/node.ts`, the only code that does; `test/git-boundary.test.ts` checks). On Android it's libgit2 (`packages/git2-port`). Paths are relative to the book's folder, which may sit inside a larger repository.

@@ -6,6 +6,7 @@
   "description": "Local writer server: Hono API on 127.0.0.1, guarded by a per-launch secret.",
   "exports": {
     ".": "./src/index.ts",
+    "./engine": "./src/engine-index.ts",
     "./node": "./src/node-ports.ts"
   },
   "dependencies": {

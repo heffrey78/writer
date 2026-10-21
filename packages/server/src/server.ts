@@ -5,7 +5,8 @@ import { getRequestListener } from "@hono/node-server";
 import type { Hono } from "hono";
 import { createApp } from "./app.ts";
 import type { CommitterOptions } from "./committer.ts";
-import { GitHub } from "./github.ts";
+import type { GitHub } from "./github.ts";
+import { githubFromEnv } from "./node-host.ts";
 import { Library } from "./library.ts";
 import { TOKEN_PARAM } from "./security.ts";
 import type { SyncerOptions } from "./sync.ts";
@@ -26,7 +27,7 @@ export interface ServerOptions {
   sync?: SyncerOptions | false;
   /** The built web app's folder (packages/web/dist), served at every path outside /api. */
   web?: string;
-  /** The GitHub connection. Default: from the environment (GitHub.fromEnv), the token in the OS keychain. */
+  /** The GitHub connection. Default: from the environment (githubFromEnv), the token in the OS keychain. */
   github?: GitHub;
 }
 
@@ -55,7 +56,7 @@ export interface RunningServer {
 const HOST = "127.0.0.1";
 
 /** Starts the server on 127.0.0.1 only. */
-export async function createServer({ library, token = newToken(), port = 0, shutdownTimeout = 10_000, commit, sync, web, github = GitHub.fromEnv() }: ServerOptions = {}): Promise<RunningServer> {
+export async function createServer({ library, token = newToken(), port = 0, shutdownTimeout = 10_000, commit, sync, web, github = githubFromEnv() }: ServerOptions = {}): Promise<RunningServer> {
   library ??= await Library.open();
   let boundPort = port;
   const workspaces = new Workspaces(library, { ...(commit !== undefined ? { commit } : {}), ...(sync !== undefined ? { sync } : {}), github });

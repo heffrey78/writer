@@ -1,9 +1,8 @@
-import { homedir } from "node:os";
-import { basename, join, resolve } from "node:path";
 import { knownKind, knownKinds, MANIFEST, newId, NOVEL_MANIFEST, parseYaml, readManifest, slugify } from "@writer/core";
 import { cloneUrl, gitFailure, repoName, type CloneProgress, type GitAuthSource } from "./git-port/port.ts";
-import { bookSource, filesPort, gitPort } from "./ports.ts";
-import { NeedsIdentity, TEMPLATES, templateOf, writeNewBook, type NewNovel } from "./new-book.ts";
+import { bookSource, filesPort, gitPort, host } from "./ports.ts";
+import { nameOf } from "./book-paths.ts";
+import { NeedsIdentity, templateOf, writeNewBook, type NewNovel } from "./new-book.ts";
 
 /** A novel the author has opened or cloned. */
 export interface LibraryEntry {
@@ -53,32 +52,6 @@ interface LibraryFile {
   novels: LibraryEntry[];
 }
 
-/** The per-user platform config directory for Writer, or $WRITER_CONFIG_DIR. */
-export function defaultConfigDir(): string {
-  const env = process.env;
-  if (env.WRITER_CONFIG_DIR) return resolve(env.WRITER_CONFIG_DIR);
-  return platformConfigDir("writer");
-}
-
-/**
- * gh-writer's config directory, whose library.json lists the books to offer to import (#2):
- * $WRITER_GH_WRITER_CONFIG_DIR, else gh-writer's own. None when Writer's config is elsewhere
- * ($WRITER_CONFIG_DIR, as tests and experiments set it): that's a world of its own.
- */
-export function ghWriterConfigDir(): string | undefined {
-  const env = process.env;
-  if (env.WRITER_GH_WRITER_CONFIG_DIR) return resolve(env.WRITER_GH_WRITER_CONFIG_DIR);
-  if (env.WRITER_CONFIG_DIR) return undefined;
-  return platformConfigDir("gh-writer");
-}
-
-function platformConfigDir(app: string): string {
-  const env = process.env;
-  if (process.platform === "win32") return join(env.APPDATA ?? join(homedir(), "AppData", "Roaming"), app);
-  if (process.platform === "darwin") return join(homedir(), "Library", "Application Support", app);
-  return join(env.XDG_CONFIG_HOME || join(homedir(), ".config"), app);
-}
-
 /**
  * The author's novels, kept in library.json in the config directory. Entries whose folder has gone
  * are dropped when the library is read, and each drop leaves a notice for the UI.
@@ -101,11 +74,11 @@ export class Library {
   }
 
   static async open({
-    configDir = defaultConfigDir(),
-    cloneDir = join(homedir(), "writer"),
-    templatesDir = TEMPLATES,
+    configDir = host().configDir(),
+    cloneDir = host().booksDir(),
+    templatesDir = host().templates(),
   }: { configDir?: string; cloneDir?: string; templatesDir?: string } = {}): Promise<Library> {
-    const library = new Library(join(configDir, "library.json"), cloneDir, templatesDir);
+    const library = new Library(filesPort().join(configDir, "library.json"), cloneDir, templatesDir);
     await library.#load();
     await library.list();
     return library;
@@ -133,11 +106,11 @@ export class Library {
    * gh-writer's books that aren't in this library (#2): those in its library.json whose folder is
    * still a book. Its library stays as it is; importing adds the folders here, not copies.
    */
-  async ghWriterBooks(configDir = ghWriterConfigDir()): Promise<{ path: string; title: string }[]> {
+  async ghWriterBooks(configDir = host().ghWriterConfigDir()): Promise<{ path: string; title: string }[]> {
     if (!configDir) return [];
     let theirs: { path?: unknown; title?: unknown }[];
     try {
-      theirs = (JSON.parse(decoder.decode(await filesPort().read(join(configDir, "library.json")))) as { novels?: { path?: unknown; title?: unknown }[] }).novels ?? [];
+      theirs = (JSON.parse(decoder.decode(await filesPort().read(filesPort().join(configDir, "library.json")))) as { novels?: { path?: unknown; title?: unknown }[] }).novels ?? [];
     } catch {
       return [];
     }
@@ -152,7 +125,7 @@ export class Library {
   }
 
   /** Add gh-writer's books to this library: those added, and those that couldn't be, with why. */
-  async importGhWriter(configDir = ghWriterConfigDir()): Promise<{ added: LibraryEntry[]; failed: { path: string; error: string }[] }> {
+  async importGhWriter(configDir = host().ghWriterConfigDir()): Promise<{ added: LibraryEntry[]; failed: { path: string; error: string }[] }> {
     const added: LibraryEntry[] = [];
     const failed: { path: string; error: string }[] = [];
     for (const { path } of await this.ghWriterBooks(configDir)) {
@@ -167,12 +140,12 @@ export class Library {
 
   /** Check that `dir` is a git repository holding a book (book.yaml, or novel.yaml for a novel in format 1 or 2), and add it (or refresh its entry). */
   async add(folder: string): Promise<LibraryEntry> {
-    const dir = expandHome(folder);
+    const dir = host().absolute(folder);
     const info = await filesPort().stat(dir).catch(() => undefined);
     // A symlink to a folder is one too: what it leads to is checked.
     const real = info && (await filesPort().real(dir));
     const kind = info?.kind === "symlink" && real ? (await filesPort().stat(real))?.kind : info?.kind;
-    if (kind !== "dir" || !real) throw new LibraryError("NOT_A_DIRECTORY", `${resolve(dir)} isn't a folder.`);
+    if (kind !== "dir" || !real) throw new LibraryError("NOT_A_DIRECTORY", `${dir} isn't a folder.`);
     const path = real;
 
     if (!(await gitPort().isRepo(path))) throw new LibraryError("NOT_A_REPO", `${path} isn't a git repository. A book needs one to keep its history and sync with GitHub.`);
@@ -230,7 +203,7 @@ export class Library {
   /** Clone a novel with the system git and add it. A failed clone leaves no folder behind. */
   async clone(repo: string, { into, onProgress, signal, auth }: CloneOptions = {}): Promise<LibraryEntry> {
     const url = cloneUrl(repo);
-    const dest = resolve(into ? expandHome(into) : join(this.cloneDir, repoName(url)));
+    const dest = host().absolute(into || filesPort().join(this.cloneDir, repoName(url)));
     const files = filesPort();
     const existing = (await files.stat(dest))?.kind === "dir" ? await files.list(dest) : undefined;
     if (existing?.length) throw gitFailure("DESTINATION_EXISTS", `destination path '${dest}' already exists and is not an empty directory`);
@@ -257,7 +230,7 @@ export class Library {
 
   /** Where a new novel called `title` goes unless the author picks a folder. */
   defaultFolder(title: string): string {
-    return join(this.cloneDir, slugify(title) || "novel");
+    return filesPort().join(this.cloneDir, slugify(title) || "novel");
   }
 
   /** The kinds of book it can start, each with a template: their keys and names ("Novel", "Journal"). */
@@ -275,7 +248,7 @@ export class Library {
     const template = templateOf(kind, this.templatesDir);
     const files = filesPort();
     if (!knownKind(kind) || (await files.stat(template).catch(() => undefined))?.kind !== "dir") throw new LibraryError("UNKNOWN_KIND", `Writer can't start a book of the kind “${kind}”.`);
-    const dest = resolve(into ? expandHome(into) : this.defaultFolder(novel.title));
+    const dest = host().absolute(into || this.defaultFolder(novel.title));
     const info = await files.stat(dest).catch(() => undefined);
     if (info && info.kind !== "dir") throw new LibraryError("NOT_A_DIRECTORY", `${dest} is a file, not a folder. Choose another folder.`);
     const existing = info && (await files.list(dest));
@@ -327,7 +300,7 @@ async function coverOf(path: string): Promise<{ title: string; author?: string; 
   const manifest = await readManifest(bookSource(path));
   if (!manifest) return undefined;
   const data = parseYaml(manifest.text, manifest.file).data as { title?: unknown; author?: unknown; cover?: unknown } | undefined;
-  const title = typeof data?.title === "string" && data.title.trim() ? data.title.trim() : basename(path);
+  const title = typeof data?.title === "string" && data.title.trim() ? data.title.trim() : nameOf(path.replace(/\\/g, "/").replace(/\/+$/, ""));
   const author = typeof data?.author === "string" ? data.author.trim() : "";
   const cover = typeof data?.cover === "string" ? data.cover.trim() : "";
   return { title, ...(author ? { author } : {}), ...(cover ? { cover } : {}) };
@@ -349,17 +322,6 @@ function withoutCredentials(url: string): string {
 function isEntry(n: unknown): n is LibraryEntry {
   const e = n as LibraryEntry;
   return typeof e === "object" && e !== null && typeof e.id === "string" && typeof e.path === "string" && typeof e.title === "string" && typeof e.lastOpened === "string";
-}
-
-/**
- * A path as a person types it: a leading ~ is their home folder, as in a shell. Without this,
- * "~/writer/novel" would be a folder named "~" wherever Writer happened to start.
- */
-export function expandHome(path: string): string {
-  const p = path.trim();
-  if (p === "~") return homedir();
-  if (p.startsWith("~/") || p.startsWith("~\\")) return join(homedir(), p.slice(2));
-  return p;
 }
 
 const decoder = new TextDecoder();

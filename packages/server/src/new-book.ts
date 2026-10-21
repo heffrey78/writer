@@ -1,23 +1,11 @@
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { editYaml, kindOf, loadBook, MANIFEST, newId, NOVEL_MANIFEST } from "@writer/core";
 import { snapshots } from "@writer/core/snapshots";
 import { hasGitIdentity } from "./committer.ts";
 import { filesUnder } from "./files.ts";
-import { bookSource, filesPort, gitPort } from "./ports.ts";
+import { bookSource, filesPort, gitPort, host } from "./ports.ts";
 
-/**
- * The templates in this checkout of Writer (or beside the server bundle: WRITER_TEMPLATES), a folder
- * each by the kind's key: templates/novel, the same files a "Use this template" repository gets, and
- * templates/journal.
- */
-export const TEMPLATES = process.env.WRITER_TEMPLATES || fileURLToPath(new URL("../../../templates", import.meta.url));
-
-/** A kind's template: templates/<kind>. */
-export const templateOf = (kind: string, root = TEMPLATES) => join(root, kind);
-
-/** The Novel's template, whose tools a novel moved to a newer format takes. */
-export const DEFAULT_TEMPLATE = templateOf("novel");
+/** A kind's template: <templates>/<kind>, in the host's templates (node-host.ts's templatesDir on Node). */
+export const templateOf = (kind: string, root = host().templates()) => filesPort().join(root, kind);
 
 /** A template's placeholder IDs (`nv_temp1a`, `ent_temp2b`), each replaced with a fresh one of its prefix in every new book, as the novel's init.mjs does on GitHub. */
 const TEMPLATE_ID = /\b([a-z]{2,8})_temp[0-9a-z]{2}\b/g;

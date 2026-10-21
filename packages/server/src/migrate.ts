@@ -1,6 +1,6 @@
 import { migration, SCHEMA_VERSION, type FileSource, type Migration } from "@writer/core";
 import { filesUnder, readToolBytes, sameBytes, TOOLS_DIR } from "./files.ts";
-import { DEFAULT_TEMPLATE } from "./new-book.ts";
+import { templateOf } from "./new-book.ts";
 import { transaction, type FileWrite, type OperationResult } from "./operations.ts";
 import { bookSource, filesPort } from "./ports.ts";
 
@@ -10,14 +10,14 @@ import { bookSource, filesPort } from "./ports.ts";
  */
 
 /** What migrating the book at `root` to format `to` would write, with the tools from `templateDir` where the book has them. */
-export async function migrationWrites(root: string, templateDir = DEFAULT_TEMPLATE, to = SCHEMA_VERSION): Promise<{ migration: Migration; writes: FileWrite[] }> {
+export async function migrationWrites(root: string, templateDir = templateOf("novel"), to = SCHEMA_VERSION): Promise<{ migration: Migration; writes: FileWrite[] }> {
   const m = await migration(bookSource(root), to);
   if (m.status !== "migrate") return { migration: m, writes: [] };
   return { migration: m, writes: [...m.writes, ...(await toolWrites(root, templateDir))] };
 }
 
 /** Migrate the book at `root` to format `to` (the newest by default) in one commit. Nothing is written unless the migration's status is "migrate". */
-export async function migrateNovel(root: string, templateDir = DEFAULT_TEMPLATE, to = SCHEMA_VERSION): Promise<{ migration: Migration; result?: OperationResult }> {
+export async function migrateNovel(root: string, templateDir = templateOf("novel"), to = SCHEMA_VERSION): Promise<{ migration: Migration; result?: OperationResult }> {
   const { migration: m, writes } = await migrationWrites(root, templateDir, to);
   if (m.status !== "migrate") return { migration: m };
   return { migration: m, result: await transaction(root, writes, m.message) };

@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { validate } from "@writer/core";
 import { nodeSource } from "@writer/core/node";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createServer, DEFAULT_TEMPLATE, Library, sessionCookie, templateOf, type LibraryEntry } from "../src/index.ts";
+import { createServer, Library, sessionCookie, templateOf, type LibraryEntry } from "../src/index.ts";
 import { gitIn, scratch } from "./fixtures.ts";
 import { send } from "./http.ts";
 
@@ -55,10 +55,10 @@ describe("Library.create", () => {
     expect(readFileSync(join(novel.path, "diagrams/README.md"), "utf8")).toMatch(/^# Diagrams of The Salt Road\n/);
 
     // Every template file is there, the scripts and workflows byte for byte, and no template ID is left.
-    expect(filesIn(novel.path)).toEqual(filesIn(DEFAULT_TEMPLATE));
-    for (const file of filesIn(DEFAULT_TEMPLATE).filter((f) => f.startsWith(".github/") || f === ".gitattributes")) {
+    expect(filesIn(novel.path)).toEqual(filesIn(templateOf("novel")));
+    for (const file of filesIn(templateOf("novel")).filter((f) => f.startsWith(".github/") || f === ".gitattributes")) {
       // Buffer.equals: toEqual compares a large file (the compiler, its fonts) byte by byte, slowly.
-      expect(readFileSync(join(novel.path, file)).equals(readFileSync(join(DEFAULT_TEMPLATE, file))), file).toBe(true);
+      expect(readFileSync(join(novel.path, file)).equals(readFileSync(join(templateOf("novel"), file))), file).toBe(true);
     }
     for (const file of filesIn(novel.path).filter((f) => !f.startsWith(".github/"))) {
       expect(readFileSync(join(novel.path, file), "utf8"), file).not.toMatch(/_temp1a\b/);

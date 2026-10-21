@@ -4,7 +4,6 @@ import { bodyLimit } from "hono/body-limit";
 import { streamSSE } from "hono/streaming";
 import { bibleRoutes } from "./bible-routes.ts";
 import { issueRoutes } from "./issues-routes.ts";
-import { compileRoutes } from "./compile-routes.ts";
 import { imageRoutes } from "./image-routes.ts";
 import { versionRoutes } from "./version-routes.ts";
 import { compareRoutes } from "./compare-routes.ts";
@@ -22,7 +21,7 @@ import type { NovelWorkspace, Workspaces } from "./workspace.ts";
 
 const HEARTBEAT_MS = 25_000;
 
-type NovelEnv = { Variables: { ws: NovelWorkspace } };
+export type NovelEnv = { Variables: { ws: NovelWorkspace } };
 
 /**
  * Any change to a novel in a newer format than this server reads (all but GET and sync) → 409 TOO_NEW.
@@ -44,7 +43,10 @@ type NovelEnv = { Variables: { ws: NovelWorkspace } };
  * POST /api/novels/:id/conflicts/resolve  { upstream, files: { <path>: resolution } } → the sync status,
  *                                   or 409 STALE { conflicts } when they changed since they were read
  */
-export function novelRoutes(library: Library, workspaces: Workspaces, github?: GitHub): Hono<NovelEnv> {
+/** Routes the host adds to each book's (the Node host's: compiling, which runs on Node only). */
+export type NovelRoutesExtra = (routes: Hono<NovelEnv>) => void;
+
+export function novelRoutes(library: Library, workspaces: Workspaces, github?: GitHub, extra?: NovelRoutesExtra): Hono<NovelEnv> {
   const routes = new Hono<NovelEnv>();
 
   routes.use("/:id/*", async (c, next) => {
@@ -188,7 +190,7 @@ export function novelRoutes(library: Library, workspaces: Workspaces, github?: G
   bibleRoutes(routes);
   imageRoutes(routes, library);
   issueRoutes(routes);
-  compileRoutes(routes);
+  extra?.(routes);
   versionRoutes(routes);
   compareRoutes(routes);
   statsRoutes(routes);

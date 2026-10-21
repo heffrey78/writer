@@ -1,5 +1,5 @@
 import type { Context } from "hono";
-import { body, type Env, type ServerModule } from "@writer/server";
+import { body, type Env, type ServerModule } from "@writer/server/engine";
 import { BoardError, BoardStore } from "./board.ts";
 
 export * from "./board.ts";

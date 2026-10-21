@@ -1,12 +1,10 @@
 import { Hono } from "hono";
 import { appInfo, licenses, UpdateCheck } from "./app-info.ts";
-import { globalIdentity, setGlobalIdentity } from "./committer.ts";
+import { compileRoutes } from "./compile-routes.ts";
+import { createEngine } from "./engine.ts";
 import { gitInstall } from "./git.ts";
-import { githubRoutes } from "./github-routes.ts";
 import type { GitHub } from "./github.ts";
-import { libraryRoutes } from "./library-routes.ts";
 import type { Library } from "./library.ts";
-import { novelRoutes } from "./novel-routes.ts";
 import { hasSession, security } from "./security.ts";
 import { webRoutes } from "./web.ts";
 import type { Workspaces } from "./workspace.ts";
@@ -22,7 +20,10 @@ export interface AppOptions {
   web?: string;
 }
 
-/** The API, behind the security middleware. Routes added later go through it too. */
+/**
+ * The Node host's app: the engine's API (engine.ts) behind the security middleware, with what only the
+ * host has: its health and git, the app's version and licences, compiling, and the built web app.
+ */
 export function createApp({ token, port, library, workspaces, github, web }: AppOptions): Hono {
   const app = new Hono();
   app.use(security({ token, port, publicPaths: new Set(["/api/session"]) }));
@@ -35,23 +36,7 @@ export function createApp({ token, port, library, workspaces, github, web }: App
   app.get("/api/app", async (c) => c.json(await appInfo(updates)));
   app.get("/api/app/licenses", async (c) => c.json({ licenses: await licenses() }));
 
-  // Who git signs as (heffrey78/gh-writer#186): the name and email set on this computer, and one from the GitHub account.
-  app.get("/api/identity", async (c) =>
-    c.json({ identity: await globalIdentity(), suggestion: (await github.suggestedIdentity().catch(() => undefined)) ?? null }),
-  );
-  app.put("/api/identity", async (c) => {
-    const body = (await c.req.json().catch(() => ({}))) as { name?: unknown; email?: unknown };
-    const name = typeof body.name === "string" ? body.name.trim() : "";
-    const email = typeof body.email === "string" ? body.email.trim() : "";
-    if (!name || !/^[^\s@]+@[^\s@]+$/.test(email)) return c.json({ code: "BAD_IDENTITY", error: "Give a name and an email address." }, 400);
-    await setGlobalIdentity({ name, email });
-    // Work that waited for a name and email is committed now.
-    await workspaces.retryIdentity();
-    return c.json({ identity: { name, email } });
-  });
-  app.route("/api/library", libraryRoutes(library, github));
-  app.route("/api/novels", novelRoutes(library, workspaces, github));
-  app.route("/api/github", githubRoutes(github));
+  app.route("/", createEngine({ library, workspaces, github, novelRoutes: compileRoutes }));
 
   if (web) {
     app.route("/", webRoutes(web));

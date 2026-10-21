@@ -1,5 +1,5 @@
 import { carrierOf, carryingField, countWords, editFrontMatter, levelLabel, outerSections, pieceSections, vocabulary, type Book, type PieceStatus, type StatusDef } from "@writer/core";
-import { filesPort, gitPort, GitHubError, type GitHub, type GitHubRepo, type ModuleService, type TextFile, type WriteResult } from "@writer/server";
+import { filesPort, gitPort, GitHubError, type GitHub, type GitHubRepo, type ModuleService, type TextFile, type WriteResult } from "@writer/server/engine";
 
 /*
  * The drafting board (heffrey78/gh-writer#11, D8): the main version's scenes mirrored to a GitHub Project, one draft

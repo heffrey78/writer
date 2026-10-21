@@ -13,7 +13,7 @@ import {
   type ManuscriptOperations,
   type OperationResult,
   type ServerModule,
-} from "@writer/server";
+} from "@writer/server/engine";
 import { EVENT, eventFields, eventFile, eventsOf, type EventFields } from "../core/index.ts";
 
 /** A commit message's prefix: the kind's short name for its codex, "Bible". */

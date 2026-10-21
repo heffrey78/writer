@@ -1,5 +1,3 @@
-import { homedir } from "node:os";
-import { sep } from "node:path";
 import { kindOf } from "@writer/core";
 import { Hono, type Context } from "hono";
 import { streamSSE } from "hono/streaming";
@@ -7,7 +5,7 @@ import { FileError, imageVersion, servableImage } from "./files.ts";
 import { GitFailure, gitFailure } from "./git-port/port.ts";
 import type { GitHub } from "./github.ts";
 import { LibraryError, type Library } from "./library.ts";
-import { bookSource, filesPort } from "./ports.ts";
+import { bookSource, filesPort, host } from "./ports.ts";
 
 /**
  * GET    /api/library        { novels, notices, folder, ghWriter, kinds }: folder is where new novels and clones go, ~ for home;
@@ -35,7 +33,7 @@ export function libraryRoutes(library: Library, github?: GitHub): Hono {
         return { ...n, ...(coverVersion ? { coverVersion } : {}), ...(kind ? { kind: kind.key, modules: [...(kind.modules ?? [])] } : {}) };
       }),
     );
-    return c.json({ novels, notices: library.notices, folder: tilde(library.cloneDir), ghWriter: await library.ghWriterBooks(), kinds: await library.kinds() });
+    return c.json({ novels, notices: library.notices, folder: host().shown(library.cloneDir), ghWriter: await library.ghWriterBooks(), kinds: await library.kinds() });
   });
 
   // Read straight from the folder: opening the novel for this would start syncing every book on the shelf.
@@ -148,8 +146,3 @@ function failure(c: Context, e: unknown): Response {
   return c.json(describe(e), e instanceof LibraryError && e.code === "UNKNOWN_NOVEL" ? 404 : 400);
 }
 
-/** A path as the author would type it: their home folder as ~. */
-function tilde(path: string): string {
-  const home = homedir();
-  return path === home ? "~" : path.startsWith(home + sep) ? `~/${path.slice(home.length + 1).split(sep).join("/")}` : path;
-}

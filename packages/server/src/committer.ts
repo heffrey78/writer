@@ -2,7 +2,7 @@ import { kindByKey, kindOf, V2_KIND } from "@writer/core";
 import { commitMessage, type FileChange } from "./commit-message.ts";
 import { TEMP_SUFFIX } from "./files.ts";
 import { GitFailure, gitFailure, NO_OBJECT, text, type Scope } from "./git-port/port.ts";
-import { bookSource, gitPort } from "./ports.ts";
+import { bookSource, gitPort, host } from "./ports.ts";
 
 export interface CommitterOptions {
   /** Commit after this long without a save (ms). Default 2 minutes. */
@@ -58,7 +58,7 @@ export async function setGlobalIdentity({ name, email }: { name: string; email: 
 /** Whether git has a name and email to commit with (config or GIT_AUTHOR_* / GIT_COMMITTER_*). */
 export async function hasGitIdentity(root: string): Promise<boolean> {
   const get = async (key: string) => (await gitPort().getConfig(root, key).catch(() => null)) ?? "";
-  const env = process.env;
+  const env = host().env();
   const name = env.GIT_AUTHOR_NAME || env.GIT_COMMITTER_NAME || (await get("user.name"));
   const email = env.GIT_AUTHOR_EMAIL || env.GIT_COMMITTER_EMAIL || (await get("user.email"));
   return Boolean(name && email);

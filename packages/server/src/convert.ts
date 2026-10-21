@@ -1,9 +1,9 @@
 import { conversionsOf, knownKind, loadBook, SCHEMA_VERSION, type Conversion } from "@writer/core";
 import { snapshots } from "@writer/core/snapshots";
 import { filesUnder, readToolBytes, sameBytes, TOOLS_DIR, WORKFLOWS_DIR } from "./files.ts";
-import { bookSource, filesPort, gitPort } from "./ports.ts";
+import { bookSource, filesPort, gitPort, host } from "./ports.ts";
 import { migrationWrites, overlay } from "./migrate.ts";
-import { DEFAULT_TEMPLATE, TEMPLATES, templateOf } from "./new-book.ts";
+import { templateOf } from "./new-book.ts";
 import { OperationError, transaction, type FileWrite, type OperationResult } from "./operations.ts";
 
 /*
@@ -19,10 +19,10 @@ export async function conversionsFor(root: string): Promise<Conversion[]> {
 }
 
 /** Make the book at `root` a book of the kind `to`, in one commit; the notes say what it did that the writer should know. */
-export async function convertBook(root: string, to: string, templates = TEMPLATES): Promise<OperationResult & { notes: string[] }> {
+export async function convertBook(root: string, to: string, templates = host().templates()): Promise<OperationResult & { notes: string[] }> {
   if (!knownKind(to)) throw new OperationError("BAD_REQUEST", `Writer has no kind of book “${to}”.`);
   // On the book as format 3 has it: book.yaml, naming its kind.
-  const { migration, writes: moved } = await migrationWrites(root, DEFAULT_TEMPLATE, SCHEMA_VERSION);
+  const { migration, writes: moved } = await migrationWrites(root, templateOf("novel", templates), SCHEMA_VERSION);
   if (migration.status === "refused") throw new OperationError("BAD_REQUEST", migration.reason);
   const before = overlay(bookSource(root), moved);
   const book = await loadBook(before);

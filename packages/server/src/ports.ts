@@ -10,6 +10,25 @@ import type { GitPort } from "./git-port/port.ts";
 export interface Ports {
   git: GitPort;
   files: FilesPort;
+  host: Host;
+}
+
+/** What the server needs to know of where it runs: its folders, its environment, and how paths are written there. */
+export interface Host {
+  /** Environment variables (GIT_AUTHOR_NAME, and those the host reads itself); none on Android. */
+  env(): Record<string, string | undefined>;
+  /** Where Writer keeps library.json. */
+  configDir(): string;
+  /** Where new books and clones go unless the writer says otherwise. */
+  booksDir(): string;
+  /** gh-writer's config folder, whose library lists books to offer to import (#2); none where there's no gh-writer. */
+  ghWriterConfigDir(): string | undefined;
+  /** The book templates, a folder each by kind. */
+  templates(): string;
+  /** A folder the writer typed ("~/books/one", a relative path) as an absolute path. */
+  absolute(path: string): string;
+  /** A path as the writer reads it: their home folder as ~. */
+  shown(path: string): string;
 }
 
 let ports: Ports | undefined;
@@ -29,6 +48,10 @@ export function gitPort(): GitPort {
 
 export function filesPort(): FilesPort {
   return given().files;
+}
+
+export function host(): Host {
+  return given().host;
 }
 
 /** A book's files as core's loader reads them, through the files port. */

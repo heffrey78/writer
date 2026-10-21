@@ -1,6 +1,6 @@
-import { createHash } from "node:crypto";
 import type { WriteHooks } from "./files-port/port.ts";
 import { filesPort } from "./ports.ts";
+import { sha256 } from "./sha256.ts";
 
 export { TEMP_SUFFIX, type WriteHooks } from "./files-port/port.ts";
 
@@ -49,8 +49,9 @@ export class FileError extends Error {
   }
 }
 
+/** A file's hash as the API reports it, and a write's base: its SHA-256 (UTF-8 for a string), in hex. */
 export function hashText(content: string | Uint8Array): string {
-  return createHash("sha256").update(content).digest("hex");
+  return sha256(content);
 }
 
 /**

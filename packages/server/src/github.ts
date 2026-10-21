@@ -1,9 +1,8 @@
-import { execFile } from "node:child_process";
 import type { GitAuth } from "./git-port/port.ts";
 
 /*
  * The author's GitHub connection (D5): an OAuth App's device flow, or the gh CLI's account, with the
- * token kept in the operating system's keychain. The token never leaves the server: not in a
+ * token kept where the host keeps secrets (the operating system's keychain, on the desktop: node-host.ts). The token never leaves the server: not in a
  * response, a log line, a file, or a repository's git config.
  */
 
@@ -21,10 +20,8 @@ const NEEDED = ["repo", "workflow"];
 /** What the drafting board needs as well: without it, only the board asks for a reconnect. */
 const BOARD = ["project"];
 
-const SERVICE = "writer";
 /** A request to GitHub that takes longer is given up (as offline). */
 const TIMEOUT_MS = 15_000;
-const ACCOUNT = "github";
 
 /** Where the token lives. */
 export interface TokenStore {
@@ -48,45 +45,6 @@ export class GitHubError extends Error {
   }
 }
 
-/** The OS keychain (macOS Keychain, Windows Credential Manager, the Secret Service on Linux). Never a plain-text file. */
-export function keychainStore(): TokenStore {
-  const entry = async () => {
-    try {
-      const { AsyncEntry } = await import("@napi-rs/keyring");
-      return new AsyncEntry(SERVICE, ACCOUNT);
-    } catch {
-      throw noKeychain();
-    }
-  };
-  const call = async <T>(fn: () => Promise<T>): Promise<T> => {
-    try {
-      return await fn();
-    } catch {
-      throw noKeychain();
-    }
-  };
-  return {
-    get: async () => {
-      const e = await entry();
-      return (await call(() => e.getPassword())) ?? undefined;
-    },
-    set: async (token) => {
-      const e = await entry();
-      await call(() => e.setPassword(token));
-    },
-    delete: async () => {
-      const e = await entry();
-      await call(() => e.deletePassword());
-    },
-  };
-}
-
-const noKeychain = () =>
-  new GitHubError(
-    "NO_KEYCHAIN",
-    "Writer keeps your GitHub sign-in in the system keychain, and couldn't reach it. On Linux, install and unlock a Secret Service keyring (GNOME Keyring or KWallet), then try again.",
-  );
-
 /** The status of a signed-in account: who, and any permission Writer needs that the token lacks. */
 function signedInStatus({ scopes, ...account }: GitHubAccount, deviceFlow: boolean): AccountStatus {
   const missing = scopes ? NEEDED.filter((s) => !scopes.includes(s)) : [];
@@ -107,15 +65,6 @@ export function memoryStore(): TokenStore {
     set: async (t) => void (token = t),
     delete: async () => void (token = undefined),
   };
-}
-
-/** The token of the gh CLI's signed-in account, if there is one. */
-export function ghToken(): Promise<string | undefined> {
-  return new Promise((resolve) => {
-    execFile("gh", ["auth", "token", "--hostname", "github.com"], { timeout: 10_000, env: { ...process.env, GH_PROMPT_DISABLED: "1" } }, (error, stdout) =>
-      resolve(error ? undefined : stdout.trim() || undefined),
-    );
-  });
 }
 
 export interface GitHubAccount {
@@ -179,8 +128,9 @@ export interface GitHubOptions {
   webUrl?: string;
   /** api.github.com, or a fake GitHub in tests. */
   apiUrl?: string;
-  store?: TokenStore;
-  /** The gh CLI's token, if it has one. */
+  /** Where the token is kept: the host's (node-host.ts's keychainStore), or memory in tests. */
+  store: TokenStore;
+  /** The gh CLI's token, if it has one: the host's (node-host.ts's ghToken); none by default. */
   gh?: () => Promise<string | undefined>;
   fetch?: typeof fetch;
 }
@@ -205,23 +155,13 @@ export class GitHub {
   /** The gh CLI's account, looked up at most once a minute. */
   #ghCache: { at: number; value: Promise<{ token: string; account: GitHubAccount } | undefined> } | undefined;
 
-  constructor({ clientId = GITHUB_CLIENT_ID, webUrl = "https://github.com", apiUrl = "https://api.github.com", store = keychainStore(), gh = ghToken, fetch: f = fetch }: GitHubOptions = {}) {
+  constructor({ clientId = GITHUB_CLIENT_ID, webUrl = "https://github.com", apiUrl = "https://api.github.com", store, gh = async () => undefined, fetch: f = fetch }: GitHubOptions) {
     this.clientId = clientId || undefined;
     this.webUrl = webUrl.replace(/\/$/, "");
     this.apiUrl = apiUrl.replace(/\/$/, "");
     this.#store = store;
     this.#gh = gh;
     this.#fetch = f;
-  }
-
-  /** From the environment: WRITER_GITHUB_CLIENT_ID, WRITER_GITHUB_URL, WRITER_GITHUB_API_URL, WRITER_TOKEN_STORE=memory. */
-  static fromEnv(env: NodeJS.ProcessEnv = process.env): GitHub {
-    return new GitHub({
-      clientId: env.WRITER_GITHUB_CLIENT_ID || GITHUB_CLIENT_ID,
-      ...(env.WRITER_GITHUB_URL ? { webUrl: env.WRITER_GITHUB_URL } : {}),
-      ...(env.WRITER_GITHUB_API_URL ? { apiUrl: env.WRITER_GITHUB_API_URL } : {}),
-      ...(env.WRITER_TOKEN_STORE === "memory" ? { store: memoryStore() } : {}),
-    });
   }
 
   /** The stored token, for git and the API. Undefined when signed out (or the keychain can't be read). */

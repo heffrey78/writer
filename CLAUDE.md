@@ -56,7 +56,7 @@ Extensibility (D14, proposed): three layers, all shipped in the app.
 
 The base never imports a module or a kind. There are no run-time third-party plugins.
 
-New server code keeps `node:` APIs at its edges, and calls git only through the git port (`gitPort()`; a new operation goes in the port, both adapters and its contract suite together), so splitting it into an engine behind ports stays cheap (D16).
+The server's logic is the engine (`@writer/server/engine`, D16): it never imports `node:` or uses Node's globals (`test/engine.test.ts` bundles it for a browser). It reaches git, the disk and the host only through its ports (`gitPort()`, `filesPort()`, `host()`); Node-only code lives in the Node host (`node-host.ts`, `app.ts`, `server.ts`) and the ports' Node adapters. A new git or file operation goes in the port, its adapters and its contract suite together.
 
 ## Stack and commands
 
