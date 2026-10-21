@@ -1,29 +1,24 @@
 import type { Book } from "@writer/core";
 import { useEffect, useRef } from "react";
-import { moduleOutlineOrders } from "../modules.tsx";
+import { moduleOutlineOrders, moduleOutlineViews } from "../modules.tsx";
 import { Navigate, useLocation, useNavigate, useParams, useSearchParams } from "react-router";
 import { cn } from "../ui/cn.ts";
-import { OutlineBoard } from "./board.tsx";
 import { OutlineCards } from "./corkboard.tsx";
 import { OutlineTable } from "./outline.tsx";
 import type { Workspace } from "./workspace.ts";
 import { PAGE } from "../ui/page.ts";
 
 /*
- * The outline (heffrey78/gh-writer#136): every scene in reading order, as a table, as cards (the corkboard), or on the
- * drafting board by status (heffrey78/gh-writer#11), switched in place. The choice is in the address (/outline/table,
- * /outline/cards, /outline/board) and remembered for /outline.
+ * The outline (heffrey78/gh-writer#136): every scene in reading order, as a table, as cards (the corkboard), or as a
+ * view the kind's modules add (the drafting board by status, heffrey78/gh-writer#11), switched in place. The choice is
+ * in the address (/outline/table, /outline/cards, /outline/board) and remembered for /outline.
  */
 
 const VIEWS = [
   { key: "table", label: "Table" },
   { key: "cards", label: "Cards" },
-  { key: "board", label: "Board" },
-] as const;
-type View = (typeof VIEWS)[number]["key"];
+];
 const KEY = "ghw.outlineView";
-
-const isView = (v: string | null | undefined): v is View => VIEWS.some((x) => x.key === v);
 
 /**
  * The table and the cards in reading order, or in an order a module adds (story time, with the
@@ -40,16 +35,16 @@ function rememberedOrder(): string {
   }
 }
 
-function remembered(): View {
+function remembered(views: string[]): string {
   try {
     const saved = localStorage.getItem(KEY);
-    return isView(saved) ? saved : "table";
+    return saved && views.includes(saved) ? saved : "table";
   } catch {
     return "table";
   }
 }
 
-function remember(view: View) {
+function remember(view: string) {
   try {
     localStorage.setItem(KEY, view);
   } catch {
@@ -87,19 +82,27 @@ export function OutlinePage({ novelId, novel, workspace }: { novelId: string; no
   useEffect(() => {
     if (state?.focusSwitch) group.current?.querySelector<HTMLInputElement>("input:checked")?.focus();
   }, [state, view]);
+  // A module's view shows reading order only: the order switch is the table's and the cards'.
+  const moduleViews = moduleOutlineViews(novel.kind);
+  const views = [...VIEWS, ...moduleViews];
+  const ordered = (v: string) => VIEWS.some((x) => x.key === v);
   const remembers = orders.find((o) => o.key === rememberedOrder());
-  if (!isView(view)) return <Navigate to={`/novels/${novelId}/outline/${remembered()}${remembered() !== "board" && remembers ? `?order=${remembers.key}` : ""}`} replace />;
-  const choose = (next: View) => {
+  if (!view || !views.some((v) => v.key === view)) {
+    const to = remembered(views.map((v) => v.key));
+    return <Navigate to={`/novels/${novelId}/outline/${to}${ordered(to) && remembers ? `?order=${remembers.key}` : ""}`} replace />;
+  }
+  const choose = (next: string) => {
     remember(next);
-    void navigate(`/novels/${novelId}/outline/${next}${moduleOrder && next !== "board" ? `?order=${moduleOrder.key}` : ""}`, { replace: true, state: { focusSwitch: true } });
+    void navigate(`/novels/${novelId}/outline/${next}${moduleOrder && ordered(next) ? `?order=${moduleOrder.key}` : ""}`, { replace: true, state: { focusSwitch: true } });
   };
+  const moduleView = moduleViews.find((v) => v.key === view);
   const bookView = { novelId, novel, workspace };
   return (
     <div className={cn(PAGE, "grid gap-4")}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-semibold">Outline</h1>
         <div className="flex flex-wrap items-center gap-3">
-          {view !== "board" && orders.length > 0 && (
+          {ordered(view) && orders.length > 0 && (
             <div role="radiogroup" aria-label="Order" className="inline-flex rounded-md border border-rule bg-raised p-0.5 text-sm">
               {ORDERS.map((o) => (
                 <label key={o.key} className={cn("cursor-pointer rounded px-3 py-1 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent", order === o.key ? "bg-accent-soft font-medium" : "text-muted hover:text-ink")}>
@@ -110,7 +113,7 @@ export function OutlinePage({ novelId, novel, workspace }: { novelId: string; no
             </div>
           )}
           <div ref={group} role="radiogroup" aria-label="Show the outline as" className="inline-flex rounded-md border border-rule bg-raised p-0.5 text-sm">
-            {VIEWS.map((v) => (
+            {views.map((v) => (
               <label key={v.key} className={cn("cursor-pointer rounded px-3 py-1 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent", view === v.key ? "bg-accent-soft font-medium" : "text-muted hover:text-ink")}>
                 <input type="radio" name="outline-view" value={v.key} checked={view === v.key} onChange={() => choose(v.key)} className="sr-only" />
                 {v.label}
@@ -119,8 +122,8 @@ export function OutlinePage({ novelId, novel, workspace }: { novelId: string; no
           </div>
         </div>
       </div>
-      {view === "board" ? (
-        <OutlineBoard novelId={novelId} novel={novel} workspace={workspace} />
+      {moduleView ? (
+        moduleView.render(bookView)
       ) : view === "cards" ? (
         moduleOrder ? moduleOrder.cards(bookView) : <OutlineCards novelId={novelId} novel={novel} workspace={workspace} />
       ) : moduleOrder ? (

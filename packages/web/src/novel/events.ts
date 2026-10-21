@@ -7,8 +7,8 @@ export interface NovelEventHandlers {
   sync?: (status: SyncStatus) => void;
   /** The novel's cached GitHub issues changed. */
   issues?: () => void;
-  /** The drafting board's status on GitHub changed. */
-  board?: () => void;
+  /** A module has news for the book (the drafting board's status on GitHub changed). */
+  module?: (module: string) => void;
 }
 
 /** How often, while Writer isn't answering, it's asked again; and how long each ask may take. */
@@ -58,11 +58,11 @@ export function useNovelEvents(novelId: string, handlers: NovelEventHandlers): b
       }, RECHECK_MS);
     };
     // Anything from the stream (the server's ping included) says it holds.
-    for (const name of ["ready", "ping", "file", "sync", "issues", "board"]) source.addEventListener(name, back);
+    for (const name of ["ready", "ping", "file", "sync", "issues", "module"]) source.addEventListener(name, back);
     source.addEventListener("file", (e) => latest.current.file?.(JSON.parse((e as MessageEvent<string>).data) as FileEvent));
     source.addEventListener("sync", (e) => latest.current.sync?.(JSON.parse((e as MessageEvent<string>).data) as SyncStatus));
     source.addEventListener("issues", () => latest.current.issues?.());
-    source.addEventListener("board", () => latest.current.board?.());
+    source.addEventListener("module", (e) => latest.current.module?.((JSON.parse((e as MessageEvent<string>).data) as { module: string }).module));
     source.onerror = () => void ask();
     return () => {
       gone = true;

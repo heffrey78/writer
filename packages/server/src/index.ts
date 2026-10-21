@@ -13,16 +13,15 @@ export {
   type PreparedMerge,
 } from "./conflicts.ts";
 export { diagramRoutes, LAYOUTS, readPositions, saveLayout, withPositions, type Positions } from "./diagrams.ts";
-export { BoardError, BoardStore, type BoardConflict, type BoardDeps, type BoardErrorCode, type BoardProject, type BoardStatus, type BoardSummary } from "./board.ts";
 export { body, operation, type Env } from "./bible-routes.ts";
-export { moduleRoutes, registerServerModule, type ServerModule } from "./modules.ts";
+export { moduleRoutes, registerServerModule, type ModuleService, type ServerModule } from "./modules.ts";
 export { BibleOperations, clean, required, withProse, type EntityFields, type NoteFields, type EntityTypeFields, type RelationshipFields, type RelationshipTypeFields } from "./bible.ts";
 export { ManuscriptOperations, type DeletedItem } from "./manuscript.ts";
 export { OperationError, transaction, type FileWrite, type OperationErrorCode, type OperationResult } from "./operations.ts";
 export { commitMessage, type FileChange } from "./commit-message.ts";
 export { Committer, hasGitIdentity, operationInProgress, type BlockedCode, type CommitResult, type CommitStatus, type CommitterOptions, type LastCommit } from "./committer.ts";
 export { atomicWrite, checkPath, FileError, hashText, MAX_FILE_BYTES, TEMP_SUFFIX, type FileErrorCode, type TextFile, type WriteHooks } from "./files.ts";
-export { classifyGitError, cloneUrl, GitFailure, type GitErrorCode } from "./git.ts";
+export { classifyGitError, cloneUrl, git, GitFailure, type GitErrorCode } from "./git.ts";
 export { DEFAULT_TEMPLATE, writeNewNovel, type NewNovel } from "./new-novel.ts";
 export { migrateNovel, migrationWrites } from "./migrate.ts";
 export { ghToken, GitHub, GITHUB_CLIENT_ID, GitHubError, githubRepoOf, keychainStore, memoryStore, SCOPES, unreachable, type AccountStatus, type DeviceCode, type GitHubAccount, type GitHubErrorCode, type GitHubOptions, type GitHubRepo, type PollResult, type RepoSummary, type TokenStore } from "./github.ts";

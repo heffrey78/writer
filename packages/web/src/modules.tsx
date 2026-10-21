@@ -47,6 +47,13 @@ export interface OutlineOrder {
   cards(view: BookView): ReactNode;
 }
 
+/** A way the outline shows the book, beside its table and cards (the drafting board): at /outline/<key>, remembered. Reading order only. */
+export interface OutlineView {
+  key: string;
+  label: string;
+  render(view: BookView): ReactNode;
+}
+
 /** What a module offers under a story-time editor once a day of the story has become a date: dating Day 1 from it. */
 export type DayToDate = (view: { novelId: string; novel: Book; day: number; date: string; done: () => void }) => ReactNode;
 
@@ -93,6 +100,7 @@ export interface WebModule {
   storyMapTabs?: readonly StoryMapTab[];
   profileSections?: readonly ProfileSection[];
   outlineOrders?: readonly OutlineOrder[];
+  outlineViews?: readonly OutlineView[];
   dayToDate?: DayToDate;
   /** Commands in the palette while a book that uses it is open. Its views are offered under "Go to" without asking. */
   commands?(view: BookView & { navigate: (to: string) => void }): Command[];
@@ -121,6 +129,9 @@ export const moduleProfileSections = (kind: BookKind, type: string): ProfileSect
 
 /** The orders the book's modules add to the outline. */
 export const moduleOutlineOrders = (kind: BookKind): OutlineOrder[] => webModulesOf(kind).flatMap((m) => m.outlineOrders ?? []);
+
+/** The views the book's modules add to the outline. */
+export const moduleOutlineViews = (kind: BookKind): OutlineView[] => webModulesOf(kind).flatMap((m) => m.outlineViews ?? []);
 
 /** What the book's modules offer once a day of the story has become a date. */
 export const moduleDayToDate = (kind: BookKind): DayToDate[] => webModulesOf(kind).flatMap((m) => (m.dayToDate ? [m.dayToDate] : []));

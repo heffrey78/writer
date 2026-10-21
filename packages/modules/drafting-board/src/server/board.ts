@@ -2,10 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { carrierOf, carryingField, countWords, editFrontMatter, levelLabel, outerSections, pieceSections, vocabulary, type Book, type PieceStatus, type StatusDef } from "@writer/core";
-import { git } from "./git.ts";
-import { GitHubError, type GitHub, type GitHubRepo } from "./github.ts";
-import type { TextFile } from "./files.ts";
-import type { WriteResult } from "./workspace.ts";
+import { git, GitHubError, type GitHub, type GitHubRepo, type ModuleService, type TextFile, type WriteResult } from "@writer/server";
 
 /*
  * The drafting board (heffrey78/gh-writer#11, D8): the main version's scenes mirrored to a GitHub Project, one draft
@@ -232,7 +229,7 @@ interface GhProject {
   items: { pageInfo: { hasNextPage: boolean; endCursor: string | null }; nodes: (GhItem | null)[] };
 }
 
-export class BoardStore {
+export class BoardStore implements ModuleService {
   readonly root: string;
   #github: GitHub;
   #repo: () => Promise<GitHubRepo | null>;
@@ -274,6 +271,11 @@ export class BoardStore {
   }
 
   /** Whether the novel has a board (made here, or found on GitHub by an earlier sync). */
+  /** After a sync with GitHub: a board that's set up catches up. (One another clone made is looked for when the board is opened.) */
+  async synced(): Promise<void> {
+    if (await this.isSetUp()) await this.sync();
+  }
+
   async isSetUp(): Promise<boolean> {
     return Boolean((await this.#load()).state.project);
   }

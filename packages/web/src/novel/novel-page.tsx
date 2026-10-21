@@ -141,7 +141,7 @@ export function NovelPage() {
     },
     sync: (status) => queryClient.setQueryData(keys.sync(novelId), status),
     issues: () => void queryClient.invalidateQueries({ queryKey: keys.issues(novelId) }),
-    board: () => void queryClient.invalidateQueries({ queryKey: keys.board(novelId) }),
+    module: (module) => void queryClient.invalidateQueries({ queryKey: keys.module(novelId, module) }),
   });
 
   const syncNow = useMutation({
@@ -189,7 +189,6 @@ export function NovelPage() {
       { id: "novel.bible", title: w?.codex.One ?? "Story bible", group: "Go to", run: () => void navigate(`/novels/${novelId}/bible`) },
       { id: "novel.outline", title: "Outline", group: "Go to", keywords: ["table"], run: () => void navigate(`/novels/${novelId}/outline/table`) },
       { id: "novel.outlineCards", title: "Outline: cards", group: "Go to", keywords: ["corkboard", "index cards"], run: () => void navigate(`/novels/${novelId}/outline/cards`) },
-      { id: "novel.outlineBoard", title: "Outline: drafting board", group: "Go to", keywords: ["board", "kanban", "status", "progress", "projects"], run: () => void navigate(`/novels/${novelId}/outline/board`) },
       { id: "novel.progress", title: "Progress", group: "Go to", keywords: ["stats", "statistics", "goal", "target", "deadline", "streak", "words a day"], run: () => void navigate(`/novels/${novelId}/progress`) },
       { id: "novel.compare", title: "Compare: what changed between drafts", group: "Go to", keywords: ["diff", "changes"], run: () => void navigate(`/novels/${novelId}/compare`) },
       { id: "novel.graph", title: "Relationships", group: "Go to", keywords: ["diagram", "characters", "graph"], run: () => void navigate(`/novels/${novelId}/relationships`) },

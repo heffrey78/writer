@@ -1,14 +1,15 @@
-import { type BoardConflict, type BoardStatus } from "@writer/client";
+
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ExternalLink } from "lucide-react";
 import { useEffect, useRef, type ReactNode } from "react";
-import { api, keys } from "../api.ts";
-import { GitHubMark, useConnect, useGitHub } from "../github/connect.tsx";
-import { useGitHubRepo } from "../github/repo.ts";
-import { when } from "../issues/parts.tsx";
-import { useBookKind, useStatusLabel, useWords } from "./kind.ts";
-import { ErrorAlert } from "../ui/alert.tsx";
-import { Button } from "../ui/button.tsx";
+import { keys } from "@writer/web/api.ts";
+import { GitHubMark, useConnect, useGitHub } from "@writer/web/github/connect.tsx";
+import { useGitHubRepo } from "@writer/web/github/repo.ts";
+import { when } from "@writer/web/issues/parts.tsx";
+import { useBookKind, useStatusLabel, useWords } from "@writer/web/novel/kind.ts";
+import { ErrorAlert } from "@writer/web/ui/alert.tsx";
+import { Button } from "@writer/web/ui/button.tsx";
+import { board, type BoardConflict, type BoardStatus } from "./client.ts";
 
 /*
  * The drafting board on GitHub (heffrey78/gh-writer#11, D8), above the board in the app: putting it there, how it
@@ -20,7 +21,7 @@ import { Button } from "../ui/button.tsx";
 /** The board's status on GitHub, for a novel on GitHub; undefined otherwise or while it loads. */
 export function useBoardStatus(novelId: string) {
   const repo = useGitHubRepo(novelId);
-  return useQuery({ queryKey: keys.board(novelId), queryFn: () => api.board.status(novelId), enabled: !!repo }).data;
+  return useQuery({ queryKey: keys.module(novelId, "drafting-board"), queryFn: () => board.status(novelId), enabled: !!repo }).data;
 }
 
 export function BoardOnGitHub({ novelId }: { novelId: string }) {
@@ -30,10 +31,10 @@ export function BoardOnGitHub({ novelId }: { novelId: string }) {
   const github = useGitHub().data;
   const status = useBoardStatus(novelId);
   const queryClient = useQueryClient();
-  const keep = (next: BoardStatus) => queryClient.setQueryData(keys.board(novelId), next);
-  const setUp = useMutation({ mutationFn: () => api.board.setUp(novelId), onSuccess: keep });
-  const sync = useMutation({ mutationFn: () => api.board.sync(novelId), onSuccess: keep });
-  const resolve = useMutation({ mutationFn: ({ scene, side }: { scene: string; side: "file" | "board" }) => api.board.resolve(novelId, scene, side), onSuccess: keep });
+  const keep = (next: BoardStatus) => queryClient.setQueryData(keys.module(novelId, "drafting-board"), next);
+  const setUp = useMutation({ mutationFn: () => board.setUp(novelId), onSuccess: keep });
+  const sync = useMutation({ mutationFn: () => board.sync(novelId), onSuccess: keep });
+  const resolve = useMutation({ mutationFn: ({ scene, side }: { scene: string; side: "file" | "board" }) => board.resolve(novelId, scene, side), onSuccess: keep });
   // Opened without a board here: one sync looks for a board another computer made (the server asks GitHub once a session).
   const looked = useRef(false);
   const signedIn = !!github?.signedIn;
@@ -49,7 +50,7 @@ export function BoardOnGitHub({ novelId }: { novelId: string }) {
       {label}
     </Button>
   );
-  const refresh = () => void queryClient.invalidateQueries({ queryKey: keys.board(novelId) });
+  const refresh = () => void queryClient.invalidateQueries({ queryKey: keys.module(novelId, "drafting-board") });
 
   let body;
   if (!github || !status) body = <p className="text-muted">Opening…</p>;

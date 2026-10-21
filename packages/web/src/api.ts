@@ -32,8 +32,8 @@ export const keys = {
   sync: (id: string) => ["sync", id] as const,
   /** Everything about a novel's GitHub issues: refetched together when they change. */
   issues: (id: string) => ["issues", id] as const,
-  /** The drafting board's status on GitHub. */
-  board: (id: string) => ["board", id] as const,
+  /** What a module's routes answer for the book (the drafting board's status): refreshed when the module says so. */
+  module: (id: string, module: string, ...rest: string[]) => ["module", id, module, ...rest] as const,
   checkpoints: (id: string) => ["checkpoints", id] as const,
   versions: (id: string) => ["versions", id] as const,
   stats: (id: string) => ["stats", id] as const,

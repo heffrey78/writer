@@ -2,14 +2,14 @@ import { carrierOf, carryingField, countWords, outerSections, pieceLevel, pieceS
 import { GripVertical } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
 import { Link, useSearchParams } from "react-router";
-import { Button } from "../ui/button.tsx";
-import { cn } from "../ui/cn.ts";
+import { FilterSelect, STATUS_TONE } from "@writer/web/novel/corkboard.tsx";
+import { useStatusLabel } from "@writer/web/novel/kind.ts";
+import { chapterTitle } from "@writer/web/novel/navigation.tsx";
+import { useSceneEdit } from "@writer/web/novel/scene-edit.ts";
+import type { Workspace } from "@writer/web/novel/workspace.ts";
+import { Button } from "@writer/web/ui/button.tsx";
+import { cn } from "@writer/web/ui/cn.ts";
 import { BoardOnGitHub, ConflictNote, useBoardStatus } from "./board-github.tsx";
-import { FilterSelect, STATUS_TONE } from "./corkboard.tsx";
-import { useStatusLabel } from "./kind.ts";
-import { chapterTitle } from "./navigation.tsx";
-import { useSceneEdit } from "./scene-edit.ts";
-import type { Workspace } from "./workspace.ts";
 
 /*
  * The drafting board (heffrey78/gh-writer#11): every scene in a column for its status, in reading order, as GitHub's

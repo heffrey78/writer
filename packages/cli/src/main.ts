@@ -2,6 +2,7 @@
 import { parseArgs } from "node:util";
 import { newId, SCHEMA_VERSION } from "@writer/core";
 import { registerKinds } from "@writer/kinds";
+import { draftingBoardServer } from "@writer/module-drafting-board/server";
 import { offPageEventsServer } from "@writer/module-off-page-events/server";
 import { storyTimeServer } from "@writer/module-story-time/server";
 import { registerServerModule } from "@writer/server";
@@ -13,7 +14,7 @@ import { runValidate } from "./validate-command.ts";
 
 registerKinds(); // The kinds of book the app ships (D14).
 // The server halves of the modules they use: their routes under a book.
-for (const module of [storyTimeServer, offPageEventsServer]) registerServerModule(module);
+for (const module of [storyTimeServer, offPageEventsServer, draftingBoardServer]) registerServerModule(module);
 
 const USAGE = `Usage: writer <command> [options]
 

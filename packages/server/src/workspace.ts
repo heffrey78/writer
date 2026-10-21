@@ -5,7 +5,7 @@ import { EVENT_FILES_FORMAT, kindByKey, knownKind, loadBook, MANIFEST, parseYaml
 import { nodeSource } from "@writer/core/node";
 import { watch, type FSWatcher } from "chokidar";
 import { BibleOperations } from "./bible.ts";
-import { BoardStore } from "./board.ts";
+import { moduleServices, type ModuleService } from "./modules.ts";
 import { Checkpoints } from "./checkpoints.ts";
 import { ManuscriptOperations } from "./manuscript.ts";
 import { Committer, type CommitStatus, type CommitterOptions } from "./committer.ts";
@@ -61,8 +61,8 @@ export class NovelWorkspace {
   readonly manuscript: ManuscriptOperations;
   /** The novel's GitHub issues, cached in the clone (with a GitHub connection; empty unless the novel is on GitHub). */
   readonly issues: IssueStore | undefined;
-  /** The drafting board on GitHub (with a GitHub connection; inert until set up, D8). */
-  readonly board: BoardStore | undefined;
+  /** What the kind's modules keep for the book (the drafting board's store), by module id. */
+  readonly modules: ReadonlyMap<string, ModuleService>;
   /** Resolves when the workspace stops: event streams end then. */
   readonly stopped: Promise<void>;
   #stop!: () => void;
@@ -108,16 +108,9 @@ export class NovelWorkspace {
     this.bible = new BibleOperations(root, (fn) => this.exclusive(fn));
     this.manuscript = new ManuscriptOperations(root, (fn) => this.exclusive(fn), () => this.kind);
     this.issues = github ? new IssueStore(root, github, () => this.githubRepo(), async () => (await this.loadModel()).novel, () => this.kind) : undefined;
-    this.board = github
-      ? new BoardStore(root, github, () => this.githubRepo(), {
-          novel: async () => (await this.loadModel()).novel,
-          onMain: async () => (await this.versions.current()) === "main",
-          read: (path) => this.read(path),
-          write: (path, content, base) => this.write(path, content, base, undefined, { announce: true }),
-        })
-      : undefined;
-    // Issues and a board that's set up are brought up to date with each sync with GitHub, so a change on
-    // github.com shows within one cycle. (A board another clone made is looked for when the board is opened.)
+    this.modules = moduleServices(this.kind, this);
+    // Issues and the modules' services (a board that's set up) are brought up to date with each sync
+    // with GitHub, so a change on github.com shows within one cycle.
     let lastSync: string | null | undefined;
     this.syncer?.onChange(() => {
       void this.syncer
@@ -126,12 +119,22 @@ export class NovelWorkspace {
           if (s.lastSync === lastSync || !s.lastSync) return;
           lastSync = s.lastSync;
           void this.issues?.refresh().catch(() => {});
-          if (await this.board?.isSetUp()) await this.board!.sync();
+          for (const service of this.modules.values()) await service.synced?.().catch(() => {});
         })
         .catch(() => {});
     });
     this.stopped = new Promise((resolve) => (this.#stop = resolve));
     this.syncer?.start();
+  }
+
+  /** The GitHub connection, if the server has one: for a module's service that works with GitHub. */
+  get github(): GitHub | undefined {
+    return this.#github;
+  }
+
+  /** A module's service for the book, by the module's id: what its routes work with. */
+  module<T extends ModuleService>(id: string): T | undefined {
+    return this.modules.get(id) as T | undefined;
   }
 
   async syncStatus(): Promise<NovelSyncStatus> {

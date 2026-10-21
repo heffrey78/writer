@@ -1,0 +1,18 @@
+{
+  "name": "@writer/module-drafting-board",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The drafting board (D14, #31): the pieces in columns by the kind's statuses, in the app, and mirrored to a GitHub Project (heffrey78/gh-writer#11, D8).",
+  "exports": {
+    "./core": "./src/core/index.ts",
+    "./server": "./src/server/index.ts",
+    "./web": "./src/web/index.tsx"
+  },
+  "dependencies": {
+    "@writer/client": "0.1.0",
+    "@writer/core": "0.1.0",
+    "@writer/server": "0.1.0",
+    "@writer/web": "0.1.0"
+  }
+}

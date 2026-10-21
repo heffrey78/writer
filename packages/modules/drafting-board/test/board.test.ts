@@ -3,13 +3,16 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { countWords } from "@writer/core";
 import { join } from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { createServer, GitHub, Library, memoryStore, sessionCookie } from "../src/index.ts";
-import type { BoardStatus } from "../src/board.ts";
-import { NovelWorkspace } from "../src/workspace.ts";
-import { fakeGitHub, type FakeGitHub } from "./fake-github.ts";
-import type { FakeProject } from "./fake-projects.ts";
-import { gitIn, novelRepo, scratch } from "./fixtures.ts";
-import { send } from "./http.ts";
+import { createServer, GitHub, Library, memoryStore, NovelWorkspace, registerServerModule, sessionCookie } from "@writer/server";
+import { fakeGitHub, type FakeGitHub } from "../../../server/test/fake-github.ts";
+import type { FakeProject } from "../../../server/test/fake-projects.ts";
+import { diaryRepo, gitIn, novelRepo, scratch } from "../../../server/test/fixtures.ts";
+import { send } from "../../../server/test/http.ts";
+import { draftingBoardServer, type BoardStatus, type BoardStore } from "../src/server/index.ts";
+
+/** The drafting board as a module (#31): the Novel's board on GitHub as before, through its server half, and none for a kind without it. */
+
+registerServerModule(draftingBoardServer);
 
 const TOKEN = "gho_board";
 const BRIDGE = "manuscript/01-return/01-arrival/02-the-bridge.md";
@@ -52,10 +55,11 @@ afterEach(async () => {
   await Promise.all(open.splice(0).map((ws) => ws.close()));
 });
 
+/** An open book's workspace, with its board: the module's service. */
 const workspace = (root = dir) => {
   const ws = new NovelWorkspace(root, { commit: false, sync: false, github });
   open.push(ws);
-  return ws;
+  return Object.assign(ws, { board: ws.module<BoardStore>("drafting-board") });
 };
 /** The novel's project on the fake GitHub. */
 const project = (): FakeProject => fake.projects.all.find((p) => p.repositories.includes(`ada/${name}`))!;
@@ -294,7 +298,7 @@ describe("through the server", () => {
     const server = await createServer({ library, token: "t", github, sync: false, commit: false });
     const headers = { cookie: `${sessionCookie(server.port)}=t`, origin: server.url, "content-type": "application/json" };
     const call = async (method: string, path: string, body?: unknown) => {
-      const r = await send(server.port, `/api/novels/${novel.id}/board${path}`, { method, headers, ...(body ? { body: JSON.stringify(body) } : {}) });
+      const r = await send(server.port, `/api/novels/${novel.id}/drafting-board${path}`, { method, headers, ...(body ? { body: JSON.stringify(body) } : {}) });
       return { status: r.status, body: JSON.parse(r.body) as BoardStatus & { code?: string } };
     };
     try {
@@ -324,9 +328,25 @@ describe("timing", () => {
     gitIn(dir, "config", "branch.main.merge", "refs/heads/main");
     const ws = new NovelWorkspace(dir, { commit: false, sync: { intervalMs: 0 }, github });
     open.push(ws);
-    ok(await ws.board!.setUp());
+    ok(await ws.module<BoardStore>("drafting-board")!.setUp());
     fake.projects.set(project(), item("sc_br1dg3"), "Status", "Revised");
     await ws.syncer!.sync();
     await expect.poll(() => statusIn(BRIDGE), { timeout: 5000 }).toBe("revised");
+  });
+});
+
+describe("a kind without the module", () => {
+  it("has no board kept, and no board routes", async () => {
+    const diary = diaryRepo(fresh("diary"));
+    expect(workspace(diary).modules.has("drafting-board")).toBe(false);
+    const library = await Library.open({ configDir: fresh("config") });
+    const book = await library.add(diary);
+    const server = await createServer({ library, token: "t", github, sync: false, commit: false });
+    try {
+      const r = await send(server.port, `/api/novels/${book.id}/drafting-board`, { method: "GET", headers: { cookie: `${sessionCookie(server.port)}=t`, origin: server.url } });
+      expect(r.status).toBe(404);
+    } finally {
+      await server.close();
+    }
   });
 });
