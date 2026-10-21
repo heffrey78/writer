@@ -7,6 +7,7 @@ import { useIdentityDialog } from "./identity.tsx";
 import { useOpenNovel, useShowLibrary } from "./desktop.ts";
 import { APP_KEYS, useOverlay } from "./palette.tsx";
 import { useTheme, type ThemeChoice } from "./theme.ts";
+import { onAndroid } from "./platform.ts";
 
 /** Commands available everywhere: the library, each novel, the theme, the shortcut reference. */
 export function GlobalCommands() {
@@ -21,7 +22,7 @@ export function GlobalCommands() {
     () => [
       { id: "app.library", title: "Go to your books", group: "Go to", run: () => showLibrary() },
       { id: "app.new", title: "New book…", group: "Books", keywords: ["start", "create"], run: () => showLibrary("/?add=new") },
-      { id: "app.open-folder", title: "Open a book's folder…", group: "Books", keywords: ["add"], run: () => showLibrary("/?add=open") },
+      ...(onAndroid ? [] : [{ id: "app.open-folder", title: "Open a book's folder…", group: "Books", keywords: ["add"], run: () => showLibrary("/?add=open") }]),
       { id: "app.clone", title: "Clone a book from GitHub…", group: "Books", keywords: ["add", "repository"], run: () => showLibrary("/?add=clone") },
       ...novels.map((n) => ({ id: `app.open.${n.id}`, title: `Open “${n.title}”`, group: "Books", keywords: [n.path], run: () => openNovel(n.id) })),
       ...(["system", "light", "dark"] as ThemeChoice[]).map((t) => ({

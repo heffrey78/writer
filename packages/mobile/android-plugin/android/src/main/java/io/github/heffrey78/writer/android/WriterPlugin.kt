@@ -5,9 +5,12 @@ import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
+import android.view.View
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.webkit.ServiceWorkerClientCompat
 import androidx.webkit.ServiceWorkerControllerCompat
 import androidx.webkit.WebViewFeature
@@ -36,6 +39,26 @@ class BytesArgs {
 @TauriPlugin
 class WriterPlugin(private val activity: Activity) : Plugin(activity) {
     override fun load(webView: WebView) {
+        keepClearOfBars(webView)
+        serveTheWorker(webView)
+    }
+
+    /**
+     * The app draws edge to edge: the page is kept clear of the status and navigation bars, a
+     * camera's cutout and the keyboard, which would otherwise cover the top bar and the line being
+     * written.
+     */
+    private fun keepClearOfBars(webView: WebView) {
+        val frame = webView.parent as? View ?: webView
+        ViewCompat.setOnApplyWindowInsetsListener(frame) { view, insets ->
+            val clear = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout() or WindowInsetsCompat.Type.ime())
+            view.setPadding(clear.left, clear.top, clear.right, clear.bottom)
+            WindowInsetsCompat.CONSUMED
+        }
+        ViewCompat.requestApplyInsets(frame)
+    }
+
+    private fun serveTheWorker(webView: WebView) {
         // The engine's service worker (engine-sw.js) is fetched, and the requests it lets through
         // are made, outside the webview's own client: Android asks a service worker client, which
         // Tauri doesn't set, so they'd go to the network for a host that isn't there. Given the

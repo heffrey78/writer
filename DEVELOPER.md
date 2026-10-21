@@ -223,7 +223,9 @@ The rest is in `src-tauri`:
 - **HTTP.** Requests to GitHub go out from Rust (reqwest with rustls and Mozilla's roots), since github.com's device flow sends no CORS headers for a page.
 - **libgit2.** It trusts the device's certificates, added in memory from Conscrypt's and the system's folders (`git2_port::trust_certificates_in`). Its global configuration, the writer's name and email, is `.gitconfig` in the app's folder.
 
-`packages/mobile/android-plugin` is a Tauri plugin with Kotlin in it (`android/`). It does two things. Its `seal` and `open` commands are the keystore cipher. It also gives the engine's service worker the webview's own request handler. Without that, Android's webview fetches the worker's script, and whatever the worker lets through, from the network, and the page would never be served.
+`packages/mobile/android-plugin` is a Tauri plugin with Kotlin in it (`android/`). It does three things. It keeps the page clear of the status and navigation bars and the keyboard, since the app draws edge to edge. Its `seal` and `open` commands are the keystore cipher. It also gives the engine's service worker the webview's own request handler. Without that, Android's webview fetches the worker's script, and whatever the worker lets through, from the network, and the page would never be served.
+
+In the page, `onAndroid` (`packages/web/src/platform.ts`) is true in the app. With no folders of the writer's to open on a phone, it leaves out Open a folder. The rest of the app is the same at phone width: the sidebar opens over the text, and the palette is in the ⋯ menu as Commands… (`e2e/phone.spec.ts`, by touch at 412 px).
 
 Building uses Unity's Android SDK, NDK and JDK, and Rust from its own rustup folder, as `env.sh` says. Nothing is installed system-wide. `packages/mobile/build.sh [aarch64|x86_64]` builds the web app and then a debug-signed APK: `aarch64` for a phone, `x86_64` for the emulator. The generated Gradle project (`src-tauri/gen/android`) isn't committed; the script makes it and points it at platform 36 and target 34.
 

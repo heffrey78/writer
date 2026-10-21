@@ -17,6 +17,7 @@ import { usePublish } from "../github/publish.tsx";
 import { usePictureFlow } from "../bible/picture.tsx";
 import { SHAPES } from "../bible/pictures.ts";
 import { CloneDialog, NewNovelDialog, OpenFolderDialog } from "./add-dialogs.tsx";
+import { onAndroid } from "../platform.ts";
 import { Cover } from "./cover.tsx";
 
 export type AddMode = "new" | "open" | "clone";
@@ -61,9 +62,11 @@ export function LibraryPage() {
           <Button variant="primary" onClick={() => add("new")}>
             <Plus className="size-4" aria-hidden /> New book
           </Button>
-          <Button onClick={() => add("open")}>
-            <FolderOpen className="size-4" aria-hidden /> Open a folder
-          </Button>
+          {!onAndroid && (
+            <Button onClick={() => add("open")}>
+              <FolderOpen className="size-4" aria-hidden /> Open a folder
+            </Button>
+          )}
           <Button onClick={() => add("clone")}>
             <GitBranch className="size-4" aria-hidden /> Clone from GitHub
           </Button>
@@ -99,7 +102,7 @@ export function LibraryPage() {
           <>
             {library.data.novels.length === 0 && (
               <p className="mb-4 text-sm text-muted">
-                <span className="font-medium text-ink">No books yet.</span> Start one, open a book you already have on this computer, or clone one from GitHub.
+                <span className="font-medium text-ink">No books yet.</span> {onAndroid ? "Start one, or clone one from GitHub." : "Start one, open a book you already have on this computer, or clone one from GitHub."}
               </p>
             )}
             <Shelf>

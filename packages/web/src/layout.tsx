@@ -1,4 +1,4 @@
-import { Check, Ellipsis, Info, Keyboard, UserPen } from "lucide-react";
+import { Check, Command, Ellipsis, Info, Keyboard, UserPen } from "lucide-react";
 import { DropdownMenu } from "radix-ui";
 import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router";
@@ -125,6 +125,10 @@ function MoreMenu({ items }: { items?: ReactNode }) {
               <UserPen className="size-4" aria-hidden /> Your name and email…
             </DropdownMenu.Item>
             <DropdownMenu.Separator className="my-1 h-px bg-rule" />
+            {/* The palette, for a hand with no keyboard (a phone's). */}
+            <DropdownMenu.Item className={MENU_ITEM} onSelect={() => useOverlay.getState().set("palette")}>
+              <Command className="size-4" aria-hidden /> Commands…
+            </DropdownMenu.Item>
             <DropdownMenu.Item className={MENU_ITEM} onSelect={() => useOverlay.getState().set("shortcuts")}>
               <Keyboard className="size-4" aria-hidden /> Keyboard shortcuts
             </DropdownMenu.Item>

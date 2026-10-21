@@ -71,7 +71,9 @@ try {
   expect.configure({ timeout: 20_000 });
 
   await expect(page.getByRole("heading", { level: 1, name: "Your books" })).toBeVisible();
-  await expect(page.getByText("No books yet")).toBeVisible();
+  await expect(page.getByText("No books yet. Start one, or clone one from GitHub.")).toBeVisible();
+  // No folders of the writer's to open on a phone.
+  await expect(page.getByRole("button", { name: "Open a folder" })).toHaveCount(0);
   step("the shelf, from the engine in the page");
 
   // Signed in with a code; the name and email git signs with, as GitHub suggests them.
@@ -102,12 +104,15 @@ try {
   await page.getByRole("dialog", { name: "Command palette" }).getByRole("combobox").fill("today's entry");
   await page.keyboard.press("Enter");
   const text = page.getByRole("textbox", { name: "Entry text" });
+  const tall = await page.evaluate(() => innerHeight);
   await text.click();
   await page.keyboard.press("Control+End");
   await page.keyboard.type("Written on the phone.");
   let entry = "";
   for (let i = 0; i < 40 && !entry; i++, await sleep(250)) entry = inApp("grep -rl \"Written on the phone.\" books/days/entries || true").trim();
   if (!entry) throw new Error("The entry wasn't saved in the app's storage.");
+  // The keyboard takes room from the page rather than covering it.
+  await expect.poll(() => page.evaluate(() => innerHeight)).toBeLessThan(tall);
   step("a journal started, and today's entry saved on the device");
 
   // Put on GitHub, then synced.

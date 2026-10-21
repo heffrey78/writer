@@ -24,6 +24,7 @@ import { draftingBoardWeb } from "@writer/module-drafting-board/web";
 import { dailyWeb } from "@writer/module-daily/web";
 import { NovelPage } from "./novel/novel-page.tsx";
 import { NotFound } from "./not-found.tsx";
+import { onAndroid } from "./platform.ts";
 import { apply } from "./theme.ts";
 import { ErrorBoundary } from "./ui/error-boundary.tsx";
 import "./styles.css";
@@ -44,10 +45,9 @@ const GraphBench = lazy(() => import("./graph/graph-bench.tsx").then((m) => ({ d
 // tauri.localhost (#52); or where a server that only bridges to its ports says so (writer serve
 // --engine-in-page). Started, and in control of the page's requests, before anything asks it a thing.
 const engine = document.querySelector<HTMLMetaElement>('meta[name="writer-engine"]')?.content;
-const inApp = location.hostname === "tauri.localhost" && "__TAURI_INTERNALS__" in window;
 const ready = engine
   ? import("./engine/in-page.ts").then((m) => m.startEngine(m.bridgeChannel(engine)))
-  : inApp
+  : onAndroid
     ? import("./engine/in-page.ts").then((m) => m.startEngine(...m.tauriHost()))
     : Promise.resolve();
 
