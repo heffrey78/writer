@@ -40,6 +40,7 @@ The novel itself is the source of truth: plain Markdown and YAML files ([format 
 | [`export`](packages/export) | DOCX (hand-written WordprocessingML), EPUB 3 and PDF (pdfkit, with Liberation Serif) from a compiled book; zipped with fflate. |
 | [`cli`](packages/cli) | `writer serve`, `validate`, `snapshots`, `compile`, `migrate` and `new-id`, and the entry points bundled into novel repositories. |
 | [`desktop`](packages/desktop) | The desktop app: a Tauri shell that runs the server bundle on its own Node and git, and opens a window on it. |
+| [`mobile`](packages/mobile) | The Android app (D16): the web app and the engine in a Tauri webview, its git (libgit2, in process), files, GitHub's HTTP and the token in Rust. See *The Android app*. |
 | [`git2-port`](packages/git2-port) | The git port over libgit2, in Rust (D16): the same operations as the server's git, for Android, where there's no git binary. A stdio binary for the contract suite on the desktop. |
 | [`kinds`](packages/kinds) | The kinds of book the app ships, as data (D14, D15): the Novel's levels, ID prefixes, folders, built-in entry types, statuses, issue kinds, its scenes' fields (each field's type is how the schema, the validator, the Scene card, the outline, comparisons and mentions read it), the modules it uses and its words on screen. See *Kinds and modules*. |
 
@@ -125,7 +126,7 @@ Run `npx playwright install chromium` in `packages/editor` once before the first
 
 Each web e2e test starts its own `writer serve` on a temp copy of the sample novel (`packages/web/e2e/fixtures.ts`), with a fake GitHub (`packages/server/test/fake-github.ts`) that serves the REST API, the device flow and git over HTTP. Most views also run an [axe](https://github.com/dequelabs/axe-core) audit, many in both light and dark themes; new UI should too. Performance benchmarks (`*.performance.spec.ts`) run after the rest, one at a time.
 
-CI (`.github/workflows/ci.yml`) runs typecheck, unit tests, validation of the sample novel, epubcheck on the sample's EPUB, every e2e test, and the git port's contract suite against libgit2.
+CI (`.github/workflows/ci.yml`) runs typecheck, unit tests, validation of the sample novel, epubcheck on the sample's EPUB, every e2e test, the git port's contract suite against libgit2, and the Android app's ports (`cargo test` in `packages/mobile/ports`).
 
 ### The engine and its hosts
 
@@ -137,7 +138,7 @@ The engine can run in the page, as on Android: `writer serve --engine-in-page` s
 
 ### The git port
 
-The server reaches git only through its git port (D16; `packages/server/src/git-port/port.ts`), so that its logic can run where there's no git binary. Each entry point gives the server its ports (`useNodePorts()` on Node: the CLI, the web dev server and the tests); code asks for `gitPort()`. On Node the port runs git itself (`git-port/node.ts`, the only code that does; `test/git-boundary.test.ts` checks). On Android it's libgit2 (`packages/git2-port`). Paths are relative to the book's folder, which may sit inside a larger repository.
+The server reaches git only through its git port (D16; `packages/server/src/git-port/port.ts`), so that its logic can run where there's no git binary. Each entry point gives the server its ports (`useNodePorts()` on Node: the CLI, the web dev server and the tests); code asks for `gitPort()`. On Node the port runs git itself (`git-port/node.ts`, the only code that does; `test/git-boundary.test.ts` checks). On Android it's libgit2 (`packages/git2-port`), reached through `git2GitPort` (`git-port/git2.ts`), which maps the port's calls onto git2-port's operations whichever way they travel: the stdio binary in the tests, Tauri's invoke in the app. Paths are relative to the book's folder, which may sit inside a larger repository.
 
 The server reaches the disk through its files port in the same way (`files-port/port.ts`, `filesPort()`; `bookSource(root)` gives core's loader a book's files). Its adapters are node:fs with chokidar (`files-port/node.ts`) and memory (`files-port/memory.ts`, for tests), held to `test/files-port.test.ts`. The port is primitives: an atomic write (temp file, flushed, renamed, folder flushed), reads, listings, stat, watch. The rules stay in the server (`files.ts`): which paths a book may have, no symlinks leading out of it, writes refused when the file changed underneath.
 
@@ -202,6 +203,31 @@ Cutting a release:
 The workflow also runs on pull requests that touch the desktop app or its scripts, without the release, and by hand (*Run workflow*). To run the smoke test on this machine against an installed package: `node scripts/build-smoke.ts`, then `/usr/lib/writer/runtime/node/node dist/smoke/smoke-desktop.mjs --sample dist/smoke/sample-novel`. Set `WRITER_SMOKE_ALLOW_GIT=1` if this machine has git.
 
 The server's messages go to `server.log` in the app's log folder (`~/.local/share/io.github.heffrey78.writer/logs` on Linux). The previous run's are in `server.previous.log`. `cargo test` in `src-tauri` runs the shell's unit tests.
+
+## The Android app
+
+`packages/mobile` is Writer on Android (D16): a Tauri 2 app whose webview runs the web app and the engine together. Nothing runs a server. The page knows it's in the app because it's served from `tauri.localhost`, and starts the engine with `tauriHost()` (`packages/web/src/engine/in-page.ts`) before it renders, as in *The engine and its hosts*. The app's Rust is the engine's host, through three commands:
+
+- `git`: one git port operation, run in process by `packages/git2-port`; a clone's or a fetch's progress comes back on a channel.
+- `port`: an operation of the files, host, http or secrets port, by name, as `remote-ports.ts` calls it.
+- `listen`: the channel every watch's events come back on.
+
+The ports are in `packages/mobile/ports`, apart from Tauri so `cargo test` runs them anywhere (CI does):
+
+- **Files** (`files.rs`): everything lives in the app's own folder (`/data/user/0/io.github.heffrey78.writer`): `books/`, `config/`, `templates/`, the git configuration and the sealed token. Writes are atomic, as on the desktop. Watching uses inotify (notify), leaves out `.git/` and the temp files, and tells a new file (`add`) from a changed one (`change`), as chokidar does.
+- **Secrets** (`secrets.rs`): the GitHub token is sealed with AES-GCM by a key that never leaves Android's keystore, and only the sealed bytes are kept, in `secrets/github`. A token the key can't open (after a reinstall) is forgotten, and the writer signs in again.
+- **Host** (`host.rs`): the folders, and the templates, which are built into the app and written to `templates/` when the app's differ from what's there. `env.json` in the app's folder, if present, is the engine's environment: the e2e run uses it to point the app at a fake GitHub.
+
+The rest is in `src-tauri`:
+
+- **HTTP.** Requests to GitHub go out from Rust (reqwest with rustls and Mozilla's roots), since github.com's device flow sends no CORS headers for a page.
+- **libgit2.** It trusts the device's certificates, added in memory from Conscrypt's and the system's folders (`git2_port::trust_certificates_in`). Its global configuration, the writer's name and email, is `.gitconfig` in the app's folder.
+
+`packages/mobile/android-plugin` is a Tauri plugin with Kotlin in it (`android/`). It does two things. Its `seal` and `open` commands are the keystore cipher. It also gives the engine's service worker the webview's own request handler. Without that, Android's webview fetches the worker's script, and whatever the worker lets through, from the network, and the page would never be served.
+
+Building uses Unity's Android SDK, NDK and JDK, and Rust from its own rustup folder, as `env.sh` says. Nothing is installed system-wide. `packages/mobile/build.sh [aarch64|x86_64]` builds the web app and then a debug-signed APK: `aarch64` for a phone, `x86_64` for the emulator. The generated Gradle project (`src-tauri/gen/android`) isn't committed; the script makes it and points it at platform 36 and target 34.
+
+`node packages/mobile/e2e.ts [APK]` runs the app end to end on a device or the emulator. It installs the APK and clears the app's data, then drives the webview with Playwright's Android support, against a fake GitHub on this computer reached through `adb reverse`. It signs in with a code, starts a journal and writes in it, puts it on GitHub, clones a novel and syncs a change made elsewhere. It then checks the files on the device and on GitHub. Set `ADB` if adb isn't on PATH. An emulator that works here: the `emulator` package and `system-images;android-36;google_apis;x86_64` from `sdkmanager`, installed into a folder of their own with `--sdk_root`, run headless with `-no-window -gpu swangle_indirect -feature -Vulkan` (the other GPU modes crash this emulator, 37.2, when the webview draws).
 
 ## Conventions
 

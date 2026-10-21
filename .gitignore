@@ -15,3 +15,8 @@ spike/d16/git2-port/target/
 spike/d16/android/src-tauri/target/
 spike/d16/android/src-tauri/gen/
 packages/git2-port/target/
+packages/mobile/src-tauri/target/
+packages/mobile/src-tauri/gen/
+packages/mobile/android-plugin/target/
+packages/mobile/ports/target/
+packages/mobile/android-plugin/android/build/

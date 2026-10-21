@@ -1,0 +1,12 @@
+[package]
+name = "writer-android"
+version = "0.1.0"
+description = "Writer's Android plugin (#52): the GitHub token sealed by a key in Android's keystore, and the webview's service worker served the app's own files"
+edition = "2024"
+publish = false
+# The name tauri-build looks for (DEP_WRITER_ANDROID_ANDROID_LIBRARY_PATH) to add this plugin's Kotlin to the app.
+links = "writer-android"
+
+[dependencies]
+tauri = { version = "2.12", features = [] }
+serde = { version = "1", features = ["derive"] }

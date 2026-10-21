@@ -40,11 +40,16 @@ for (const module of WEB_MODULES) registerWebModule(module);
 // The graph benchmark (heffrey78/gh-writer#68), loaded only when visited.
 const GraphBench = lazy(() => import("./graph/graph-bench.tsx").then((m) => ({ default: m.GraphBench })));
 
-// The engine in the page (#51, D16), where the host says so: a server that only bridges to its ports
-// (writer serve --engine-in-page), as Android's app does. Started, and in control of the page's
-// requests, before anything asks it a thing.
+// The engine in the page (#51, D16): in the Android app, whose webview serves the page itself from
+// tauri.localhost (#52); or where a server that only bridges to its ports says so (writer serve
+// --engine-in-page). Started, and in control of the page's requests, before anything asks it a thing.
 const engine = document.querySelector<HTMLMetaElement>('meta[name="writer-engine"]')?.content;
-const ready = engine ? import("./engine/in-page.ts").then((m) => m.startEngine(m.bridgeChannel(engine))) : Promise.resolve();
+const inApp = location.hostname === "tauri.localhost" && "__TAURI_INTERNALS__" in window;
+const ready = engine
+  ? import("./engine/in-page.ts").then((m) => m.startEngine(m.bridgeChannel(engine)))
+  : inApp
+    ? import("./engine/in-page.ts").then((m) => m.startEngine(...m.tauriHost()))
+    : Promise.resolve();
 
 void ready.then(() =>
   createRoot(document.getElementById("root")!).render(

@@ -4,10 +4,13 @@ import { dailyServer } from "@writer/module-daily/server";
 import { draftingBoardServer } from "@writer/module-drafting-board/server";
 import { offPageEventsServer } from "@writer/module-off-page-events/server";
 import { storyTimeServer } from "@writer/module-story-time/server";
+import { Channel, invoke } from "@tauri-apps/api/core";
 import {
   createEngine,
+  git2GitPort,
   GitHub,
   GITHUB_CLIENT_ID,
+  gitFailure,
   httpChannel,
   Library,
   registerServerModule,
@@ -18,6 +21,8 @@ import {
   remoteTokenStore,
   setPorts,
   Workspaces,
+  type GitErrorCode,
+  type GitPort,
   type PortChannel,
 } from "@writer/server/engine";
 
@@ -26,13 +31,14 @@ import {
  * GitHub's HTTP and the token through a channel to the host. A service worker (/engine-sw.js) hands it
  * every request the page makes to /api/, so the app talks to it as to a server.
  */
-export async function startEngine(channel: PortChannel): Promise<void> {
+/** `git`: the host's own git port, where it has one (Android's); else git through the channel too. */
+export async function startEngine(channel: PortChannel, git: GitPort = remoteGitPort(channel)): Promise<void> {
   registerKinds();
   // The page's CSP forbids compiling the schemas here: the shipped kinds' are compiled ahead of time.
   useCompiledKindSchemas();
   for (const module of [storyTimeServer, offPageEventsServer, draftingBoardServer, dailyServer]) registerServerModule(module);
   const host = await remoteHost(channel);
-  setPorts({ git: remoteGitPort(channel), files: remoteFilesPort(channel), host });
+  setPorts({ git, files: remoteFilesPort(channel), host });
   const env = host.env();
   const github = new GitHub({
     clientId: env.WRITER_GITHUB_CLIENT_ID || GITHUB_CLIENT_ID,
@@ -56,6 +62,39 @@ export async function startEngine(channel: PortChannel): Promise<void> {
 
 /** The engine over HTTP to a Node bridge at `base`: the tests' host (writer serve --engine-in-page). */
 export const bridgeChannel = (base: string) => httpChannel(base);
+
+/**
+ * The engine's host in the Android app (packages/mobile): its Rust, through Tauri's invoke. `git`
+ * runs libgit2 there (git2-port), a clone's progress coming back on a channel of its own; `port` the
+ * files, host, http and secrets ports; and one channel, opened by `listen`, carries every watch's
+ * events, handed to whoever listens here.
+ */
+export function tauriHost(): [PortChannel, GitPort] {
+  const listeners = new Set<Parameters<PortChannel["listen"]>[0]>();
+  let events: Channel<{ watch: string; type: "add" | "change" | "unlink"; path: string }> | undefined;
+  const channel: PortChannel = {
+    // The Rust answers null where the Node bridge leaves the answer out: undefined, as a port returns it.
+    call: async (port, op, args) => (await invoke("port", { port, op, args })) ?? undefined,
+    listen: (onEvent) => {
+      if (!events) {
+        events = new Channel((e) => listeners.forEach((l) => l(e)));
+        void invoke("listen", { events });
+      }
+      listeners.add(onEvent);
+      return () => void listeners.delete(onEvent);
+    },
+  };
+  const git = git2GitPort(async (op, dir, args, onProgress) => {
+    const progress = new Channel<Parameters<NonNullable<typeof onProgress>>[0]>((p) => onProgress?.(p));
+    try {
+      return await invoke("git", { op, dir, args, progress });
+    } catch (e) {
+      const f = e as { code?: GitErrorCode; message?: string };
+      throw gitFailure(f?.code ?? "GIT", f?.message ?? String(e));
+    }
+  });
+  return [channel, git];
+}
 
 /** Register the service worker, answer what it hands over, and resolve once it controls the page. */
 async function serveThroughWorker(handle: (request: Request) => Promise<Response>): Promise<void> {

@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/mobile-schema.json",
+  "identifier": "default",
+  "description": "The app's page may call its own commands: the ports the engine in it runs on.",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

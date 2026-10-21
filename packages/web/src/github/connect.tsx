@@ -4,7 +4,7 @@ import { Check, Copy, ExternalLink } from "lucide-react";
 import { DropdownMenu } from "radix-ui";
 import { useEffect, useRef, useState } from "react";
 import { create } from "zustand";
-import { api } from "../api.ts";
+import { api, keys } from "../api.ts";
 import { ErrorAlert } from "../ui/alert.tsx";
 import { Button } from "../ui/button.tsx";
 import { cn } from "../ui/cn.ts";
@@ -126,6 +126,8 @@ function Connect({ then, onClose }: { then: (() => void) | undefined; onClose: (
 
   const connected = (status: GitHubStatus) => {
     queryClient.setQueryData(githubKey, status);
+    // The account suggests a name and email to git, which may not know one yet (identity.tsx).
+    void queryClient.invalidateQueries({ queryKey: keys.identity });
     onClose();
     then?.();
   };

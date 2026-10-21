@@ -1,0 +1,40 @@
+[package]
+name = "writer-mobile"
+version = "0.1.0"
+description = "Writer on Android (D16, #52): the web app and the engine in the webview, given git, files, GitHub's HTTP and the token by this Rust"
+license = "MIT"
+authors = ["Jeff Wikstrom"]
+repository = "https://github.com/heffrey78/writer"
+edition = "2024"
+publish = false
+
+[lib]
+name = "writer_mobile_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.7", features = [] }
+
+[dependencies]
+tauri = { version = "2.12", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+base64 = "0.22"
+git2-port = { path = "../../git2-port" }
+# For where libgit2 keeps the global configuration (the same git2 git2-port uses).
+git2 = { version = "0.21", default-features = false }
+writer-android = { path = "../android-plugin" }
+writer-mobile-ports = { path = "../ports" }
+# GitHub's device flow and API, which a page can't reach (CORS); Mozilla's roots, so no system store is needed.
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+
+# No system OpenSSL on Android: built from source for the target.
+[target.'cfg(target_os = "android")'.dependencies]
+git2-port = { path = "../../git2-port", features = ["vendored-openssl"] }
+
+# `tauri android build --debug` uses this profile: optimized and stripped, so the APK is a download
+# a phone can take, and still signed with the debug key for sideloading.
+[profile.dev]
+opt-level = "s"
+debug = false
+strip = true

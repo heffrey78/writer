@@ -21,6 +21,7 @@ export { OperationError, transaction, type FileWrite, type OperationErrorCode, t
 export { commitMessage, type FileChange } from "./commit-message.ts";
 export { Committer, hasGitIdentity, operationInProgress, type BlockedCode, type CommitResult, type CommitStatus, type CommitterOptions, type LastCommit } from "./committer.ts";
 export { atomicWrite, checkPath, FileError, hashText, MAX_FILE_BYTES, TEMP_SUFFIX, type FileErrorCode, type TextFile, type WriteHooks } from "./files.ts";
+export { git2GitPort, type Git2Call } from "./git-port/git2.ts";
 export { cloneUrl, GitFailure, gitFailure, type GitErrorCode, type GitPort } from "./git-port/port.ts";
 export { bookSource, filesPort, gitPort, host, setPorts, type Host, type Ports } from "./ports.ts";
 export { templateOf, writeNewBook, type NewNovel } from "./new-book.ts";

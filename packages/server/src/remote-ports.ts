@@ -1,6 +1,7 @@
 import type { FileEventType, FilesPort } from "./files-port/port.ts";
 import type { GitPort } from "./git-port/port.ts";
 import { gitFailure, type GitErrorCode } from "./git-port/port.ts";
+import { fromBase64, toBase64 } from "./base64.ts";
 import type { TokenStore } from "./github.ts";
 import type { Host } from "./ports.ts";
 
@@ -40,19 +41,6 @@ export function decode(value: unknown): unknown {
     return Object.fromEntries(Object.entries(o).map(([k, v]) => [k, decode(v)]));
   }
   return value;
-}
-
-function toBase64(bytes: Uint8Array): string {
-  let s = "";
-  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  return btoa(s);
-}
-
-function fromBase64(b64: string): Uint8Array {
-  const s = atob(b64);
-  const out = new Uint8Array(s.length);
-  for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i);
-  return out;
 }
 
 /** A failure as the channel reports one: a git failure keeps its code. */

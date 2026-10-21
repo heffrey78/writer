@@ -40,6 +40,25 @@ test("at first run, signed in and unknown to git: asked once, with the account's
   await expect(dialog).toHaveCount(0);
 });
 
+test("signed in from the app, unknown to git: asked straight away, with the account's name", async ({ page, app }) => {
+  writeFileSync(gitconfig(app), "[init]\n\tdefaultBranch = main\n");
+  await launch(page, app);
+  await expect(page.getByRole("heading", { name: "Your books" })).toBeVisible();
+  await page.getByRole("button", { name: "More" }).click();
+  await page.getByRole("menuitem", { name: "Connect GitHub…" }).click();
+  const connect = page.getByRole("dialog", { name: "Connect to GitHub" });
+  await connect.getByRole("button", { name: "Sign in with a code" }).click();
+  await expect(connect.getByLabel("Your code")).toHaveText(app.github.userCode);
+  app.github.approve();
+  await expect(connect).toHaveCount(0);
+  // What git knew was asked before the sign-in: asked again once it's done, no reload needed.
+  const dialog = page.getByRole("dialog", { name: "Your name and email" });
+  await expect(dialog.getByLabel("Name")).toHaveValue("Ada Writer");
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await expect(dialog).toHaveCount(0);
+  expect(readFileSync(gitconfig(app), "utf8")).toMatch(/name = Ada Writer/);
+});
+
 test("from the ⋯ menu: the name and email git signs with, changed by keyboard", async ({ page, app }) => {
   await launch(page, app);
   await page.getByRole("button", { name: "More" }).click();

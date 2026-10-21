@@ -1,0 +1,13 @@
+{
+  "name": "@writer/mobile",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The Android app (D16): the web app and the engine in a Tauri webview, its git, files, GitHub's HTTP and the token in Rust.",
+  "scripts": {
+    "build": "./build.sh"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.12.2"
+  }
+}

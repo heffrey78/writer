@@ -72,6 +72,8 @@ TypeScript throughout, on Node ≥ 22.18, which runs `.ts` directly (no build fo
 | `npm run build:template` | rebuild the vendored tools and diagram snapshots |
 | `npm run desktop` | the desktop app in development |
 | `npm run desktop:arch` | the Arch package, `packages/desktop/arch/writer-*.pkg.tar.zst` |
+| `packages/mobile/build.sh [aarch64\|x86_64]` | the Android APK, for a phone or the emulator (DEVELOPER.md, *The Android app*) |
+| `node packages/mobile/e2e.ts [APK]` | the Android app end to end on a device or the emulator, against a fake GitHub |
 
 Names that stay gh-writer's on purpose (the `.github/gh-writer/` tools folder, the issue anchor footer, the board markers, `.git/gh-writer/` caches, the EPUB `urn:gh-writer:`) are listed in DEVELOPER.md under *Names kept from gh-writer*. Don't rename them: gh-writer's novels depend on them.
 

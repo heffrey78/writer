@@ -1,0 +1,16 @@
+[package]
+name = "writer-mobile-ports"
+version = "0.1.0"
+description = "The Android app's ports (#52): files in the app's storage, the sealed GitHub token and the host's facts, apart from Tauri so they test anywhere"
+edition = "2024"
+publish = false
+
+[dependencies]
+serde_json = "1"
+base64 = "0.22"
+notify = "8"
+# The book templates, put in the app's storage on first run.
+include_dir = "0.7"
+
+[dev-dependencies]
+tempfile = "3"
