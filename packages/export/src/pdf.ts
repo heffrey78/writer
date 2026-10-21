@@ -2,17 +2,19 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import nodeZlib from "node:zlib";
-import { numberWords, type Block, type CompiledBook, type Run } from "@writer/core";
+import { type Block, type CompiledBook, type Run } from "@writer/core";
 import { zlibSync } from "fflate";
 import * as fontkit from "fontkit";
 import PDFDocument from "pdfkit";
 import { pdfCover, type CoverImage } from "./cover.ts";
 
 /*
- * The book as a PDF, laid out like the DOCX (standard manuscript format), after its cover if it has one: Letter pages, 1-inch
- * margins, 12 pt type double-spaced with first lines indented half an inch, a title page without a
- * header, then Surname / SHORT TITLE / page at the top right; each chapter on a new page, its heading
- * a third of the way down; scene breaks centred; "THE END". The type is Liberation Serif (SIL Open Font
+ * The book as a PDF, laid out like the DOCX, after its cover if it has one: Letter pages, 1-inch
+ * margins, 12 pt type with first lines indented half an inch, a title page without a header, then the
+ * running header and page at the top right; each chapter on a new page, its heading a third of the
+ * way down; scene breaks centred. The book's layout (#32) gives the headings, the title page, the
+ * running header, the spacing and the end mark: in standard manuscript format double-spaced,
+ * Surname / SHORT TITLE / page, and "THE END". The type is Liberation Serif (SIL Open Font
  * License), metric-compatible with Times New Roman, embedded (only the letters used).
  */
 
@@ -46,8 +48,6 @@ const PAGE = { width: 8.5 * PT, height: 11 * PT };
 const MARGIN = PT;
 const WIDTH = PAGE.width - 2 * MARGIN;
 const SIZE = 12;
-/** Double spacing: a line every 24 pt. */
-const LINE = 2 * SIZE;
 const INDENT = PT / 2;
 
 /** Liberation Serif from a folder holding its four LiberationSerif-*.ttf files. */
@@ -97,7 +97,9 @@ export function toPdf(book: CompiledBook, { date = new Date(0), fonts = defaultF
   doc.registerFont("bold", fonts.bold as unknown as string);
   doc.registerFont("boldItalic", fonts.boldItalic as unknown as string);
   doc.font("regular").fontSize(SIZE);
-  // Extra space added to the type's own line height, for a line every 24 pt.
+  /** A line every 24 pt, double-spaced (manuscript format), or as the layout spaces them. */
+  const LINE = book.spacing * SIZE;
+  // Extra space added to the type's own line height, for a line every LINE pt.
   const gap = LINE - doc.currentLineHeight(true);
   // For the whole document: text continued in another face keeps it (an option per call doesn't).
   doc.lineGap(gap);
@@ -258,23 +260,24 @@ export function toPdf(book: CompiledBook, { date = new Date(0), fonts = defaultF
   for (const chapter of book.chapters) {
     if (chapter.part) {
       newPage(third);
-      centred(`Part ${numberWords(chapter.part.number)}`);
+      centred(chapter.part.heading);
       if (chapter.part.title) centred(chapter.part.title);
     }
     section(chapter.heading, chapter.blocks);
   }
-  if (book.chapters.length) {
+  if (book.chapters.length && book.end) {
     doc.y += LINE / 2;
-    centred("THE END");
+    centred(book.end);
   }
   for (const s of book.back) section(s.title, s.blocks);
 
-  // The running header, from the manuscript's page 2 (the title page is its page 1), once every page is there.
+  // The running header (manuscript format's Surname / SHORT TITLE / page; the page alone, plain), from the
+  // book's page 2 (the title page is its page 1), once every page is there.
   const range = doc.bufferedPageRange();
   const titlePage = range.start + (coverBytes ? 1 : 0);
   for (let i = titlePage + 1; i < range.start + range.count; i++) {
     doc.switchToPage(i);
-    const header = `${book.header.surname} / ${book.header.shortTitle} / ${i - titlePage + 1}`;
+    const header = `${book.runningHead}${i - titlePage + 1}`;
     check(header, "regular");
     // In the top margin: no new page for writing there.
     const bottom = doc.page.margins.bottom;

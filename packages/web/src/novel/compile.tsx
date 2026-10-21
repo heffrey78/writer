@@ -1,4 +1,4 @@
-import { pieceLevel, pieceSections, vocabulary, type Book } from "@writer/core";
+import { layoutOf, pieceLevel, pieceSections, vocabulary, type Book, type CompileLayout } from "@writer/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { useId, useState } from "react";
 import { api, keys } from "../api.ts";
@@ -11,10 +11,11 @@ import { chapterTitle } from "./navigation.tsx";
 import { useNotice } from "./notice.tsx";
 import type { Workspace } from "./workspace.ts";
 
+/** The formats, each with what it's for: the Word file's and the PDF's as the book's layout says (#32). */
 const FORMATS = [
-  { key: "docx", label: "Word (DOCX)", hint: "standard manuscript format, for agents and editors" },
-  { key: "epub", label: "E-book (EPUB)", hint: "for readers and e-readers" },
-  { key: "pdf", label: "PDF", hint: "laid out like the Word file" },
+  { key: "docx", label: "Word (DOCX)", hint: (layout: CompileLayout) => layout.says.docx },
+  { key: "epub", label: "E-book (EPUB)", hint: () => "for readers and e-readers" },
+  { key: "pdf", label: "PDF", hint: (layout: CompileLayout) => layout.says.pdf },
 ] as const;
 type Format = (typeof FORMATS)[number]["key"];
 
@@ -139,7 +140,7 @@ export function CompileDialog({ novelId, novel, workspace, onClose }: { novelId:
                 }}
               />
               <span>
-                {f.label} <span className="text-muted">— {f.hint}</span>
+                {f.label} <span className="text-muted">— {f.hint(layoutOf(novel.kind))}</span>
               </span>
             </label>
           ))}
@@ -222,7 +223,7 @@ function CoverRow({ novelId, novel }: { novelId: string; novel: Book }) {
           )}
         </div>
       </div>
-      <p className="text-muted">On the EPUB's cover and the PDF's first page. Word manuscripts go out without one, as agents expect.</p>
+      <p className="text-muted">{layoutOf(novel.kind).says.cover}</p>
       {flow.problem && (
         <p role="alert" className="text-danger">
           {flow.problem}

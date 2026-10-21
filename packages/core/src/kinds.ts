@@ -138,6 +138,8 @@ export interface BookKind extends Noun {
   statuses: readonly StatusDef[];
   /** A piece's fields beyond those every kind has, in the order its card shows them. */
   fields: readonly FieldDef[];
+  /** How its books are compiled to Word and PDF: a layout one of its modules brings ("manuscript"), else the base's plain one. */
+  compileLayout?: string;
   /** What a book's issues are about: a label kind/<key> each. */
   issueKinds: readonly IssueKind[];
   /** The modules its books use, by id (D14): each adds its fields after the kind's own, its checks and its records. */

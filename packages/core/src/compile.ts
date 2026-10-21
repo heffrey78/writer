@@ -3,10 +3,13 @@ import { fromMarkdown } from "mdast-util-from-markdown";
 import { gfmFromMarkdown } from "mdast-util-gfm";
 import { toString } from "mdast-util-to-string";
 import { gfm } from "micromark-extension-gfm";
+import { modulesOf } from "./modules.ts";
 import { outerSections, pieceSections, picturePath, type Book } from "./model.ts";
 import { parseMarkdown } from "./parse.ts";
+import type { BookKind } from "./kinds.ts";
 import type { FileSource } from "./source.ts";
 import type { CompilePreset } from "./types.ts";
+import { vocabulary, type Word } from "./vocabulary.ts";
 import { countWords } from "./words.ts";
 
 /*
@@ -42,8 +45,8 @@ export interface CompiledChapter {
   /** Its number in the whole book (a range keeps the numbers), and its heading as the preset has it. */
   number: number;
   heading: string;
-  /** The part it opens, when it's the first chapter of one. */
-  part?: { id: string; title: string; number: number };
+  /** The part it opens, when it's the first chapter of one: its heading as the layout has it ("Part One"). */
+  part?: { id: string; title: string; number: number; heading: string };
   blocks: Block[];
 }
 
@@ -64,14 +67,59 @@ export interface CompiledBook {
     /** As the title page shows it ("about 82,000 words"), or undefined for none. */
     wordCount: string | undefined;
   };
-  /** The running header: Surname / SHORT TITLE / page. */
-  header: { surname: string; shortTitle: string };
+  /** What the running header says before the page number, from the second page: "Vale / BRIDGE AT VARN / " (none: the number alone). */
+  runningHead: string;
+  /** After the last chapter, as the layout has it: "THE END". */
+  end?: string;
+  /** Line spacing, in lines: 2, double-spaced (manuscript format). */
+  spacing: number;
   sceneBreak: string;
   front: Matter[];
   chapters: CompiledChapter[];
   back: Matter[];
   /** Words in the chapters compiled (exact). */
   words: number;
+}
+
+/**
+ * How a compiled book is laid out (#32): the words and conventions of its pages, which the DOCX and
+ * PDF follow and the EPUB's headings too. A kind names its layout (BookKind.compileLayout), which a
+ * module it uses brings (standard manuscript format, the Novel's); the base keeps a plain one.
+ */
+export interface CompileLayout {
+  key: string;
+  label: string;
+  /** A chapter's heading (a section of the innermost level): "Chapter Four: The Flood". */
+  heading(view: { preset: CompilePreset; number: number; title: string | undefined; level: Word }): string;
+  /** A part's heading (a section of the level outside it): "Part One". */
+  partHeading(view: { number: number; level: Word }): string;
+  /** The title page's contact lines (top left) and word count (top right). */
+  titlePage(view: { preset: CompilePreset; author: string; words: number }): { contact: string[]; wordCount: string | undefined };
+  /** What the running header says before the page number: "Vale / BRIDGE AT VARN / ". */
+  runningHead(view: { preset: CompilePreset; title: string; author: string }): string;
+  end?: string;
+  /** Line spacing, in lines. */
+  spacing: number;
+  /** What the compile dialog says of the Word file, the PDF and the cover. */
+  says: { docx: string; pdf: string; cover: string };
+}
+
+/** The base's layout: headings in the kind's words, the title and byline on the title page, page numbers, one and a half spacing. */
+export const PLAIN_LAYOUT: CompileLayout = {
+  key: "plain",
+  label: "Plain",
+  heading: ({ preset, number, title, level }) => (title && preset.chapter_heading !== "number" ? title : `${level.One} ${number}`),
+  partHeading: ({ number, level }) => `${level.One} ${number}`,
+  titlePage: ({ preset, words }) => ({ contact: preset.title_page?.contact ?? [], wordCount: preset.word_count === "exact" ? `${words.toLocaleString("en-US")} words` : undefined }),
+  runningHead: () => "",
+  spacing: 1.5,
+  says: { docx: "for word processors", pdf: "laid out like the Word file", cover: "On the EPUB's cover and the PDF's first page." },
+};
+
+/** A kind's layout: the one it names, from its modules, or the base's plain one. */
+export function layoutOf(kind: BookKind): CompileLayout {
+  const key = kind.compileLayout;
+  return (key && modulesOf(kind).flatMap((m) => m.layouts ?? []).find((l) => l.key === key)) || PLAIN_LAYOUT;
 }
 
 export interface CompileOptions {
@@ -102,6 +150,8 @@ export async function compileBook(novel: Book, source: Pick<FileSource, "read">,
   if (!preset) throw new CompileError(`There's no preset “${name}” in compile.yaml.`);
   const title = novel.config?.title ?? "Untitled";
   const author = preset.title_page?.author ?? novel.config?.author ?? "";
+  const layout = layoutOf(novel.kind);
+  const w = vocabulary(novel.kind);
 
   const chapters = pieceSections(novel);
   const first = options.from ? chapters.findIndex((c) => c.id === options.from) : 0;
@@ -131,8 +181,8 @@ export async function compileBook(novel: Book, source: Pick<FileSource, "read">,
     chapterOut.push({
       id: chapter.id,
       number: i + 1,
-      heading: heading(preset, i + 1, chapter.title),
-      ...(opensPart ? { part: { id: part.id, title: part.title ?? "", number: part.number } } : {}),
+      heading: layout.heading({ preset, number: i + 1, title: chapter.title, level: w.level(chapter.level) }),
+      ...(opensPart ? { part: { id: part.id, title: part.title ?? "", number: part.number, heading: layout.partHeading({ number: part.number, level: w.level(part.level) }) } } : {}),
       blocks,
     });
   }
@@ -147,57 +197,21 @@ export async function compileBook(novel: Book, source: Pick<FileSource, "read">,
     return out;
   };
 
-  const surname = preset.title_page?.surname ?? (author.trim().split(/\s+/).at(-1) || "Anonymous");
-  const shortTitle = (preset.title_page?.short_title ?? shortOf(title)).toUpperCase();
   return {
     id: novel.config?.id ?? "",
     title,
     author,
     language: novel.config?.language ?? "en",
-    titlePage: { contact: preset.title_page?.contact ?? (author ? [author] : []), wordCount: wordCount(preset, words) },
-    header: { surname, shortTitle },
+    titlePage: layout.titlePage({ preset, author, words }),
+    runningHead: layout.runningHead({ preset, title, author }),
+    ...(layout.end ? { end: layout.end } : {}),
+    spacing: layout.spacing,
     sceneBreak: preset.scene_break ?? "#",
     front: await matter(preset.front),
     chapters: chapterOut,
     back: await matter(preset.back),
     words,
   };
-}
-
-/** "Chapter Four: The Flood", "Chapter Four" or "The Flood", as the preset asks (a chapter without a title: its number). */
-function heading(preset: CompilePreset, n: number, title: string | undefined): string {
-  const number = `Chapter ${numberWords(n)}`;
-  const style = preset.chapter_heading ?? "number-and-title";
-  if (style === "number" || !title) return number;
-  if (style === "title") return title;
-  return `${number}: ${title}`;
-}
-
-/** The title page's word count: manuscript format rounds it (to hundreds under 10,000 words, thousands above). */
-function wordCount(preset: CompilePreset, words: number): string | undefined {
-  const style = preset.word_count ?? "rounded";
-  if (style === "none") return undefined;
-  const format = (n: number) => n.toLocaleString("en-US");
-  if (style === "exact") return `${format(words)} words`;
-  const step = words < 10_000 ? 100 : 1000;
-  return `about ${format(Math.max(step, Math.round(words / step) * step))} words`;
-}
-
-/** A short title for the running header: the title's first three words without a leading article. */
-function shortOf(title: string): string {
-  const words = title.replace(/^(the|a|an)\s+/i, "").split(/\s+/).filter(Boolean);
-  return words.slice(0, 3).join(" ") || title;
-}
-
-const ONES = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
-const TENS = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
-
-/** A number in words, as chapter headings write it: 1 → "One", 42 → "Forty-Two", 101 → "One Hundred One". */
-export function numberWords(n: number): string {
-  if (n < 20) return ONES[n] ?? String(n);
-  if (n < 100) return TENS[Math.floor(n / 10)]! + (n % 10 ? `-${ONES[n % 10]}` : "");
-  if (n < 1000) return `${ONES[Math.floor(n / 100)]} Hundred${n % 100 ? ` ${numberWords(n % 100)}` : ""}`;
-  return String(n);
 }
 
 /** A front- or back-matter file: its first heading is its title, the rest its text. */

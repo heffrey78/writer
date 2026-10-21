@@ -1,0 +1,13 @@
+{
+  "name": "@writer/module-manuscript-format",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Standard manuscript format (D14, #32): the compile layout agents and editors ask for, numbered chapter headings, the submission title page and running header, double spacing, THE END.",
+  "exports": {
+    "./core": "./src/core/index.ts"
+  },
+  "dependencies": {
+    "@writer/core": "0.1.0"
+  }
+}

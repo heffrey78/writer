@@ -90,8 +90,7 @@ test("syncs with its remote, and compiles", async ({ page, app }) => {
   await palette(page, "Compile the guide");
   const dialog = page.getByRole("dialog", { name: "Compile the guide" });
   await expect(dialog).toBeVisible();
-  // Not "manuscript": standard manuscript format is the DOCX's layout until it's a module (#32).
-  await expect(dialog).not.toContainText(/\b(scenes?|chapters?|story bible|novel)\b/i);
+  await expect(dialog).not.toContainText(novelWords);
   const downloads: Download[] = [];
   page.on("download", (d) => downloads.push(d));
   await dialog.getByRole("button", { name: "Compile" }).click();
@@ -102,4 +101,7 @@ test("syncs with its remote, and compiles", async ({ page, app }) => {
   const xml = strFromU8(unzipSync(new Uint8Array(readFileSync((await docx!.path())!)))["word/document.xml"]!);
   expect(xml).toContain("Flocks of two hundred in March.");
   expect(xml).toContain("a scratchy song");
+  // The plain layout: its families' titles as their headings, no manuscript format's.
+  expect(xml).toContain(">Warblers<");
+  expect(xml).not.toMatch(/Chapter|THE END/);
 });

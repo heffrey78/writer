@@ -1,3 +1,4 @@
+import type { CompileLayout } from "./compile.ts";
 import type { EntityTypeDef } from "./ids.ts";
 import type { BookKind, FieldDef, Noun } from "./kinds.ts";
 import type { Book, ModuleRecord, Piece } from "./model.ts";
@@ -41,6 +42,8 @@ export interface BookModule {
   facts?: (book: Book, piece: Piece) => string[];
   /** Where things are in story time, for what the base shows of places (the story-time module's). */
   clock?: StoryClock;
+  /** Compile layouts a kind may name (BookKind.compileLayout): standard manuscript format. */
+  layouts?: readonly CompileLayout[];
   /** What moving a novel to a newer format does to its files (format 2 gives each off-page event a file of its own). */
   migrations?: readonly ModuleMigration[];
 }

@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { bookImages, compileBook, countWords, flatBlocks, loadBook, memorySource, numberWords, pieceSections, type CompiledBook, type FileSource } from "../src/index.ts";
+import { bookImages, compileBook, countWords, flatBlocks, loadBook, memorySource, pieceSections, type CompiledBook, type FileSource } from "../src/index.ts";
 
 const ROOT = fileURLToPath(new URL("../../../examples/sample-novel/", import.meta.url));
 const sample: Record<string, string> = Object.fromEntries(
@@ -71,7 +71,7 @@ describe("compiling the manuscript", () => {
   it("puts the chapters and their scenes in reading order, parts marked, scenes set apart by breaks", async () => {
     const { novel, source } = await open();
     const book = await compileBook(novel, source);
-    expect(book).toMatchObject({ title: "The Bridge at Varn", author: "Writer sample", language: "en", sceneBreak: "#", header: { surname: "sample", shortTitle: "BRIDGE AT VARN" } });
+    expect(book).toMatchObject({ title: "The Bridge at Varn", author: "Writer sample", language: "en", sceneBreak: "#", runningHead: "sample / BRIDGE AT VARN / ", end: "THE END", spacing: 2 });
     expect(book.chapters.map((c) => [c.number, c.heading, c.part?.title])).toEqual([
       [1, "Chapter One: Arrival", "Return"],
       [2, "Chapter Two: Old Debts", undefined],
@@ -154,7 +154,7 @@ describe("compiling the manuscript", () => {
     });
     expect(novel.diagnostics.filter((d) => d.file === "compile.yaml")).toEqual([]);
     const book = await compileBook(novel, source);
-    expect(book.header).toEqual({ surname: "Writer", shortTitle: "VARN" });
+    expect(book.runningHead).toBe("Writer / VARN / ");
     expect(book.titlePage).toEqual({ contact: ["Ada Writer", "1 Bridge Street", "ada@example.com"], wordCount: `${book.words.toLocaleString("en-US")} words` });
     expect(book.sceneBreak).toBe("* * *");
     expect(book.chapters[0]!.heading).toBe("Chapter One");
@@ -169,9 +169,5 @@ describe("compiling the manuscript", () => {
   it("reports a preset naming a missing file, or a setting it doesn't know", async () => {
     const { novel } = await open({ "compile.yaml": "presets:\n  draft:\n    front: [front/missing.md]\n    chapter_heading: fancy\n" });
     expect(novel.diagnostics.filter((d) => d.file === "compile.yaml").map((d) => d.code).sort()).toEqual(["E_MISSING_FILE", "E_SCHEMA"]);
-  });
-
-  it("writes chapter numbers in words", () => {
-    expect([1, 12, 20, 21, 42, 99, 100, 101, 345].map(numberWords)).toEqual(["One", "Twelve", "Twenty", "Twenty-One", "Forty-Two", "Ninety-Nine", "One Hundred", "One Hundred One", "Three Hundred Forty-Five"]);
   });
 });

@@ -1,15 +1,17 @@
-import { bookImages, numberWords, type Align, type Block, type CompiledBook, type Run } from "@writer/core";
+import { bookImages, type Align, type Block, type CompiledBook, type Run } from "@writer/core";
 import type { CoverImage } from "./cover.ts";
 import { isoSeconds, xml } from "./xml.ts";
 import { zip } from "./zip.ts";
 
 /*
- * The book as a Word document in standard manuscript format (the conventions agents and editors ask
- * for): Letter pages with 1-inch margins; Times New Roman 12 pt, double-spaced, first lines indented
- * half an inch, no space between paragraphs; a title page with the contact details top left, the word
- * count top right and the title and byline centred, without a header; from page 2 a running header,
- * right-aligned: Surname / SHORT TITLE / page; each chapter on a new page with its heading a third
- * of the way down; scene breaks as the preset's marker, centred; "THE END" after the last chapter.
+ * The book as a Word document: Letter pages with 1-inch margins; Times New Roman 12 pt, first lines
+ * indented half an inch, no space between paragraphs; a title page with the contact details top left,
+ * the word count top right and the title and byline centred, without a header; from page 2 a running
+ * header, right-aligned, ending in the page number; each chapter on a new page with its heading a
+ * third of the way down; scene breaks as the preset's marker, centred. The book's layout (#32) gives
+ * the headings, the title page, the running header, the spacing and the end mark: standard manuscript
+ * format (the conventions agents and editors ask for) double-spaces, heads the pages Surname / SHORT
+ * TITLE / page, and ends with "THE END".
  */
 
 export interface DocxOptions {
@@ -62,14 +64,14 @@ export function toDocx(book: CompiledBook, { date = new Date(0), pictures = new 
   for (const chapter of book.chapters) {
     if (chapter.part) {
       pageBreak();
-      body.push(p("PartHeading", runs([{ text: `Part ${numberWords(chapter.part.number)}` }])));
+      body.push(p("PartHeading", runs([{ text: chapter.part.heading }])));
       if (chapter.part.title) body.push(p("PartTitle", runs([{ text: chapter.part.title }])));
     }
     pageBreak();
     body.push(p("Heading1", runs([{ text: chapter.heading }])));
     body.push(...blocks(chapter.blocks, book.sceneBreak));
   }
-  if (book.chapters.length) body.push(p("TheEnd", runs([{ text: "THE END" }])));
+  if (book.chapters.length && book.end) body.push(p("TheEnd", runs([{ text: book.end }])));
   for (const section of book.back) {
     pageBreak();
     body.push(p("Heading2", runs([{ text: section.title }])));
@@ -78,7 +80,7 @@ export function toDocx(book: CompiledBook, { date = new Date(0), pictures = new 
 
   const sectPr = `<w:sectPr><w:headerReference w:type="default" r:id="rIdHeader"/><w:headerReference w:type="first" r:id="rIdHeaderFirst"/><w:pgSz w:w="${PAGE.width}" w:h="${PAGE.height}"/><w:pgMar w:top="${INCH}" w:right="${INCH}" w:bottom="${INCH}" w:left="${INCH}" w:header="${INCH / 2}" w:footer="${INCH / 2}" w:gutter="0"/><w:titlePg/></w:sectPr>`;
   const document = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<w:document ${W}><w:body>${body.join("")}${sectPr}</w:body></w:document>`;
-  const header = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<w:hdr ${W}><w:p><w:pPr><w:pStyle w:val="Header"/></w:pPr>${runs([{ text: `${book.header.surname} / ${book.header.shortTitle} / ` }]).join("")}<w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText xml:space="preserve"> PAGE </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:t>1</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r></w:p></w:hdr>`;
+  const header = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<w:hdr ${W}><w:p><w:pPr><w:pStyle w:val="Header"/></w:pPr>${runs([{ text: book.runningHead }]).join("")}<w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText xml:space="preserve"> PAGE </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:t>1</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r></w:p></w:hdr>`;
   const headerFirst = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<w:hdr ${W}><w:p><w:pPr><w:pStyle w:val="Header"/></w:pPr></w:p></w:hdr>`;
 
   return zip(
@@ -88,7 +90,7 @@ export function toDocx(book: CompiledBook, { date = new Date(0), pictures = new 
       { path: "docProps/core.xml", data: core(book, date) },
       { path: "docProps/app.xml", data: app },
       { path: "word/document.xml", data: document },
-      { path: "word/styles.xml", data: styles(book.language) },
+      { path: "word/styles.xml", data: styles(book.language, book.spacing) },
       { path: "word/settings.xml", data: settings(book.language) },
       { path: "word/header1.xml", data: header },
       { path: "word/header2.xml", data: headerFirst },
@@ -197,13 +199,15 @@ function runs(list: Run[]): string[] {
   });
 }
 
-function styles(language: string): string {
+function styles(language: string, spacing: number): string {
+  // Double-spaced (manuscript format): 480, twice the single line's 240.
+  const line = Math.round(240 * spacing);
   const paragraph = (id: string, name: string, pPr: string, rPr = "", extra = "") =>
     `<w:style w:type="paragraph" w:styleId="${id}"${id === "Normal" ? ' w:default="1"' : ""}><w:name w:val="${name}"/>${id === "Normal" ? "" : '<w:basedOn w:val="Normal"/>'}${extra}<w:pPr>${pPr}</w:pPr>${rPr ? `<w:rPr>${rPr}</w:rPr>` : ""}</w:style>`;
   const centred = '<w:ind w:firstLine="0"/><w:jc w:val="center"/>';
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:styles ${W}><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:eastAsia="Times New Roman" w:cs="Times New Roman"/><w:sz w:val="24"/><w:szCs w:val="24"/><w:lang w:val="${xml(language)}"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="0" w:line="480" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>${[
-    paragraph("Normal", "Normal", `<w:widowControl/><w:spacing w:after="0" w:line="480" w:lineRule="auto"/><w:ind w:firstLine="${INCH / 2}"/>`),
+<w:styles ${W}><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:eastAsia="Times New Roman" w:cs="Times New Roman"/><w:sz w:val="24"/><w:szCs w:val="24"/><w:lang w:val="${xml(language)}"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="0" w:line="${line}" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>${[
+    paragraph("Normal", "Normal", `<w:widowControl/><w:spacing w:after="0" w:line="${line}" w:lineRule="auto"/><w:ind w:firstLine="${INCH / 2}"/>`),
     paragraph("Contact", "Contact", '<w:spacing w:line="240" w:lineRule="auto"/><w:ind w:firstLine="0"/>'),
     paragraph("Title", "Title", `<w:spacing w:before="${INCH * 3}"/>${centred}`),
     paragraph("Byline", "Byline", centred),

@@ -1,4 +1,4 @@
-import { bookImages, numberWords, type Align, type Block, type CompiledBook, type Run } from "@writer/core";
+import { bookImages, type Align, type Block, type CompiledBook, type Run } from "@writer/core";
 import type { CoverImage } from "./cover.ts";
 import { isoSeconds, xml } from "./xml.ts";
 import { zip, type ZipEntry } from "./zip.ts";
@@ -68,7 +68,7 @@ export function toEpub(book: CompiledBook, { date = new Date(0), cover, pictures
   for (const chapter of book.chapters) {
     if (chapter.part) {
       inPart = true;
-      const name = `Part ${numberWords(chapter.part.number)}`;
+      const name = chapter.part.heading;
       add({ id: `part-${chapter.part.number}`, title: chapter.part.title ? `${name}: ${chapter.part.title}` : name, toc: true, level: 0, body: `<section epub:type="part" class="part"><h1>${xml(name)}</h1>${chapter.part.title ? `<p class="part-title">${xml(chapter.part.title)}</p>` : ""}</section>` });
     }
     add({ id: `chapter-${String(chapter.number).padStart(3, "0")}`, title: chapter.heading, toc: true, level: inPart ? 1 : 0, body: `<section epub:type="chapter"><h2>${xml(chapter.heading)}</h2>${blocks(chapter.blocks)}</section>` });

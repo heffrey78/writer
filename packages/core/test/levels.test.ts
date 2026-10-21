@@ -50,10 +50,10 @@ describe("a kind with one level (a diary: months of days)", () => {
     expect(codes(novelish)).toEqual(expect.arrayContaining(['W_UNKNOWN_KEY Unknown field "chapters"']));
   });
 
-  it("compiles, its months as the book's chapters", async () => {
+  it("compiles, its months as the book's chapters, headed in its words (the plain layout: it has no manuscript format)", async () => {
     const book = await load(diary, A_DIARY);
     const compiled = await compileBook(book, memorySource(A_DIARY));
-    expect(compiled.chapters.map((c) => [c.heading, c.part])).toEqual([["Chapter One: March", undefined], ["Chapter Two", undefined]]);
+    expect(compiled.chapters.map((c) => [c.heading, c.part])).toEqual([["March", undefined], ["Month 2", undefined]]);
   });
 });
 
