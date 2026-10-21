@@ -2,7 +2,7 @@ import { entryPresence, relationshipsAt, relationshipStyle, vocabulary, type Ent
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
 import { DropdownMenu } from "radix-ui";
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 import { api, keys } from "../api.ts";
 import { MENU_ITEM } from "../layout.tsx";
@@ -42,6 +42,14 @@ export function RelationshipArcs({ novelId, novel, entity, compact }: { novelId:
     if (i >= 0) setAt(i);
   }, [current?.id, novel]);
   const [dialog, setDialog] = useState<{ kind: "add" } | { kind: "change" | "end" | "remove"; relationship: Relationship }>();
+  // Focus goes back where the dialog was opened from: the relationship's bar, or Add a relationship when
+  // the bar is gone (removed, or redrawn as a change split it). The dialogs have no trigger to go back to.
+  const opener = useRef<HTMLElement | null>(null);
+  const addButton = useRef<HTMLButtonElement>(null);
+  const close = () => {
+    setDialog(undefined);
+    requestAnimationFrame(() => (opener.current?.isConnected ? opener.current : addButton.current)?.focus());
+  };
   const markerName = useId();
   const refresh = () => queryClient.invalidateQueries({ queryKey: keys.novel(novelId) });
   const remove = useMutation({ mutationFn: (id: string) => api.bible.deleteRelationship(novelId, id), onSuccess: refresh });
@@ -78,7 +86,15 @@ export function RelationshipArcs({ novelId, novel, entity, compact }: { novelId:
     <ProfileSection
       title="Relationships"
       action={
-        <Button size="sm" variant="ghost" onClick={() => setDialog({ kind: "add" })}>
+        <Button
+          ref={addButton}
+          size="sm"
+          variant="ghost"
+          onClick={() => {
+            opener.current = addButton.current;
+            setDialog({ kind: "add" });
+          }}
+        >
           <Plus className="size-4" aria-hidden /> Add a relationship
         </Button>
       }
@@ -110,6 +126,7 @@ export function RelationshipArcs({ novelId, novel, entity, compact }: { novelId:
                                 <button
                                   type="button"
                                   title={said}
+                                  onFocus={(e) => (opener.current = e.currentTarget)}
                                   style={{
                                     gridColumn: `${start + 1} / ${Math.max(end, start + 1) + 1}`,
                                     borderColor: `var(--ghw-${slot})`,
@@ -175,13 +192,13 @@ export function RelationshipArcs({ novelId, novel, entity, compact }: { novelId:
         )
       )}
       {remove.isError && <ErrorAlert title="Couldn't remove it">{remove.error.message}</ErrorAlert>}
-      {dialog?.kind === "add" && <AddRelationshipDialog novelId={novelId} novel={novel} entity={entity} onClose={() => setDialog(undefined)} />}
+      {dialog?.kind === "add" && <AddRelationshipDialog novelId={novelId} novel={novel} entity={entity} onClose={close} />}
       {(dialog?.kind === "change" || dialog?.kind === "end") && (
-        <RelationshipAtSceneDialog novelId={novelId} novel={novel} entity={entity} kind={dialog.kind} relationship={dialog.relationship} onClose={() => setDialog(undefined)} />
+        <RelationshipAtSceneDialog novelId={novelId} novel={novel} entity={entity} kind={dialog.kind} relationship={dialog.relationship} onClose={close} />
       )}
       <Confirm
         open={dialog?.kind === "remove"}
-        onOpenChange={(o) => !o && setDialog(undefined)}
+        onOpenChange={(o) => !o && close()}
         title="Remove this relationship?"
         description={dialog?.kind === "remove" ? `“${describe(novel, entity.id, dialog.relationship)}” will no longer be in the ${vocabulary(novel.kind).codex.short}.` : ""}
         action="Remove"

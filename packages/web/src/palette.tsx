@@ -199,7 +199,7 @@ export function CommandPalette() {
               <Cmdk.Input
                 value={search}
                 onValueChange={setSearch}
-                placeholder="Type a command, or a scene to go to…"
+                placeholder="Type a command, or where to go…"
                 className="h-12 w-full border-b border-rule bg-transparent px-4 text-base outline-none placeholder:text-muted"
               />
               <Cmdk.List className="max-h-[min(60vh,28rem)] overflow-y-auto p-2" label="Commands">

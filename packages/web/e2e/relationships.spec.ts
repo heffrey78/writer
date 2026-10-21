@@ -59,6 +59,8 @@ test("allies until the betrayal, rivals after it: recorded as two spans and show
   await axe(page);
   await dialog(page).getByRole("button", { name: "Change it" }).click();
   await expect(panel(page).getByRole("list", { name: "All relationships" })).toContainText("Rivals with Mirela Kost, from “The Betrayal”");
+  // Focus came back to the panel, though the bar it was opened from is now two.
+  await expect(panel(page).locator(":focus")).toHaveCount(1);
 
   const records = novel.relationships().slice(before);
   expect(records).toEqual([
