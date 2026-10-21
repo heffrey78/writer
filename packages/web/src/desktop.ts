@@ -13,7 +13,7 @@ interface Invoke {
   invoke<T>(command: string, args?: Record<string, unknown>): Promise<T>;
 }
 
-/** A command from the shell, by name: "go" (a path in the app) or "about". */
+/** A command from the shell, by name: "go" (a path in the app), "about", or "command" (a palette command, by its id). */
 export interface ShellCommand {
   name: string;
   arg?: string | null;
@@ -103,10 +103,13 @@ export function reportRecent(novels: { id: string; title: string }[]): void {
   void shell?.invoke("set_recent", { novels });
 }
 
-/** Open a novel: in the desktop app, in a window of its own (or bring that window forward); in a browser, here. */
-export function useOpenNovel(): (id: string) => void {
+/**
+ * Open a novel, at `path` within it if given ("today"): in the desktop app, in a window of its own (or
+ * bring that window forward, there); in a browser, here.
+ */
+export function useOpenNovel(): (id: string, path?: string) => void {
   const navigate = useNavigate();
-  return useCallback((id: string) => (shell ? void shell.invoke("open_novel", { id }) : void navigate(`/novels/${id}`)), [navigate]);
+  return useCallback((id: string, path?: string) => (shell ? void shell.invoke("open_novel", path ? { id, path } : { id }) : void navigate(`/novels/${id}${path ? `/${path}` : ""}`)), [navigate]);
 }
 
 /**

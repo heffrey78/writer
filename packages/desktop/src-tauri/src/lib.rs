@@ -137,11 +137,15 @@ async fn pick_folder(window: WebviewWindow, title: String) -> Option<String> {
         .map(|path| path.display().to_string())
 }
 
-/// Open a novel in its own window, or bring that window forward.
+/// Open a novel in its own window, or bring that window forward; at `path` within it if given (a
+/// module's page: "today", Today's entry), sent once the page is ready.
 #[tauri::command]
-fn open_novel(app: AppHandle, id: String) {
+fn open_novel(app: AppHandle, id: String, path: Option<String>) {
     if let Some(label) = novel_label(&id) {
         let _ = open_window(&app, &label, &format!("/novels/{id}"));
+        if let Some(path) = path.filter(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '/')) {
+            deliver(&app, &label, PageCommand { name: "go", arg: Some(format!("/novels/{id}/{path}")) });
+        }
     }
 }
 
@@ -486,6 +490,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<()> {
     let system_git = CheckMenuItemBuilder::with_id("system-git", "Use This Computer's git").checked(shell.settings.lock().unwrap().system_git).build(app)?;
     let file = SubmenuBuilder::new(app, "File")
         .item(&MenuItemBuilder::with_id("new-novel", "New Book…").build(app)?)
+        .item(&MenuItemBuilder::with_id("today", "Today's Entry").accelerator("CmdOrCtrl+Shift+T").build(app)?)
         .item(&MenuItemBuilder::with_id("open-folder", "Open Folder…").build(app)?)
         .item(&MenuItemBuilder::with_id("clone", "Clone from GitHub…").build(app)?)
         .item(&recent)
@@ -523,6 +528,15 @@ fn on_menu(app: &AppHandle, id: &str) {
         "library" => {
             let _ = open_window(app, LIBRARY, "/");
         }
+        // The palette's Today's entry, where it's offered: in a journal's window, or on the shelf (for
+        // the journal opened last). Elsewhere it does nothing.
+        "today" => {
+            let label = focused().map(|w| w.label().to_string()).unwrap_or_else(|| LIBRARY.into());
+            if label == LIBRARY {
+                let _ = open_window(app, LIBRARY, "/");
+            }
+            deliver(app, &label, PageCommand { name: "command", arg: Some("daily.today".into()) });
+        }
         "about" => {
             let label = focused().map(|w| w.label().to_string()).unwrap_or_else(|| LIBRARY.into());
             if label == LIBRARY {
@@ -555,7 +569,7 @@ fn on_menu(app: &AppHandle, id: &str) {
         "quit" => quit(app),
         _ => {
             if let Some(id) = id.strip_prefix("recent:") {
-                open_novel(app.clone(), id.to_string());
+                open_novel(app.clone(), id.to_string(), None);
             }
         }
     }

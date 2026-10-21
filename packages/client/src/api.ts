@@ -112,6 +112,9 @@ export interface LibraryEntry {
   coverVersion?: string;
   remote?: string;
   lastOpened: string;
+  /** Its kind of book, and the kind's modules, where it's of one this Writer ships. */
+  kind?: string;
+  modules?: string[];
 }
 
 export interface LibraryNotice {

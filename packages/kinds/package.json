@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@writer/core": "0.1.0",
+    "@writer/module-daily": "0.1.0",
     "@writer/module-drafting-board": "0.1.0",
     "@writer/module-manuscript-format": "0.1.0",
     "@writer/module-off-page-events": "0.1.0",

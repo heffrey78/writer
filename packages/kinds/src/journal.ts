@@ -51,7 +51,7 @@ export const journal: BookKind = {
     },
   ],
   // An entry's date first on its card, then who, where and what.
-  modules: ["presence", "story-time"],
+  modules: ["presence", "story-time", "daily"],
   fieldOrder: ["when", "people", "places", "events", "values"],
   issueKinds: [
     { key: "follow-up", label: "Follow up", color: "0075ca", description: "Something to come back to" },

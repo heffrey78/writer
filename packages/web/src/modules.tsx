@@ -25,8 +25,8 @@ export interface ModuleView {
   path: string;
   label: string;
   icon: LucideIcon;
-  /** The sidebar's group it's listed in, after the base's views. */
-  group: "Plan" | "Revise";
+  /** The sidebar's group it's listed in, after the base's views; none for a page reached another way (today's entry). */
+  group?: "Plan" | "Revise";
   render(view: BookView): ReactNode;
 }
 
@@ -92,10 +92,22 @@ export interface WebRecordType {
   fromNote?: { label: string; action: string; hint?(view: BookView): ReactNode; make(view: BookView, note: Note, keep: boolean): Promise<string> };
 }
 
+/**
+ * Something a module offers on a book's tile on the shelf (Today's entry): it opens the book at
+ * `path`. `command` is its palette command's id in the book (daily.today), which the shelf offers too,
+ * for the book most recently opened.
+ */
+export interface ShelfAction {
+  label: string;
+  path: string;
+  command: string;
+}
+
 export interface WebModule {
   /** The module's id, as its kind lists it. */
   id: string;
   views?: readonly ModuleView[];
+  shelfActions?: readonly ShelfAction[];
   records?: readonly WebRecordType[];
   storyMapTabs?: readonly StoryMapTab[];
   profileSections?: readonly ProfileSection[];
@@ -117,6 +129,9 @@ export function registerWebModule(module: WebModule): void {
 export function webModulesOf(kind: BookKind): WebModule[] {
   return (kind.modules ?? []).flatMap((id) => registry.get(id) ?? []);
 }
+
+/** The web halves of the modules named, in their order: a book on the shelf, whose kind's modules its entry lists. */
+export const webModulesByIds = (ids: readonly string[]): WebModule[] => ids.flatMap((id) => registry.get(id) ?? []);
 
 /** The views the book's modules add. */
 export const moduleViews = (kind: BookKind): ModuleView[] => webModulesOf(kind).flatMap((m) => m.views ?? []);
@@ -164,7 +179,8 @@ export function ModuleCommands(view: BookView) {
   useCommands(
     (): Command[] =>
       webModulesOf(novel.kind).flatMap((m) => [
-        ...(m.views ?? []).map((v) => ({ id: `${m.id}.view.${v.path}`, title: v.label, group: "Go to", run: () => void navigate(`/novels/${novelId}/${v.path}`) })),
+        // A view without a place in the sidebar is reached another way (today's entry, by its own command).
+        ...(m.views ?? []).filter((v) => v.group).map((v) => ({ id: `${m.id}.view.${v.path}`, title: v.label, group: "Go to", run: () => void navigate(`/novels/${novelId}/${v.path}`) })),
         ...(m.storyMapTabs ?? []).map((t) => ({ id: `${m.id}.story-map.${t.key}`, title: `Story map: ${t.label}`, group: "Go to", keywords: ["diagram", ...(t.keywords ?? [])], run: () => void navigate(`/novels/${novelId}/story-map/${t.key}`) })),
         ...(m.commands?.({ ...view, navigate: (to) => void navigate(to) }) ?? []),
       ]),

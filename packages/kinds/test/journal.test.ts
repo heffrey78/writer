@@ -10,10 +10,10 @@ import { journal } from "../src/index.ts";
 const SAMPLE = fileURLToPath(new URL("../../../examples/sample-journal", import.meta.url));
 
 describe("the Journal kind", () => {
-  it("is registered with presence and story time, and none of the Novel's story-only modules", () => {
+  it("is registered with presence, story time and daily writing, and none of the Novel's story-only modules", () => {
     const kind = kindByKey("journal");
     expect(kind).toBe(withModules(journal));
-    expect(kind.modules).toEqual(["presence", "story-time"]);
+    expect(kind.modules).toEqual(["presence", "story-time", "daily"]);
     expect(kind.fields.map((f) => f.key)).toEqual(["when", "people", "places", "events", "values"]);
     expect(layoutOf(kind)).toBe(PLAIN_LAYOUT);
   });

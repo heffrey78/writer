@@ -1,6 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { sep } from "node:path";
+import { kindOf } from "@writer/core";
+import { nodeSource } from "@writer/core/node";
 import { Hono, type Context } from "hono";
 import { streamSSE } from "hono/streaming";
 import { FileError, imageVersion, servableImage } from "./files.ts";
@@ -11,7 +13,8 @@ import { LibraryError, type Library } from "./library.ts";
 /**
  * GET    /api/library        { novels, notices, folder, ghWriter, kinds }: folder is where new novels and clones go, ~ for home;
  *                             kinds are the kinds of book New can start ({ key, label }, the Novel first);
- *                             each novel with its cover's version, when it has one; ghWriter, the books in
+ *                             each novel with its cover's version, when it has one, and its kind and the kind's
+ *                             modules (kind, modules) where it's of one this Writer ships; ghWriter, the books in
  *                             gh-writer's library that aren't here, to offer to bring in
  * GET    /api/library/:id/cover  the novel's cover image, for the shelf (without opening the novel)
  * POST   /api/library        { path } → 201 { novel }
@@ -28,7 +31,9 @@ export function libraryRoutes(library: Library, github?: GitHub): Hono {
     const novels = await Promise.all(
       (await library.list()).map(async (n) => {
         const coverVersion = await imageVersion(n.path, n.cover);
-        return coverVersion ? { ...n, coverVersion } : n;
+        // Its kind's modules, for what they offer on its tile (Today's entry): read from its manifest.
+        const kind = await kindOf(nodeSource(n.path)).catch(() => undefined);
+        return { ...n, ...(coverVersion ? { coverVersion } : {}), ...(kind ? { kind: kind.key, modules: [...(kind.modules ?? [])] } : {}) };
       }),
     );
     return c.json({ novels, notices: library.notices, folder: tilde(library.cloneDir), ghWriter: await library.ghWriterBooks(), kinds: await library.kinds() });

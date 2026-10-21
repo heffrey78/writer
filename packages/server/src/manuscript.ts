@@ -5,6 +5,7 @@ import { editFrontMatter, editYaml, indexById, kindByKey, loadBook, numberedName
 import { nodeSource } from "@writer/core/node";
 import { parse, stringify } from "yaml";
 import { git } from "./git.ts";
+import { overlay } from "./migrate.ts";
 import { OperationError, transaction, type FileWrite, type OperationResult } from "./operations.ts";
 
 /** A piece or section that was deleted and can be brought back. */
@@ -106,8 +107,12 @@ export class ManuscriptOperations {
    * What adding a piece to a section writes, for an operation to commit with its own changes: the
    * piece's file, with `front` after its ID, title and status, and the section's order and numbering.
    */
-  async sceneWrites(novel: Book, chapterId: string, { title, after, front = {} }: { title: string; after?: string | null; front?: Record<string, unknown> }): Promise<{ id: string; title: string; file: string; writes: FileWrite[] }> {
-    const o = new Overlay(this.root);
+  async sceneWrites(novel: Book, chapterId: string, piece: { title: string; after?: string | null; front?: Record<string, unknown> }): Promise<{ id: string; title: string; file: string; writes: FileWrite[] }> {
+    return this.#sceneWrites(novel, new Overlay(this.root), chapterId, piece);
+  }
+
+  /** sceneWrites, on top of an operation's pending changes `o`. */
+  async #sceneWrites(novel: Book, o: Overlay, chapterId: string, { title, after, front = {} }: { title: string; after?: string | null; front?: Record<string, unknown> }): Promise<{ id: string; title: string; file: string; writes: FileWrite[] }> {
     const chapter = this.#holder(novel, chapterId);
     const name = required(title, "title");
     const id = uniqueId(novel.kind.piece.prefix, new Set(indexById(novel).keys()));
@@ -121,6 +126,38 @@ export class ManuscriptOperations {
     // Where it is once numbered.
     const file = writes.find((w) => typeof w.content === "string" && w.path.endsWith(".md") && w.content.startsWith(`---\nid: ${id}\n`))!.path;
     return { id, title: name, file, writes };
+  }
+
+  /**
+   * A piece placed in sections found by their titles, outermost first from the level the book starts
+   * at (a journal's year and month, or its month alone), each made at the end of its parent where it's
+   * missing, and the piece added at the end of the innermost: today's entry. One commit; `message` is
+   * told what was made.
+   */
+  placePiece(path: string[], piece: { title: string; front?: Record<string, unknown> }, message: (made: { sections: string[]; piece: string }) => string): Promise<OperationResult & { id: string; file: string }> {
+    return this.#exclusive(async () => {
+      const o = new Overlay(this.root);
+      // The book as it will be: each step reads what the ones before it made.
+      const load = () => loadBook(overlay(nodeSource(this.root), [...o.writes].map(([p, content]) => ({ path: p, content }))), this.#kindOf());
+      let novel = await load();
+      const levels = novel.kind.levels.slice(novel.kind.levels.findIndex((l) => l.key === novel.levels[0]));
+      if (path.length !== levels.length) throw new OperationError("BAD_REQUEST", `A ${vocabulary(novel.kind).piece.one} here is in ${levels.length} section${levels.length === 1 ? "" : "s"}, not ${path.length}.`);
+      const made: string[] = [];
+      let parent: string | null = null;
+      for (const [i, title] of path.entries()) {
+        const level = levels[i]!;
+        const found = novel.allSections.find((s) => s.level === level.key && s.title === title && (s.parentId ?? null) === parent);
+        if (found) {
+          parent = found.id;
+          continue;
+        }
+        parent = (await this.#createSection(novel, o, level.key, parent, { title })).id;
+        made.push(title);
+        novel = await load();
+      }
+      const { id, title, file, writes } = await this.#sceneWrites(novel, o, parent!, piece);
+      return { ...(await transaction(this.root, writes, message({ sections: made, piece: title }))), id, file };
+    });
   }
 
   /** A new, empty chapter in a part (or at the top level), after `after`. */

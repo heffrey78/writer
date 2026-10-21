@@ -5,6 +5,8 @@ import { DropdownMenu } from "radix-ui";
 import { useState, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router";
 import { api, keys } from "../api.ts";
+import { useCommands, type Command } from "../commands.ts";
+import { webModulesByIds, type ShelfAction } from "../modules.tsx";
 import { desktop, useOpenNovel } from "../desktop.ts";
 import { ago, remoteLabel } from "../format.ts";
 import { Shell } from "../layout.tsx";
@@ -34,6 +36,22 @@ export function LibraryPage() {
   const close = () => add(undefined);
   // Book menus open inside the page's landmarks (not at the end of body).
   const [menus, setMenus] = useState<HTMLElement | null>(null);
+  // What the books' modules offer from the shelf (Today's entry), in the palette: for each book, and
+  // under the action's own command for the one opened last (books come most recent first), so the
+  // desktop menu's item works from here too.
+  const openNovel = useOpenNovel();
+  useCommands(
+    (): Command[] => {
+      const offered = (library.data?.novels ?? []).flatMap((n) => shelfActions(n).map((a) => ({ n, a })));
+      const latest = new Map<string, { n: LibraryEntry; a: ShelfAction }>();
+      for (const o of offered) if (!latest.has(o.a.command)) latest.set(o.a.command, o);
+      return [
+        ...offered.map(({ n, a }) => ({ id: `${a.command}.${n.id}`, title: `${a.label}: ${n.title}`, group: "Your books", run: () => openNovel(n.id, a.path) })),
+        ...[...latest.values()].map(({ n, a }) => ({ id: a.command, title: `${a.label} (${n.title})`, group: "Your books", run: () => openNovel(n.id, a.path) })),
+      ];
+    },
+    [library.data, openNovel],
+  );
 
   return (
     <Shell>
@@ -207,6 +225,11 @@ function Book({ novel, menus }: { novel: LibraryEntry; menus: HTMLElement | null
             {novel.remote ? remoteLabel(novel.remote) : "Not on GitHub yet"}
           </p>
           <p className="text-muted">Opened {ago(novel.lastOpened)}</p>
+          {shelfActions(novel).map((a) => (
+            <button key={a.command} type="button" onClick={() => openNovel(novel.id, a.path)} className="mt-1 text-accent underline-offset-2 hover:underline">
+              {a.label}
+            </button>
+          ))}
         </div>
         <DropdownMenu.Root modal={false}>
           <DropdownMenu.Trigger asChild>
@@ -222,6 +245,11 @@ function Book({ novel, menus }: { novel: LibraryEntry; menus: HTMLElement | null
               <DropdownMenu.Item className={item} onSelect={() => openNovel(novel.id)}>
                 Open
               </DropdownMenu.Item>
+              {shelfActions(novel).map((a) => (
+                <DropdownMenu.Item key={a.command} className={item} onSelect={() => openNovel(novel.id, a.path)}>
+                  {a.label}
+                </DropdownMenu.Item>
+              ))}
               {!novel.remote && (
                 <DropdownMenu.Item className={item} onSelect={() => usePublish.getState().show({ id: novel.id, folder: novel.path })}>
                   Put on GitHub…
@@ -269,3 +297,6 @@ function Book({ novel, menus }: { novel: LibraryEntry; menus: HTMLElement | null
     </li>
   );
 }
+
+/** What a book's modules offer on its tile: Today's entry, for a journal. */
+const shelfActions = (novel: LibraryEntry): ShelfAction[] => webModulesByIds(novel.modules ?? []).flatMap((m) => m.shelfActions ?? []);

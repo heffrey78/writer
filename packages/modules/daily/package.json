@@ -1,0 +1,19 @@
+{
+  "name": "@writer/module-daily",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Daily writing (D14, #38): today's entry one action away, made in its month (and year) and dated, from the palette, the shelf and the desktop menu; and a calendar of the entries.",
+  "exports": {
+    "./core": "./src/core/index.ts",
+    "./server": "./src/server/index.ts",
+    "./web": "./src/web/index.tsx"
+  },
+  "dependencies": {
+    "@writer/client": "0.1.0",
+    "@writer/core": "0.1.0",
+    "@writer/module-story-time": "0.1.0",
+    "@writer/server": "0.1.0",
+    "@writer/web": "0.1.0"
+  }
+}
