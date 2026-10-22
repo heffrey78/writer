@@ -8,6 +8,7 @@ import { chapterContent, loadChapter, parseChapter, replaceScene, Scene, type Sc
 import type { EditorWords } from "./words.ts";
 import { loadMarkdown, setInitialMarkdown } from "./editor.ts";
 import { Picture, proseContent } from "./extensions.ts";
+import { FootnotesExtension } from "./footnotes.ts";
 import { FindExtension } from "./find.ts";
 import { SearchHighlightExtension } from "./search.ts";
 import { SelectFocusExtension } from "./select-focus.ts";
@@ -220,6 +221,7 @@ export function SceneEditor({
       spellExtension,
       ...mentionExtension,
       mentionInfo,
+      FootnotesExtension,
       picturesExtension,
       ...movingAround,
       Placeholder.configure({ placeholder }),
@@ -377,7 +379,7 @@ export function ChapterEditor({
   }).current;
 
   const editor = useEditor({
-    extensions: [...withPictures(chapterContent, pictureUrl).map((e) => ((e as unknown) === Scene ? Scene.configure({ label: words.piece.One }) : e)), UndoRedo, SelectFocusExtension, issueMarksExtension, pinnedLines, WritingModesExtension, WordCountExtension, FindExtension, SearchHighlightExtension, spellExtension, ...mentionExtension, mentionInfo, picturesExtension, ...movingAround],
+    extensions: [...withPictures(chapterContent, pictureUrl).map((e) => ((e as unknown) === Scene ? Scene.configure({ label: words.piece.One }) : e)), UndoRedo, SelectFocusExtension, issueMarksExtension, pinnedLines, WritingModesExtension, WordCountExtension, FindExtension, SearchHighlightExtension, spellExtension, ...mentionExtension, mentionInfo, FootnotesExtension, picturesExtension, ...movingAround],
     editorProps: {
       attributes: { role: "textbox", "aria-multiline": "true", "aria-label": label, class: "ghw-prose ghw-chapter" },
     },

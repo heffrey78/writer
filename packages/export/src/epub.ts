@@ -7,7 +7,8 @@ import { zip, type ZipEntry } from "./zip.ts";
  * The book as an EPUB 3 e-book: its cover (if it has one), a title page, front matter, a page for each part, a file per
  * chapter, back matter, a navigation document (the table of contents, chapters under their parts)
  * and a small stylesheet. Metadata from novel.yaml; its identifier the novel's ID, so editions of
- * one novel are known as one book.
+ * one novel are known as one book. A chapter's footnotes follow its text as its notes, each reference
+ * linked to its note and back.
  */
 
 export interface EpubOptions {
@@ -48,7 +49,8 @@ export function toEpub(book: CompiledBook, { date = new Date(0), cover, pictures
     const href = `pictures/${path.slice("images/".length).split("/").map(encodeURIComponent).join("/")}`;
     files.set(path, { id: `picture-${files.size + 1}`, href, type: image.type, bytes: image.bytes });
   }
-  const blocks = (list: Block[]) => xhtmlBlocks(list, book.sceneBreak, files);
+  // `seen`: the chapter's notes referred to so far, the first reference to each carrying its anchor.
+  const blocks = (list: Block[], seen = new Set<number>()) => xhtmlBlocks(list, book.sceneBreak, files, seen);
   const add = (page: Omit<Page, "file">) => pages.push({ ...page, file: `${page.id}.xhtml` });
 
   const image = cover && { href: `images/cover.${cover.type === "image/png" ? "png" : "jpg"}`, type: cover.type };
@@ -73,7 +75,8 @@ export function toEpub(book: CompiledBook, { date = new Date(0), cover, pictures
       const title = chapter.part.title !== name ? chapter.part.title : "";
       add({ id: `part-${chapter.part.number}`, title: title ? `${name}: ${title}` : name, toc: true, level: 0, body: `<section epub:type="part" class="part"><h1>${xml(name)}</h1>${title ? `<p class="part-title">${xml(title)}</p>` : ""}</section>` });
     }
-    add({ id: `chapter-${String(chapter.number).padStart(3, "0")}`, title: chapter.heading, toc: true, level: inPart ? 1 : 0, body: `<section epub:type="chapter"><h2>${xml(chapter.heading)}</h2>${blocks(chapter.blocks)}</section>` });
+    const seen = new Set<number>();
+    add({ id: `chapter-${String(chapter.number).padStart(3, "0")}`, title: chapter.heading, toc: true, level: inPart ? 1 : 0, body: `<section epub:type="chapter"><h2>${xml(chapter.heading)}</h2>${blocks(chapter.blocks, seen)}${chapterNotes(chapter.notes, book.sceneBreak, files, seen)}</section>` });
   }
   book.back.forEach((s, i) => add({ id: `back-${i + 1}`, title: s.title, toc: true, level: 0, body: `<section epub:type="backmatter"><h2>${xml(s.title)}</h2>${blocks(s.blocks)}</section>` }));
 
@@ -86,7 +89,7 @@ export function toEpub(book: CompiledBook, { date = new Date(0), cover, pictures
     { path: "META-INF/container.xml", data: container },
     { path: "OEBPS/content.opf", data: opf(book, pages, date, image, [...files.values()]) },
     { path: "OEBPS/nav.xhtml", data: page("Contents", nav(pages)) },
-    { path: "OEBPS/style.css", data: css },
+    { path: "OEBPS/style.css", data: css + (book.chapters.some((c) => c.notes) ? notesCss : "") },
     // Already compressed: stored as it is.
     ...(cover && image ? [{ path: `OEBPS/${image.href}`, data: cover.bytes, store: true }] : []),
     ...[...files.values()].map((f) => ({ path: `OEBPS/${decodeURI(f.href)}`, data: f.bytes, store: true })),
@@ -96,7 +99,7 @@ export function toEpub(book: CompiledBook, { date = new Date(0), cover, pictures
 }
 
 /** Blocks as XHTML: quoted paragraphs and lists together in one blockquote, breaks as the preset's marker. */
-function xhtmlBlocks(list: Block[], sceneBreak: string, pictures: Map<string, PictureFile>): string {
+function xhtmlBlocks(list: Block[], sceneBreak: string, pictures: Map<string, PictureFile>, seen: Set<number>): string {
   let out = "";
   let quote = false;
   for (const b of list) {
@@ -105,30 +108,30 @@ function xhtmlBlocks(list: Block[], sceneBreak: string, pictures: Map<string, Pi
       out += q ? "<blockquote>" : "</blockquote>";
       quote = q;
     }
-    out += xhtmlBlock(b, sceneBreak, pictures);
+    out += xhtmlBlock(b, sceneBreak, pictures, seen);
   }
   return quote ? `${out}</blockquote>` : out;
 }
 
 const alignClass = (a: Align) => (a ? ` class="align-${a}"` : "");
 
-function xhtmlBlock(b: Block, sceneBreak: string, pictures: Map<string, PictureFile>): string {
+function xhtmlBlock(b: Block, sceneBreak: string, pictures: Map<string, PictureFile>, seen: Set<number>): string {
   switch (b.kind) {
     case "paragraph":
-      return `<p>${runs(b.runs)}</p>`;
+      return `<p>${runs(b.runs, seen)}</p>`;
     case "break":
       return `<p class="scene-break" role="separator" aria-label="Scene break">${xml(sceneBreak)}</p>`;
     case "heading":
       // Beneath the chapter's h2: a scene's # is h3.
-      return `<h${b.level + 2} class="scene-heading">${runs(b.runs)}</h${b.level + 2}>`;
+      return `<h${b.level + 2} class="scene-heading">${runs(b.runs, seen)}</h${b.level + 2}>`;
     case "list": {
       const tag = b.ordered ? "ol" : "ul";
       const start = b.ordered && b.start !== 1 ? ` start="${b.start}"` : "";
-      return `<${tag}${start}>${b.items.map((item) => `<li>${item.map((x) => xhtmlBlock(x, sceneBreak, pictures)).join("")}</li>`).join("")}</${tag}>`;
+      return `<${tag}${start}>${b.items.map((item) => `<li>${item.map((x) => xhtmlBlock(x, sceneBreak, pictures, seen)).join("")}</li>`).join("")}</${tag}>`;
     }
     case "table": {
-      const head = b.header.map((cell, i) => `<th scope="col"${alignClass(b.align[i] ?? null)}>${runs(cell)}</th>`).join("");
-      const body = b.rows.map((row) => `<tr>${b.header.map((_, i) => `<td${alignClass(b.align[i] ?? null)}>${runs(row[i] ?? [])}</td>`).join("")}</tr>`).join("");
+      const head = b.header.map((cell, i) => `<th scope="col"${alignClass(b.align[i] ?? null)}>${runs(cell, seen)}</th>`).join("");
+      const body = b.rows.map((row) => `<tr>${b.header.map((_, i) => `<td${alignClass(b.align[i] ?? null)}>${runs(row[i] ?? [], seen)}</td>`).join("")}</tr>`).join("");
       return `<table><thead><tr>${head}</tr></thead>${body ? `<tbody>${body}</tbody>` : ""}</table>`;
     }
     case "image": {
@@ -141,9 +144,22 @@ function xhtmlBlock(b: Block, sceneBreak: string, pictures: Map<string, PictureF
   }
 }
 
-function runs(list: Run[]): string {
+/** A chapter's notes after its text: each linked back to where it's referred to. */
+function chapterNotes(notes: { number: number; blocks: Block[] }[] | undefined, sceneBreak: string, pictures: Map<string, PictureFile>, seen: Set<number>): string {
+  if (!notes?.length) return "";
+  const items = notes.map((n) => `<li id="note-${n.number}" epub:type="endnote" role="doc-endnote">${xhtmlBlocks(n.blocks, sceneBreak, pictures, seen)}<p class="note-back"><a href="#noteref-${n.number}" role="doc-backlink">Back to the text</a></p></li>`);
+  return `<section epub:type="endnotes" role="doc-endnotes" class="notes"><h3>Notes</h3><ol>${items.join("")}</ol></section>`;
+}
+
+/** Runs as XHTML: a note's reference raised and linked to it, the first one also the anchor it links back to. */
+function runs(list: Run[], seen = new Set<number>()): string {
   return list
     .map((r) => {
+      if (r.note !== undefined) {
+        const id = seen.has(r.note) ? "" : ` id="noteref-${r.note}"`;
+        seen.add(r.note);
+        return `<sup><a${id} href="#note-${r.note}" epub:type="noteref" role="doc-noteref">${xml(r.text)}</a></sup>`;
+      }
       let html = r.text.split("\n").map(xml).join("<br/>");
       if (r.em) html = `<em>${html}</em>`;
       if (r.strong) html = `<strong>${html}</strong>`;
@@ -186,6 +202,15 @@ function opf(book: CompiledBook, pages: Page[], date: Date, image: { href: strin
 
 const container = `<?xml version="1.0" encoding="UTF-8"?>
 <container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>`;
+
+/** For a book with notes: the notes set smaller after the chapter, their way back on a line of its own. */
+const notesCss = `.notes { margin-top: 2em; font-size: 0.9em; }
+.notes h3 { text-align: center; font-weight: normal; }
+.notes ol { padding-left: 1.5em; }
+.notes p, .note-back { text-indent: 0; }
+.note-back { font-size: 0.9em; }
+sup a { text-decoration: none; }
+`;
 
 const css = `body { font-family: serif; line-height: 1.5; margin: 0 5%; }
 h1, h2 { text-align: center; font-weight: normal; margin: 3em 0 1.5em; page-break-before: always; }

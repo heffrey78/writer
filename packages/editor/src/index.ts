@@ -88,3 +88,4 @@ export { SelectFocusExtension } from "./select-focus.ts";
 export { linkCommands, linkNameAtCaret, linkSuggestKey, LinkSuggestExtension, type LinkSuggestOptions } from "./link-suggest.ts";
 export { decoratePinned, PinnedLinesExtension, pinnedLinesKey, refreshPinnedLines, type PinnedLinesOptions } from "./pinned-lines.ts";
 export { IssueMarksExtension, issueMarksKey, ISSUE_MARKS_KEY, refreshIssueMarks, sceneText, sceneTextAt, type AnchoredIssue, type IssueMarksOptions } from "./issue-marks.ts";
+export { FootnotesExtension } from "./footnotes.ts";

@@ -787,3 +787,58 @@
   color: var(--ghw-muted);
   user-select: none;
 }
+
+/* Footnotes (#58): a reference raised, as the page sets it; a note beneath the text, after its label. */
+.ghw-footnote-ref {
+  position: relative;
+  font-size: 0.7em;
+  line-height: 1;
+  padding: 0 0.1em;
+  color: var(--ghw-accent);
+  font-family: var(--ghw-ui-font, system-ui, sans-serif);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ghw-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.ghw-prose .ghw-footnote {
+  display: flex;
+  gap: 0.6em;
+  margin: 0.5em 0;
+  padding-top: 0.5em;
+  border-top: 1px solid var(--ghw-rule);
+  font-size: 0.85em;
+  color: var(--ghw-ink);
+}
+
+.ghw-prose .ghw-footnote + .ghw-footnote {
+  border-top: none;
+  padding-top: 0;
+}
+
+.ghw-footnote-label {
+  flex: none;
+  min-width: 1.2em;
+  color: var(--ghw-accent);
+  font-family: var(--ghw-ui-font, system-ui, sans-serif);
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+}
+
+.ghw-footnote-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.ghw-footnote-text p {
+  margin: 0;
+}

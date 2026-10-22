@@ -117,7 +117,7 @@ describe("unedited round-trip", () => {
   });
 
   test("arbitrary Markdown round-trips unedited", () => {
-    const unit = fc.constantFrom(..."ab \n\n\n\t*_[]()#>-+=`~|!<&\\:.1".split(""), "#char_7f3k2q", "\r\n", "    ", "http://x.y");
+    const unit = fc.constantFrom(..."ab \n\n\n\t*_[]()#>-+=`~|!<&\\:.1".split(""), "#char_7f3k2q", "\r\n", "    ", "http://x.y", "[^1]", "[^1]: ");
     fc.assert(fc.property(fc.string({ unit, maxLength: 80 }), (md) => roundTrip(md) === md), { numRuns: Number(process.env.FUZZ_RUNS ?? 3000) });
   }, Number(process.env.FUZZ_TIMEOUT ?? 120_000));
 });
@@ -338,6 +338,8 @@ describe("canonical serialization", () => {
     { weight: 6, arbitrary: fc.tuple(text, markSet, href).map(([t, marks, h]) => schema.text(t, marks.map((m) => (m === "link" ? schema.marks.link!.create({ href: h }) : schema.marks[m]!.create())))) },
     { weight: 1, arbitrary: fc.constant(schema.nodes.hard_break!.create()) },
     { weight: 1, arbitrary: fc.tuple(fc.constantFrom("Ada", "Ben *Varn*", "a]b"), fc.subarray(["em", "strong"] as const)).map(([label, marks]) => schema.nodes.mention!.create({ id: "char_7f3k2q", label }, null, marks.map((m) => schema.marks[m]!.create()))) },
+    // A footnote's reference (#58): the document gets its note.
+    { weight: 1, arbitrary: fc.constant(schema.nodes.footnote_ref!.create({ label: "1" })) },
   );
   const paragraph = fc.array(inline, { maxLength: 8 }).map((content) => schema.nodes.paragraph!.create(null, content));
   const blockArb: fc.Arbitrary<Node> = fc.oneof(
@@ -377,7 +379,11 @@ describe("canonical serialization", () => {
     .tuple(fc.constantFrom("A map", "Ada [age 9]", "x"), fc.option(fc.constantFrom("The valley", 'a "quote"', "x)y"), { nil: null }))
     .map(([alt, caption]) => schema.nodes.picture!.create({ url: "/images/map.jpg", alt, caption }));
   const richArb = fc.oneof({ weight: 4, arbitrary: blockArb }, heading, list, table, picture);
-  const docArb = fc.array(richArb, { minLength: 1, maxLength: 5 }).map((blocks) => schema.nodes.doc!.create(null, blocks));
+  const docArb = fc.tuple(fc.array(richArb, { minLength: 1, maxLength: 5 }), fc.array(paragraph, { minLength: 1, maxLength: 2 })).map(([blocks, note]) => {
+    let referred = false;
+    for (const b of blocks) b.descendants((n) => void (n.type.name === "footnote_ref" && (referred = true)));
+    return schema.nodes.doc!.create(null, referred ? [...blocks, schema.nodes.footnote!.create({ label: "1" }, note)] : blocks);
+  });
 
   /**
    * What a document means in Markdown: per paragraph, each character with its marks, breaks and
@@ -394,6 +400,7 @@ describe("canonical serialization", () => {
         const marks = child.marks.map((m) => m.type.name + (m.attrs.href ?? "")).join(",");
         if (child.type.name === "hard_break") lines.push([]);
         else if (child.type.name === "mention") lines.at(-1)!.push(`@${child.attrs.id}:${child.attrs.label}|${marks}`);
+        else if (child.type.name === "footnote_ref") lines.at(-1)!.push(`^${child.attrs.label}|${marks}`);
         else for (const ch of child.text!) lines.at(-1)!.push(ch === " " ? `${ch}|${visible(child.marks)}` : `${ch}|${marks}`);
       });
       const isSpace = (t: string | undefined) => t?.[0] === " " && t[1] === "|";

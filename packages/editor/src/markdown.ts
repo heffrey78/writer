@@ -19,6 +19,8 @@ import { proseSchema } from "./schema.ts";
  *
  * Headings, lists, tables and pictures on a line of their own are modelled too (D10): edited, they're
  * written with `#` headings, `-` bullets, `1.` numbering, aligned `|` tables and `![alt](src "caption")`.
+ * So are footnotes (#58): a reference `[^label]`, and a definition of paragraphs, `[^label]: …` with
+ * any after the first indented four spaces.
  *
  * Markdown the schema doesn't model is never dropped: unknown blocks become raw_block and
  * unknown inline syntax becomes raw_inline, both saved verbatim.
@@ -149,6 +151,13 @@ function block(node: Nodes, markdown: string, schema: Schema, nested: boolean): 
       );
       return schema.nodes.table!.create(null, rows);
     }
+    case "footnoteDefinition": {
+      // Paragraphs only, and only at the top: anything else stays raw.
+      if (nested) throw new Unsupported();
+      const children = node.children.map((c) => block(c, markdown, schema, true));
+      if (children.some((c) => c.type.name !== "paragraph")) throw new Unsupported();
+      return schema.nodes.footnote!.create({ label: node.label ?? node.identifier }, children.length ? children : [schema.nodes.paragraph!.create()]);
+    }
     default:
       throw new Unsupported();
   }
@@ -184,6 +193,9 @@ function inlines(nodes: PhrasingContent[], marks: readonly Mark[], markdown: str
         continue;
       case "break":
         out.push(schema.nodes.hard_break!.create(null, null, marks));
+        continue;
+      case "footnoteReference":
+        out.push(schema.nodes.footnote_ref!.create({ label: n.label ?? n.identifier }, null, marks));
         continue;
       case "link": {
         const mention = MENTION_URL.exec(n.url);
@@ -328,7 +340,11 @@ function canonicalBlock(node: Node, docStyle: Style | null, before?: string): st
     // to-markdown may write the character after a backslash as a character reference (`&#x61;`)
     // so emphasis can flank, which the backslash would then escape. to-markdown already escapes
     // a backslash before ASCII punctuation; escape it before anything else too.
-    unsafe: [{ character: "\\", after: "[^!-/:-@\\[-`{-~]" }],
+    unsafe: [
+      { character: "\\", after: "[^!-/:-@\\[-`{-~]" },
+      // A footnote's reference then a colon, starting a block, would read back as its definition.
+      { character: ":", before: "\\]" },
+    ],
     ...(style.spaces ? { handlers: { break: spacesBreak } } : {}),
   };
   return toMarkdown({ type: "root", children: [blockToMdast(node)] }, options).replace(/\n$/, "");
@@ -377,6 +393,12 @@ function blockToMdast(node: Node): RootContent {
     }
     case "picture":
       return { type: "paragraph", children: [{ type: "image", url: node.attrs.url, alt: node.attrs.alt, title: node.attrs.caption || null }] };
+    case "footnote": {
+      // A note not yet written is `[^label]:`, which still defines it.
+      const children: BlockContent[] = [];
+      node.forEach((p) => void (isEmpty(p) || children.push(blockToMdast(p) as BlockContent)));
+      return { type: "footnoteDefinition", identifier: String(node.attrs.label).toLowerCase(), label: node.attrs.label, children };
+    }
     default:
       return { type: "html", value: node.textContent };
   }
@@ -493,6 +515,8 @@ function leafToMdast(node: Node): PhrasingContent {
       return { type: "break" };
     case "mention":
       return { type: "link", url: `#${node.attrs.id}`, title: null, children: [{ type: "text", value: node.attrs.label }] };
+    case "footnote_ref":
+      return { type: "footnoteReference", identifier: String(node.attrs.label).toLowerCase(), label: node.attrs.label };
     default:
       return { type: "html", value: node.attrs.text };
   }

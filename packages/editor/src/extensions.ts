@@ -110,7 +110,7 @@ export const Heading = Node.create({
   name: "heading",
   group: "block",
   // A line of text: a Markdown heading can't hold a break.
-  content: "(text | mention | raw_inline)*",
+  content: "(text | mention | raw_inline | footnote_ref)*",
   defining: true,
   addAttributes: () => ({ level: { default: 1, rendered: false, parseHTML: (el) => Math.min(3, Math.max(1, Number(el.tagName.slice(1)) - 1)) }, ...source() }),
   parseHTML: () => [2, 3, 4].map((n) => ({ tag: `h${n}` })),
@@ -269,7 +269,7 @@ export const TableRow = Node.create({
 });
 
 /** Cells hold a line of text: no breaks, which a GitHub table cell can't. */
-const CELL_CONTENT = "(text | mention | raw_inline)*";
+const CELL_CONTENT = "(text | mention | raw_inline | footnote_ref)*";
 
 export const TableHeader = Node.create({
   name: "table_header",
@@ -323,7 +323,7 @@ export const Picture = Node.create<PictureOptions>({
   },
 });
 
-/** Markdown the editor doesn't model (code, HTML, footnotes…), edited as plain Markdown text. */
+/** Markdown the editor doesn't model (code, HTML…), edited as plain Markdown text. */
 export const RawBlock = Node.create({
   name: "raw_block",
   group: "block",
@@ -388,6 +388,49 @@ export const RawInline = Node.create({
     node.attrs.text,
   ],
   renderText: ({ node }) => node.attrs.text,
+});
+
+/**
+ * A footnote's reference, `[^label]`: its label raised, as the page will set it. An atom, like a
+ * mention; its text is the note's (Footnote), so it says nothing to a word count or a search.
+ */
+export const FootnoteRef = Node.create({
+  name: "footnote_ref",
+  inline: true,
+  group: "inline",
+  atom: true,
+  selectable: false,
+  addAttributes: () => ({ label: { default: "", rendered: false, parseHTML: (el) => el.getAttribute("data-footnote") ?? "" } }),
+  parseHTML: () => [{ tag: "sup[data-footnote]" }],
+  // Heard as "Footnote 1", seen as its number raised.
+  renderHTML: ({ node, HTMLAttributes }) => [
+    "sup",
+    mergeAttributes(HTMLAttributes, { "data-footnote": node.attrs.label, class: "ghw-footnote-ref", title: "Go to the footnote" }),
+    ["span", { class: "ghw-visually-hidden" }, "Footnote "],
+    node.attrs.label,
+  ],
+  renderText: () => "",
+});
+
+/**
+ * A footnote's text, `[^label]: …` beneath the prose: its paragraphs, written like any other, after
+ * its label (which goes back to where it's referred to). Definitions with more than paragraphs in
+ * them stay raw Markdown.
+ */
+export const Footnote = Node.create({
+  name: "footnote",
+  group: "block",
+  content: "paragraph+",
+  defining: true,
+  isolating: true,
+  addAttributes: () => ({ label: { default: "", rendered: false, parseHTML: (el) => el.getAttribute("data-footnote") ?? "" }, ...source() }),
+  parseHTML: () => [{ tag: "aside[data-footnote]", contentElement: ".ghw-footnote-text" }],
+  renderHTML: ({ node, HTMLAttributes }) => [
+    "aside",
+    mergeAttributes(HTMLAttributes, { "data-footnote": node.attrs.label, class: "ghw-footnote", role: "doc-footnote", "aria-label": `Footnote ${node.attrs.label}` }),
+    ["span", { class: "ghw-footnote-label", contenteditable: "false", title: "Back to the text" }, node.attrs.label],
+    ["div", { class: "ghw-footnote-text" }, 0],
+  ],
 });
 
 // Marks, in nesting order when serializing: links wrap emphasis, emphasis wraps strong.
@@ -457,9 +500,11 @@ export const proseContent = [
   TableCell,
   Picture,
   RawBlock,
+  Footnote,
   HardBreak,
   Mention,
   RawInline,
+  FootnoteRef,
   Link,
   Emphasis,
   Strong,

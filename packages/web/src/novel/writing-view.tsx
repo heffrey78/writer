@@ -316,6 +316,17 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
     useIssuePanel.setState({ numbers: [], editor: undefined });
     useRaise.getState().open(passage, editor);
   };
+  // Footnotes (#58), from the palette as by their keys: a new one where the caret is, or between a note and its place.
+  useCommands(
+    () =>
+      editor
+        ? [
+            { id: "writing.footnote", title: "Add a footnote", group: "Writing", keys: "Mod-Alt-f", keywords: ["note", "reference", "citation"], run: () => void editor.chain().focus().addFootnote().run() },
+            { id: "writing.followFootnote", title: "Go to the footnote, or back to the text", group: "Writing", keywords: ["note", "reference"], run: () => void editor.chain().focus().followFootnote().run() },
+          ]
+        : [],
+    [editor],
+  );
   useCommands(
     () => (repo ? [{ id: "writing.raiseIssue", title: "Raise an issue about the selection…", group: "GitHub", keywords: ["note", "plot hole", "continuity", "research", "github"], run: raiseFromSelection }] : []),
     [repo, editor, novel],

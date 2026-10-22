@@ -1,4 +1,4 @@
-import type { Nodes, PhrasingContent, Root } from "mdast";
+import type { FootnoteDefinition, Nodes, PhrasingContent, Root } from "mdast";
 import { fromMarkdown } from "mdast-util-from-markdown";
 import { gfmFromMarkdown } from "mdast-util-gfm";
 import { toString } from "mdast-util-to-string";
@@ -23,6 +23,11 @@ export interface Run {
   text: string;
   em?: boolean;
   strong?: boolean;
+  /**
+   * A footnote's reference: its number in the chapter's notes, which `text` also holds, so a format
+   * that doesn't set notes still shows it.
+   */
+  note?: number;
 }
 
 export type Align = "left" | "center" | "right" | null;
@@ -40,6 +45,12 @@ export type Block =
   /** A picture on a line of its own: its repository path (images/…), alt text and caption. */
   | { kind: "image"; path: string; alt: string; caption?: string };
 
+/** A footnote: its number in its chapter, and its text. */
+export interface ChapterNote {
+  number: number;
+  blocks: Block[];
+}
+
 export interface CompiledChapter {
   id: string;
   /** Its number in the whole book (a range keeps the numbers), and its heading as the preset has it. */
@@ -48,6 +59,8 @@ export interface CompiledChapter {
   /** The part it opens, when it's the first chapter of one: its heading as the layout has it ("Part One"), which may be its title. */
   part?: { id: string; title: string; number: number; heading: string };
   blocks: Block[];
+  /** Its footnotes, numbered from 1 in the order they're first referred to; none, for a chapter without them. */
+  notes?: ChapterNote[];
 }
 
 /** Front or back matter: a page with a title (its first heading) and its text. */
@@ -166,10 +179,11 @@ export async function compileBook(novel: Book, source: Pick<FileSource, "read">,
   for (let i = first; i <= last; i++) {
     const chapter = chapters[i]!;
     const blocks: Block[] = [];
+    const notes: ChapterNote[] = [];
     for (const sceneId of chapter.childIds) {
       const scene = byId.get(sceneId);
       if (!scene) continue;
-      const body = prose(scene.body);
+      const body = prose(scene.body, notes);
       if (novel.kind.piece.headed) {
         // A headed piece (a section) is set apart by its title, even before it's written.
         blocks.push({ kind: "heading", level: 1, runs: [{ text: scene.title }] }, ...trimBreaks(body));
@@ -190,6 +204,7 @@ export async function compileBook(novel: Book, source: Pick<FileSource, "read">,
       heading: layout.heading({ preset, number: i + 1, title: chapter.title, level: w.level(chapter.level) }),
       ...(opensPart ? { part: { id: part.id, title: part.title ?? "", number: part.number, heading: layout.partHeading({ number: part.number, title: part.title, level: w.level(part.level) }) } } : {}),
       blocks,
+      ...(notes.length ? { notes } : {}),
     });
   }
 
@@ -231,10 +246,33 @@ function section(text: string, path: string): Matter {
   return { title, blocks: trimBreaks(tree.children.filter((_, i) => i !== first).flatMap((n) => blocks(n, false))) };
 }
 
-/** A scene body's blocks. */
-function prose(markdown: string): Block[] {
-  return mdast(markdown).children.flatMap((n) => blocks(n, false));
+/**
+ * A scene body's blocks. Its footnotes join the chapter's `notes`, numbered on from them as each is
+ * first referred to; their definitions aren't part of the text. Without `notes` (front and back
+ * matter), footnotes are left out.
+ */
+function prose(markdown: string, notes?: ChapterNote[]): Block[] {
+  const tree = mdast(markdown);
+  const defined = new Map<string, FootnoteDefinition>();
+  for (const n of tree.children) if (n.type === "footnoteDefinition") defined.set(n.identifier, n);
+  const numbers = new Map<string, number>();
+  const refer = (identifier: string): number | undefined => {
+    const known = numbers.get(identifier);
+    if (known !== undefined || !notes) return known;
+    const definition = defined.get(identifier);
+    if (!definition) return undefined;
+    const note: ChapterNote = { number: notes.length + 1, blocks: [] };
+    numbers.set(identifier, note.number);
+    notes.push(note);
+    // A note may refer to another; numbered first, so one that refers to itself ends.
+    note.blocks = trimBreaks(definition.children.flatMap((c) => blocks(c, false, refer)));
+    return note.number;
+  };
+  return tree.children.filter((n) => n.type !== "footnoteDefinition").flatMap((n) => blocks(n, false, refer));
 }
+
+/** A footnote's number in its chapter, as it's referred to: undefined where footnotes aren't set. */
+type Refer = (identifier: string) => number | undefined;
 
 function mdast(markdown: string): Root {
   return fromMarkdown(markdown.replace(/\r\n?/g, "\n"), { extensions: [gfm()], mdastExtensions: [gfmFromMarkdown()] });
@@ -251,39 +289,42 @@ function trimBreaks(list: Block[]): Block[] {
   return out;
 }
 
-function blocks(node: Nodes, quote: boolean): Block[] {
+function blocks(node: Nodes, quote: boolean, refer?: Refer): Block[] {
   switch (node.type) {
     case "paragraph": {
       const picture = pictureOf(node.children);
       if (picture) return [picture];
-      const runs = merge(inline(node.children, {}));
+      const runs = merge(inline(node.children, {}, refer));
       return runs.length ? [{ kind: "paragraph", runs, ...(quote ? { quote: true } : {}) }] : [];
     }
     case "blockquote":
-      return node.children.flatMap((c) => blocks(c, true));
+      return node.children.flatMap((c) => blocks(c, true, refer));
     case "thematicBreak":
       return [{ kind: "break" }];
     case "html":
       // Hidden notes (<!-- … -->) and other raw HTML aren't the story.
       return [];
     case "heading": {
-      const runs = merge(inline(node.children, {}));
+      const runs = merge(inline(node.children, {}, refer));
       return runs.length ? [{ kind: "heading", level: Math.min(node.depth, 3) as 1 | 2 | 3, runs }] : [];
     }
     case "list": {
-      const items = node.children.map((item) => item.children.flatMap((c) => blocks(c, false))).filter((item) => item.length);
+      const items = node.children.map((item) => item.children.flatMap((c) => blocks(c, false, refer))).filter((item) => item.length);
       return items.length ? [{ kind: "list", ordered: !!node.ordered, start: node.start ?? 1, items, ...(quote ? { quote: true } : {}) }] : [];
     }
     case "table": {
-      const [head, ...body] = node.children.map((row) => row.children.map((cell) => merge(inline(cell.children, {}))));
+      const [head, ...body] = node.children.map((row) => row.children.map((cell) => merge(inline(cell.children, {}, refer))));
       return head ? [{ kind: "table", align: (node.align ?? []).map((a) => a ?? null), header: head, rows: body }] : [];
     }
     case "code": {
       const text = toString(node).trim();
       return text ? [{ kind: "paragraph", runs: [{ text }], ...(quote ? { quote: true } : {}) }] : [];
     }
+    case "footnoteDefinition":
+      // A note's text is the note's, not the page's.
+      return [];
     default:
-      return "children" in node ? (node.children as Nodes[]).flatMap((c) => blocks(c, quote)) : [];
+      return "children" in node ? (node.children as Nodes[]).flatMap((c) => blocks(c, quote, refer)) : [];
   }
 }
 
@@ -338,7 +379,7 @@ export function flatBlocks(list: Block[]): Extract<Block, { kind: "paragraph" | 
 /** Soft line breaks (hard-wrapped prose) read as spaces, as in the editor. */
 const unwrap = (text: string) => text.replace(/[ \t]*\n[ \t]*/g, " ");
 
-function inline(nodes: PhrasingContent[], style: { em?: boolean; strong?: boolean }): Run[] {
+function inline(nodes: PhrasingContent[], style: { em?: boolean; strong?: boolean }, refer?: Refer): Run[] {
   const out: Run[] = [];
   for (const n of nodes) {
     switch (n.type) {
@@ -346,10 +387,10 @@ function inline(nodes: PhrasingContent[], style: { em?: boolean; strong?: boolea
         out.push({ text: unwrap(n.value), ...style });
         break;
       case "emphasis":
-        out.push(...inline(n.children, { ...style, em: true }));
+        out.push(...inline(n.children, { ...style, em: true }, refer));
         break;
       case "strong":
-        out.push(...inline(n.children, { ...style, strong: true }));
+        out.push(...inline(n.children, { ...style, strong: true }, refer));
         break;
       case "break":
         out.push({ text: "\n", ...style });
@@ -358,29 +399,34 @@ function inline(nodes: PhrasingContent[], style: { em?: boolean; strong?: boolea
       case "linkReference":
       case "delete":
         // A mention ([Ada](#char_…)) or a link: its words.
-        out.push(...inline(n.children, style));
+        out.push(...inline(n.children, style, refer));
         break;
+      case "footnoteReference": {
+        const number = refer?.(n.identifier);
+        if (number !== undefined) out.push({ text: String(number), note: number });
+        break;
+      }
       case "inlineCode":
         out.push({ text: n.value, ...style });
         break;
       case "html":
         break;
       default:
-        if ("children" in n) out.push(...inline(n.children as PhrasingContent[], style));
+        if ("children" in n) out.push(...inline(n.children as PhrasingContent[], style, refer));
         else if ("value" in n && typeof n.value === "string") out.push({ text: n.value, ...style });
     }
   }
   return out;
 }
 
-/** Neighbouring runs in the same style as one; empty ones gone; the paragraph's ends trimmed. */
+/** Neighbouring runs in the same style as one (a note's reference on its own); empty ones gone; the paragraph's ends trimmed. */
 function merge(runs: Run[]): Run[] {
   const out: Run[] = [];
   for (const r of runs) {
     if (!r.text) continue;
     const last = out.at(-1);
-    if (last && !!last.em === !!r.em && !!last.strong === !!r.strong) last.text += r.text;
-    else out.push({ text: r.text, ...(r.em ? { em: true } : {}), ...(r.strong ? { strong: true } : {}) });
+    if (last && !last.note && !r.note && !!last.em === !!r.em && !!last.strong === !!r.strong) last.text += r.text;
+    else out.push({ text: r.text, ...(r.em ? { em: true } : {}), ...(r.strong ? { strong: true } : {}), ...(r.note ? { note: r.note } : {}) });
   }
   if (out.length) {
     out[0]!.text = out[0]!.text.replace(/^\s+/, "");

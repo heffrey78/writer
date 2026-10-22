@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import nodeZlib from "node:zlib";
-import { type Block, type CompiledBook, type Run } from "@writer/core";
+import { flatBlocks, type Block, type CompiledBook, type Run } from "@writer/core";
 import { zlibSync } from "fflate";
 import * as fontkit from "fontkit";
 import PDFDocument from "pdfkit";
@@ -14,8 +14,9 @@ import { pdfCover, type CoverImage } from "./cover.ts";
  * running header and page at the top right; each chapter on a new page, its heading a third of the
  * way down; scene breaks centred. The book's layout (#32) gives the headings, the title page, the
  * running header, the spacing and the end mark: in standard manuscript format double-spaced,
- * Surname / SHORT TITLE / page, and "THE END". The type is Liberation Serif (SIL Open Font
- * License), metric-compatible with Times New Roman, embedded (only the letters used).
+ * Surname / SHORT TITLE / page, and "THE END". A chapter's footnotes follow its text as its notes,
+ * their references raised. The type is Liberation Serif (SIL Open Font License), metric-compatible
+ * with Times New Roman, embedded (only the letters used).
  */
 
 /** The four faces of the type, as TrueType data. */
@@ -130,9 +131,11 @@ export function toPdf(book: CompiledBook, { date = new Date(0), fonts = defaultF
       const f = face(r);
       check(r.text, f);
       const continued = i < runs.length - 1;
+      // A note's reference in the type's own superscript figures.
+      const features = r.note !== undefined ? { features: ["sups" as const] } : {};
       // The paragraph's first run places it; the rest carry on along the line (given no position).
-      if (i === 0) doc.font(f).text(r.text, x, doc.y, { width, indent, align, continued });
-      else doc.font(f).text(r.text, { continued });
+      if (i === 0) doc.font(f).text(r.text, x, doc.y, { width, indent, align, continued, ...features });
+      else doc.font(f).text(r.text, { continued, ...features });
     });
   };
   const paragraph = (runs: Run[], quote: boolean) =>
@@ -257,6 +260,23 @@ export function toPdf(book: CompiledBook, { date = new Date(0), fonts = defaultF
     blocks(list);
   };
   for (const s of book.front) section(s.title, s.blocks);
+  // A chapter's notes after its text: smaller and single-spaced, each opening with its number.
+  const NOTE_SIZE = 10;
+  const notes = (list: { number: number; blocks: Block[] }[]) => {
+    doc.y += LINE / 2;
+    room(3 * LINE);
+    centred("Notes");
+    doc.fontSize(NOTE_SIZE).lineGap(single);
+    for (const note of list) {
+      const paragraphs = flatBlocks(note.blocks).filter((b) => b.kind === "paragraph");
+      paragraphs.forEach((b, i) => {
+        room(NOTE_SIZE * 2);
+        text(i === 0 ? [{ text: `${note.number}. ` }, ...b.runs] : b.runs, { indent: 0 });
+      });
+      doc.y += NOTE_SIZE / 2;
+    }
+    doc.fontSize(SIZE).lineGap(gap);
+  };
   for (const chapter of book.chapters) {
     if (chapter.part) {
       newPage(third);
@@ -264,6 +284,7 @@ export function toPdf(book: CompiledBook, { date = new Date(0), fonts = defaultF
       if (chapter.part.title && chapter.part.title !== chapter.part.heading) centred(chapter.part.title);
     }
     section(chapter.heading, chapter.blocks);
+    if (chapter.notes?.length) notes(chapter.notes);
   }
   if (book.chapters.length && book.end) {
     doc.y += LINE / 2;

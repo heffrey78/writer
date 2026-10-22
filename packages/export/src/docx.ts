@@ -1,4 +1,4 @@
-import { bookImages, type Align, type Block, type CompiledBook, type Run } from "@writer/core";
+import { bookImages, flatBlocks, type Align, type Block, type CompiledBook, type Run } from "@writer/core";
 import type { CoverImage } from "./cover.ts";
 import { isoSeconds, xml } from "./xml.ts";
 import { zip } from "./zip.ts";
@@ -11,7 +11,8 @@ import { zip } from "./zip.ts";
  * third of the way down; scene breaks as the preset's marker, centred. The book's layout (#32) gives
  * the headings, the title page, the running header, the spacing and the end mark: standard manuscript
  * format (the conventions agents and editors ask for) double-spaces, heads the pages Surname / SHORT
- * TITLE / page, and ends with "THE END".
+ * TITLE / page, and ends with "THE END". Footnotes are Word's own, at the foot of their page, numbered
+ * through the document as Word numbers them; a book without them has none of their parts.
  */
 
 export interface DocxOptions {
@@ -28,6 +29,10 @@ interface Parts {
   /** The pictures embedded, in order: their file in word/media and its relationship. */
   media: { path: string; file: string; rel: string; image: CoverImage }[];
   pictures: Map<string, CoverImage>;
+  /** The footnotes, in order, as WordprocessingML: footnote i has the ID i + 1 (-1 and 0 are the separators). */
+  footnotes: string[];
+  /** The open chapter's notes: each one's number in the chapter, to its footnote's ID. */
+  noteIds: Map<number, number>;
 }
 
 const W = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"';
@@ -38,7 +43,7 @@ const TEXT_WIDTH = PAGE.width - 2 * INCH;
 
 export function toDocx(book: CompiledBook, { date = new Date(0), pictures = new Map() }: DocxOptions = {}): Uint8Array {
   const body: string[] = [];
-  const parts: Parts = { lists: [], media: [], pictures };
+  const parts: Parts = { lists: [], media: [], pictures, footnotes: [], noteIds: new Map() };
   // Pictures embedded in the order they're first shown, each once.
   for (const path of bookImages(book)) {
     const image = pictures.get(path);
@@ -69,8 +74,16 @@ export function toDocx(book: CompiledBook, { date = new Date(0), pictures = new 
     }
     pageBreak();
     body.push(p("Heading1", runs([{ text: chapter.heading }])));
+    // Its notes become footnotes first, so the text's references know their IDs.
+    parts.noteIds = new Map();
+    for (const note of chapter.notes ?? []) {
+      const id = parts.footnotes.length + 1;
+      parts.noteIds.set(note.number, id);
+      parts.footnotes.push(footnote(id, note.blocks));
+    }
     body.push(...blocks(chapter.blocks, book.sceneBreak));
   }
+  parts.noteIds = new Map();
   if (book.chapters.length && book.end) body.push(p("TheEnd", runs([{ text: book.end }])));
   for (const section of book.back) {
     pageBreak();
@@ -78,6 +91,7 @@ export function toDocx(book: CompiledBook, { date = new Date(0), pictures = new 
     body.push(...blocks(section.blocks, book.sceneBreak));
   }
 
+  const notes = parts.footnotes.length > 0;
   const sectPr = `<w:sectPr><w:headerReference w:type="default" r:id="rIdHeader"/><w:headerReference w:type="first" r:id="rIdHeaderFirst"/><w:pgSz w:w="${PAGE.width}" w:h="${PAGE.height}"/><w:pgMar w:top="${INCH}" w:right="${INCH}" w:bottom="${INCH}" w:left="${INCH}" w:header="${INCH / 2}" w:footer="${INCH / 2}" w:gutter="0"/><w:titlePg/></w:sectPr>`;
   const document = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<w:document ${W}><w:body>${body.join("")}${sectPr}</w:body></w:document>`;
   const header = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<w:hdr ${W}><w:p><w:pPr><w:pStyle w:val="Header"/></w:pPr>${runs([{ text: book.runningHead }]).join("")}<w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText xml:space="preserve"> PAGE </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:t>1</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r></w:p></w:hdr>`;
@@ -85,17 +99,18 @@ export function toDocx(book: CompiledBook, { date = new Date(0), pictures = new 
 
   return zip(
     [
-      { path: "[Content_Types].xml", data: contentTypes },
+      { path: "[Content_Types].xml", data: contentTypes(notes) },
       { path: "_rels/.rels", data: packageRels },
       { path: "docProps/core.xml", data: core(book, date) },
       { path: "docProps/app.xml", data: app },
       { path: "word/document.xml", data: document },
-      { path: "word/styles.xml", data: styles(book.language, book.spacing) },
-      { path: "word/settings.xml", data: settings(book.language) },
+      { path: "word/styles.xml", data: styles(book.language, book.spacing, notes) },
+      { path: "word/settings.xml", data: settings(book.language, notes) },
       { path: "word/header1.xml", data: header },
       { path: "word/header2.xml", data: headerFirst },
       { path: "word/numbering.xml", data: numbering(parts.lists) },
-      { path: "word/_rels/document.xml.rels", data: documentRels(parts.media) },
+      ...(notes ? [{ path: "word/footnotes.xml", data: footnotesPart(parts.footnotes) }] : []),
+      { path: "word/_rels/document.xml.rels", data: documentRels(parts.media, notes) },
       // Already compressed: stored as they are.
       ...parts.media.map((m) => ({ path: `word/${m.file}`, data: m.image.bytes, store: true })),
     ],
@@ -113,19 +128,19 @@ function docxBlocks(list: Block[], sceneBreak: string, parts: Parts, depth: numb
   return list.flatMap((b): string[] => {
     switch (b.kind) {
       case "paragraph":
-        return [p(b.quote ? "Quote" : "Normal", runs(b.runs))];
+        return [p(b.quote ? "Quote" : "Normal", runs(b.runs, parts.noteIds))];
       case "break":
         return [p("SceneBreak", runs([{ text: sceneBreak }]))];
       case "heading":
-        return [p(`SceneHeading${b.level}`, runs(b.runs))];
+        return [p(`SceneHeading${b.level}`, runs(b.runs, parts.noteIds))];
       case "list": {
         parts.lists.push({ ordered: b.ordered, start: b.start });
         const numId = parts.lists.length;
         return b.items.flatMap((item) =>
           item.flatMap((x, i) => {
             // An item's first paragraph carries its bullet or number; what follows in it is indented to its text.
-            if (x.kind === "paragraph" && i === 0) return [p("ListParagraph", runs(x.runs), `<w:numPr><w:ilvl w:val="${depth}"/><w:numId w:val="${numId}"/></w:numPr>`)];
-            if (x.kind === "paragraph") return [p("ListParagraph", runs(x.runs), `<w:ind w:left="${(depth + 1) * (INCH / 2)}" w:firstLine="0"/>`)];
+            if (x.kind === "paragraph" && i === 0) return [p("ListParagraph", runs(x.runs, parts.noteIds), `<w:numPr><w:ilvl w:val="${depth}"/><w:numId w:val="${numId}"/></w:numPr>`)];
+            if (x.kind === "paragraph") return [p("ListParagraph", runs(x.runs, parts.noteIds), `<w:ind w:left="${(depth + 1) * (INCH / 2)}" w:firstLine="0"/>`)];
             return docxBlocks([x], sceneBreak, parts, depth + 1);
           }),
         );
@@ -190,16 +205,37 @@ function p(style: string, content: string[], extraPPr = ""): string {
   return `<w:p><w:pPr><w:pStyle w:val="${style}"/>${extraPPr}</w:pPr>${content.join("")}</w:p>`;
 }
 
-/** Runs as WordprocessingML: italic and bold as such, a "\n" in the text as a line break. */
-function runs(list: Run[]): string[] {
+/**
+ * Runs as WordprocessingML: italic and bold as such, a "\n" in the text as a line break, a note's
+ * reference as its footnote's (by `noteIds`), or where it has none (in a footnote) its number raised.
+ */
+function runs(list: Run[], noteIds?: Map<number, number>): string[] {
   return list.map((r) => {
+    const id = r.note === undefined ? undefined : noteIds?.get(r.note);
+    if (id !== undefined) return `<w:r><w:rPr><w:rStyle w:val="FootnoteReference"/></w:rPr><w:footnoteReference w:id="${id}"/></w:r>`;
+    if (r.note !== undefined) return `<w:r><w:rPr><w:vertAlign w:val="superscript"/></w:rPr><w:t>${xml(r.text)}</w:t></w:r>`;
     const props = r.em || r.strong ? `<w:rPr>${r.strong ? "<w:b/>" : ""}${r.em ? "<w:i/>" : ""}</w:rPr>` : "";
     const parts = r.text.split("\n").map((t) => `<w:t xml:space="preserve">${xml(t)}</w:t>`);
     return `<w:r>${props}${parts.join("<w:br/>")}</w:r>`;
   });
 }
 
-function styles(language: string, spacing: number): string {
+/** A footnote: its text's paragraphs (lists and tables flattened), the first opening with its number. */
+function footnote(id: number, blocks: Block[]): string {
+  const paragraphs = flatBlocks(blocks).filter((b) => b.kind === "paragraph");
+  const body = (paragraphs.length ? paragraphs : [{ kind: "paragraph" as const, runs: [] }]).map((b, i) =>
+    p("FootnoteText", [...(i === 0 ? ['<w:r><w:rPr><w:rStyle w:val="FootnoteReference"/></w:rPr><w:footnoteRef/></w:r>', '<w:r><w:t xml:space="preserve"> </w:t></w:r>'] : []), ...runs(b.runs)]),
+  );
+  return `<w:footnote w:id="${id}">${body.join("")}</w:footnote>`;
+}
+
+/** The footnotes part: the separator lines Word draws above them, then each footnote. */
+function footnotesPart(footnotes: string[]): string {
+  const separator = (id: number, type: string, mark: string) => `<w:footnote w:type="${type}" w:id="${id}"><w:p><w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/></w:pPr><w:r><w:${mark}/></w:r></w:p></w:footnote>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<w:footnotes ${W}>${separator(-1, "separator", "separator")}${separator(0, "continuationSeparator", "continuationSeparator")}${footnotes.join("")}</w:footnotes>`;
+}
+
+function styles(language: string, spacing: number, notes = false): string {
   // Double-spaced (manuscript format): 480, twice the single line's 240.
   const line = Math.round(240 * spacing);
   const paragraph = (id: string, name: string, pPr: string, rPr = "", extra = "") =>
@@ -226,22 +262,29 @@ function styles(language: string, spacing: number): string {
     paragraph("Caption", "caption", `<w:spacing w:line="240" w:lineRule="auto"/>${centred}`),
     paragraph("TheEnd", "The end", `<w:spacing w:before="${INCH / 2}"/>${centred}`),
     paragraph("Header", "header", '<w:spacing w:line="240" w:lineRule="auto"/><w:ind w:firstLine="0"/><w:jc w:val="right"/>'),
+    // A book with footnotes: their text single-spaced at 10 pt, their numbers raised.
+    ...(notes
+      ? [
+          paragraph("FootnoteText", "footnote text", '<w:spacing w:line="240" w:lineRule="auto"/><w:ind w:firstLine="0"/>', '<w:sz w:val="20"/><w:szCs w:val="20"/>'),
+          '<w:style w:type="character" w:styleId="FootnoteReference"><w:name w:val="footnote reference"/><w:rPr><w:vertAlign w:val="superscript"/></w:rPr></w:style>',
+        ]
+      : []),
   ].join("")}</w:styles>`;
 }
 
-const settings = (language: string) =>
-  `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<w:settings ${W}><w:defaultTabStop w:val="720"/><w:characterSpacingControl w:val="doNotCompress"/><w:themeFontLang w:val="${xml(language)}"/><w:compat><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"/></w:compat></w:settings>`;
+const settings = (language: string, notes = false) =>
+  `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<w:settings ${W}><w:defaultTabStop w:val="720"/><w:characterSpacingControl w:val="doNotCompress"/>${notes ? '<w:footnotePr><w:footnote w:id="-1"/><w:footnote w:id="0"/></w:footnotePr>' : ""}<w:themeFontLang w:val="${xml(language)}"/><w:compat><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"/></w:compat></w:settings>`;
 
 const core = (book: CompiledBook, date: Date) =>
   `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>${xml(book.title)}</dc:title><dc:creator>${xml(book.author)}</dc:creator><dc:language>${xml(book.language)}</dc:language><dcterms:created xsi:type="dcterms:W3CDTF">${isoSeconds(date)}</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">${isoSeconds(date)}</dcterms:modified></cp:coreProperties>`;
 
 const app = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Application>Writer</Application></Properties>`;
 
-const contentTypes = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="jpg" ContentType="image/jpeg"/><Default Extension="png" ContentType="image/png"/><Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/><Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/><Override PartName="/word/header2.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/></Types>`;
+const contentTypes = (notes: boolean) => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="jpg" ContentType="image/jpeg"/><Default Extension="png" ContentType="image/png"/><Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/><Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/><Override PartName="/word/header2.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>${notes ? '<Override PartName="/word/footnotes.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml"/>' : ""}<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/></Types>`;
 
 const packageRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/></Relationships>`;
 
-const documentRels = (media: Parts["media"]) => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdStyles" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rIdSettings" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/><Relationship Id="rIdNumbering" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/><Relationship Id="rIdHeader" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/><Relationship Id="rIdHeaderFirst" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header2.xml"/>${media.map((m) => `<Relationship Id="${m.rel}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="${m.file}"/>`).join("")}</Relationships>`;
+const documentRels = (media: Parts["media"], notes: boolean) => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdStyles" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rIdSettings" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/><Relationship Id="rIdNumbering" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/><Relationship Id="rIdHeader" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/><Relationship Id="rIdHeaderFirst" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header2.xml"/>${notes ? '<Relationship Id="rIdFootnotes" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes" Target="footnotes.xml"/>' : ""}${media.map((m) => `<Relationship Id="${m.rel}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="${m.file}"/>`).join("")}</Relationships>`;

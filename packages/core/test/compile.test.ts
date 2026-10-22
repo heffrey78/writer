@@ -88,6 +88,30 @@ describe("compiling the manuscript", () => {
     expect(book.titlePage.wordCount).toBe(`about ${(Math.round(book.words / 100) * 100).toLocaleString("en-US")} words`);
   });
 
+  it("takes footnotes as the chapter's notes, numbered as they're first referred to, their text out of the page (#58)", async () => {
+    const BRIDGE = "manuscript/01-return/01-arrival/02-the-bridge.md";
+    const withBody = (path: string, body: string) => sample[path]!.replace(/\n---\n[\s\S]*$/, `\n---\n${body}`);
+    const { novel, source } = await open({
+      // Each file's labels are its own: both say [^1].
+      [STATION]: withBody(STATION, "The clock ran fast.[^1] It always had.[^1] *Twelve* years.[^n]\n\n[^1]: Four minutes, by the station master's watch.\n\n[^n]: See also[^1].\n"),
+      [BRIDGE]: withBody(BRIDGE, "Nine piers.[^1]\n\n[^1]: Counted from the town side.\n\n    Twice.\n"),
+    });
+    const book = await compileBook(novel, source);
+    const [first, ...rest] = book.chapters;
+    expect(first!.blocks.slice(0, 1)).toEqual([
+      { kind: "paragraph", runs: [{ text: "The clock ran fast." }, { text: "1", note: 1 }, { text: " It always had." }, { text: "1", note: 1 }, { text: " " }, { text: "Twelve", em: true }, { text: " years." }, { text: "2", note: 2 }] },
+    ]);
+    expect(first!.notes).toEqual([
+      { number: 1, blocks: [{ kind: "paragraph", runs: [{ text: "Four minutes, by the station master's watch." }] }] },
+      { number: 2, blocks: [{ kind: "paragraph", runs: [{ text: "See also" }, { text: "1", note: 1 }, { text: "." }] }] },
+      { number: 3, blocks: [{ kind: "paragraph", runs: [{ text: "Counted from the town side." }] }, { kind: "paragraph", runs: [{ text: "Twice." }] }] },
+    ]);
+    // The notes' text isn't the page's; chapters without footnotes have no notes.
+    expect(JSON.stringify(first!.blocks)).not.toContain("Four minutes");
+    expect(JSON.stringify(first!.blocks)).not.toContain("[^");
+    expect(rest.every((c) => c.notes === undefined)).toBe(true);
+  });
+
   it("keeps only the story's words: mentions as their words, no IDs, front matter or hidden notes", async () => {
     const { novel, source } = await open();
     const book = await compileBook(novel, source);

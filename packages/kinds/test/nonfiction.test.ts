@@ -65,9 +65,12 @@ describe("the Non-fiction kind", () => {
       { kind: "heading", level: 1, runs: [{ text: "Ten tons an acre" }] },
     ]);
     const line = "more than ten tons of dry earth passed through their bodies";
+    // Its footnote, the chapter's note (#58).
+    expect(compiled.chapters[0]!.notes).toEqual([{ number: 1, blocks: [{ kind: "paragraph", runs: [{ text: "He gives the figure in metric too: 10,516 kilogrammes." }] }] }]);
 
     const docx = unzipSync((await render(compiled, "docx", { date: DATE })).bytes);
     expect(strFromU8(docx["word/document.xml"]!)).toContain(line);
+    expect(strFromU8(docx["word/footnotes.xml"]!)).toContain("10,516 kilogrammes");
     const epub = unzipSync((await render(compiled, "epub", { date: DATE })).bytes);
     expect(Object.entries(epub).some(([path, bytes]) => path.endsWith(".xhtml") && strFromU8(bytes).includes(line))).toBe(true);
     const pdf = await getDocument({ data: new Uint8Array((await render(compiled, "pdf", { date: DATE })).bytes) }).promise;
@@ -75,5 +78,6 @@ describe("the Non-fiction kind", () => {
     for (let i = 1; i <= pdf.numPages; i++) text += (await (await pdf.getPage(i)).getTextContent()).items.map((x) => ("str" in x ? x.str : "")).join(" ") + " ";
     expect(text.replace(/\s+/g, " ")).toContain("Ten tons an acre");
     expect(text).toContain("Burial");
+    expect(text).toContain("10,516 kilogrammes");
   });
 });
