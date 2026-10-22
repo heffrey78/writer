@@ -122,7 +122,11 @@ test("the editor is reachable and usable by keyboard alone", async ({ page }) =>
   await page.getByRole("combobox", { name: "Open" }).focus();
   await page.keyboard.press("Tab");
   await expect(textbox(page)).toBeFocused();
-  await move(page, "ControlOrMeta+End");
+  // A Ctrl+End pressed as the text takes the focus can be lost (seen in CI): pressed until the caret's at the end.
+  await expect(async () => {
+    await move(page, "ControlOrMeta+End");
+    expect(await page.evaluate(() => window.editor!.state.selection.from === window.editor!.state.doc.content.size - 1)).toBe(true);
+  }).toPass({ timeout: 5000 });
   await page.keyboard.type(" The end.");
   await savedContains(page, "in a wound. The end.\n");
 });
