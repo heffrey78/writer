@@ -23,7 +23,10 @@
     "build:server": "npm run build && node scripts/build-server.ts",
     "fetch:runtime": "node scripts/fetch-runtime.ts",
     "desktop": "npm run build:server && npm run fetch:runtime && npm run dev -w @writer/desktop",
-    "desktop:arch": "npm run build:server && npm run fetch:runtime && packages/desktop/arch/build.sh"
+    "desktop:arch": "npm run build:server && npm run fetch:runtime && packages/desktop/arch/build.sh",
+    "android": "packages/mobile/build.sh aarch64",
+    "android:emulator": "packages/mobile/build.sh x86_64",
+    "android:install": "packages/mobile/install.sh"
   },
   "devDependencies": {
     "@types/node": "^26.6.4",
