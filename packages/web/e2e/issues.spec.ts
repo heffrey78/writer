@@ -1,6 +1,6 @@
 import { passageIssueBody, readAnchor } from "@writer/core";
 import type { Page } from "@playwright/test";
-import { axe, expect, test, type App } from "./fixtures.ts";
+import { axe, expect, palette, test, type App } from "./fixtures.ts";
 
 const views = (page: Page) => page.getByRole("navigation", { name: "Views" });
 const issueList = (page: Page) => page.getByRole("list", { name: "Issues" });
@@ -334,6 +334,45 @@ test("open issues sit beside their passages, follow the text, open beside it, an
   await expect(marker).toHaveCount(0);
   await views(page).getByRole("link", { name: "Issues" }).click();
   await expect(issueList(page).getByRole("listitem").filter({ hasText: "Who counted the flags?" })).toContainText(`Orphaned: the passage it's about is gone from “The Station”. It read: “${quote}”`);
+});
+
+// The owner's phone (#55): the issue opened at the foot of the chapter, and the sidebar couldn't open.
+test("on a phone, an issue opens over the text; back from it, the sidebar opens from the ⋯ menu", async ({ page, app }) => {
+  await page.setViewportSize({ width: 412, height: 915 });
+  const id = await open(page, app);
+  await onGitHub(page, app, id);
+  const quote = "She stood with her bag at her feet and counted them twice, the way you count stitches in a wound.";
+  app.github.addIssue("ada", "varn", {
+    title: "Who counted the flags?",
+    body: passageIssueBody({ details: "Ben counts them in chapter two.", quote, sceneTitle: "The Station", anchor: { scene: "sc_5tat1n", quote } }),
+  });
+  await page.request.post(`${app.url}/api/novels/${id}/issues/refresh`, { headers: { origin: app.url } });
+
+  const text = page.getByRole("textbox", { name: "Chapter text" });
+  await text.getByRole("button", { name: "Issue #1: Who counted the flags?" }).click();
+  const panel = page.getByRole("complementary", { name: /Who counted the flags\?/ });
+  await expect(panel).toContainText("Ben counts them in chapter two.");
+  // Over the text, from the top of the screen, inside it: not after the chapter's last line.
+  const box = (await panel.boundingBox())!;
+  expect(box.y).toBeLessThan(10);
+  expect(box.x + box.width).toBeLessThanOrEqual(412);
+  expect(box.y + box.height).toBeLessThanOrEqual(915);
+  await axe(page);
+  await panel.getByRole("button", { name: "Back to the text" }).click();
+  await expect(panel).toHaveCount(0);
+
+  await page.getByRole("banner").getByRole("button", { name: /^More/ }).click();
+  await page.getByRole("menuitem", { name: "Show the scene's details" }).click();
+  await expect(page.getByRole("tab", { name: "Scene", selected: true })).toBeVisible();
+  await axe(page);
+  await page.keyboard.press("Escape");
+
+  // Asked for from the palette while the issue is open, the sidebar takes the issue's place.
+  await text.getByRole("button", { name: "Issue #1: Who counted the flags?" }).click();
+  await expect(panel).toBeVisible();
+  await palette(page, "Show the scene's details");
+  await expect(panel).toHaveCount(0);
+  await expect(page.getByRole("tab", { name: "Scene", selected: true })).toBeVisible();
 });
 
 test("milestones: made, renamed, closed and reopened from the Issues view", async ({ page, app }) => {

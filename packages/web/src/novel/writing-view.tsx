@@ -181,12 +181,18 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
   // Too narrow for the sidebar's strip: its tabs in the ⋯ menu, where a touch can reach them.
   const wideSidebar = useWideSidebar();
   const showTab = sidebar.show;
+  // The sidebar asked for while an issue is being read, which has its place: the issue closes. One
+  // being raised stays, with what's typed in it.
+  const reveal = (show: () => void) => () => {
+    if (useIssuePanel.getState().numbers.length) useIssuePanel.setState({ numbers: [], editor: undefined });
+    show();
+  };
   useEffect(() => {
     if (wideSidebar) return;
     usePageMenu.getState().set([
-      { id: "writing.sceneTab", label: `Show the ${w.piece.one}'s details`, run: () => showTab("scene") },
-      { id: "writing.notesTab", label: `Show the ${w.piece.one}'s notes`, run: () => showTab("notes") },
-      { id: "writing.entryTab", label: `Show the open ${w.entity.one}`, run: () => showTab("entry") },
+      { id: "writing.sceneTab", label: `Show the ${w.piece.one}'s details`, run: reveal(() => showTab("scene")) },
+      { id: "writing.notesTab", label: `Show the ${w.piece.one}'s notes`, run: reveal(() => showTab("notes")) },
+      { id: "writing.entryTab", label: `Show the open ${w.entity.one}`, run: reveal(() => showTab("entry")) },
     ]);
     return () => usePageMenu.getState().set([]);
   }, [wideSidebar, showTab, w]);
@@ -198,11 +204,12 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
         group: "Writing",
         keys: "Mod-Shift-\\",
         keywords: [`${w.piece.one} details`, w.entity.one, "panel"],
-        run: sidebar.toggle,
+        // Over an issue being read, the sidebar comes back on its last tab rather than toggling.
+        run: () => (useIssuePanel.getState().numbers.length ? reveal(() => sidebar.show(useRightSidebar.getState().tab))() : sidebar.toggle()),
       },
-      { id: "writing.sceneTab", title: `Show the ${w.piece.one}'s details`, group: "Writing", keywords: ["sidebar", "panel"], run: () => sidebar.show("scene") },
-      { id: "writing.entryTab", title: `Show the open ${w.entity.one}`, group: "Writing", keywords: ["sidebar", w.codex.one, "panel"], run: () => sidebar.show("entry") },
-      { id: "writing.notesTab", title: `Show the ${w.piece.one}'s notes`, group: "Writing", keywords: ["sidebar", "panel", "sticky"], run: () => sidebar.show("notes") },
+      { id: "writing.sceneTab", title: `Show the ${w.piece.one}'s details`, group: "Writing", keywords: ["sidebar", "panel"], run: reveal(() => sidebar.show("scene")) },
+      { id: "writing.entryTab", title: `Show the open ${w.entity.one}`, group: "Writing", keywords: ["sidebar", w.codex.one, "panel"], run: reveal(() => sidebar.show("entry")) },
+      { id: "writing.notesTab", title: `Show the ${w.piece.one}'s notes`, group: "Writing", keywords: ["sidebar", "panel", "sticky"], run: reveal(() => sidebar.show("notes")) },
       {
         id: "writing.newSceneNote",
         title: `New note on this ${w.piece.one}`,
@@ -501,8 +508,9 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
       <StatusBar novelId={novelId} workspace={workspace} />
       </div>
       {raising || issueOpen ? (
-        // An issue being raised or read takes the sidebar's place until it's closed.
-        <div className="shrink-0 border-rule bg-panel lg:w-[28rem] lg:overflow-y-auto lg:border-l">
+        // An issue being raised or read takes the sidebar's place until it's closed: beside the text,
+        // or on a narrow screen over it, as the sidebar's sheet is.
+        <div className="fixed inset-y-0 right-0 z-40 w-[28rem] max-w-[90vw] shrink-0 overflow-y-auto border-l border-rule bg-panel shadow-xl lg:relative lg:inset-auto lg:z-auto lg:max-w-none lg:shadow-none">
           <RaisePanel novelId={novelId} novel={novel} />
           {!raising && <IssuePanel novelId={novelId} />}
         </div>
