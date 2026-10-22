@@ -151,6 +151,7 @@ describe("novel template", () => {
 describe.each([
   ["journal", "examples/sample-journal"],
   ["campaign", "examples/sample-campaign"],
+  ["nonfiction", "examples/sample-nonfiction"],
 ])("%s template", (kind, sample) => {
   const dir = join(repo, "templates", kind);
 

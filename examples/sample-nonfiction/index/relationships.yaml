@@ -1,0 +1,6 @@
+relationships:
+  - {id: rel_wh1dw0, from: per_wh1te0, to: per_darw1n, type: influenced}
+  - {id: rel_dwt0p1, from: per_darw1n, to: clm_t0p501, type: argues}
+  - {id: rel_dwb4r1, from: per_darw1n, to: clm_b4ry50, type: argues}
+  - {id: rel_srb4r1, from: src_d4rw1n, to: clm_b4ry50, type: supports}
+  - {id: rel_b4rca5, from: con_b4r1a0, to: con_ca5t50, type: builds-on}

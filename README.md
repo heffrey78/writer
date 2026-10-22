@@ -7,7 +7,7 @@ Writer grows out of [gh-writer](https://github.com/heffrey78/gh-writer), a novel
 - **Novel:** parts, chapters and scenes, with a story bible, plotlines and story time. This is what gh-writer does today.
 - **Journal:** one book on the shelf, a chapter for each month and an entry for each day, with the people, places, events and values in it ([#5](https://github.com/heffrey78/writer/issues/5)).
 - **Campaign:** a tabletop campaign's arcs and sessions, NPCs, places, factions, items and quests ([#6](https://github.com/heffrey78/writer/issues/6)).
-- **Non-fiction:** parts, chapters and sections, with sources and concepts ([#7](https://github.com/heffrey78/writer/issues/7)).
+- **Non-fiction:** parts, chapters and sections, with an index of sources, people, concepts and claims, footnotes and citations ([#7](https://github.com/heffrey78/writer/issues/7)).
 
 Writer doesn't try to be everything to everyone. A feature that only some kinds want is a module those kinds use, not a part of every book ([D14](https://github.com/heffrey78/writer/issues/10)). Books from gh-writer open in Writer unchanged ([#2](https://github.com/heffrey78/writer/issues/2)).
 

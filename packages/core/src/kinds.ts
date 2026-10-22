@@ -142,6 +142,12 @@ export interface BookKind extends Noun {
      * `command` is what the palette calls it, and the note is titled `title`: the piece's title.
      */
     quickNote?: { command: string; title: string };
+    /**
+     * Its title is a heading in the compiled book, beneath its chapter's: a non-fiction book's
+     * sections. Without it, pieces are set apart by the preset's break, their titles left out (a
+     * novel's scenes).
+     */
+    headed?: boolean;
   };
   /** The words for what isn't a level or the piece: all the sections and pieces, the codex, and an entity of it. */
   words: { content: Noun; codex: Noun; entity: Noun };

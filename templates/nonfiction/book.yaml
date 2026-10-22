@@ -1,0 +1,35 @@
+schema_version: 3
+kind: nonfiction
+id: nf_temp1a
+title: Untitled Book
+author: ""
+relationship_types:
+  - key: builds-on
+    label: Builds on
+    inverse_label: Built on by
+    from_types: [concept]
+    to_types: [concept]
+  - key: coined
+    label: Coined
+    inverse_label: Coined by
+    from_types: [person]
+    to_types: [concept]
+  - key: argues
+    label: Argues
+    inverse_label: Argued by
+    from_types: [person]
+    to_types: [claim]
+  - key: supports
+    label: Supports
+    inverse_label: Supported by
+    to_types: [claim]
+  - key: contradicts
+    label: Contradicts
+    symmetric: true
+    from_types: [claim, source]
+    to_types: [claim, source]
+  - key: influenced
+    label: Influenced
+    inverse_label: Influenced by
+    from_types: [person]
+    to_types: [person]

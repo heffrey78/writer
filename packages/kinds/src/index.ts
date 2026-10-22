@@ -10,12 +10,13 @@ import { storyTime } from "@writer/module-story-time/core";
 import { toJournalModule } from "@writer/module-to-journal/core";
 import { campaign } from "./campaign.ts";
 import { journal } from "./journal.ts";
+import { nonfiction } from "./nonfiction.ts";
 import { novel } from "./novel.ts";
 
-export { campaign, journal, novel };
+export { campaign, journal, nonfiction, novel };
 
 /** Every kind of book the app ships: the Novel first. */
-export const KINDS: readonly BookKind[] = [novel, journal, campaign];
+export const KINDS: readonly BookKind[] = [novel, journal, campaign, nonfiction];
 
 /** The core halves of the modules the shipped kinds use (D14), from packages/modules. */
 export const MODULES: readonly BookModule[] = [pointOfView, plotlines, presenceModule, storyTime, offPageEvents, draftingBoard, manuscriptFormat, daily, toJournalModule];

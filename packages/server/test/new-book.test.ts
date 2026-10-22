@@ -102,6 +102,21 @@ describe("Library.create", () => {
     }
   });
 
+  it("starts a non-fiction book from its own template: a chapter with a first section, an index folder for each type (#57)", async () => {
+    const library = await openLibrary();
+    const book = await library.create({ kind: "nonfiction", title: "Small Ploughs" });
+    const result = await validate(nodeSource(book.path));
+    expect(result.diagnostics).toEqual([]);
+    expect(result.novel.kind.key).toBe("nonfiction");
+    expect(result.novel.pieces.map((p) => [p.title, p.status])).toEqual([["Section 1", "outline"]]);
+    expect(readFileSync(join(book.path, "book.yaml"), "utf8")).toMatch(/^id: nf_[0-9a-z]{6}$/m);
+    expect(filesIn(book.path)).toEqual(filesIn(templateOf("nonfiction")));
+    expect(filesIn(book.path)).toEqual(expect.arrayContaining(["text/_order.yaml", "index/sources/.gitkeep", "index/concepts/.gitkeep", "index/claims/.gitkeep", "notes/.gitkeep"]));
+    for (const file of filesIn(book.path).filter((f) => !f.startsWith(".github/"))) {
+      expect(readFileSync(join(book.path, file), "utf8"), file).not.toMatch(/_temp1a\b/);
+    }
+  });
+
   it("refuses a kind it has no template for, leaving nothing behind", async () => {
     const library = await openLibrary();
     await expect(library.create({ kind: "almanac", title: "Almanac" })).rejects.toMatchObject({ code: "UNKNOWN_KIND" });

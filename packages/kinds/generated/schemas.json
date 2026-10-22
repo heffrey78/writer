@@ -47,5 +47,21 @@
       "book": "v8",
       "arc": "v9"
     }
+  },
+  "nonfiction": {
+    "fingerprint": "9afff53667022ff3",
+    "exports": {
+      "novel": "v0",
+      "manuscript-order": "v1",
+      "scene": "v2",
+      "entity": "v3",
+      "relationships": "v4",
+      "note": "v5",
+      "layouts": "v6",
+      "compile": "v7",
+      "book": "v8",
+      "part": "v9",
+      "chapter": "v10"
+    }
   }
 }

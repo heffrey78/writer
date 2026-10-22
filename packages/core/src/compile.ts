@@ -170,6 +170,12 @@ export async function compileBook(novel: Book, source: Pick<FileSource, "read">,
       const scene = byId.get(sceneId);
       if (!scene) continue;
       const body = prose(scene.body);
+      if (novel.kind.piece.headed) {
+        // A headed piece (a section) is set apart by its title, even before it's written.
+        blocks.push({ kind: "heading", level: 1, runs: [{ text: scene.title }] }, ...trimBreaks(body));
+        words += countWords(scene.body);
+        continue;
+      }
       if (!body.length) continue;
       // Scenes are set apart by the break; a scene's own break that starts or ends it would double it.
       if (blocks.length) blocks.push({ kind: "break" });
