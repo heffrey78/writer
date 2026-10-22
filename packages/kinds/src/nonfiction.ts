@@ -45,6 +45,11 @@ export const nonfiction: BookKind = {
   ],
   // Citations: a footnote cites a source, and the compiled book ends with a bibliography.
   modules: ["presence", "citations"],
+  // Issues lead Revise: fact checks and citations needed are a non-fiction book's revision.
+  sidebar: [
+    { key: "plan", label: "Plan", pages: ["outline", "index", "notes", "relationships", "story-map", "progress"] },
+    { key: "revise", label: "Revise", pages: ["issues", "compare"] },
+  ],
   fieldOrder: ["sources", "people", "concepts", "claims", "entities"],
   // Who argues what, and how the ideas build on each other.
   graphTypes: ["person", "concept", "claim"],

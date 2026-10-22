@@ -30,14 +30,28 @@ test("opens in its months and entries, in a journal's words", async ({ page, app
   }
 });
 
+test("its sidebar looks back first, then at its people and places, with no outline or comparing", async ({ page, app }) => {
+  await open(page, app);
+  const views = page.getByRole("navigation", { name: "Views" });
+  await expect(views.getByRole("heading")).toHaveText(["Look back", "People and places"]);
+  // Issues only for a journal on GitHub, which the sample isn't.
+  await expect(views.getByRole("group", { name: "Look back" }).getByRole("link")).toHaveText(["Calendar", "Read", "Notes"]);
+  await expect(views.getByRole("group", { name: "People and places" }).getByRole("link")).toHaveText(["Index", "Relationships", "Story map", "Progress"]);
+  // Collapsed to its strip, in the same order.
+  await page.getByRole("button", { name: "Collapse the sidebar" }).click();
+  const strip = page.getByRole("navigation", { name: "Views" }).getByRole("link");
+  await expect.poll(() => strip.evaluateAll((links) => links.map((l) => l.getAttribute("aria-label")))).toEqual(["Journal", "Calendar", "Read", "Notes", "Index", "Relationships", "Story map", "Progress"]);
+});
+
 test("its index, outline and story map say its words too", async ({ page, app }) => {
   await open(page, app);
   await palette(page, "index");
   await expect(page.getByRole("heading", { level: 1, name: "Index" })).toBeVisible();
-  for (const type of ["People", "Places", "Events", "Values"]) await expect(page.getByRole("heading", { level: 2, name: new RegExp(`^${type}`) })).toBeVisible();
+  for (const type of ["People", "Places", "Events", "Values"]) await expect(page.getByRole("heading", { level: 2, name: new RegExp(`^${type} \\d`) })).toBeVisible();
   await expect(page.locator("main")).not.toContainText(novelWords);
 
-  await page.getByRole("navigation", { name: "Views" }).getByRole("link", { name: "Outline" }).click();
+  // Not in a journal's sidebar, but still in the palette.
+  await palette(page, "outline");
   await expect(page.getByRole("heading", { level: 1, name: "Outline" })).toBeVisible();
   // Table and Cards: no drafting board for a journal.
   await expect(page.getByRole("radiogroup", { name: "Show the outline as" }).getByRole("radio")).toHaveCount(2);

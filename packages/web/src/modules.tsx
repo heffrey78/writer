@@ -25,7 +25,10 @@ export interface ModuleView {
   path: string;
   label: string;
   icon: LucideIcon;
-  /** The sidebar's group it's listed in, after the base's views; none for a page reached another way (today's entry). */
+  /**
+   * The sidebar's group it's listed in where the kind's sidebar doesn't place it (#61), after the
+   * group's pages; none for a page reached another way (today's entry). Its path is its key in a kind's sidebar.
+   */
   group?: "Plan" | "Revise";
   render(view: BookView): ReactNode;
 }

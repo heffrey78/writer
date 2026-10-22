@@ -53,6 +53,11 @@ export const campaign: BookKind = {
   ],
   // The world's calendar under the session's title, then who and what is in it.
   modules: ["presence", "story-time"],
+  sidebar: [
+    { key: "prep", label: "Prep", pages: ["index", "notes", "outline", "issues"] },
+    { key: "world", label: "The world", pages: ["relationships", "story-map"] },
+    { key: "look-back", label: "Look back", pages: ["progress", "compare"] },
+  ],
   fieldOrder: ["when", "party", "npcs", "locations", "factions", "items", "quests", "entities"],
   // Who stands with whom: the factions are on the graph with the people.
   graphTypes: ["npc", "pc", "faction"],

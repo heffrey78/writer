@@ -116,6 +116,23 @@ export interface StatusDef {
   color: "GRAY" | "BLUE" | "GREEN" | "YELLOW" | "ORANGE" | "RED" | "PINK" | "PURPLE";
 }
 
+/**
+ * A group of the sidebar's pages, after Write (#61): its key, its heading in the kind's words, and its
+ * pages in order. A page is named by its key: the base's are outline, story-map, relationships, notes,
+ * progress, index, compare and issues; a module's is its page's path (calendar).
+ */
+export interface SidebarGroup {
+  key: string;
+  label: string;
+  pages: readonly string[];
+}
+
+/** The sidebar of a kind that doesn't declare its own: the Novel's, Plan and Revise. A module's page goes in the group its module names. */
+export const BASE_SIDEBAR: readonly SidebarGroup[] = [
+  { key: "plan", label: "Plan", pages: ["outline", "story-map", "relationships", "notes", "progress", "index"] },
+  { key: "revise", label: "Revise", pages: ["compare", "issues"] },
+];
+
 /** A kind of book: its label and plural are what a book of it is called ("Novel", "Novels"). */
 export interface BookKind extends Noun {
   key: string;
@@ -179,6 +196,11 @@ export interface BookKind extends Noun {
   fieldOrder?: readonly string[];
   /** The order of its entry types with its modules', by key, as `fieldOrder` orders fields. */
   entityTypeOrder?: readonly string[];
+  /**
+   * Its sidebar's pages after Write, by group (#61). Pages it leaves out aren't in the sidebar, but are
+   * still in the palette; a module's page it doesn't name goes in its module's group. Without it, BASE_SIDEBAR.
+   */
+  sidebar?: readonly SidebarGroup[];
 }
 
 /** The kind of every book in format v2, which has no `kind`. */

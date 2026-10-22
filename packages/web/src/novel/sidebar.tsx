@@ -1,4 +1,4 @@
-import { vocabulary, type Book, type BookKind } from "@writer/core";
+import { BASE_SIDEBAR, vocabulary, type Book, type BookKind } from "@writer/core";
 import { BookOpen, CircleDot, Columns2, Goal, ListTree, Map as MapIcon, Network, PanelLeftClose, PanelLeftOpen, PenLine, StickyNote, type LucideIcon } from "lucide-react";
 import { Dialog } from "radix-ui";
 import { useEffect, useId, useState, type ReactNode } from "react";
@@ -12,8 +12,9 @@ import { ManuscriptSidebar } from "./manuscript-tree.tsx";
 import type { Workspace } from "./workspace.ts";
 
 /*
- * The novel's sidebar (heffrey78/gh-writer#136): Write (the manuscript), then the views grouped by what the author is
- * doing: Plan (every view of the book and its world, heffrey78/gh-writer#232) and Revise. It collapses to a strip of icons (Ctrl+\), remembered in this browser.
+ * The book's sidebar (heffrey78/gh-writer#136): Write (the manuscript), then the views grouped by what the author is
+ * doing, as the book's kind groups them (#61): a novel's Plan (every view of the book and its world,
+ * heffrey78/gh-writer#232) and Revise, a journal's Look back. It collapses to a strip of icons (Ctrl+\), remembered in this browser.
  */
 
 const KEY = "ghw.sidebar";
@@ -45,28 +46,33 @@ interface Place {
   icon: LucideIcon;
 }
 
-/** The views by group, the book's modules' after the base's in each; the story map only with a tab from a module; Issues only for a novel on GitHub. */
+/**
+ * The pages by group, as the kind's sidebar has them (#61): the story map only with a tab from a
+ * module, Issues only for a book on GitHub. A module's page the kind doesn't name goes last in its
+ * module's group, or the first group where the kind has none of that key. A group left empty isn't shown.
+ */
 export function groups(onGitHub: boolean, kind: BookKind): { label: string; places: Place[] }[] {
-  const views = moduleViews(kind);
-  const added = (group: string) => views.filter((v) => v.group === group).map(({ path, label, icon }) => ({ path, label, icon }));
-  return [
-    {
-      label: "Plan",
-      places: [
-        { path: "outline", label: "Outline", icon: ListTree },
-        ...(moduleStoryMapTabs(kind).length ? [{ path: "story-map", label: "Story map", icon: MapIcon }] : []),
-        { path: "relationships", label: "Relationships", icon: Network },
-        { path: "notes", label: "Notes", icon: StickyNote },
-        { path: "progress", label: "Progress", icon: Goal },
-        { path: "bible", label: vocabulary(kind).codex.One, icon: BookOpen },
-        ...added("Plan"),
-      ],
-    },
-    {
-      label: "Revise",
-      places: [{ path: "compare", label: "Compare", icon: Columns2 }, ...(onGitHub ? [{ path: "issues", label: "Issues", icon: CircleDot }] : []), ...added("Revise")],
-    },
-  ];
+  const views = moduleViews(kind).filter((v) => v.group);
+  const pages = new Map<string, Place | null>([
+    ["outline", { path: "outline", label: "Outline", icon: ListTree }],
+    ["story-map", moduleStoryMapTabs(kind).length ? { path: "story-map", label: "Story map", icon: MapIcon } : null],
+    ["relationships", { path: "relationships", label: "Relationships", icon: Network }],
+    ["notes", { path: "notes", label: "Notes", icon: StickyNote }],
+    ["progress", { path: "progress", label: "Progress", icon: Goal }],
+    ["index", { path: "bible", label: vocabulary(kind).codex.One, icon: BookOpen }],
+    ["compare", { path: "compare", label: "Compare", icon: Columns2 }],
+    ["issues", onGitHub ? { path: "issues", label: "Issues", icon: CircleDot } : null],
+    ...views.map(({ path, label, icon }): [string, Place] => [path, { path, label, icon }]),
+  ]);
+  const layout = kind.sidebar ?? BASE_SIDEBAR;
+  const named = new Set(layout.flatMap((g) => g.pages));
+  const groupOf = (moduleGroup: string) => layout.find((g) => g.key === moduleGroup.toLowerCase()) ?? layout[0];
+  return layout
+    .map((g) => ({
+      label: g.label,
+      places: [...g.pages, ...views.filter((v) => !named.has(v.path) && groupOf(v.group!) === g).map((v) => v.path)].flatMap((key) => pages.get(key) ?? []),
+    }))
+    .filter((g) => g.places.length);
 }
 
 const SHORTCUT = /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘\\" : "Ctrl+\\";
