@@ -14,10 +14,10 @@ const SAMPLE = fileURLToPath(new URL("../../../examples/sample-nonfiction", impo
 const DATE = new Date("2026-10-22T12:00:00Z");
 
 describe("the Non-fiction kind", () => {
-  it("is registered with presence, and none of the Novel's story modules", () => {
+  it("is registered with presence and citations, and none of the Novel's story modules", () => {
     const kind = kindByKey("nonfiction");
     expect(kind).toBe(withModules(nonfiction));
-    expect(kind.modules).toEqual(["presence"]);
+    expect(kind.modules).toEqual(["presence", "citations"]);
     expect(kind.fields.map((f) => f.key)).toEqual(["sources", "people", "concepts", "claims", "entities"]);
     expect(layoutOf(kind)).toBe(PLAIN_LAYOUT);
   });
@@ -66,7 +66,9 @@ describe("the Non-fiction kind", () => {
     ]);
     const line = "more than ten tons of dry earth passed through their bodies";
     // Its footnote, the chapter's note (#58).
-    expect(compiled.chapters[0]!.notes).toEqual([{ number: 1, blocks: [{ kind: "paragraph", runs: [{ text: "He gives the figure in metric too: 10,516 kilogrammes." }] }] }]);
+    expect(compiled.chapters[0]!.notes).toEqual([{ number: 1, blocks: [{ kind: "paragraph", runs: [{ text: "Darwin, Vegetable Mould. He gives the figure in metric too: 10,516 kilogrammes." }] }] }]);
+    // Its bibliography, from the citations module (#59).
+    expect(compiled.back.map((m) => m.title)).toEqual(["Bibliography"]);
 
     const docx = unzipSync((await render(compiled, "docx", { date: DATE })).bytes);
     expect(strFromU8(docx["word/document.xml"]!)).toContain(line);
@@ -79,5 +81,6 @@ describe("the Non-fiction kind", () => {
     expect(text.replace(/\s+/g, " ")).toContain("Ten tons an acre");
     expect(text).toContain("Burial");
     expect(text).toContain("10,516 kilogrammes");
+    expect(text).toContain("Bibliography");
   });
 });

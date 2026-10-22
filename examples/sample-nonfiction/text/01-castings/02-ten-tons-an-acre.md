@@ -11,4 +11,4 @@ claims: [clm_t0p501]
 
 From that he drew his claim: [worms make the topsoil](#clm_t0p501). Every particle of the mould, he thought, had passed through a worm many times over.
 
-[^1]: He gives the figure in metric too: 10,516 kilogrammes.
+[^1]: [Vegetable Mould](#src_d4rw1n). He gives the figure in metric too: 10,516 kilogrammes.

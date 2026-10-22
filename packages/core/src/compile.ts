@@ -4,13 +4,14 @@ import { gfmFromMarkdown } from "mdast-util-gfm";
 import { toString } from "mdast-util-to-string";
 import { gfm } from "micromark-extension-gfm";
 import { modulesOf } from "./modules.ts";
-import { outerSections, pieceSections, picturePath, type Book } from "./model.ts";
+import { entityById, outerSections, pieceSections, picturePath, type Book, type Entity, type Piece } from "./model.ts";
 import { parseMarkdown } from "./parse.ts";
 import type { BookKind } from "./kinds.ts";
 import type { FileSource } from "./source.ts";
 import type { CompilePreset } from "./types.ts";
 import { vocabulary, type Word } from "./vocabulary.ts";
 import { countWords } from "./words.ts";
+import { ID_PATTERN } from "./ids.ts";
 
 /*
  * Compiling the manuscript (heffrey78/gh-writer#19, D6): the scenes in reading order, as a book every output format
@@ -117,6 +118,21 @@ export interface CompileLayout {
   says: { docx: string; pdf: string; cover: string };
 }
 
+/**
+ * What a module adds to a compiled book (BookModule.compile, #59): how an entry reads where a
+ * footnote mentions it, and back matter after the preset's. The citations module gives a source's
+ * short form in the notes and a bibliography at the end.
+ */
+export interface CompileHooks {
+  /**
+   * How a mention of `entity` reads in a footnote where its words are the entry's name or one of its
+   * aliases (as @ writes them); undefined leaves its words. Words the writer chose stay theirs.
+   */
+  noteMention?(book: Book, entity: Entity): string | undefined;
+  /** Back matter after the preset's, from what was compiled: its pieces, and the entries they mention (text and notes). */
+  back?(book: Book, drawn: { pieces: readonly Piece[]; mentioned: ReadonlySet<string> }): Matter[];
+}
+
 /** The base's layout: headings in the kind's words, the title and byline on the title page, page numbers, one and a half spacing. */
 export const PLAIN_LAYOUT: CompileLayout = {
   key: "plain",
@@ -173,6 +189,19 @@ export async function compileBook(novel: Book, source: Pick<FileSource, "read">,
   if (first > last) throw new CompileError("The range ends before it starts.");
 
   const byId = new Map(novel.allPieces.map((s) => [s.id, s]));
+  // What the compiled text mentions, and how a mention reads in a note, for its modules (CompileHooks).
+  const hooks = modulesOf(novel.kind).flatMap((m) => (m.compile ? [m.compile] : []));
+  const mentioned = new Set<string>();
+  const compiled: Piece[] = [];
+  const cite = (id: string, words: string): string | undefined => {
+    const entity = entityById(novel, id);
+    if (!entity || ![entity.name, ...entity.aliases].includes(words.trim())) return undefined;
+    for (const h of hooks) {
+      const short = h.noteMention?.(novel, entity);
+      if (short) return short;
+    }
+    return undefined;
+  };
   const parts = new Map(outerSections(novel).map((p, i) => [p.id, { ...p, number: i + 1 }]));
   const chapterOut: CompiledChapter[] = [];
   let words = 0;
@@ -183,7 +212,8 @@ export async function compileBook(novel: Book, source: Pick<FileSource, "read">,
     for (const sceneId of chapter.childIds) {
       const scene = byId.get(sceneId);
       if (!scene) continue;
-      const body = prose(scene.body, notes);
+      compiled.push(scene);
+      const body = prose(scene.body, notes, { mentioned, cite });
       if (novel.kind.piece.headed) {
         // A headed piece (a section) is set apart by its title, even before it's written.
         blocks.push({ kind: "heading", level: 1, runs: [{ text: scene.title }] }, ...trimBreaks(body));
@@ -230,7 +260,7 @@ export async function compileBook(novel: Book, source: Pick<FileSource, "read">,
     sceneBreak: preset.scene_break ?? "#",
     front: await matter(preset.front),
     chapters: chapterOut,
-    back: await matter(preset.back),
+    back: [...(await matter(preset.back)), ...hooks.flatMap((h) => h.back?.(novel, { pieces: compiled, mentioned }) ?? [])],
     words,
   };
 }
@@ -251,7 +281,7 @@ function section(text: string, path: string): Matter {
  * first referred to; their definitions aren't part of the text. Without `notes` (front and back
  * matter), footnotes are left out.
  */
-function prose(markdown: string, notes?: ChapterNote[]): Block[] {
+function prose(markdown: string, notes?: ChapterNote[], context: Omit<Context, "refer" | "inNote"> = {}): Block[] {
   const tree = mdast(markdown);
   const defined = new Map<string, FootnoteDefinition>();
   for (const n of tree.children) if (n.type === "footnoteDefinition") defined.set(n.identifier, n);
@@ -265,14 +295,24 @@ function prose(markdown: string, notes?: ChapterNote[]): Block[] {
     numbers.set(identifier, note.number);
     notes.push(note);
     // A note may refer to another; numbered first, so one that refers to itself ends.
-    note.blocks = trimBreaks(definition.children.flatMap((c) => blocks(c, false, refer)));
+    note.blocks = trimBreaks(definition.children.flatMap((c) => blocks(c, false, { ...context, refer, inNote: true })));
     return note.number;
   };
-  return tree.children.filter((n) => n.type !== "footnoteDefinition").flatMap((n) => blocks(n, false, refer));
+  return tree.children.filter((n) => n.type !== "footnoteDefinition").flatMap((n) => blocks(n, false, { ...context, refer }));
 }
 
 /** A footnote's number in its chapter, as it's referred to: undefined where footnotes aren't set. */
 type Refer = (identifier: string) => number | undefined;
+
+/** What the text is compiled with: its footnotes, whether it's a note's, the entries it mentions, and how one reads in a note. */
+interface Context {
+  refer?: Refer;
+  inNote?: boolean;
+  mentioned?: Set<string>;
+  cite?: (id: string, words: string) => string | undefined;
+}
+
+const MENTION = new RegExp(`^#(${ID_PATTERN.source.slice(1, -1)})$`);
 
 function mdast(markdown: string): Root {
   return fromMarkdown(markdown.replace(/\r\n?/g, "\n"), { extensions: [gfm()], mdastExtensions: [gfmFromMarkdown()] });
@@ -289,31 +329,31 @@ function trimBreaks(list: Block[]): Block[] {
   return out;
 }
 
-function blocks(node: Nodes, quote: boolean, refer?: Refer): Block[] {
+function blocks(node: Nodes, quote: boolean, context: Context = {}): Block[] {
   switch (node.type) {
     case "paragraph": {
       const picture = pictureOf(node.children);
       if (picture) return [picture];
-      const runs = merge(inline(node.children, {}, refer));
+      const runs = merge(inline(node.children, {}, context));
       return runs.length ? [{ kind: "paragraph", runs, ...(quote ? { quote: true } : {}) }] : [];
     }
     case "blockquote":
-      return node.children.flatMap((c) => blocks(c, true, refer));
+      return node.children.flatMap((c) => blocks(c, true, context));
     case "thematicBreak":
       return [{ kind: "break" }];
     case "html":
       // Hidden notes (<!-- … -->) and other raw HTML aren't the story.
       return [];
     case "heading": {
-      const runs = merge(inline(node.children, {}, refer));
+      const runs = merge(inline(node.children, {}, context));
       return runs.length ? [{ kind: "heading", level: Math.min(node.depth, 3) as 1 | 2 | 3, runs }] : [];
     }
     case "list": {
-      const items = node.children.map((item) => item.children.flatMap((c) => blocks(c, false, refer))).filter((item) => item.length);
+      const items = node.children.map((item) => item.children.flatMap((c) => blocks(c, false, context))).filter((item) => item.length);
       return items.length ? [{ kind: "list", ordered: !!node.ordered, start: node.start ?? 1, items, ...(quote ? { quote: true } : {}) }] : [];
     }
     case "table": {
-      const [head, ...body] = node.children.map((row) => row.children.map((cell) => merge(inline(cell.children, {}, refer))));
+      const [head, ...body] = node.children.map((row) => row.children.map((cell) => merge(inline(cell.children, {}, context))));
       return head ? [{ kind: "table", align: (node.align ?? []).map((a) => a ?? null), header: head, rows: body }] : [];
     }
     case "code": {
@@ -324,7 +364,7 @@ function blocks(node: Nodes, quote: boolean, refer?: Refer): Block[] {
       // A note's text is the note's, not the page's.
       return [];
     default:
-      return "children" in node ? (node.children as Nodes[]).flatMap((c) => blocks(c, quote, refer)) : [];
+      return "children" in node ? (node.children as Nodes[]).flatMap((c) => blocks(c, quote, context)) : [];
   }
 }
 
@@ -379,7 +419,7 @@ export function flatBlocks(list: Block[]): Extract<Block, { kind: "paragraph" | 
 /** Soft line breaks (hard-wrapped prose) read as spaces, as in the editor. */
 const unwrap = (text: string) => text.replace(/[ \t]*\n[ \t]*/g, " ");
 
-function inline(nodes: PhrasingContent[], style: { em?: boolean; strong?: boolean }, refer?: Refer): Run[] {
+function inline(nodes: PhrasingContent[], style: { em?: boolean; strong?: boolean }, context: Context = {}): Run[] {
   const out: Run[] = [];
   for (const n of nodes) {
     switch (n.type) {
@@ -387,22 +427,30 @@ function inline(nodes: PhrasingContent[], style: { em?: boolean; strong?: boolea
         out.push({ text: unwrap(n.value), ...style });
         break;
       case "emphasis":
-        out.push(...inline(n.children, { ...style, em: true }, refer));
+        out.push(...inline(n.children, { ...style, em: true }, context));
         break;
       case "strong":
-        out.push(...inline(n.children, { ...style, strong: true }, refer));
+        out.push(...inline(n.children, { ...style, strong: true }, context));
         break;
       case "break":
         out.push({ text: "\n", ...style });
         break;
-      case "link":
+      case "link": {
+        // A mention ([Ada](#char_…)): its words, or in a note, as a module would have it read.
+        const id = MENTION.exec(n.url)?.[1];
+        if (id) context.mentioned?.add(id);
+        const short = id && context.inNote ? context.cite?.(id, toString(n)) : undefined;
+        if (short) out.push({ text: short, ...style });
+        else out.push(...inline(n.children, style, context));
+        break;
+      }
       case "linkReference":
       case "delete":
-        // A mention ([Ada](#char_…)) or a link: its words.
-        out.push(...inline(n.children, style, refer));
+        // A link: its words.
+        out.push(...inline(n.children, style, context));
         break;
       case "footnoteReference": {
-        const number = refer?.(n.identifier);
+        const number = context.refer?.(n.identifier);
         if (number !== undefined) out.push({ text: String(number), note: number });
         break;
       }
@@ -412,7 +460,7 @@ function inline(nodes: PhrasingContent[], style: { em?: boolean; strong?: boolea
       case "html":
         break;
       default:
-        if ("children" in n) out.push(...inline(n.children as PhrasingContent[], style, refer));
+        if ("children" in n) out.push(...inline(n.children as PhrasingContent[], style, context));
         else if ("value" in n && typeof n.value === "string") out.push({ text: n.value, ...style });
     }
   }

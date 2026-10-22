@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@writer/core": "0.1.0",
-    "ajv": "^8.20.0",
+    "@writer/module-citations": "0.1.0",
     "@writer/module-daily": "0.1.0",
     "@writer/module-drafting-board": "0.1.0",
     "@writer/module-manuscript-format": "0.1.0",
@@ -19,6 +19,7 @@
     "@writer/module-point-of-view": "0.1.0",
     "@writer/module-presence": "0.1.0",
     "@writer/module-story-time": "0.1.0",
-    "@writer/module-to-journal": "0.1.0"
+    "@writer/module-to-journal": "0.1.0",
+    "ajv": "^8.20.0"
   }
 }

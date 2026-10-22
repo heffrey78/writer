@@ -1,4 +1,4 @@
-import type { CompileLayout } from "./compile.ts";
+import type { CompileHooks, CompileLayout } from "./compile.ts";
 import type { EntityTypeDef } from "./ids.ts";
 import type { BookKind, FieldDef, Noun } from "./kinds.ts";
 import type { Book, ModuleRecord, Piece } from "./model.ts";
@@ -44,6 +44,8 @@ export interface BookModule {
   clock?: StoryClock;
   /** Compile layouts a kind may name (BookKind.compileLayout): standard manuscript format. */
   layouts?: readonly CompileLayout[];
+  /** What it adds to a compiled book: how an entry reads in the notes, and back matter (citations' bibliography). */
+  compile?: CompileHooks;
   /** What a book of the kind can be made instead (a novel kept as a journal, a Journal): one commit each. */
   conversions?: readonly Conversion[];
   /** What moving a novel to a newer format does to its files (format 2 gives each off-page event a file of its own). */

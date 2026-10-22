@@ -19,6 +19,7 @@
     "@writer/client": "0.1.0",
     "@writer/core": "0.1.0",
     "@writer/editor": "0.1.0",
+    "@writer/module-citations": "0.1.0",
     "@xyflow/react": "^12.12.0",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",

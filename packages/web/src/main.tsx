@@ -22,6 +22,7 @@ import { storyTimeWeb } from "@writer/module-story-time/web";
 import { offPageEventsWeb } from "@writer/module-off-page-events/web";
 import { draftingBoardWeb } from "@writer/module-drafting-board/web";
 import { dailyWeb } from "@writer/module-daily/web";
+import { citationsWeb } from "@writer/module-citations/web";
 import { NovelPage } from "./novel/novel-page.tsx";
 import { NotFound } from "./not-found.tsx";
 import { onAndroid } from "./platform.ts";
@@ -35,7 +36,7 @@ apply();
 // book's kind, from the server; they're registered here too, for what the base reads through them in
 // the browser (a piece's facts, the story clock). Then their web halves.
 for (const module of MODULES) registerModule(module);
-const WEB_MODULES: readonly WebModule[] = [plotlinesWeb, presenceWeb, storyTimeWeb, offPageEventsWeb, draftingBoardWeb, dailyWeb];
+const WEB_MODULES: readonly WebModule[] = [plotlinesWeb, presenceWeb, storyTimeWeb, offPageEventsWeb, draftingBoardWeb, dailyWeb, citationsWeb];
 for (const module of WEB_MODULES) registerWebModule(module);
 
 // The graph benchmark (heffrey78/gh-writer#68), loaded only when visited.

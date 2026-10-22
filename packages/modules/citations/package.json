@@ -1,0 +1,15 @@
+{
+  "name": "@writer/module-citations",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Citations (D14, #59): a footnote cites a source from the index, reading in the compiled notes as its short form, and the compiled book ends with a bibliography of the sources it draws on.",
+  "exports": {
+    "./core": "./src/core/index.ts",
+    "./web": "./src/web/index.tsx"
+  },
+  "dependencies": {
+    "@writer/core": "0.1.0",
+    "@writer/web": "0.1.0"
+  }
+}

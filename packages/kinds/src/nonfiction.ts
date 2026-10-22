@@ -4,8 +4,8 @@ import type { BookKind } from "@writer/core";
  * A work of non-fiction (#7): parts (if it has them) and chapters of sections, with an index of the
  * sources it draws on, the people in it, the concepts it explains and the claims it makes. Concepts
  * are threads through the book; presence shows which sources, people and concepts each chapter
- * turns to. Research notes are the book's notes. No dates of a story: story time isn't one of its
- * modules.
+ * turns to. Research notes are the book's notes. Its footnotes cite its sources (the citations
+ * module). No dates of a story: story time isn't one of its modules.
  */
 export const nonfiction: BookKind = {
   key: "nonfiction",
@@ -43,7 +43,8 @@ export const nonfiction: BookKind = {
     { key: "claims", label: "Claims", role: "made", type: { kind: "entities", entityType: "claim" }, mentionAdds: true },
     { key: "entities", label: "Also in it", role: "in it", type: { kind: "own-entities" }, mentionAdds: true },
   ],
-  modules: ["presence"],
+  // Citations: a footnote cites a source, and the compiled book ends with a bibliography.
+  modules: ["presence", "citations"],
   fieldOrder: ["sources", "people", "concepts", "claims", "entities"],
   // Who argues what, and how the ideas build on each other.
   graphTypes: ["person", "concept", "claim"],
