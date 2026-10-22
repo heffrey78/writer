@@ -69,7 +69,7 @@ try {
   // contexts, which a webview hasn't).
   [android] = await _android.devices();
   if (!android) throw new Error("Playwright sees no Android device.");
-  const page: Page = await (await android.webView({ pkg: PACKAGE }, { timeout: 30_000 })).page();
+  let page: Page = await (await android.webView({ pkg: PACKAGE }, { timeout: 30_000 })).page();
 
   await expect(page.getByRole("heading", { level: 1, name: "Your books" })).toBeVisible();
   await expect(page.getByText("No books yet. Start one, or clone one from GitHub.")).toBeVisible();
@@ -83,8 +83,24 @@ try {
   const connect = page.getByRole("dialog", { name: "Connect to GitHub" });
   await connect.getByRole("button", { name: "Sign in with a code" }).click();
   await expect(connect.getByLabel("Your code")).toHaveText(fake.userCode);
+  // GitHub's page opens outside the app (the phone's browser): the app stays where it was, waiting.
+  // Clicked from the page: Playwright's own click would wait for a navigation here that never comes.
+  await connect.getByRole("link", { name: /login\/device/ }).evaluate((a: HTMLElement) => a.click());
+  const top = () => /topResumedActivity=\S+ \S+ (\S+)\//.exec(adb("shell", "dumpsys", "activity", "activities"))?.[1];
+  for (let i = 0; i < 40 && top() === PACKAGE; i++) await sleep(250);
+  if (top() === PACKAGE) throw new Error("Nothing opened GitHub's page outside the app.");
+  adb("shell", "monkey", "-p", PACKAGE, "-c", "android.intent.category.LAUNCHER", "1");
+  for (let i = 0; i < 40 && top() !== PACKAGE; i++) await sleep(250);
+  if (!page.url().startsWith("http://tauri.localhost/")) throw new Error(`GitHub's page opened in the app: ${page.url()}`);
+  // Connected afresh: after the link's cancelled navigation, Playwright's Android driver finds nothing
+  // with the old connection's locators, though the page shows it all.
+  await android.close();
+  [android] = await _android.devices();
+  page = await (await android!.webView({ pkg: PACKAGE }, { timeout: 30_000 })).page();
+  const waiting = page.getByRole("dialog", { name: "Connect to GitHub" });
+  await expect(waiting.getByLabel("Your code")).toHaveText(fake.userCode);
   fake.approve();
-  await expect(connect).toHaveCount(0);
+  await expect(waiting).toHaveCount(0);
   const identity = page.getByRole("dialog", { name: "Your name and email" });
   await expect(identity.getByLabel("Name")).toHaveValue("Ada Writer");
   await identity.getByRole("button", { name: "Save" }).click();
@@ -92,7 +108,7 @@ try {
   if (!/name = Ada Writer/.test(inApp("cat .gitconfig"))) throw new Error("The name and email weren't kept in the app's git configuration.");
   const token = inApp("cat secrets/github | base64");
   if (!token.trim() || Buffer.from(token, "base64").includes(fake.deviceToken)) throw new Error("The token isn't kept sealed.");
-  step("signed in with a code, the token sealed by the keystore; the name git signs with kept");
+  step("signed in with a code, GitHub's page opened outside the app; the token sealed by the keystore; the name git signs with kept");
 
   // A journal, and today's entry written in.
   await page.getByRole("list", { name: "Books" }).getByRole("button", { name: "New book" }).click();

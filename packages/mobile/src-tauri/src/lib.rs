@@ -104,10 +104,10 @@ struct Keystore<R: Runtime>(AppHandle<R>);
 
 impl<R: Runtime> secrets::Cipher for Keystore<R> {
     fn seal(&self, plain: String) -> Result<String, String> {
-        self.0.try_state::<writer_android::Keystore<R>>().ok_or("No keystore here: it's Android's.")?.seal(plain)
+        self.0.try_state::<writer_android::Android<R>>().ok_or("No keystore here: it's Android's.")?.seal(plain)
     }
     fn open(&self, sealed: String) -> Result<String, String> {
-        self.0.try_state::<writer_android::Keystore<R>>().ok_or("No keystore here: it's Android's.")?.open(sealed)
+        self.0.try_state::<writer_android::Android<R>>().ok_or("No keystore here: it's Android's.")?.open(sealed)
     }
 }
 

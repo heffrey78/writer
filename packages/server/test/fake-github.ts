@@ -75,6 +75,8 @@ export interface FakeGitHub {
   deny(): void;
   /** The next poll answers slow_down. */
   slowDown(): void;
+  /** Out of reach (true): every request's connection is dropped unanswered, until set false. */
+  unreachable(down: boolean): void;
   /** The code runs out. */
   expire(): void;
   /** GitHub stops accepting the token. */
@@ -103,6 +105,7 @@ export interface FakeGitHub {
 
 export async function fakeGitHub({ clientId = "Iv1.fakeclient", login = "ada", interval = 0, gitRoot }: { clientId?: string; login?: string; interval?: number; gitRoot?: string } = {}): Promise<FakeGitHub> {
   let approved = false;
+  let down = false;
   let denied = false;
   let slow = false;
   let expired = false;
@@ -148,6 +151,7 @@ export async function fakeGitHub({ clientId = "Iv1.fakeclient", login = "ada", i
     approve: () => void (approved = true),
     deny: () => void (denied = true),
     slowDown: () => void (slow = true),
+    unreachable: (on) => void (down = on),
     expire: () => void (expired = true),
     revoke: (token) => void fake.users.delete(token),
     repoPath: (owner, name) => join(gitRoot ?? "", owner, `${name}.git`),
@@ -168,6 +172,7 @@ export async function fakeGitHub({ clientId = "Iv1.fakeclient", login = "ada", i
     });
 
   const server = createServer(async (req, res) => {
+    if (down && !req.url?.startsWith("/__fake/")) return void req.socket.destroy();
     const url = new URL(req.url ?? "/", "http://fake");
     const git = /^\/([^/]+)\/([^/]+)\.git(\/.*)$/.exec(url.pathname);
     if (git && gitRoot) return serveGit(req, res, url, git[1]!, git[2]!);

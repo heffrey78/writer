@@ -73,6 +73,21 @@ test("connects with a code entered on GitHub, shows the account, and signs out",
   expect(bodies.filter((b) => b.includes(app.github.deviceToken))).toEqual([]);
 });
 
+// A phone back from the browser where the code was entered finds GitHub out of reach for a moment (#55).
+test("waiting for the code, GitHub out of reach for a while: asked again until it answers, then signed in", async ({ page, app }) => {
+  await launch(page, app);
+  await connect(page);
+  await dialog(page).getByRole("button", { name: "Sign in with a code" }).click();
+  await expect(dialog(page).getByLabel("Your code")).toHaveText(app.github.userCode);
+  app.github.unreachable(true);
+  await expect(dialog(page).getByRole("status").filter({ hasText: "Can't reach GitHub just now" })).toHaveText("Can't reach GitHub just now. Still waiting, and trying again…", { timeout: 10_000 });
+  await expect(dialog(page).getByRole("alert")).toHaveCount(0);
+  app.github.approve();
+  app.github.unreachable(false);
+  await expect(dialog(page)).toHaveCount(0, { timeout: 10_000 });
+  await expectSignedIn(page, "ada");
+});
+
 test("offers gh's account when the gh CLI is signed in", async ({ page, app }) => {
   const bin = join(app.home, "bin");
   mkdirSync(bin);

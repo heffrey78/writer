@@ -83,6 +83,15 @@ const TABS: { key: SidebarTab; label: string; icon: typeof FileText }[] = [
   { key: "entry", label: "Entry", icon: BookOpen },
 ];
 
+/** Whether the screen is wide enough for the sidebar beside the text, with its strip when closed. */
+export function useWideSidebar(): boolean {
+  return useSyncExternalStore((changed) => {
+    const query = matchMedia(WIDE);
+    query.addEventListener("change", changed);
+    return () => query.removeEventListener("change", changed);
+  }, wide);
+}
+
 /**
  * The sidebar, open or as its strip. `toText` puts the focus back in the text (Escape, F6);
  * `content` is what each tab shows.
@@ -91,14 +100,7 @@ export function RightSidebar({ content, toText, labels = {} }: { content: Record
   // A tab may say what it's showing (the Entry tab an event, as "Event").
   const label = (t: (typeof TABS)[number]) => labels[t.key] ?? t.label;
   const { open: opened, sheet, tab, width, set, toggle, show } = useRightSidebar();
-  const isWide = useSyncExternalStore(
-    (changed) => {
-      const query = matchMedia(WIDE);
-      query.addEventListener("change", changed);
-      return () => query.removeEventListener("change", changed);
-    },
-    wide,
-  );
+  const isWide = useWideSidebar();
   const open = isWide ? opened : sheet;
   const aside = useRef<HTMLElement>(null);
   const tabs = useRef<Record<SidebarTab, HTMLButtonElement | null>>({ scene: null, notes: null, entry: null });

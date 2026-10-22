@@ -1,6 +1,8 @@
 package io.github.heffrey78.writer.android
 
 import android.app.Activity
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
@@ -27,6 +29,11 @@ import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
 @InvokeArg
+class UrlArgs {
+    lateinit var url: String
+}
+
+@InvokeArg
 class BytesArgs {
     /** Base64. */
     lateinit var data: String
@@ -34,7 +41,8 @@ class BytesArgs {
 
 /**
  * Writer's Android plugin (#52): the GitHub token sealed by an AES key kept in Android's keystore,
- * and the page's service worker given the app's own files.
+ * other sites opened in the phone's browser, the page kept clear of the system's bars, and the page's
+ * service worker given the app's own files.
  */
 @TauriPlugin
 class WriterPlugin(private val activity: Activity) : Plugin(activity) {
@@ -69,6 +77,19 @@ class WriterPlugin(private val activity: Activity) : Plugin(activity) {
             override fun shouldInterceptRequest(request: WebResourceRequest): WebResourceResponse? =
                 client.shouldInterceptRequest(webView, request)
         })
+    }
+
+    /** Another site, in the phone's browser (or whichever app the writer opens such links with). */
+    @Command
+    fun view(invoke: Invoke) {
+        try {
+            val url = Uri.parse(invoke.parseArgs(UrlArgs::class.java).url)
+            if (url.scheme != "https" && url.scheme != "http") throw IllegalArgumentException("Only web addresses open elsewhere.")
+            activity.startActivity(Intent(Intent.ACTION_VIEW, url))
+            invoke.resolve()
+        } catch (e: Exception) {
+            invoke.reject(e.message ?: e.javaClass.simpleName)
+        }
     }
 
     @Command

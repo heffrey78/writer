@@ -137,7 +137,11 @@ export function remoteFetch(channel: PortChannel): typeof fetch {
   return async (input, init) => {
     const request = new Request(input, init);
     const body = request.body ? new Uint8Array(await request.arrayBuffer()) : undefined;
-    const r = (await called(channel, "http", "fetch", [{ url: request.url, method: request.method, headers: [...request.headers], ...(body ? { body } : {}) }])) as { status: number; headers: [string, string][]; body: Uint8Array };
+    // A request that got no answer fails as fetch's do, with a TypeError: what the engine takes for
+    // GitHub out of reach (github.ts, unreachable), not a fault of its own.
+    const r = (await called(channel, "http", "fetch", [{ url: request.url, method: request.method, headers: [...request.headers], ...(body ? { body } : {}) }]).catch((e: unknown) => {
+      throw new TypeError(e instanceof Error ? e.message : String(e));
+    })) as { status: number; headers: [string, string][]; body: Uint8Array };
     return new Response(r.status === 204 || r.status === 304 ? null : (r.body as Uint8Array<ArrayBuffer>), { status: r.status, headers: r.headers });
   };
 }

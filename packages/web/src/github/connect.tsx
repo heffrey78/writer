@@ -5,6 +5,7 @@ import { DropdownMenu } from "radix-ui";
 import { useEffect, useRef, useState } from "react";
 import { create } from "zustand";
 import { api, keys } from "../api.ts";
+import { onAndroid } from "../platform.ts";
 import { ErrorAlert } from "../ui/alert.tsx";
 import { Button } from "../ui/button.tsx";
 import { cn } from "../ui/cn.ts";
@@ -134,6 +135,8 @@ function Connect({ then, onClose }: { then: (() => void) | undefined; onClose: (
   const start = useMutation({ mutationFn: api.github.startDevice, onSuccess: (code) => setStep({ kind: "code", code }) });
   const gh = useMutation({ mutationFn: api.github.useGh, onSuccess: connected });
   const [pollError, setPollError] = useState<Error>();
+  // GitHub out of reach while waiting (a phone back from the browser, its network still waking): asked again.
+  const [unreachable, setUnreachable] = useState(false);
 
   // Ask GitHub every `interval` seconds whether the code has been entered.
   const code = step.kind === "code" && !step.outcome ? step.code : undefined;
@@ -145,6 +148,7 @@ function Connect({ then, onClose }: { then: (() => void) | undefined; onClose: (
       try {
         const result = await api.github.pollDevice();
         if (closed.current) return;
+        setUnreachable(false);
         if (result.status === "done") return connected(result.account);
         if (result.status === "pending") {
           interval = result.interval;
@@ -153,7 +157,13 @@ function Connect({ then, onClose }: { then: (() => void) | undefined; onClose: (
         }
         setStep({ kind: "code", code, outcome: result.status === "denied" ? "denied" : "expired" });
       } catch (e) {
-        if (!closed.current) setPollError(e instanceof Error ? e : new Error(String(e)));
+        if (closed.current) return;
+        if (e instanceof ApiError && e.code === "NETWORK") {
+          setUnreachable(true);
+          timer = setTimeout(() => void poll(), Math.max(interval, 0.25) * 1000);
+          return;
+        }
+        setPollError(e instanceof Error ? e : new Error(String(e)));
       }
     };
     timer = setTimeout(() => void poll(), Math.max(interval, 0.25) * 1000);
@@ -177,7 +187,7 @@ function Connect({ then, onClose }: { then: (() => void) | undefined; onClose: (
       {step.kind === "choose" ? (
         <div className="grid gap-3 text-sm">
           <p className="text-muted">
-            Writer uses your GitHub account to clone and sync your books, and to put new ones on GitHub. Your sign-in is kept in this computer's keychain.
+            Writer uses your GitHub account to clone and sync your books, and to put new ones on GitHub. {onAndroid ? "Your sign-in is kept sealed by this phone's keystore." : "Your sign-in is kept in this computer's keychain."}
           </p>
           {status?.keychain && <ErrorAlert title="The keychain can't be reached">{status.keychain}</ErrorAlert>}
           {status?.gh && (
@@ -223,7 +233,7 @@ function Connect({ then, onClose }: { then: (() => void) | undefined; onClose: (
                 Open {step.code.verificationUri.replace(/^https?:\/\//, "")} <ExternalLink className="size-3.5" aria-hidden />
               </a>
               <p className="text-muted" role="status">
-                Waiting for you to enter the code on GitHub…
+                {unreachable ? "Can't reach GitHub just now. Still waiting, and trying again…" : "Waiting for you to enter the code on GitHub…"}
               </p>
             </>
           )}

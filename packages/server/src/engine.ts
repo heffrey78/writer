@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { HTTPException } from "hono/http-exception";
 import { globalIdentity, setGlobalIdentity } from "./committer.ts";
 import { githubRoutes } from "./github-routes.ts";
 import type { GitHub } from "./github.ts";
@@ -25,6 +26,13 @@ export interface EngineOptions {
 
 export function createEngine({ library, workspaces, github, novelRoutes: extra }: EngineOptions): Hono {
   const app = new Hono();
+  // An error nothing expected: said in words, for the page to show, and logged where the host keeps
+  // its messages (on Android, the device's log), rather than a bare 500.
+  app.onError((e, c) => {
+    if (e instanceof HTTPException) return e.getResponse();
+    console.error(e);
+    return c.json({ code: "INTERNAL", error: `Writer hit a problem it didn't expect: ${e.message}` }, 500);
+  });
   // What a host doesn't answer itself (Node's app.ts does, first): that it's up, and what it is.
   // Up while its host answers: a page's engine is nothing without its ports.
   app.get("/api/health", async (c) => {

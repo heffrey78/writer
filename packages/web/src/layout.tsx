@@ -1,4 +1,4 @@
-import { Check, Command, Ellipsis, Info, Keyboard, UserPen } from "lucide-react";
+import { Check, Command, Ellipsis, Info, Keyboard, PanelRight, UserPen } from "lucide-react";
 import { DropdownMenu } from "radix-ui";
 import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router";
@@ -10,6 +10,7 @@ import { useIdentityDialog } from "./identity.tsx";
 import { useOverlay } from "./palette.tsx";
 import { useTheme, type ThemeChoice } from "./theme.ts";
 import { cn } from "./ui/cn.ts";
+import { usePageMenu } from "./page-menu.ts";
 
 /** The look of an item in the top bar's ⋯ menu, for the items pages add. */
 export const MENU_ITEM = "flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm outline-none data-[highlighted]:bg-accent-soft";
@@ -80,6 +81,7 @@ export function Shell({
 
 /** Everything not needed at every moment: the page's own items, the theme, the account, the shortcuts. */
 function MoreMenu({ items }: { items?: ReactNode }) {
+  const pageItems = usePageMenu((s) => s.items);
   const { theme, setTheme } = useTheme();
   const { expired, missingScopes } = useGitHubAttention();
   const attention = expired || missingScopes;
@@ -96,8 +98,13 @@ function MoreMenu({ items }: { items?: ReactNode }) {
         </DropdownMenu.Trigger>
         <DropdownMenu.Portal container={anchor}>
           <DropdownMenu.Content align="end" sideOffset={4} className="z-50 grid min-w-60 rounded-md border border-rule bg-raised p-1 text-ink shadow-lg">
-            {items && (
+            {(items || pageItems.length > 0) && (
               <>
+                {pageItems.map((item) => (
+                  <DropdownMenu.Item key={item.id} className={MENU_ITEM} onSelect={item.run}>
+                    <PanelRight className="size-4" aria-hidden /> {item.label}
+                  </DropdownMenu.Item>
+                ))}
                 {items}
                 <DropdownMenu.Separator className="my-1 h-px bg-rule" />
               </>

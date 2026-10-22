@@ -2,8 +2,8 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
-import { afterAll, describe, expect, it } from "vitest";
-import { createEngine, GitHub, hashText, Library, memoryFilesPort, memoryStore, setPorts, Workspaces, type GitPort, type Host } from "../src/engine-index.ts";
+import { afterAll, describe, expect, it, vi } from "vitest";
+import { createEngine, GitHub, hashText, Library, memoryFilesPort, memoryStore, remoteFetch, setPorts, Workspaces, type GitPort, type Host, type PortChannel } from "../src/engine-index.ts";
 import { useNodePorts } from "../src/node-ports.ts";
 
 /**
@@ -65,6 +65,16 @@ function quietGit(): GitPort {
   });
 }
 
+const memoryHost: Host = {
+  env: () => ({}),
+  configDir: () => "/config",
+  booksDir: () => "/books",
+  ghWriterConfigDir: () => undefined,
+  templates: () => "/templates",
+  absolute: (path) => path,
+  shown: (path) => path,
+};
+
 describe("the engine on in-memory ports", () => {
   afterAll(() => useNodePorts());
 
@@ -76,16 +86,7 @@ describe("the engine on in-memory ports", () => {
       if (e.isFile()) seed[`/books/varn/${relative(sample, join(e.parentPath, e.name))}`] = readFileSync(join(e.parentPath, e.name));
     }
     const files = memoryFilesPort(seed);
-    const host: Host = {
-      env: () => ({}),
-      configDir: () => "/config",
-      booksDir: () => "/books",
-      ghWriterConfigDir: () => undefined,
-      templates: () => "/templates",
-      absolute: (path) => path,
-      shown: (path) => path,
-    };
-    setPorts({ git: quietGit(), files, host });
+    setPorts({ git: quietGit(), files, host: memoryHost });
 
     const library = await Library.open();
     const { id } = await library.add("/books/varn");
@@ -109,6 +110,27 @@ describe("the engine on in-memory ports", () => {
     const refused = await put("Something else.\n", file.hash);
     expect(refused.status).toBe(409);
     expect(((await refused.json()) as { current: { content: string } }).current.content).toBe(saved);
+    await workspaces.close();
+  });
+
+  // On Android a phone back from another app found GitHub out of reach, and was told only "HTTP 500" (#55).
+  it("takes a request its host couldn't make for GitHub out of reach, and says what an error it didn't expect was", async () => {
+    setPorts({ git: quietGit(), files: memoryFilesPort(), host: memoryHost });
+    const library = await Library.open();
+    const workspaces = new Workspaces(library, { commit: false, sync: false });
+    const refusing: PortChannel = { call: () => Promise.reject({ message: "connection closed before the answer came" }), listen: () => () => {} };
+    const offline = new GitHub({ clientId: "id", store: memoryStore(), fetch: remoteFetch(refusing) });
+    const out = await createEngine({ library, workspaces, github: offline }).request("/api/github/device", { method: "POST" });
+    expect(out.status).toBe(502);
+    expect(await out.json()).toMatchObject({ code: "NETWORK" });
+
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    const broken = new GitHub({ clientId: "id", store: memoryStore(), fetch: () => Promise.reject(new Error("the keystore said no")) });
+    const failed = await createEngine({ library, workspaces, github: broken }).request("/api/github/device", { method: "POST" });
+    expect(failed.status).toBe(500);
+    expect(await failed.json()).toEqual({ code: "INTERNAL", error: "Writer hit a problem it didn't expect: the keystore said no" });
+    expect(logged).toHaveBeenCalled();
+    logged.mockRestore();
     await workspaces.close();
   });
 });

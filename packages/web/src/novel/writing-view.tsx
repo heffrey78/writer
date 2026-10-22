@@ -51,7 +51,8 @@ import { SceneNotes, useSceneNotes } from "../notes/scene-notes.tsx";
 import { leaveMention, MentionCard, useMentionCard } from "./mention-card.tsx";
 import { mentionEdits } from "./mention-sync.ts";
 import { useNotice } from "./notice.tsx";
-import { RightSidebar, useRightSidebar } from "./right-sidebar.tsx";
+import { RightSidebar, useRightSidebar, useWideSidebar } from "./right-sidebar.tsx";
+import { usePageMenu } from "../page-menu.ts";
 import { pinnedLine, SceneDetails, usePins } from "./scene-details.tsx";
 import { TodayCount } from "./today-count.tsx";
 import { useStructure } from "./structure.ts";
@@ -177,6 +178,18 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
   const recordShown = shownRecord && recordType(novel.kind, shownRecord.type);
   const focusMode = useWritingModes((m) => m.focus);
   const quickNote = novel.kind.piece.quickNote;
+  // Too narrow for the sidebar's strip: its tabs in the ⋯ menu, where a touch can reach them.
+  const wideSidebar = useWideSidebar();
+  const showTab = sidebar.show;
+  useEffect(() => {
+    if (wideSidebar) return;
+    usePageMenu.getState().set([
+      { id: "writing.sceneTab", label: `Show the ${w.piece.one}'s details`, run: () => showTab("scene") },
+      { id: "writing.notesTab", label: `Show the ${w.piece.one}'s notes`, run: () => showTab("notes") },
+      { id: "writing.entryTab", label: `Show the open ${w.entity.one}`, run: () => showTab("entry") },
+    ]);
+    return () => usePageMenu.getState().set([]);
+  }, [wideSidebar, showTab, w]);
   useCommands(
     () => [
       {

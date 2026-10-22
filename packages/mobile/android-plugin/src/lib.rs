@@ -1,7 +1,8 @@
 //! Writer's Android plugin (#52). Its Kotlin (android/) seals and opens bytes with an AES key that
-//! lives in Android's keystore and can't leave it, for the GitHub token; and, when the webview loads,
-//! gives the page's service worker (packages/web/public/engine-sw.js) the same answers as the page,
-//! which Android's webview otherwise asks the network for.
+//! lives in Android's keystore and can't leave it, for the GitHub token; opens other sites in the
+//! phone's browser; and, when the webview loads, keeps the page clear of the system's bars and gives
+//! the page's service worker (packages/web/public/engine-sw.js) the same answers as the page, which
+//! Android's webview otherwise asks the network for.
 
 use serde::{Deserialize, Serialize};
 use tauri::plugin::{Builder, TauriPlugin};
@@ -16,10 +17,17 @@ struct Bytes {
     data: String,
 }
 
-/// The keystore's cipher, as the app's secrets store (secrets.rs there) uses it.
-pub struct Keystore<R: Runtime>(#[allow(dead_code)] tauri::plugin::PluginHandle<R>);
+#[derive(Serialize)]
+#[cfg_attr(not(target_os = "android"), allow(dead_code))]
+struct Address {
+    url: String,
+}
 
-impl<R: Runtime> Keystore<R> {
+/// The plugin's Kotlin: the keystore's cipher, as the app's secrets store (secrets.rs there) uses
+/// it, and the phone's browser.
+pub struct Android<R: Runtime>(#[allow(dead_code)] tauri::plugin::PluginHandle<R>);
+
+impl<R: Runtime> Android<R> {
     fn run(&self, op: &str, data: String) -> Result<String, String> {
         #[cfg(target_os = "android")]
         return self.0.run_mobile_plugin::<Bytes>(op, Bytes { data }).map(|b| b.data).map_err(|e| e.to_string());
@@ -36,13 +44,36 @@ impl<R: Runtime> Keystore<R> {
     pub fn open(&self, sealed: String) -> Result<String, String> {
         self.run("open", sealed)
     }
+
+    /// `url` opened by the phone (its browser), from a thread of its own: the Kotlin runs on the
+    /// main thread, which a navigation is decided on.
+    #[cfg(target_os = "android")]
+    fn view(&self, url: String) {
+        let handle = self.0.clone();
+        std::thread::spawn(move || drop(handle.run_mobile_plugin::<()>("view", Address { url })));
+    }
 }
 
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("writer-android")
+        // The app's own pages stay in its webview. Another site (GitHub's sign-in page, a link in a
+        // note) opens in the phone's browser: in the webview it would take the place of the app,
+        // and the app's engine with it.
+        .on_navigation(|webview, url| {
+            let elsewhere = matches!(url.scheme(), "http" | "https") && url.host_str() != Some("tauri.localhost");
+            #[cfg(target_os = "android")]
+            if elsewhere {
+                if let Some(android) = webview.try_state::<Android<R>>() {
+                    android.view(url.to_string());
+                }
+                return false;
+            }
+            let _ = (webview, elsewhere);
+            true
+        })
         .setup(|app, api| {
             #[cfg(target_os = "android")]
-            app.manage(Keystore(api.register_android_plugin("io.github.heffrey78.writer.android", "WriterPlugin")?));
+            app.manage(Android(api.register_android_plugin("io.github.heffrey78.writer.android", "WriterPlugin")?));
             // Elsewhere, no keystore: the app's secrets say so.
             #[cfg(not(target_os = "android"))]
             let _ = (app, api);

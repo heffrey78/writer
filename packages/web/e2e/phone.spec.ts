@@ -57,6 +57,15 @@ test("on a phone, by touch: the shelf, a book, its sidebar, writing, the palette
   await page.keyboard.type(" Written on the phone.");
   await expect.poll(() => readFileSync(join(app.home, "varn", STATION), "utf8"), { timeout: 10_000 }).toContain("Written on the phone.");
 
+  // The scene's details, from the ⋯ menu: no strip of buttons for the right sidebar on a phone.
+  await page.getByRole("banner").getByRole("button", { name: /^More/ }).tap();
+  await page.getByRole("menuitem", { name: "Show the scene's details" }).tap();
+  await expect(page.getByRole("tab", { name: "Scene", selected: true })).toBeVisible();
+  await fits(page);
+  await audit(page);
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("tab", { name: "Scene" })).toHaveCount(0);
+
   // The palette, from the ⋯ menu: a command tapped.
   await page.getByRole("banner").getByRole("button", { name: /^More/ }).tap();
   await page.getByRole("menuitem", { name: "Commands…" }).tap();
