@@ -9,6 +9,7 @@ import { gitIn, novelRepo, scratch } from "../../../server/test/fixtures.ts";
 import { send } from "../../../server/test/http.ts";
 import { entriesIn, entryOn, entryTitle, isDay, placeOf, today } from "../src/core/index.ts";
 import { dailyServer } from "../src/server/index.ts";
+import { entryHtml, newestFirst } from "../src/web/read.ts";
 
 /** Daily writing (#38): today's entry, made where it goes once, then opened; the Journal's, and no novel's. */
 
@@ -81,5 +82,25 @@ describe("the today route", () => {
     } finally {
       await close();
     }
+  });
+});
+
+describe("the journal read back", () => {
+  it("puts the entries newest first, a day's in the book's order, undated last", async () => {
+    const journal = await loadBook(nodeSource(sample));
+    const days = newestFirst(journal).map((e) => e.day);
+    const dated = days.filter((d) => d !== undefined);
+    expect(dated.length).toBeGreaterThan(2);
+    expect(dated).toEqual([...dated].sort().reverse());
+    expect(days.indexOf(undefined) === -1 || days.slice(days.indexOf(undefined)).every((d) => d === undefined)).toBe(true);
+  });
+
+  it("shows an entry's text safely: names linked to their index entries, pictures from the book, notes left out", () => {
+    const html = entryHtml('Out with [Mira Hale](#per_ab12cd) to the Spit.<!-- a note to self -->\n\n![The spit](/images/the-spit.jpg)\n\n<script>alert(1)</script>\n', "lib_x");
+    expect(html).toContain('<a href="/novels/lib_x/bible/per_ab12cd">Mira Hale</a>');
+    expect(html).toContain('<img src="/api/novels/lib_x/images/the-spit.jpg" alt="The spit"');
+    expect(html).not.toContain("a note to self");
+    expect(html).not.toContain("<script>");
+    expect(html).toContain("&lt;script&gt;");
   });
 });

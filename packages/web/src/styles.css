@@ -1,4 +1,6 @@
 @import "tailwindcss";
+/* The modules' web halves (packages/modules) are outside this package: their classes are looked for there too. */
+@source "../../modules";
 @import "@writer/editor/styles.css";
 
 /*

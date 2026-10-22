@@ -47,3 +47,35 @@ test("its index, outline and story map say its words too", async ({ page, app })
   await expect(page.getByRole("tabpanel", { name: "Timeline" }).getByRole("link", { name: "Thursday, 1 October" })).toBeVisible();
   await expect(page.locator("main")).not.toContainText(novelWords);
 });
+
+test("read back as a blog: every entry's text, newest first; a name opens its index entry, a title the entry", async ({ page, app }) => {
+  await open(page, app);
+  await page.getByRole("navigation", { name: "Views" }).getByRole("link", { name: "Read" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Entries, newest first" })).toBeVisible();
+  const entries = page.getByRole("list", { name: "Entries, newest first" }).getByRole("article");
+  await expect(entries.first().getByRole("heading", { level: 2 })).toHaveText("Sunday, 4 October");
+  await expect(entries.nth(1).getByRole("heading", { level: 2 })).toHaveText("Saturday, 3 October");
+  await expect(entries.first()).toContainText("Nothing much. A quiet day is a day too.");
+  await expect(entries.first().locator("time")).toHaveText("4 October 2026");
+  await expect(page.locator("body")).not.toContainText(novelWords);
+  for (const colorScheme of ["light", "dark"] as const) {
+    await page.emulateMedia({ colorScheme });
+    await axe(page);
+  }
+
+  // A name in an entry opens its index entry, within the app.
+  await entries.nth(1).getByRole("link", { name: "the sluice" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "The Old Sluice" })).toBeVisible();
+  await page.goBack();
+
+  // A title opens the entry to write in; what's written there is what's read back.
+  await entries.first().getByRole("link", { name: "Sunday, 4 October" }).click();
+  const text = page.getByRole("textbox", { name: "Entry text" });
+  await expect(text).toBeVisible();
+  await text.click();
+  await page.keyboard.press("Control+End");
+  await page.keyboard.type(" Rain at dusk.");
+  await page.goBack();
+  await expect(entries.first()).toContainText("A quiet day is a day too. Rain at dusk.");
+});
+
