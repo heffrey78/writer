@@ -197,7 +197,8 @@ export function NovelPage() {
       ...(versions.data ?? [])
         .filter((v) => !v.current)
         .map((v) => ({ id: `novel.version.${v.id}`, title: `Open version: ${v.name}`, group: "Drafts", run: () => switchVersion.mutate(v) })),
-      { id: "novel.compile", title: `Compile the ${w?.content.one ?? "manuscript"}…`, group: w?.book.One ?? "Novel", keywords: ["export", "docx", "word", "epub", "pdf", "e-book", w?.content.one ?? "manuscript"], run: () => setCompiling(true) },
+      // Compiling runs on Node (@writer/export reads its fonts from disk): not where the engine runs in the page.
+      ...(engineInPage ? [] : [{ id: "novel.compile", title: `Compile the ${w?.content.one ?? "manuscript"}…`, group: w?.book.One ?? "Novel", keywords: ["export", "docx", "word", "epub", "pdf", "e-book", w?.content.one ?? "manuscript"], run: () => setCompiling(true) }]),
       { id: "novel.bible", title: w?.codex.One ?? "Story bible", group: "Go to", run: () => void navigate(`/novels/${novelId}/bible`) },
       { id: "novel.outline", title: "Outline", group: "Go to", keywords: ["table"], run: () => void navigate(`/novels/${novelId}/outline/table`) },
       { id: "novel.outlineCards", title: "Outline: cards", group: "Go to", keywords: ["corkboard", "index cards"], run: () => void navigate(`/novels/${novelId}/outline/cards`) },
@@ -245,9 +246,11 @@ export function NovelPage() {
       <DropdownMenu.Item className={MENU_ITEM} onSelect={() => useDrafts.getState().set(true)}>
         <History className="size-4" aria-hidden /> Checkpoints…
       </DropdownMenu.Item>
-      <DropdownMenu.Item className={MENU_ITEM} onSelect={() => setCompiling(true)}>
-        <FileDown className="size-4" aria-hidden /> Compile…
-      </DropdownMenu.Item>
+      {!engineInPage && (
+        <DropdownMenu.Item className={MENU_ITEM} onSelect={() => setCompiling(true)}>
+          <FileDown className="size-4" aria-hidden /> Compile…
+        </DropdownMenu.Item>
+      )}
     </>
   );
   const actions = workspace && (

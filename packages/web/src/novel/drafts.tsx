@@ -1,8 +1,8 @@
 import { ApiError, type Checkpoint, type Version } from "@writer/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronRight, Split } from "lucide-react";
+import { ChevronRight, Split, X } from "lucide-react";
 import { Dialog } from "radix-ui";
-import { useId, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useId, useState, type FormEvent, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { create } from "zustand";
 import { api, keys } from "../api.ts";
@@ -38,6 +38,8 @@ export function DraftsButton({ novelId, workspace }: { novelId: string; workspac
   const { open, set } = useDrafts();
   const versions = useVersions(novelId);
   const current = versions.data?.find((v) => v.current);
+  // Open or closed is the app's, not the book's: leaving the book closes it, so the next doesn't open on it.
+  useEffect(() => () => set(false), [novelId, set]);
   return (
     <Dialog.Root open={open} onOpenChange={set}>
       <Dialog.Trigger asChild>
@@ -53,7 +55,13 @@ export function DraftsButton({ novelId, workspace }: { novelId: string; workspac
           // An adoption with passages to settle opens the resolver, which keeps the focus.
           onCloseAutoFocus={(e) => void (useAdoption.getState().conflicts && e.preventDefault())}
         >
-          <Dialog.Title className="text-lg font-semibold">Drafts</Dialog.Title>
+          <div className="flex items-start justify-between gap-3">
+            <Dialog.Title className="text-lg font-semibold">Drafts</Dialog.Title>
+            {/* On a phone the panel fills the screen: there's no overlay to tap, and no Escape. */}
+            <Dialog.Close aria-label="Close" className="rounded-md p-1 text-muted hover:bg-paper hover:text-ink">
+              <X className="size-4" aria-hidden />
+            </Dialog.Close>
+          </div>
           <Dialog.Description className="text-sm text-muted">
             A version is a separate take on the book, with its own text and {w.codex.one}. A checkpoint is a moment in a version you can come back to. Whatever you do here can be undone.
           </Dialog.Description>

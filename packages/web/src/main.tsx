@@ -51,6 +51,7 @@ const ready = engine
   : onAndroid
     ? import("./engine/in-page.ts").then((m) => m.startEngine(...m.tauriHost()))
     : Promise.resolve();
+if (onAndroid) void import("./android-back.ts").then((m) => m.handleBack());
 
 void ready.then(() =>
   createRoot(document.getElementById("root")!).render(

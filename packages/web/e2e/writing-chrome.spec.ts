@@ -34,3 +34,20 @@ test("the chapter's length by its title, the scene's on its card, the session's 
     await axe(page);
   }
 });
+
+test("Compile… is in the ⋯ menu and the palette, except with the engine in the page, which can't compile", async ({ page, app, serveArgs }) => {
+  await app.restart(app.novelRepo("varn"));
+  await page.goto(app.launchUrl);
+  await expect(page.getByRole("textbox", { name: "Chapter text" })).toBeFocused();
+  const offered = serveArgs.includes("--engine-in-page") ? 0 : 1;
+
+  await page.getByRole("banner").getByRole("button", { name: "More" }).click();
+  await expect(page.getByRole("menuitem", { name: "Checkpoints…" })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Compile…" })).toHaveCount(offered);
+  await page.keyboard.press("Escape");
+
+  await page.keyboard.press("ControlOrMeta+k");
+  const palette = page.getByRole("dialog", { name: "Command palette" });
+  await palette.getByRole("combobox").fill("compile");
+  await expect(palette.getByRole("option", { name: /^Compile the manuscript/ })).toHaveCount(offered);
+});

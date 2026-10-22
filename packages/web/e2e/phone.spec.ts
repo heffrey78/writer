@@ -88,3 +88,29 @@ test("on a phone, by touch: the shelf, a book, its sidebar, writing, the palette
   await sync.getByRole("button", { name: "Sync now" }).tap();
   await expect.poll(() => app.git(remote, "show", `main:${STATION}`), { timeout: 15_000 }).toContain("Written on the phone.");
 });
+
+test("on a phone, Drafts closes by its button, and a book left with Drafts open doesn't open on it", async ({ page, app }) => {
+  await app.restart(app.novelRepo("varn"));
+  await launch(page, app);
+  const drafts = page.getByRole("dialog", { name: "Drafts" });
+  const open = page.getByRole("button", { name: "Drafts: Main version is open" });
+
+  // It fills the screen, with nothing beside it to tap: its own button closes it.
+  await open.tap();
+  await expect(drafts).toBeVisible();
+  await fits(page);
+  await audit(page);
+  await drafts.getByRole("button", { name: "Close" }).tap();
+  await expect(drafts).toHaveCount(0);
+
+  // Left for the shelf while open, as Android's back did: the book opens on its text again.
+  await page.getByRole("link", { name: "Writer: your books" }).tap();
+  await page.getByRole("list", { name: "Books" }).getByRole("link", { name: /The Bridge at Varn/ }).tap();
+  await open.tap();
+  await expect(drafts).toBeVisible();
+  await page.goBack();
+  await expect(page.getByRole("heading", { level: 1, name: "Your books" })).toBeVisible();
+  await page.getByRole("list", { name: "Books" }).getByRole("link", { name: /The Bridge at Varn/ }).tap();
+  await expect(page.getByRole("textbox", { name: "Chapter text" })).toBeVisible();
+  await expect(drafts).toHaveCount(0);
+});

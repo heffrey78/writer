@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/mobile-schema.json",
   "identifier": "default",
-  "description": "The app's page may call its own commands: the ports the engine in it runs on.",
+  "description": "The app's page may call its own commands: the ports the engine in it runs on. It may leave the app, when back is pressed on its first page.",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": ["core:default", "core:app:allow-exit"]
 }
