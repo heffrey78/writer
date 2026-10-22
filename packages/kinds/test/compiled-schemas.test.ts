@@ -17,7 +17,7 @@ describe("the compiled schemas", () => {
   });
 
   it("judge the sample books as the schemas compiled at run time do", async () => {
-    const books = ["sample-novel", "sample-journal", "sample-campaign"];
+    const books = ["sample-novel", "sample-journal", "sample-campaign", "sample-nonfiction"];
     const before = await Promise.all(books.map(async (b) => (await validate(nodeSource(sample(b)))).diagnostics));
     useCompiledKindSchemas();
     const after = await Promise.all(books.map(async (b) => (await validate(nodeSource(sample(b)))).diagnostics));

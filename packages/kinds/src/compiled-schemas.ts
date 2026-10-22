@@ -3,6 +3,7 @@ import type { ValidateFunction } from "ajv";
 import meta from "../generated/schemas.json" with { type: "json" };
 import * as campaign from "../generated/schemas-campaign.js";
 import * as journal from "../generated/schemas-journal.js";
+import * as nonfiction from "../generated/schemas-nonfiction.js";
 import * as novel from "../generated/schemas-novel.js";
 
 /**
@@ -10,12 +11,13 @@ import * as novel from "../generated/schemas-novel.js";
  * code can't be compiled at run time: the engine in a page (#51). Core uses a kind's only while its
  * schemas are those they were compiled from.
  */
-const MODULES: Record<string, Record<string, ValidateFunction>> = { novel, journal, campaign };
+const MODULES: Record<string, Record<string, ValidateFunction>> = { novel, journal, campaign, nonfiction };
 
 export function useCompiledKindSchemas(): void {
   for (const [key, { fingerprint, exports }] of Object.entries(meta)) {
     const module = MODULES[key];
-    if (!module) continue;
+    // A kind left out here would compile its schemas at run time, which a page's CSP refuses.
+    if (!module) throw new Error(`The ${key} kind's compiled schemas aren't imported in compiled-schemas.ts`);
     useCompiledSchemas(key, fingerprint, Object.fromEntries(Object.entries(exports).map(([name, exported]) => [name, module[exported]!])));
   }
 }
