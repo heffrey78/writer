@@ -39,6 +39,7 @@ export async function body(c: Context): Promise<Record<string, unknown>> {
  * POST  /:id/notes/:note/promote               { chapter, keep } → 201 { id, file }: the scene it became (what a module makes of one is the module's route)
  * POST  /:id/migrate                           { to? } → { migrated, commit }: the book in format `to` (the newest by default), one commit (D11, D15)
  * POST  /:id/convert                           { to } → { commit, files, notes }: the book made a book of the kind `to`, by its kind's modules' conversion, one commit (#39)
+ * PUT   /:id/sidebar                           { sidebar: { groups?, hidden? } | null } → { commit, files }: the writer's arrangement of the sidebar in book.yaml, or the kind's again (#63)
  * POST  /:id/bible/entity-types                { key, prefix, label, folder?, color? }
  * PATCH /:id/bible/entity-types/:key           { label?, color? }
  * POST  /:id/bible/relationship-types          { key, label, inverse_label?, symmetric?, from_types?, to_types? }
@@ -102,6 +103,10 @@ export function bibleRoutes(routes: Hono<Env>): void {
     const { to } = await body(c);
     const ws = c.var.ws;
     return operation(c, () => ws.exclusive(() => convertBook(ws.root, String(to ?? ""))));
+  });
+  routes.put("/:id/sidebar", async (c) => {
+    const { sidebar } = await body(c);
+    return operation(c, () => bible(c).updateSidebar(sidebar as never));
   });
   routes.post("/:id/bible/relationships/:rel/delete", async (c) => operation(c, () => bible(c).deleteRelationship(c.req.param("rel"))));
   routes.post("/:id/bible/entity-types", async (c) => operation(c, async () => bible(c).createEntityType((await body(c)) as never), 201));

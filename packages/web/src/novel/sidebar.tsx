@@ -1,4 +1,4 @@
-import { BASE_SIDEBAR, vocabulary, type Book, type BookKind } from "@writer/core";
+import { arrangeSidebar, MANIFEST, vocabulary, type Book, type BookKind, type SidebarFile } from "@writer/core";
 import { BookOpen, CircleDot, Columns2, Goal, ListTree, Map as MapIcon, Network, PanelLeftClose, PanelLeftOpen, PenLine, StickyNote, type LucideIcon } from "lucide-react";
 import { Dialog } from "radix-ui";
 import { useEffect, useId, useState, type ReactNode } from "react";
@@ -27,6 +27,9 @@ function load(): boolean {
   }
 }
 
+/** Whether Arrange the sidebar (#63, arrange-sidebar.tsx) is open: the app's, so it closes when its book does. */
+export const useArrangeSidebar = create<{ open: boolean; set: (open: boolean) => void }>((set) => ({ open: false, set: (open) => set({ open }) }));
+
 export const useSidebar = create<{ collapsed: boolean; toggle: () => void }>((set, get) => ({
   collapsed: load(),
   toggle: () => {
@@ -40,20 +43,30 @@ export const useSidebar = create<{ collapsed: boolean; toggle: () => void }>((se
   },
 }));
 
-interface Place {
+export interface Place {
+  /** Its key in a kind's sidebar and the writer's arrangement (#61). */
+  key: string;
   path: string;
   label: string;
   icon: LucideIcon;
 }
 
+/** A group of the sidebar's pages: its key, its heading, its pages in order. */
+export interface PlaceGroup {
+  key: string;
+  label: string;
+  places: Place[];
+}
+
 /**
- * The pages by group, as the kind's sidebar has them (#61): the story map only with a tab from a
- * module, Issues only for a book on GitHub. A module's page the kind doesn't name goes last in its
- * module's group, or the first group where the kind has none of that key. A group left empty isn't shown.
+ * The sidebar's pages by group (#61, #63): the kind's, with the writer's arrangement over it, and the
+ * pages it doesn't show. The story map only with a tab from a module, Issues only for a book on
+ * GitHub. A module's page neither names goes last in its module's group, or the first group where
+ * the kind has none of that key.
  */
-export function groups(onGitHub: boolean, kind: BookKind): { label: string; places: Place[] }[] {
+export function arrangement(onGitHub: boolean, kind: BookKind, mine?: SidebarFile): { groups: PlaceGroup[]; hidden: Place[] } {
   const views = moduleViews(kind).filter((v) => v.group);
-  const pages = new Map<string, Place | null>([
+  const pages = new Map<string, Omit<Place, "key"> | null>([
     ["outline", { path: "outline", label: "Outline", icon: ListTree }],
     ["story-map", moduleStoryMapTabs(kind).length ? { path: "story-map", label: "Story map", icon: MapIcon } : null],
     ["relationships", { path: "relationships", label: "Relationships", icon: Network }],
@@ -62,18 +75,30 @@ export function groups(onGitHub: boolean, kind: BookKind): { label: string; plac
     ["index", { path: "bible", label: vocabulary(kind).codex.One, icon: BookOpen }],
     ["compare", { path: "compare", label: "Compare", icon: Columns2 }],
     ["issues", onGitHub ? { path: "issues", label: "Issues", icon: CircleDot } : null],
-    ...views.map(({ path, label, icon }): [string, Place] => [path, { path, label, icon }]),
+    ...views.map(({ path, label, icon }): [string, Omit<Place, "key">] => [path, { path, label, icon }]),
   ]);
-  const layout = kind.sidebar ?? BASE_SIDEBAR;
-  const named = new Set(layout.flatMap((g) => g.pages));
+  const place = (key: string): Place[] => {
+    const p = pages.get(key);
+    return p ? [{ key, ...p }] : [];
+  };
+  const { groups: layout, hidden } = arrangeSidebar(kind, mine);
+  const named = new Set([...layout.flatMap((g) => g.pages), ...hidden]);
   const groupOf = (moduleGroup: string) => layout.find((g) => g.key === moduleGroup.toLowerCase()) ?? layout[0];
-  return layout
-    .map((g) => ({
+  return {
+    groups: layout.map((g) => ({
+      key: g.key,
       label: g.label,
-      places: [...g.pages, ...views.filter((v) => !named.has(v.path) && groupOf(v.group!) === g).map((v) => v.path)].flatMap((key) => pages.get(key) ?? []),
-    }))
-    .filter((g) => g.places.length);
+      places: [...g.pages, ...views.filter((v) => !named.has(v.path) && groupOf(v.group!) === g).map((v) => v.path)].flatMap(place),
+    })),
+    hidden: hidden.flatMap(place),
+  };
 }
+
+/** The sidebar's groups as it shows them: a group left empty isn't shown. */
+export const groups = (onGitHub: boolean, kind: BookKind, mine?: SidebarFile): PlaceGroup[] => arrangement(onGitHub, kind, mine).groups.filter((g) => g.places.length);
+
+/** The writer's arrangement of a book's sidebar: book.yaml's, which a format 2 novel.yaml doesn't have (#63). */
+export const arrangedBy = (novel: Book): SidebarFile | undefined => (novel.manifest === MANIFEST ? novel.config?.sidebar : undefined);
 
 const SHORTCUT = /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘\\" : "Ctrl+\\";
 
@@ -117,7 +142,7 @@ export function Sidebar({ novelId, novel, workspace, current, onGitHub }: { nove
   if (narrow)
     return (
       <>
-        <Strip novelId={novelId} kind={novel.kind} onGitHub={onGitHub} toggle={() => setDrawer(true)} />
+        <Strip novelId={novelId} novel={novel} onGitHub={onGitHub} toggle={() => setDrawer(true)} />
         <Dialog.Root open={drawer} onOpenChange={setDrawer}>
           <Dialog.Portal>
             <Dialog.Overlay className="fixed inset-0 z-30 bg-black/40" />
@@ -130,7 +155,7 @@ export function Sidebar({ novelId, novel, workspace, current, onGitHub }: { nove
       </>
     );
   return collapsed ? (
-    <Strip novelId={novelId} kind={novel.kind} onGitHub={onGitHub} toggle={toggle} />
+    <Strip novelId={novelId} novel={novel} onGitHub={onGitHub} toggle={toggle} />
   ) : (
     <Expanded novelId={novelId} novel={novel} workspace={workspace} current={current} onGitHub={onGitHub} toggle={toggle} />
   );
@@ -160,8 +185,8 @@ function Expanded({ novelId, novel, workspace, current, onGitHub, toggle }: { no
         </div>
       </section>
       <nav aria-label="Views" className="grid shrink-0 gap-3 border-t border-rule px-3 py-3 text-sm">
-        {groups(onGitHub, novel.kind).map((g) => (
-          <Group key={g.label} label={g.label}>
+        {groups(onGitHub, novel.kind, arrangedBy(novel)).map((g) => (
+          <Group key={g.key} label={g.label}>
             {g.places.map((p) => (
               <li key={p.path}>
                 <NavLink to={`/novels/${novelId}/${p.path}`} className={({ isActive }) => cn("flex items-center gap-2 rounded-md px-2 py-1 hover:bg-paper", isActive && "bg-accent-soft font-medium")}>
@@ -182,6 +207,9 @@ function Expanded({ novelId, novel, workspace, current, onGitHub, toggle }: { no
             ))}
           </Group>
         ))}
+        <button type="button" onClick={() => useArrangeSidebar.getState().set(true)} className="justify-self-start rounded-md px-2 py-1 text-xs text-muted hover:bg-paper hover:text-ink">
+          Arrange the sidebar…
+        </button>
       </nav>
     </aside>
   );
@@ -206,7 +234,8 @@ function Group({ label, children }: { label: string; children: ReactNode }) {
 }
 
 /** Collapsed: one icon per place, each named (for screen readers, and as a tooltip). */
-function Strip({ novelId, kind, onGitHub, toggle }: { novelId: string; kind: BookKind; onGitHub: boolean; toggle: () => void }) {
+function Strip({ novelId, novel, onGitHub, toggle }: { novelId: string; novel: Book; onGitHub: boolean; toggle: () => void }) {
+  const { kind } = novel;
   const icon = (to: string, label: string, Icon: LucideIcon, end = false) => (
     <NavLink
       key={to}
@@ -224,8 +253,8 @@ function Strip({ novelId, kind, onGitHub, toggle }: { novelId: string; kind: Boo
       <ToggleButton collapsed toggle={toggle} />
       <nav aria-label="Views" className="flex flex-col items-center gap-1">
         {icon(`/novels/${novelId}`, vocabulary(kind).content.One, PenLine, true)}
-        {groups(onGitHub, kind).map((g) => (
-          <div key={g.label} role="group" aria-label={g.label} className="flex flex-col items-center gap-1 border-t border-rule pt-1">
+        {groups(onGitHub, kind, arrangedBy(novel)).map((g) => (
+          <div key={g.key} role="group" aria-label={g.label} className="flex flex-col items-center gap-1 border-t border-rule pt-1">
             {g.places.map((p) => icon(`/novels/${novelId}/${p.path}`, p.label, p.icon))}
           </div>
         ))}

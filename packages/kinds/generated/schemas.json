@@ -1,6 +1,6 @@
 {
   "novel": {
-    "fingerprint": "d0dbf9fee239f20e",
+    "fingerprint": "d92170f5ecdc330e",
     "exports": {
       "novel": "v0",
       "manuscript-order": "v1",
@@ -18,7 +18,7 @@
     }
   },
   "journal": {
-    "fingerprint": "cab3da29f898f5e9",
+    "fingerprint": "37f358aa3c871f49",
     "exports": {
       "novel": "v0",
       "manuscript-order": "v1",
@@ -34,7 +34,7 @@
     }
   },
   "campaign": {
-    "fingerprint": "df841ad3ab52a901",
+    "fingerprint": "60753c833cd2142f",
     "exports": {
       "novel": "v0",
       "manuscript-order": "v1",
@@ -49,7 +49,7 @@
     }
   },
   "nonfiction": {
-    "fingerprint": "9afff53667022ff3",
+    "fingerprint": "643f990a4fbbcc75",
     "exports": {
       "novel": "v0",
       "manuscript-order": "v1",

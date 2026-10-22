@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { devices, type Page } from "@playwright/test";
 import { axe, expect, launch, test } from "./fixtures.ts";
 
@@ -113,4 +114,22 @@ test("on a phone, Drafts closes by its button, and a book left with Drafts open 
   await page.getByRole("list", { name: "Books" }).getByRole("link", { name: /The Bridge at Varn/ }).tap();
   await expect(page.getByRole("textbox", { name: "Chapter text" })).toBeVisible();
   await expect(drafts).toHaveCount(0);
+});
+
+test("on a phone, Arrange the sidebar fits, from the ⋯ menu, and closes by its button", async ({ page, app }) => {
+  await app.restart(app.bookRepo(fileURLToPath(new URL("../../../examples/sample-journal", import.meta.url)), "journal"));
+  await launch(page, app);
+  // The book open first: until then the ⋯ menu has only the app's items.
+  await expect(page.getByRole("textbox", { name: "Month text" })).toBeVisible();
+  await page.getByRole("banner").getByRole("button", { name: /^More/ }).tap();
+  await page.getByRole("menuitem", { name: "Arrange the sidebar…" }).tap();
+  const dialog = page.getByRole("dialog", { name: "Arrange the sidebar" });
+  await expect(dialog).toBeVisible();
+  const box = await dialog.boundingBox();
+  expect(box!.x).toBeGreaterThanOrEqual(0);
+  expect(box!.x + box!.width).toBeLessThanOrEqual(viewport.width);
+  await fits(page);
+  await audit(page);
+  await dialog.getByRole("button", { name: "Cancel" }).tap();
+  await expect(dialog).toHaveCount(0);
 });

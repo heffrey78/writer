@@ -9,7 +9,7 @@ import { api, keys } from "../api.ts";
 import { useCommands, type Command } from "../commands.ts";
 import { ModuleCommands, moduleRecordTypes, moduleRoutes, useNewRecord } from "../modules.tsx";
 import { flushOnQuit } from "../desktop.ts";
-import { FileDown, History } from "lucide-react";
+import { FileDown, History, ListOrdered } from "lucide-react";
 import { DropdownMenu } from "radix-ui";
 import { MENU_ITEM, Shell } from "../layout.tsx";
 import { ErrorAlert } from "../ui/alert.tsx";
@@ -24,6 +24,7 @@ import { BookKindContext, useWords } from "./kind.ts";
 import { EntryOver, NoteOver, RecordOver } from "./item-modals.tsx";
 import { cn } from "../ui/cn.ts";
 import { DraftsButton, useDrafts } from "./drafts.tsx";
+import { ArrangeSidebar } from "./arrange-sidebar.tsx";
 import { CompileDialog } from "./compile.tsx";
 import { ComparePage } from "./compare-page.tsx";
 import { StoryMapPage, storyMapTabs } from "./story-map.tsx";
@@ -31,7 +32,7 @@ import { ProgressPage } from "./progress-page.tsx";
 import { AdoptConflicts, useSwitchVersion, useVersions } from "./versions.tsx";
 import { SaveConflicts, SyncConflicts } from "./conflicts.tsx";
 import { useNovelEvents } from "./events.ts";
-import { Sidebar, useSidebar } from "./sidebar.tsx";
+import { Sidebar, useArrangeSidebar, useSidebar } from "./sidebar.tsx";
 import { chapterTitle } from "./navigation.tsx";
 import { NoticeBar } from "./notice.tsx";
 import { OutlinePage } from "./outline-page.tsx";
@@ -199,6 +200,7 @@ export function NovelPage() {
         .map((v) => ({ id: `novel.version.${v.id}`, title: `Open version: ${v.name}`, group: "Drafts", run: () => switchVersion.mutate(v) })),
       // Compiling runs on Node (@writer/export reads its fonts from disk): not where the engine runs in the page.
       ...(engineInPage ? [] : [{ id: "novel.compile", title: `Compile the ${w?.content.one ?? "manuscript"}…`, group: w?.book.One ?? "Novel", keywords: ["export", "docx", "word", "epub", "pdf", "e-book", w?.content.one ?? "manuscript"], run: () => setCompiling(true) }]),
+      { id: "novel.arrangeSidebar", title: "Arrange the sidebar…", group: "App", keywords: ["order", "hide", "show", "pages", "views", "menu"], run: () => useArrangeSidebar.getState().set(true) },
       { id: "novel.bible", title: w?.codex.One ?? "Story bible", group: "Go to", run: () => void navigate(`/novels/${novelId}/bible`) },
       { id: "novel.outline", title: "Outline", group: "Go to", keywords: ["table"], run: () => void navigate(`/novels/${novelId}/outline/table`) },
       { id: "novel.outlineCards", title: "Outline: cards", group: "Go to", keywords: ["corkboard", "index cards"], run: () => void navigate(`/novels/${novelId}/outline/cards`) },
@@ -245,6 +247,9 @@ export function NovelPage() {
     <>
       <DropdownMenu.Item className={MENU_ITEM} onSelect={() => useDrafts.getState().set(true)}>
         <History className="size-4" aria-hidden /> Checkpoints…
+      </DropdownMenu.Item>
+      <DropdownMenu.Item className={MENU_ITEM} onSelect={() => useArrangeSidebar.getState().set(true)}>
+        <ListOrdered className="size-4" aria-hidden /> Arrange the sidebar…
       </DropdownMenu.Item>
       {!engineInPage && (
         <DropdownMenu.Item className={MENU_ITEM} onSelect={() => setCompiling(true)}>
@@ -353,6 +358,7 @@ export function NovelPage() {
         <AdoptConflicts novelId={novelId} novel={book} workspace={workspace} />
         {compiling && <CompileDialog novelId={novelId} novel={book} workspace={workspace} onClose={() => setCompiling(false)} />}
         <SaveConflicts novel={book} workspace={workspace} />
+        <ArrangeSidebar novelId={novelId} novel={book} onGitHub={!!repo} onNewFormat={newFormat.commands[0]?.run} />
         <ModuleCommands novelId={novelId} novel={book} workspace={workspace} />
         <NoticeBar />
         <NotesLeftDialog />

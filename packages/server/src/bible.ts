@@ -6,11 +6,13 @@ import {
   proseText,
   indexById,
   loadBook,
+  MANIFEST,
   nextSeriesSlot,
   SERIES,
   ID_PATTERN,
   RECORD_PREFIXES,
   reservedPrefixes,
+  SCHEMA_VERSION,
   slugify,
   uniqueFileName,
   uniqueId,
@@ -18,6 +20,7 @@ import {
   type Book,
   type Relationship,
   type SeriesSlot,
+  type SidebarFile,
   type YamlEdit,
 } from "@writer/core";
 import { parse, stringify } from "yaml";
@@ -508,6 +511,28 @@ export class BibleOperations {
       const edits = Object.keys(current).length ? editsAt(["target"], changes as Record<string, unknown>) : [{ path: ["target"], remove: true as const }];
       const content = editYaml(await this.#read(novel.manifest), edits.filter((e) => !("value" in e) || e.value !== undefined));
       return transaction(this.root, [{ path: novel.manifest, content }], "Set the book's targets");
+    });
+  }
+
+  /**
+   * Set the writer's arrangement of the sidebar in book.yaml (#63), or remove it (null: the kind's
+   * again). One commit. A novel still in novel.yaml is NEEDS_MIGRATION: gh-writer reads that file.
+   */
+  updateSidebar(sidebar: SidebarFile | null): Promise<OperationResult> {
+    return this.#run(async (novel) => {
+      if (novel.manifest !== MANIFEST) {
+        throw new OperationError("NEEDS_MIGRATION", `Arranging the sidebar needs the book in the new format, with its settings in ${MANIFEST}.`, { from: novel.config?.schema_version, to: SCHEMA_VERSION });
+      }
+      if (sidebar !== null) {
+        if (typeof sidebar !== "object" || Array.isArray(sidebar)) throw new OperationError("BAD_REQUEST", "The sidebar is its groups' pages and the pages hidden, by key, or null.");
+        const keys = (v: unknown) => Array.isArray(v) && v.every((k) => typeof k === "string" && /^[a-z][a-z0-9-]*$/.test(k));
+        const { groups, hidden, ...rest } = sidebar as Record<string, unknown>;
+        const groupsOk = groups === undefined || (typeof groups === "object" && groups !== null && !Array.isArray(groups) && Object.entries(groups).every(([k, v]) => keys([k]) && keys(v)));
+        if (Object.keys(rest).length || !groupsOk || (hidden !== undefined && !keys(hidden))) throw new OperationError("BAD_REQUEST", "The sidebar is its groups' pages and the pages hidden, by key.");
+      }
+      const edit = sidebar === null ? { path: ["sidebar"], remove: true as const } : { path: ["sidebar"], value: sidebar };
+      const content = editYaml(await this.#read(novel.manifest), [edit]);
+      return transaction(this.root, [{ path: novel.manifest, content }], sidebar === null ? "The sidebar as the book's kind has it" : "Arrange the sidebar");
     });
   }
 

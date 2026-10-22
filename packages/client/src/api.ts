@@ -4,7 +4,7 @@
  */
 
 import type { Comparison, ParagraphDiff } from "@writer/core/compare";
-import type { SeriesSlot, WritingDay } from "@writer/core";
+import type { SeriesSlot, SidebarFile, WritingDay } from "@writer/core";
 
 /** GET /stats: the open version's writing days, the manuscript's words now, and novel.yaml's target. */
 /** How a relationship type is drawn: a palette slot and a line. */
@@ -535,6 +535,8 @@ export function createApi({ baseUrl = "", headers = {}, fetch = globalThis.fetch
     /** Kept as an automatic checkpoint first: `checkpoint` in the result brings it back. */
     discardVersion: async (id: string, versionId: string) =>
       (await request<DiscardResult>("DELETE", `/api/novels/${encodeURIComponent(id)}/versions/${encodeURIComponent(versionId)}`)).data,
+    /** The writer's arrangement of the sidebar in book.yaml, or null for the kind's again (#63): one commit. */
+    setSidebar: async (id: string, sidebar: SidebarFile | null) => (await request<OperationResult>("PUT", `/api/novels/${encodeURIComponent(id)}/sidebar`, { sidebar })).data,
     /** Set novel.yaml's targets (null removes one): one commit. */
     setTarget: async (id: string, target: { words?: number | null; date?: string | null; daily?: number | null }) =>
       (await request<OperationResult>("PUT", `/api/novels/${encodeURIComponent(id)}/target`, target)).data,

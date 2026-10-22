@@ -3,8 +3,10 @@ import type { FieldDef } from "./kinds.ts";
 import { loadBook } from "./load.ts";
 import { moduleDiagnostics, recordTypesOf } from "./modules.ts";
 import { allRecords, levelLabel, mentions, pieceLevel, picturePath, pictures, sectionsAt, type Book, type Picture, type RecordRef } from "./model.ts";
+import { sidebarOf, sidebarPages, type SidebarFile } from "./sidebar.ts";
 import type { FileSource } from "./source.ts";
 import type { Diagnostic, Severity } from "./types.ts";
+import { vocabulary } from "./vocabulary.ts";
 
 /** Every diagnostic code, with its severity. docs/format/v3.md documents each one. */
 export const RULES: Readonly<Record<string, Severity>> = {
@@ -34,6 +36,7 @@ export const RULES: Readonly<Record<string, Severity>> = {
   W_MISSING_IMAGE: "warning",
   W_IMAGE_OUTSIDE: "warning",
   W_NOTE_PIN: "warning",
+  W_SIDEBAR_UNKNOWN: "warning",
 };
 
 export interface ValidationResult {
@@ -181,6 +184,23 @@ export function validateBook(novel: Book): Diagnostic[] {
       if (!typeByKey.has(k)) push("error", "E_ENTITY_TYPE", novel.manifest, `Relationship type "${t.key}" refers to unknown entity type "${k}"`, { pointer: `/relationship_types/${i}` });
     }
   });
+
+  // The sidebar's arrangement (#63): a group or page this kind doesn't have is harmless, but probably a typo.
+  // Only when it has the schema's shape: E_SCHEMA says what's wrong with one that hasn't.
+  const sidebar = novel.config?.sidebar;
+  const keyList = (v: unknown): v is string[] => Array.isArray(v) && v.every((k) => typeof k === "string");
+  const shaped = (s: unknown): s is SidebarFile =>
+    typeof s === "object" && s !== null && (!("groups" in s) || (typeof s.groups === "object" && s.groups !== null && Object.values(s.groups).every(keyList))) && (!("hidden" in s) || keyList(s.hidden));
+  if (shaped(sidebar)) {
+    const groupKeys = new Set(sidebarOf(kind).map((g) => g.key));
+    const pages = new Set(sidebarPages(kind));
+    const unknown = (key: string, pointer: string, what: string) => push("warning", "W_SIDEBAR_UNKNOWN", novel.manifest, `The sidebar names ${what} “${key}”, which ${vocabulary(kind).book.a} doesn't have`, { pointer });
+    for (const [group, list] of Object.entries(sidebar.groups ?? {})) {
+      if (!groupKeys.has(group)) unknown(group, `/sidebar/groups/${group}`, "a group");
+      list.forEach((p, i) => !pages.has(p) && unknown(p, `/sidebar/groups/${group}/${i}`, "a page"));
+    }
+    (sidebar.hidden ?? []).forEach((p, i) => !pages.has(p) && unknown(p, `/sidebar/hidden/${i}`, "a page"));
+  }
 
   // Diagram layouts: positions for records that no longer exist are harmless, but stale.
   for (const [name, layout] of Object.entries(novel.layouts)) {

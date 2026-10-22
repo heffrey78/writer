@@ -1,3 +1,5 @@
+import type { SidebarFile } from "./sidebar.ts";
+
 // File shapes of the v1 novel repository format, mirroring packages/core/schemas.
 // Keep these in sync with the JSON Schemas; test/schemas.test.ts checks the examples.
 
@@ -22,6 +24,8 @@ export interface NovelFile {
   calendar?: { start?: string };
   /** How long a plotline may go unmentioned before the swimlanes show a gap. */
   plotline_gap?: { scenes: number } | { words: number };
+  /** The writer's arrangement of the sidebar (#63), in format 3. */
+  sidebar?: SidebarFile;
 }
 
 export interface CustomEntityTypeFile {

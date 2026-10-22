@@ -97,13 +97,21 @@ function pieceSchema(kind: BookKind): object {
   return { $schema: scene.$schema, $id: scene.$id, title: scene.title, type: "object", properties, required: ["id", "title"], additionalProperties: false };
 }
 
-/** book.yaml (format 3): novel.yaml's settings, and the kind of book it is. */
+/** A page's or a group's key in the sidebar's arrangement. */
+const SIDEBAR_KEY = { type: "string", pattern: "^[a-z][a-z0-9-]*$" };
+
+/**
+ * book.yaml (format 3): novel.yaml's settings, the kind of book it is, and the writer's arrangement of
+ * the sidebar (#63), which only format 3 has: gh-writer reads a format 2 novel.yaml.
+ */
 function bookSchema(): object {
+  const keys = { type: "array", items: SIDEBAR_KEY, uniqueItems: true };
+  const sidebar = { type: "object", properties: { groups: { type: "object", additionalProperties: keys }, hidden: keys }, additionalProperties: false };
   return {
     ...novel,
     $id: `${BASE}book.schema.json`,
     title: "book.yaml",
-    properties: { ...novel.properties, schema_version: { type: "integer", minimum: 3 }, kind: ref("nonEmptyText") },
+    properties: { ...novel.properties, schema_version: { type: "integer", minimum: 3 }, kind: ref("nonEmptyText"), sidebar },
     required: [...novel.required, "kind"],
   };
 }
