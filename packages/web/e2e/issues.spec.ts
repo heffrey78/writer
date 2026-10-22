@@ -310,6 +310,13 @@ test("open issues sit beside their passages, follow the text, open beside it, an
   await expect(panel).toHaveCount(0);
   await expect(text).toBeFocused();
 
+  // The sidebar's shortcut over the open issue: the sidebar in its place.
+  await marker.click();
+  await expect(panel).toBeVisible();
+  await page.keyboard.press("ControlOrMeta+Shift+Backslash");
+  await expect(panel).toHaveCount(0);
+  await expect(page.getByRole("tablist", { name: "Right sidebar tabs" })).toBeVisible();
+
   // By keyboard: the shortcut beside the passage.
   await text.getByText(/the way you count stitches/).click();
   await expect(text).toBeFocused();

@@ -51,7 +51,7 @@ import { SceneNotes, useSceneNotes } from "../notes/scene-notes.tsx";
 import { leaveMention, MentionCard, useMentionCard } from "./mention-card.tsx";
 import { mentionEdits } from "./mention-sync.ts";
 import { useNotice } from "./notice.tsx";
-import { RightSidebar, useRightSidebar, useWideSidebar } from "./right-sidebar.tsx";
+import { isSidebarKey, RightSidebar, useRightSidebar, useWideSidebar } from "./right-sidebar.tsx";
 import { usePageMenu } from "../page-menu.ts";
 import { pinnedLine, SceneDetails, usePins } from "./scene-details.tsx";
 import { TodayCount } from "./today-count.tsx";
@@ -271,6 +271,19 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
   const repo = useGitHubRepo(novelId);
   const raising = useRaise((s) => s.passage !== undefined);
   const issueOpen = useIssuePanel((s) => s.numbers.length > 0);
+  // The sidebar's shortcut while an issue being read has its place: the sidebar, which listens for
+  // it, isn't there to hear it.
+  useEffect(() => {
+    if (!issueOpen) return;
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (!isSidebarKey(e)) return;
+      e.preventDefault();
+      useIssuePanel.setState({ numbers: [], editor: undefined });
+      useRightSidebar.getState().show(useRightSidebar.getState().tab);
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [issueOpen]);
   // Open issues about passages, beside them in the margin.
   const openIssues = useIssueList(novelId, { state: "open" }, { enabled: !!repo });
   const anchored = useMemo(

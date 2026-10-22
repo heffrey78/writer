@@ -74,6 +74,9 @@ export const useRightSidebar = create<SidebarState>((set, get) => {
 });
 
 const MAC = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
+
+/** Ctrl+Shift+\ (⌘⇧\ on a Mac), the key by its place: Shift+\ types "|" on most keyboards. */
+export const isSidebarKey = (e: globalThis.KeyboardEvent) => (MAC ? e.metaKey : e.ctrlKey) && e.shiftKey && !e.altKey && e.code === "Backslash";
 export const SIDEBAR_SHORTCUT = MAC ? "⌘⇧\\" : "Ctrl+Shift+\\";
 const ARIA_KEYS = MAC ? "Meta+Shift+\\" : "Control+Shift+\\";
 
@@ -110,7 +113,7 @@ export function RightSidebar({ content, toText, labels = {} }: { content: Record
   useEffect(() => {
     const onKey = (e: globalThis.KeyboardEvent) => {
       const mod = MAC ? e.metaKey : e.ctrlKey;
-      if (mod && e.shiftKey && !e.altKey && e.code === "Backslash") {
+      if (isSidebarKey(e)) {
         e.preventDefault();
         toggle();
         return;
