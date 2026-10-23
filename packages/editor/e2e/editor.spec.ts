@@ -98,6 +98,19 @@ test("a mention can't be broken by typing", async ({ page }) => {
   expect(await savedText(page)).not.toContain("[Ada]");
 });
 
+test("the space after a mention at the end of a line stays as typing goes on, without TipTap's style tag", async ({ page }) => {
+  await openScene(page, STATION);
+  // TipTap takes its tag out when an editor goes while the next isn't in the page yet (a new view).
+  await page.evaluate(() => document.querySelectorAll("style[data-tiptap-style]").forEach((s) => s.remove()));
+  expect(await textbox(page).evaluate((el) => getComputedStyle(el).whiteSpace)).toBe("break-spaces");
+  await caretAfter(page, "into Varn, and ");
+  await move(page, "End");
+  // As the @ menu leaves a mention: the entry, then a space, the caret after it.
+  await page.evaluate(() => void window.editor!.chain().focus().insertContent([{ type: "mention", attrs: { id: "char_7f3k2q", label: "Ada" } }, { type: "text", text: " " }]).run());
+  await page.keyboard.type("too.");
+  await savedContains(page, "[Ada](#char_7f3k2q) too.");
+});
+
 test("headings, lists, tables and pictures show as themselves; raw Markdown is shown and kept as written", async ({ page }) => {
   await openScene(page, "scenes/sampler.md");
   const text = textbox(page);

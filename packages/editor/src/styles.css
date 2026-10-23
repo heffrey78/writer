@@ -38,6 +38,46 @@
   --ghw-paper: #1b1a18;
 }
 
+/*
+ * What ProseMirror needs of the page, here as well as in TipTap's own style tag: TipTap takes its tag
+ * out when an editor goes and no other is in the page, and an editor coming on a new page isn't in
+ * it yet. Without pre-wrap, a space at the end of a line collapses, and typing after it loses it.
+ */
+.ProseMirror {
+  position: relative;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+  white-space: break-spaces;
+  -webkit-font-variant-ligatures: none;
+  font-variant-ligatures: none;
+  font-feature-settings: "liga" 0;
+}
+
+.ProseMirror [contenteditable="false"] {
+  white-space: normal;
+}
+
+.ProseMirror [contenteditable="false"] [contenteditable="true"],
+.ProseMirror pre {
+  white-space: pre-wrap;
+}
+
+img.ProseMirror-separator {
+  display: inline !important;
+  border: none !important;
+  margin: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.ProseMirror-hideselection *::selection {
+  background: transparent;
+}
+
+.ProseMirror-hideselection * {
+  caret-color: transparent;
+}
+
 .ghw-prose {
   max-width: var(--ghw-prose-measure);
   margin: 0 auto;
