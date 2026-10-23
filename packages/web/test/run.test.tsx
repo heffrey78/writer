@@ -7,7 +7,8 @@ import type { Editor } from "@tiptap/core";
 import { join } from "node:path";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createStore } from "zustand/vanilla";
-import { RunPieces, type Run } from "../src/novel/run.tsx";
+import { useNotice } from "../src/novel/notice.tsx";
+import { BEGIN, RunPieces, type Run } from "../src/novel/run.tsx";
 import type { Workspace, WorkspaceState } from "../src/novel/workspace.ts";
 
 /** A run of pieces in the writing view (#64): each in its own editor, saving to its own file. */
@@ -27,8 +28,9 @@ function workspace() {
   const change = vi.fn((path: string, body: string) => store.setState((s) => ({ files: { ...s.files, [path]: { ...s.files[path]!, body } } })));
   const open = vi.fn(async (paths: string[]) => {
     for (const path of paths) {
-      const piece = book.allPieces.find((p) => p.file === path)!;
-      store.setState((s) => ({ files: { ...s.files, [path]: { path, frontMatter: "", body: piece.body, disk: piece.body, hash: "h" } } }));
+      // A piece just made is empty.
+      const body = book.allPieces.find((p) => p.file === path)?.body ?? "";
+      store.setState((s) => ({ files: { ...s.files, [path]: { path, frontMatter: "", body, disk: body, hash: "h" } } }));
     }
   });
   return { store, open, change, live: () => () => {} } as unknown as Workspace & { change: typeof change; open: typeof open };
@@ -37,7 +39,7 @@ function workspace() {
 function mount(pieces: readonly Piece[], more: Partial<Run> = {}) {
   const ws = workspace();
   const editors = new Map<string, Editor>();
-  const onFocus = vi.fn((editor: Editor, piece: Piece) => void editors.set(piece.id, editor));
+  const onFocus = vi.fn((editor: Editor, piece: Piece | undefined) => void editors.set(piece?.id ?? BEGIN, editor));
   const run: Run = {
     key: "test",
     heading: "Entries",
@@ -98,5 +100,62 @@ describe("a run of pieces", () => {
     act(() => screen.getByRole("button", { name: "Earlier entries" }).click());
     expect(screen.getAllByRole("article")).toHaveLength(12);
     expect(screen.queryByRole("button", { name: "Earlier entries" })).toBeNull();
+  });
+});
+
+describe("the place to begin a piece", () => {
+  const today = () => ({ ...book.allPieces[0]!, id: "ent_today", title: "Friday, 23 October", file: "entries/01-2026/01-october/04-friday-23-october.md", body: "" });
+  const begin = (make: () => Promise<string>) => ({ label: "Write today's entry", header: <h2>Today</h2>, make });
+  const typeIn = (editor: Editor, text: string) => {
+    act(() => void editor.chain().focus("end").insertContent(text).run());
+    act(() => void vi.advanceTimersByTime(400));
+  };
+
+  it("makes the piece on its first words, and the same editor goes on as the piece's, every word kept", async () => {
+    const make = vi.fn(async () => "ent_today");
+    const { ws, rerender } = mount(book.allPieces, { begin: begin(make) });
+    const box = await screen.findByRole("textbox", { name: "Write today's entry" });
+    const editor = (box as unknown as { editor: Editor }).editor;
+    typeIn(editor, "Rain");
+    expect(make).toHaveBeenCalledTimes(1);
+    // Typing goes on while it's made.
+    typeIn(editor, " at dawn");
+    expect(make).toHaveBeenCalledTimes(1);
+    await act(async () => {});
+
+    // The book has it: the run's caller gives it first, with no place to begin one.
+    const made = today();
+    rerender({ pieces: [made, ...book.allPieces], begin: undefined });
+    await act(async () => {});
+    expect(screen.getAllByRole("article")[0]!.getAttribute("aria-label")).toBe(made.title);
+    expect(screen.getAllByRole("textbox")[0]).toBe(box);
+    expect(box.getAttribute("aria-label")).toBe(`Entry text: ${made.title}`);
+    expect(ws.store.getState().files[made.file]?.body).toBe("Rain at dawn\n");
+    typeIn(editor, ".");
+    expect(ws.store.getState().files[made.file]?.body).toBe("Rain at dawn.\n");
+    expect(editor.getText()).toBe("Rain at dawn.");
+  });
+
+  it("makes nothing if nothing is typed", async () => {
+    const make = vi.fn(async () => "ent_today");
+    mount(book.allPieces, { begin: begin(make) });
+    const box = await screen.findByRole("textbox", { name: "Write today's entry" });
+    const editor = (box as unknown as { editor: Editor }).editor;
+    act(() => void editor.commands.focus());
+    act(() => void editor.view.dom.dispatchEvent(new FocusEvent("blur")));
+    act(() => void vi.advanceTimersByTime(1000));
+    expect(make).not.toHaveBeenCalled();
+  });
+
+  it("keeps the words if the piece can't be made, and tries again as typing goes on", async () => {
+    const make = vi.fn<() => Promise<string>>().mockRejectedValueOnce(new Error("The disk is full")).mockResolvedValue("ent_today");
+    mount(book.allPieces, { begin: begin(make) });
+    const editor = ((await screen.findByRole("textbox", { name: "Write today's entry" })) as unknown as { editor: Editor }).editor;
+    typeIn(editor, "Rain");
+    await act(async () => {});
+    expect(useNotice.getState().notice?.message).toMatch(/^Couldn't start the entry: The disk is full\. Your words are kept here/);
+    expect(editor.getText()).toBe("Rain");
+    typeIn(editor, ".");
+    expect(make).toHaveBeenCalledTimes(2);
   });
 });

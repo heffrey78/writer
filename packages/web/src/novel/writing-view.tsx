@@ -363,7 +363,7 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
   });
   const onMention = mentionsFor(() => editor);
   // What each editor of a run is given: the same tools, acting on it.
-  const runTools = (piece: Piece, get: () => Editor | undefined): RunTools => ({
+  const runTools = (piece: Piece | undefined, get: () => Editor | undefined): RunTools => ({
     entities,
     newEntry,
     issueMarks: issueMarksFor(get),
