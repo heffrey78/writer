@@ -11,7 +11,7 @@ import { storyTimeWeb } from "@writer/module-story-time/web";
 import { Users } from "lucide-react";
 import { describe, expect, it } from "vitest";
 import { registerWebModule } from "../src/modules.tsx";
-import { groups } from "../src/novel/sidebar.tsx";
+import { groups, homeOf } from "../src/novel/sidebar.tsx";
 
 /** Each kind's sidebar (#61): its groups in its words, its pages in its order, with the app's modules. */
 
@@ -61,5 +61,15 @@ describe("the sidebar", () => {
     registerWebModule({ id: "company", views: [{ path: "company", label: "Company", icon: Users, group: "Revise", render: () => null }] });
     expect(sidebar({ ...kindByKey("nonfiction"), modules: [...nonfiction.modules!, "company"] })[1]).toEqual(["Revise", ["Issues", "Compare", "Company"]]);
     expect(sidebar({ ...kindByKey("journal"), modules: [...journal.modules!, "company"] })[0]).toEqual(["Look back", ["Calendar", "Read", "Notes", "Issues", "Company"]]);
+  });
+
+  it("names the page a kind's books open on, if it's there", () => {
+    expect(homeOf(true, kindByKey("novel"))).toBeUndefined();
+    const journal = kindByKey("journal");
+    expect(homeOf(true, { ...journal, home: "calendar" })).toBe("calendar");
+    expect(homeOf(true, { ...journal, home: "index" })).toBe("bible");
+    // Issues off GitHub, and a page no module adds: the first section, as without one.
+    expect(homeOf(false, { ...journal, home: "issues" })).toBeUndefined();
+    expect(homeOf(true, { ...journal, home: "nowhere" })).toBeUndefined();
   });
 });

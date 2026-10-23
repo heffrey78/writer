@@ -201,6 +201,11 @@ export interface BookKind extends Noun {
    * still in the palette; a module's page it doesn't name goes in its module's group. Without it, BASE_SIDEBAR.
    */
   sidebar?: readonly SidebarGroup[];
+  /**
+   * The page its books open on (#64), by a key as in `sidebar`: a journal's journal page (read). Without
+   * it, or where the page isn't there, a book opens on its first section.
+   */
+  home?: string;
 }
 
 /** The kind of every book in format v2, which has no `kind`. */

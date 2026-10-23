@@ -32,7 +32,7 @@ import { ProgressPage } from "./progress-page.tsx";
 import { AdoptConflicts, useSwitchVersion, useVersions } from "./versions.tsx";
 import { SaveConflicts, SyncConflicts } from "./conflicts.tsx";
 import { useNovelEvents } from "./events.ts";
-import { Sidebar, useArrangeSidebar, useSidebar } from "./sidebar.tsx";
+import { homeOf, Sidebar, useArrangeSidebar, useSidebar } from "./sidebar.tsx";
 import { chapterTitle } from "./navigation.tsx";
 import { NoticeBar } from "./notice.tsx";
 import { OutlinePage } from "./outline-page.tsx";
@@ -305,6 +305,8 @@ export function NovelPage() {
       </BookKindContext.Provider>
     );
   }
+  // Where the book opens: its kind's home page (a journal's journal page), else its first section.
+  const home = homeOf(!!repo, book.kind);
   const sameView = viewOf(["bible", ...moduleRecordTypes(book.kind).map((t) => t.type)]);
   return (
     <BookKindContext.Provider value={book.kind}>
@@ -321,7 +323,7 @@ export function NovelPage() {
           <div className="md:overflow-y-auto">
             <ErrorBoundary what="this view" remount={sameView}>
               <Routes>
-                <Route index element={pieceSections(book)[0] ? <Navigate to={`/novels/${novelId}/chapter/${pieceSections(book)[0]!.id}`} replace /> : <EmptyManuscript novel={book} />} />
+                <Route index element={home ? <Navigate to={`/novels/${novelId}/${home}`} replace /> : pieceSections(book)[0] ? <Navigate to={`/novels/${novelId}/chapter/${pieceSections(book)[0]!.id}`} replace /> : <EmptyManuscript novel={book} />} />
                 <Route path="chapter/:chapterId" element={<ChapterRoute novelId={novelId} novel={book} workspace={workspace} spell={spell} entries={entries} />} />
                 <Route path="scene/:sceneId" element={<SceneRoute novelId={novelId} novel={book} workspace={workspace} spell={spell} entries={entries} />} />
                 <Route

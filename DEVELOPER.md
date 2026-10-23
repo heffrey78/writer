@@ -63,6 +63,8 @@ The base never imports a kind or a module: `packages/core/test/boundary.test.ts`
 
 A kind's `sidebar` (#61) says which pages its sidebar shows after Write, in groups headed in its words, in order: the base's pages by key (`outline`, `story-map`, `relationships`, `notes`, `progress`, `index`, `compare`, `issues`), a module's by its page's path (`calendar`). Pages it leaves out are still in the palette under "Go to". Without one, a kind has the base's, Plan and Revise (`BASE_SIDEBAR`), which is the Novel's. Issues still needs the book on GitHub, and the story map a module's tab. The writer can arrange it (Arrange the sidebar…, #63): `sidebar` in `book.yaml`, which `arrangeSidebar` in core lays over the kind's, and `arrangement` in the web app's `sidebar.tsx` turns into pages. A novel still in `novel.yaml` is asked to move to the new format first, since gh-writer reads that file.
 
+A kind's `home` (#64) names, by the same keys, the page its books open on: a journal opens on its journal page (`read`). Without it, or where the page isn't there (Issues off GitHub), a book opens on its first section.
+
 A module may need another (`needs`): off-page events need story time, and a kind that lists one without the other is refused when it's registered.
 
 The rest of the code reads a book's kind from its model (`book.kind`), or in the web app from `useBookKind()`. The words on screen come from the kind too (#22): `vocabulary(kind)` in core, or `useWords()` in the web app, says the book, its levels, its piece, its content, its codex and an entity in the forms a sentence needs (`w.piece.one` "scene", `w.piece.a` "a scene", `w.level("chapter").count(3)` "3 chapters", `w.codex.One` "Story bible"). Base code never writes "scene" or "chapter" itself.

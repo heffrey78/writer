@@ -58,15 +58,9 @@ export interface PlaceGroup {
   places: Place[];
 }
 
-/**
- * The sidebar's pages by group (#61, #63): the kind's, with the writer's arrangement over it, and the
- * pages it doesn't show. The story map only with a tab from a module, Issues only for a book on
- * GitHub. A module's page neither names goes last in its module's group, or the first group where
- * the kind has none of that key.
- */
-export function arrangement(onGitHub: boolean, kind: BookKind, mine?: SidebarFile): { groups: PlaceGroup[]; hidden: Place[] } {
-  const views = moduleViews(kind).filter((v) => v.group);
-  const pages = new Map<string, Omit<Place, "key"> | null>([
+/** The pages a kind's sidebar can name, by key: none where the page isn't there (Issues off GitHub). */
+function pagesOf(onGitHub: boolean, kind: BookKind): Map<string, Omit<Place, "key"> | null> {
+  return new Map<string, Omit<Place, "key"> | null>([
     ["outline", { path: "outline", label: "Outline", icon: ListTree }],
     ["story-map", moduleStoryMapTabs(kind).length ? { path: "story-map", label: "Story map", icon: MapIcon } : null],
     ["relationships", { path: "relationships", label: "Relationships", icon: Network }],
@@ -75,8 +69,22 @@ export function arrangement(onGitHub: boolean, kind: BookKind, mine?: SidebarFil
     ["index", { path: "bible", label: vocabulary(kind).codex.One, icon: BookOpen }],
     ["compare", { path: "compare", label: "Compare", icon: Columns2 }],
     ["issues", onGitHub ? { path: "issues", label: "Issues", icon: CircleDot } : null],
-    ...views.map(({ path, label, icon }): [string, Omit<Place, "key">] => [path, { path, label, icon }]),
+    ...moduleViews(kind).filter((v) => v.group).map(({ path, label, icon }): [string, Omit<Place, "key">] => [path, { path, label, icon }]),
   ]);
+}
+
+/** The path of the page a book of the kind opens on (#64), if it names one that's there. */
+export const homeOf = (onGitHub: boolean, kind: BookKind): string | undefined => (kind.home ? pagesOf(onGitHub, kind).get(kind.home)?.path : undefined);
+
+/**
+ * The sidebar's pages by group (#61, #63): the kind's, with the writer's arrangement over it, and the
+ * pages it doesn't show. The story map only with a tab from a module, Issues only for a book on
+ * GitHub. A module's page neither names goes last in its module's group, or the first group where
+ * the kind has none of that key.
+ */
+export function arrangement(onGitHub: boolean, kind: BookKind, mine?: SidebarFile): { groups: PlaceGroup[]; hidden: Place[] } {
+  const views = moduleViews(kind).filter((v) => v.group);
+  const pages = pagesOf(onGitHub, kind);
   const place = (key: string): Place[] => {
     const p = pages.get(key);
     return p ? [{ key, ...p }] : [];
