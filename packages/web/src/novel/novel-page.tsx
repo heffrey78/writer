@@ -350,7 +350,7 @@ export function NovelPage() {
                 <Route path="issues" element={<GitHubOnly repo={repo} novelId={novelId}>{() => <IssuesPage novelId={novelId} novel={book} workspace={workspace} />}</GitHubOnly>} />
                 <Route path="issues/:number" element={<GitHubOnly repo={repo} novelId={novelId}>{() => <IssueRoute novelId={novelId} novel={book} workspace={workspace} />}</GitHubOnly>} />
                 <Route path="notes" element={<NotesPage novelId={novelId} novel={book} />} />
-                {moduleRoutes({ novelId, novel: book, workspace })}
+                {moduleRoutes({ novelId, novel: book, workspace, spell, entries })}
                 <Route path="*" element={<Missing what="page" />} />
               </Routes>
             </ErrorBoundary>

@@ -5,6 +5,7 @@ import { Route, useNavigate } from "react-router";
 import { create } from "zustand";
 import { useCommands, type Command } from "./commands.ts";
 import type { SpellService } from "@writer/editor/react";
+import type { QuickEntries } from "./bible/quick-entries.ts";
 import type { Workspace } from "./novel/workspace.ts";
 
 /*
@@ -18,6 +19,9 @@ export interface BookView {
   novelId: string;
   novel: Book;
   workspace: Workspace;
+  /** For a view that writes (a record's page, a run of pieces in the writing view, #64): the book's spell checker and quick entries. */
+  spell?: { service: SpellService; onAddWord: (w: string) => void } | undefined;
+  entries?: QuickEntries | undefined;
 }
 
 /** A page of the book a module adds: its route under the book (and below it), and its place in the sidebar. */
@@ -69,7 +73,6 @@ export interface ProfileSection {
 /** A module's record as its page shows it: on its own, in a modal over the codex's gallery, or in the right sidebar's Entry tab. */
 export interface RecordPageView extends BookView {
   record: ModuleRecord;
-  spell?: { service: SpellService; onAddWord: (w: string) => void } | undefined;
   /** In a modal or the Entry tab: its title is a level-2 heading with this ID (a modal's own top heading, in one). */
   embedded?: { headingId: string; modal?: boolean };
   /** The whole page, or the Entry tab's, which leaves out deleting it and links to the page. */

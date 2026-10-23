@@ -59,14 +59,15 @@ import { useStructure } from "./structure.ts";
 import { TitleDialog } from "./structure-dialogs.tsx";
 import { chapterTitle } from "./navigation.tsx";
 import { PictureInTextDialog, type PictureRequest } from "./picture-in-text.tsx";
+import { RunPieces, type Run, type RunTools } from "./run.tsx";
 import type { Workspace } from "./workspace.ts";
 
 interface Props {
   novelId: string;
   novel: Book;
   workspace: Workspace;
-  /** A chapter (continuous) or a single scene. */
-  view: { chapter: Section } | { scene: Piece; chapter: Section | undefined };
+  /** A chapter (continuous), a single scene, or a run of pieces each in its own editor (#64). */
+  view: { chapter: Section } | { scene: Piece; chapter: Section | undefined } | { run: Run };
   spell: { service: SpellService; onAddWord: (word: string) => void } | undefined;
   /** Where entries made from the @ menu go (see createQuickEntries). */
   entries?: QuickEntries | undefined;
@@ -75,7 +76,11 @@ interface Props {
 /** The editor of the writing view on screen, if any: where a panel opened from elsewhere returns focus. */
 export const useWritingEditor = create<{ editor: Editor | undefined }>(() => ({ editor: undefined }));
 
-/** The editor for a chapter or a scene, wired to the workspace's files, with word counts and find and replace. */
+/**
+ * The editor for a chapter or a scene, or the editors of a run of pieces, wired to the workspace's
+ * files, with word counts and find and replace. In a run, the editor the caret is in (or was last in)
+ * is the one the commands and panels act on.
+ */
 export function WritingView({ novelId, novel, workspace, view, spell, entries }: Props) {
   const navigate = useNavigate();
   const w = vocabulary(novel.kind);
@@ -84,10 +89,13 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
   const [editor, setEditor] = useState<Editor>();
   const byId = useMemo(() => new Map(novel.allPieces.map((s) => [s.id, s])), [novel]);
   const scenes = useMemo(
-    () => ("scene" in view ? [view.scene] : view.chapter.childIds.map((id) => byId.get(id)).filter((s): s is Piece => s !== undefined)),
+    () => ("run" in view ? view.run.pieces : "scene" in view ? [view.scene] : view.chapter.childIds.map((id) => byId.get(id)).filter((s): s is Piece => s !== undefined)),
     [view, byId],
   );
-  const paths = scenes.map((s) => s.file);
+  // A run's pieces open their own files, as they come near the screen.
+  const paths = "run" in view ? [] : scenes.map((s) => s.file);
+  // In a run, the piece the caret is in, or was last in.
+  const [runPiece, setRunPiece] = useState<Piece>();
   const entities = useMemo(() => mentionEntities(novel), [novel]);
   const newEntry = useQuickEntry(novel, entries);
   useEffect(() => {
@@ -98,7 +106,7 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
     };
   }, [editor]);
   // Focus goes to the text when a chapter or scene is opened, not when it reloads (files renamed by a move).
-  const viewId = "scene" in view ? view.scene.id : view.chapter.id;
+  const viewId = "run" in view ? `run:${view.run.key}` : "scene" in view ? view.scene.id : view.chapter.id;
   const focusedView = useRef<string | undefined>(undefined);
   const autofocus = focusedView.current !== viewId;
   useEffect(() => {
@@ -133,13 +141,21 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
   const pictureUrl = useCallback((path: string) => imageUrl(novelId, path), [novelId]);
   // A picture to add (dropped, pasted or from the palette) or change (Enter or a double-click on it): asked about in a dialog (heffrey78/gh-writer#203).
   const [pictureRequest, setPictureRequest] = useState<PictureRequest>();
-  const pictures: PictureCallbacks = {
-    add: (files, at) => setPictureRequest({ kind: "add", at, ...(files[0] ? { file: files[0] } : {}) }),
+  // The editor the picture goes in: in a run, the one it was dropped on or asked for in.
+  const pictureIn = useRef<Editor>(undefined);
+  const picturesFor = (get: () => Editor | undefined): PictureCallbacks => ({
+    add: (files, at) => {
+      pictureIn.current = get();
+      setPictureRequest({ kind: "add", at, ...(files[0] ? { file: files[0] } : {}) });
+    },
     edit: (at) => {
+      const editor = get();
       const picture = editor && !editor.isDestroyed ? pictureAt(editor, at) : undefined;
+      pictureIn.current = editor;
       if (picture) setPictureRequest({ kind: "edit", at, picture });
     },
-  };
+  });
+  const pictures = picturesFor(() => editor);
   useCommands(
     () => [
       {
@@ -147,7 +163,11 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
         title: "Insert a picture…",
         group: "Writing",
         keywords: ["image", "map", "illustration", "figure"],
-        run: () => editor && !editor.isDestroyed && setPictureRequest({ kind: "add", at: editor.state.selection.from }),
+        run: () => {
+          if (!editor || editor.isDestroyed) return;
+          pictureIn.current = editor;
+          setPictureRequest({ kind: "add", at: editor.state.selection.from });
+        },
       },
     ],
     [editor],
@@ -158,7 +178,7 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
   useEffect(() => {
     const byPath = (path: string | undefined) => scenes.find((s) => s.file === path);
     const update = () => {
-      const s = "scene" in view ? view.scene : editor && !editor.isDestroyed ? byPath(caretScene(editor)) : scenes[0];
+      const s = "scene" in view ? view.scene : "run" in view ? runPiece : editor && !editor.isDestroyed ? byPath(caretScene(editor)) : scenes[0];
       setCurrent(s ? { id: s.id, title: s.title, path: s.file } : undefined);
     };
     update();
@@ -167,7 +187,7 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
       editor?.off("selectionUpdate", update);
       setCurrent(undefined);
     };
-  }, [editor, view, scenes, setCurrent]);
+  }, [editor, view, scenes, setCurrent, runPiece]);
 
   // The right sidebar: the Scene tab follows the scene the author is in.
   const current = useCurrentScene((s) => s.scene);
@@ -297,14 +317,16 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
         : [],
     [repo, openIssues.data, novel],
   );
-  const issueMarks = {
+  const issueMarksFor = (get: () => Editor | undefined) => ({
     issues: anchored,
     onOpen: (numbers: number[]) => {
+      const editor = get();
       if (!editor || editor.isDestroyed) return;
       useRaise.setState({ passage: undefined, editor: undefined });
       useIssuePanel.getState().open(numbers, editor);
     },
-  };
+  });
+  const issueMarks = issueMarksFor(() => editor);
   const [menu, setMenu] = useState<{ x: number; y: number }>();
   const raiseFromSelection = () => {
     if (!editor || editor.isDestroyed) return;
@@ -331,11 +353,25 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
     () => (repo ? [{ id: "writing.raiseIssue", title: "Raise an issue about the selection…", group: "GitHub", keywords: ["note", "plot hole", "continuity", "research", "github"], run: raiseFromSelection }] : []),
     [repo, editor, novel],
   );
-  const sceneOf = (sceneId: string | undefined) => ("scene" in view ? view.scene : novel.allPieces.find((s) => s.file === sceneId));
-  const onMention = {
-    show: (target: MentionTarget) => editor && useMentionCard.getState().show({ ...target, scene: sceneOf(target.sceneId), editor }),
+  const sceneOf = (sceneId: string | undefined) => ("scene" in view ? view.scene : "run" in view ? runPiece : novel.allPieces.find((s) => s.file === sceneId));
+  const mentionsFor = (get: () => Editor | undefined, piece?: Piece) => ({
+    show: (target: MentionTarget) => {
+      const editor = get();
+      if (editor) useMentionCard.getState().show({ ...target, scene: piece ?? sceneOf(target.sceneId), editor });
+    },
     leave: leaveMention,
-  };
+  });
+  const onMention = mentionsFor(() => editor);
+  // What each editor of a run is given: the same tools, acting on it.
+  const runTools = (piece: Piece, get: () => Editor | undefined): RunTools => ({
+    entities,
+    newEntry,
+    issueMarks: issueMarksFor(get),
+    onMention: mentionsFor(get, piece),
+    pictureUrl,
+    pictures: picturesFor(get),
+    ...(spell ? { spell } : {}),
+  });
   useCommands(
     () => [
       {
@@ -414,6 +450,11 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
 
   const replaceClosed = (changed: { id: string; markdown: string }[]) => {
     for (const { id: path, markdown } of changed) {
+      // A run's other pieces may be open in their own editors: through the workspace, which they show.
+      if ("run" in view && workspace.store.getState().files[path]) {
+        workspace.change(path, markdown);
+        continue;
+      }
       void api.readFile(novelId, path).then(({ content, hash }) => api.writeFile(novelId, path, joinSceneFile({ ...splitSceneFile(content), body: markdown }), hash));
     }
   };
@@ -422,11 +463,11 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
     const scene = novel.allPieces.find((s) => s.file === path);
     if (!scene) return;
     // In the chapter view, open the chapter holding it; otherwise the scene.
-    if (!("scene" in view) && scene.sectionId) void navigate(`/novels/${novelId}/chapter/${scene.sectionId}`);
+    if ("chapter" in view && !("scene" in view) && scene.sectionId) void navigate(`/novels/${novelId}/chapter/${scene.sectionId}`);
     else void navigate(`/novels/${novelId}/scene/${scene.id}`);
   };
 
-  const heading = "scene" in view ? view.scene.title : chapterTitle(novel, view.chapter);
+  const heading = "run" in view ? view.run.heading : "scene" in view ? view.scene.title : chapterTitle(novel, view.chapter);
 
   // The pinned details under each scene's title, following the details as they change (not the text).
   const pinKeys = usePins((p) => p.keys);
@@ -472,8 +513,8 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
       >
         <div className="flex flex-wrap items-baseline justify-between gap-3">
           <h1 className="text-xl font-semibold">{heading}</h1>
-          {/* The chapter's length by its title; the scene's is on its card, the session's and today's below. */}
-          <WordCount chapterWords={chapterWords} show={["chapter"]} words={words} />
+          {/* The chapter's length by its title; the scene's is on its card, the session's and today's below. A run's pieces say their own. */}
+          {"run" in view ? view.run.controls : <WordCount chapterWords={chapterWords} show={["chapter"]} words={words} />}
         </div>
         {"scene" in view && pinned[view.scene.file] && <p className="ghw-pinned -mt-2 text-[13px] text-muted">{pinned[view.scene.file]}</p>}
         {splitting && (
@@ -486,7 +527,20 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
           />
         )}
         <FindReplace manuscript={manuscript} editor={editor ?? null} onReplace={replaceClosed} onOpenScene={openScene} words={words} />
-        {!("scene" in view) && scenes.length === 0 ? (
+        {"run" in view ? (
+          <RunPieces
+            key={view.run.key}
+            run={view.run}
+            workspace={workspace}
+            piece={w.piece.one}
+            label={(piece) => `${w.piece.One} text: ${piece.title}`}
+            tools={runTools}
+            onFocus={(editor, piece) => {
+              setEditor(editor);
+              setRunPiece(piece);
+            }}
+          />
+        ) : !("scene" in view) && scenes.length === 0 ? (
           <EmptyChapter autofocus={autofocus} onAdd={(title) => structure.createScene(view.chapter.id, title)} />
         ) : !loaded ? (
           <p role="status" className="text-muted">
@@ -592,6 +646,7 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
             setPictureRequest(undefined);
             // Once the dialog has closed and given the text its focus back.
             requestAnimationFrame(() => {
+              const editor = pictureIn.current;
               if (!editor || editor.isDestroyed) return;
               if (request.kind === "add") insertPicture(editor, picture, request.at);
               else setPicture(editor, request.at, picture);
