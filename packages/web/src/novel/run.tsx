@@ -15,7 +15,7 @@ import type { Workspace } from "./workspace.ts";
  * order files have it.
  */
 export interface Run {
-  /** Tells one run from another: the caret is put in `caret` once for each. */
+  /** Tells one run from another. */
   key: string;
   heading: string;
   /** Beside the heading: the run's own controls (Reading). */
@@ -33,8 +33,11 @@ export interface Run {
   empty?: ReactNode;
   /** A place at the top of the run to begin a new piece in: today's entry. */
   begin?: Begin;
-  /** Where the caret goes, at the end, as the run opens: a piece's ID, or BEGIN for the place to begin one. */
-  caret?: string;
+  /**
+   * Where the caret goes, at the end: a piece's ID, or BEGIN for the place to begin one. Once for each
+   * `asked`: the navigation that asked for it (Today's entry, again).
+   */
+  caret?: { to: string; asked: string };
 }
 
 /**
@@ -47,8 +50,16 @@ export interface Begin {
   label: string;
   /** Over it, as a piece's header is. */
   header: ReactNode;
-  /** Make the piece: its ID. The caller's run has it once the book has. */
+  /**
+   * Make the piece: its ID, as soon as it's made and before the run has it (the book reloaded after),
+   * so the place knows the piece as its own when it arrives.
+   */
   make(): Promise<string>;
+  /**
+   * Where the words typed are kept in the tab's session storage until the piece's file has them, as
+   * autosave keeps unsaved text: a reload or a crash before then finds them there, and makes the piece.
+   */
+  keep: string;
 }
 
 /** `caret` for the place to begin a piece. */
@@ -88,16 +99,17 @@ export function RunPieces({ run, workspace, label, tools, onFocus, piece: noun }
   ];
   const more = shown < items.length;
 
-  // The caret where the run's caller asks, once for each run.
+  // The caret where the run's caller asks, once each time it asks.
   const placed = useRef<string | undefined>(undefined);
   useEffect(() => {
-    if (!run.caret || placed.current === run.key || run.reading) return;
-    const at = items.findIndex((i) => i.key === run.caret);
+    const caret = run.caret;
+    if (!caret || placed.current === caret.asked || run.reading) return;
+    const at = items.findIndex((i) => i.key === caret.to || i.piece?.id === caret.to);
     if (at < 0) return;
-    placed.current = run.key;
+    placed.current = caret.asked;
     setShown((n) => Math.max(n, at + 1));
-    setWant({ key: run.caret, at: "end" });
-  }, [run.key, run.caret, run.pieces, run.reading]); // eslint-disable-line react-hooks/exhaustive-deps
+    setWant({ key: items[at]!.key, at: "end" });
+  }, [run.caret?.to, run.caret?.asked, run.pieces, run.reading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const at = end.current;
@@ -196,9 +208,11 @@ function RunPiece({ piece, began, run, workspace, label, tools, want, onWanted, 
   const writing = !run.reading && (near || want !== undefined || began);
   // In the place to begin a piece: the text last reported, which is the editor's until its piece's
   // file is open and has it (bound); and whether the piece is being made.
-  const typed = useRef("");
+  const [kept] = useState(() => (began && !piece && run.begin ? stored(run.begin.keep) : undefined));
+  const typed = useRef(kept ?? "");
   const making = useRef(false);
   const [bound, setBound] = useState(!began);
+  const keep = useRef(run.begin?.keep);
 
   useEffect(() => {
     const el = at.current;
@@ -223,6 +237,7 @@ function RunPiece({ piece, began, run, workspace, label, tools, want, onWanted, 
       if (gone) return;
       const f = workspace.store.getState().files[path];
       if (f && f.body !== typed.current) workspace.change(path, typed.current);
+      if (keep.current) store(keep.current, undefined);
       setBound(true);
     });
     return () => void (gone = true);
@@ -255,6 +270,8 @@ function RunPiece({ piece, began, run, workspace, label, tools, want, onWanted, 
 
   useEffect(() => {
     if (!want) return;
+    // Asked for, it's written in from now on, as one that has come near the screen is.
+    setNear(true);
     if (!editor || editor.isDestroyed) {
       at.current?.scrollIntoView({ block: "nearest" });
       return;
@@ -263,9 +280,7 @@ function RunPiece({ piece, began, run, workspace, label, tools, want, onWanted, 
     onWanted();
   }, [want, editor]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const onChange = (md: string) => {
-    typed.current = md;
-    if (path && bound) return workspace.change(path, md);
+  const make = () => {
     if (path || making.current || !run.begin) return;
     making.current = true;
     run.begin.make().then(onMade, (e: unknown) => {
@@ -273,11 +288,29 @@ function RunPiece({ piece, began, run, workspace, label, tools, want, onWanted, 
       onFailed(e);
     });
   };
+  const onChange = (md: string) => {
+    typed.current = md;
+    if (path && bound) return workspace.change(path, md);
+    if (keep.current) store(keep.current, md);
+    make();
+  };
+  // Made at the first keystroke, not the first pause: the place is the piece's as soon as it can be.
+  useEffect(() => {
+    if (!editor || path) return;
+    const first = () => !editor.isEmpty && make();
+    editor.on("update", first);
+    return () => void editor.off("update", first);
+  }, [editor, path]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Words kept from before a reload or a crash: the piece is made for them at once.
+  useEffect(() => {
+    if (kept) make();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Arrow keys off the text's last line go on to the next piece, off its first back to the one
   // before; Alt+PageDown and Alt+PageUp from anywhere in it.
   const onKeyDown = (e: KeyboardEvent) => {
-    if (!editor || editor.isDestroyed || e.ctrlKey || e.metaKey || e.shiftKey) return;
+    // Not a key the editor took (the @ menu's arrows): measuring the line moves the caret in the page.
+    if (!editor || editor.isDestroyed || e.defaultPrevented || e.ctrlKey || e.metaKey || e.shiftKey) return;
     if (e.altKey) {
       if ((e.key === "PageDown" || e.key === "PageUp") && onStep(e.key === "PageDown" ? 1 : -1)) e.preventDefault();
       return;
@@ -309,4 +342,22 @@ function RunPiece({ piece, began, run, workspace, label, tools, want, onWanted, 
       )}
     </article>
   );
+}
+
+/** The words kept for a place to begin a piece, if any. */
+function stored(key: string): string | undefined {
+  try {
+    return sessionStorage.getItem(key) || undefined;
+  } catch {
+    return undefined; // blocked by the browser's privacy settings
+  }
+}
+
+function store(key: string, words: string | undefined): void {
+  try {
+    if (words) sessionStorage.setItem(key, words);
+    else sessionStorage.removeItem(key);
+  } catch {
+    // Storage full or blocked: the editor still holds the words.
+  }
 }

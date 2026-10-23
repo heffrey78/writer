@@ -105,7 +105,8 @@ describe("a run of pieces", () => {
 
 describe("the place to begin a piece", () => {
   const today = () => ({ ...book.allPieces[0]!, id: "ent_today", title: "Friday, 23 October", file: "entries/01-2026/01-october/04-friday-23-october.md", body: "" });
-  const begin = (make: () => Promise<string>) => ({ label: "Write today's entry", header: <h2>Today</h2>, make });
+  const begin = (make: () => Promise<string>) => ({ label: "Write today's entry", header: <h2>Today</h2>, make, keep: "test:begin" });
+  beforeEach(() => sessionStorage.clear());
   const typeIn = (editor: Editor, text: string) => {
     act(() => void editor.chain().focus("end").insertContent(text).run());
     act(() => void vi.advanceTimersByTime(400));
@@ -134,6 +135,22 @@ describe("the place to begin a piece", () => {
     typeIn(editor, ".");
     expect(ws.store.getState().files[made.file]?.body).toBe("Rain at dawn.\n");
     expect(editor.getText()).toBe("Rain at dawn.");
+    // Kept in the tab only until the file had them.
+    expect(sessionStorage.getItem("test:begin")).toBeNull();
+  });
+
+  it("keeps the words typed before the piece is made, and after a reload makes it for them", async () => {
+    const make = vi.fn(() => new Promise<string>(() => {}));
+    const first = mount(book.allPieces, { begin: begin(make) });
+    typeIn(((await screen.findByRole("textbox", { name: "Write today's entry" })) as unknown as { editor: Editor }).editor, "Rain");
+    expect(sessionStorage.getItem("test:begin")).toBe("Rain\n");
+    first.view.unmount();
+
+    const again = vi.fn(async () => "ent_today");
+    mount(book.allPieces, { begin: begin(again) });
+    const box = await screen.findByRole("textbox", { name: "Write today's entry" });
+    expect(box.textContent).toBe("Rain");
+    expect(again).toHaveBeenCalledTimes(1);
   });
 
   it("makes nothing if nothing is typed", async () => {

@@ -428,7 +428,8 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
   }, [editor, words]);
 
   // For the single-scene view, the chapter's count is the other scenes' plus this one's live count.
-  const liveScene = useStore(liveCounts, (c) => c.scene);
+  // Only there: following it re-renders the view, and in a run all its editors, at every keystroke.
+  const liveScene = useStore(liveCounts, (c) => ("scene" in view && view.chapter ? c.scene : 0));
   const chapterWords =
     "scene" in view && view.chapter
       ? view.chapter.childIds.filter((id) => id !== view.scene.id).reduce((n, id) => n + countWords(byId.get(id)?.body ?? ""), liveScene)
