@@ -13,7 +13,7 @@ describe("arranging the sidebar", () => {
   it("is the kind's without an arrangement, with what the kind leaves out hidden", () => {
     const a = arrangeSidebar(journal());
     expect(pages(a)).toEqual([
-      ["look-back", ["calendar", "read", "notes", "issues"]],
+      ["look-back", ["read", "calendar", "notes", "issues"]],
       ["people-and-places", ["index", "relationships", "story-map", "progress"]],
     ]);
     expect(a.hidden).toEqual(["outline", "compare"]);
@@ -39,7 +39,7 @@ describe("arranging the sidebar", () => {
   it("shows a page named twice once, in the first of the kind's groups that names it", () => {
     const a = arrangeSidebar(journal(), { groups: { "people-and-places": ["notes"], "look-back": ["notes"] } });
     expect(pages(a)).toEqual([
-      ["look-back", ["notes", "calendar", "read", "issues"]],
+      ["look-back", ["notes", "read", "calendar", "issues"]],
       ["people-and-places", ["index", "relationships", "story-map", "progress"]],
     ]);
   });
@@ -49,7 +49,7 @@ describe("arranging the sidebar", () => {
   });
 
   it("keeps a page the writer hides hidden even where they also place it", () => {
-    expect(pages(arrangeSidebar(journal(), { groups: { "look-back": ["notes"] }, hidden: ["notes"] }))[0]).toEqual(["look-back", ["calendar", "read", "issues"]]);
+    expect(pages(arrangeSidebar(journal(), { groups: { "look-back": ["notes"] }, hidden: ["notes"] }))[0]).toEqual(["look-back", ["read", "calendar", "issues"]]);
   });
 });
 

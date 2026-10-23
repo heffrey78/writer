@@ -56,11 +56,13 @@ export const journal: BookKind = {
   ],
   // An entry's date first on its card, then who, where and what.
   modules: ["presence", "story-time", "daily"],
-  // Looking back comes first; a journal has little use for an outline, or for comparing drafts.
+  // Looking back comes first, from the journal page, where today's is written too; a journal has
+  // little use for an outline, or for comparing drafts.
   sidebar: [
-    { key: "look-back", label: "Look back", pages: ["calendar", "read", "notes", "issues"] },
+    { key: "look-back", label: "Look back", pages: ["read", "calendar", "notes", "issues"] },
     { key: "people-and-places", label: "People and places", pages: ["index", "relationships", "story-map", "progress"] },
   ],
+  home: "read",
   fieldOrder: ["when", "people", "places", "events", "entities", "values"],
   issueKinds: [
     { key: "follow-up", label: "Follow up", color: "0075ca", description: "Something to come back to" },

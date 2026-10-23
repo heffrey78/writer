@@ -116,14 +116,14 @@ try {
   await making.getByRole("radio", { name: "Journal" }).check();
   await making.getByRole("textbox", { name: "Title" }).fill("Days");
   await making.getByRole("button", { name: "Create" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "No months yet" })).toBeVisible();
+  // A journal opens on its journal page (#64), today's place at the top.
+  await expect(page.getByRole("heading", { level: 1, name: "Day by day" })).toBeVisible();
   await page.keyboard.press("Control+k");
   await page.getByRole("dialog", { name: "Command palette" }).getByRole("combobox").fill("today's entry");
   await page.keyboard.press("Enter");
-  const text = page.getByRole("textbox", { name: "Entry text" });
+  const text = page.getByRole("textbox", { name: "Write today's entry" });
   const tall = await page.evaluate(() => innerHeight);
   await text.click();
-  await page.keyboard.press("Control+End");
   await page.keyboard.type("Written on the phone.");
   let entry = "";
   for (let i = 0; i < 40 && !entry; i++, await sleep(250)) entry = inApp("grep -rl \"Written on the phone.\" books/days/entries || true").trim();
@@ -174,7 +174,7 @@ try {
     const palette = p.getByRole("dialog", { name: "Command palette" });
     await palette.getByRole("combobox").fill("today's entry");
     await palette.getByRole("option", { name: "Today's entry" }).click();
-    return p.getByRole("textbox", { name: "Entry text" });
+    return p.getByRole("textbox", { name: /^Entry text: / }).first();
   };
   await (await todaysEntry(page)).click();
   await page.keyboard.press("Control+End");

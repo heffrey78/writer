@@ -9,7 +9,6 @@ import { expect, launch, palette, selectionSettled, test, type App } from "./fix
  */
 
 const badge = (page: Page) => page.getByRole("button", { name: /^Sync: / });
-const text = (page: Page) => page.getByRole("textbox", { name: "Entry text" });
 const listbox = (page: Page) => page.getByRole("listbox", { name: "Mention suggestions" });
 
 /** Sign in to the fake GitHub with a code, from the ⋯ menu. */
@@ -23,14 +22,13 @@ async function signIn(page: Page, app: App) {
   await expect(dialog).toHaveCount(0);
 }
 
-/** Today's entry, on `day` (the writer's clock), from the palette: written in where its text ends. */
+/** Today's entry, on `day` (the writer's clock), from the palette: written where it begins, on the journal page. */
 async function write(page: Page, day: string, words: () => Promise<void>) {
   await page.clock.setFixedTime(new Date(`${day}T08:00:00`));
   await palette(page, "today's entry");
-  await expect(page).toHaveURL(/\/scene\/ent_[0-9a-hjkmnp-tv-z]{6}$/);
-  await text(page).click();
+  await expect(page).toHaveURL(/\/read$/);
+  await expect(page.getByRole("textbox", { name: "Write today's entry" })).toBeFocused();
   await selectionSettled(page);
-  await page.keyboard.press("ControlOrMeta+End");
   await words();
 }
 
@@ -52,7 +50,7 @@ test("a new journal, written in on three days, its people and places from mentio
   await dialog.getByRole("radio", { name: "Journal" }).check();
   await dialog.getByRole("textbox", { name: "Title" }).fill("Days");
   await dialog.getByRole("button", { name: "Create" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "No months yet" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Day by day" })).toBeVisible();
   const dir = join(app.home, "writer", "days");
 
   await write(page, "2026-10-19", async () => {
@@ -64,7 +62,8 @@ test("a new journal, written in on three days, its people and places from mentio
     await page.keyboard.press("Backspace");
     await page.keyboard.type(". Forty curlew.");
   });
-  await expect(page.getByRole("heading", { level: 1, name: "October" })).toBeVisible();
+  // Made in its month.
+  await expect(page.getByRole("tree").getByRole("treeitem", { name: "October", exact: false }).first()).toBeVisible();
   await write(page, "2026-10-20", async () => {
     await page.keyboard.type("Rain. ");
     await page.keyboard.type("@Mira");
@@ -75,7 +74,7 @@ test("a new journal, written in on three days, its people and places from mentio
   await write(page, "2026-11-02", async () => {
     await page.keyboard.type("November already.");
   });
-  await expect(page.getByRole("heading", { level: 1, name: "November" })).toBeVisible();
+  await expect(page.getByRole("tree").getByRole("treeitem", { name: "November", exact: false }).first()).toBeVisible();
 
   // Each day in its month and year, its people and places in its fields, all saved.
   const entries = ["entries/01-2026/01-october/01-monday-19-october.md", "entries/01-2026/01-october/02-tuesday-20-october.md", "entries/01-2026/02-november/01-monday-2-november.md"];

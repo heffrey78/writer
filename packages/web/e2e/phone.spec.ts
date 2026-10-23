@@ -119,8 +119,10 @@ test("on a phone, Drafts closes by its button, and a book left with Drafts open 
 test("on a phone, Arrange the sidebar fits, from the ⋯ menu, and closes by its button", async ({ page, app }) => {
   await app.restart(app.bookRepo(fileURLToPath(new URL("../../../examples/sample-journal", import.meta.url)), "journal"));
   await launch(page, app);
-  // The book open first: until then the ⋯ menu has only the app's items.
-  await expect(page.getByRole("textbox", { name: "Month text" })).toBeVisible();
+  // The book open first, on its journal page (#64), which fits: until then the ⋯ menu has only the app's items.
+  await expect(page.getByRole("textbox", { name: "Write today's entry" })).toBeVisible();
+  await expect(page.getByRole("list", { name: "Day by day" }).getByRole("article").nth(1)).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
   await page.getByRole("banner").getByRole("button", { name: /^More/ }).tap();
   await page.getByRole("menuitem", { name: "Arrange the sidebar…" }).tap();
   const dialog = page.getByRole("dialog", { name: "Arrange the sidebar" });

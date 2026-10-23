@@ -30,11 +30,11 @@ describe("the sidebar", () => {
 
   it("is a journal's: looking back first, then its people and places, with no outline or comparing", () => {
     expect(sidebar(kindByKey("journal"))).toEqual([
-      ["Look back", ["Calendar", "Read", "Notes", "Issues"]],
+      ["Look back", ["Day by day", "Calendar", "Notes", "Issues"]],
       ["People and places", ["Index", "Relationships", "Story map", "Progress"]],
     ]);
     // Issues only for a book on GitHub.
-    expect(sidebar(kindByKey("journal"), false)[0]).toEqual(["Look back", ["Calendar", "Read", "Notes"]]);
+    expect(sidebar(kindByKey("journal"), false)[0]).toEqual(["Look back", ["Day by day", "Calendar", "Notes"]]);
   });
 
   it("is a campaign's and a non-fiction book's own", () => {
@@ -60,12 +60,13 @@ describe("the sidebar", () => {
   it("puts a module's page the kind doesn't name in its module's group, or the first where the kind has none", () => {
     registerWebModule({ id: "company", views: [{ path: "company", label: "Company", icon: Users, group: "Revise", render: () => null }] });
     expect(sidebar({ ...kindByKey("nonfiction"), modules: [...nonfiction.modules!, "company"] })[1]).toEqual(["Revise", ["Issues", "Compare", "Company"]]);
-    expect(sidebar({ ...kindByKey("journal"), modules: [...journal.modules!, "company"] })[0]).toEqual(["Look back", ["Calendar", "Read", "Notes", "Issues", "Company"]]);
+    expect(sidebar({ ...kindByKey("journal"), modules: [...journal.modules!, "company"] })[0]).toEqual(["Look back", ["Day by day", "Calendar", "Notes", "Issues", "Company"]]);
   });
 
   it("names the page a kind's books open on, if it's there", () => {
     expect(homeOf(true, kindByKey("novel"))).toBeUndefined();
     const journal = kindByKey("journal");
+    expect(homeOf(false, journal)).toBe("read");
     expect(homeOf(true, { ...journal, home: "calendar" })).toBe("calendar");
     expect(homeOf(true, { ...journal, home: "index" })).toBe("bible");
     // Issues off GitHub, and a page no module adds: the first section, as without one.
