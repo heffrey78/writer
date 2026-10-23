@@ -130,7 +130,8 @@ describe("the place to begin a piece", () => {
     await act(async () => {});
     expect(screen.getAllByRole("article")[0]!.getAttribute("aria-label")).toBe(made.title);
     expect(screen.getAllByRole("textbox")[0]).toBe(box);
-    expect(box.getAttribute("aria-label")).toBe(`Entry text: ${made.title}`);
+    // Still the place's name: renaming the text box under the writer restarts Android's keyboard.
+    expect(box.getAttribute("aria-label")).toBe("Write today's entry");
     expect(ws.store.getState().files[made.file]?.body).toBe("Rain at dawn\n");
     typeIn(editor, ".");
     expect(ws.store.getState().files[made.file]?.body).toBe("Rain at dawn.\n");

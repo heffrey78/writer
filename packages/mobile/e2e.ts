@@ -110,7 +110,8 @@ try {
   if (!token.trim() || Buffer.from(token, "base64").includes(fake.deviceToken)) throw new Error("The token isn't kept sealed.");
   step("signed in with a code, GitHub's page opened outside the app; the token sealed by the keystore; the name git signs with kept");
 
-  // A journal, and today's entry written in.
+  // A journal, and today's entry written in. The page's height first, before a field brings the keyboard up.
+  const tall = await page.evaluate(() => innerHeight);
   await page.getByRole("list", { name: "Books" }).getByRole("button", { name: "New book" }).click();
   const making = page.getByRole("dialog", { name: "New book" });
   await making.getByRole("radio", { name: "Journal" }).check();
@@ -122,8 +123,13 @@ try {
   await page.getByRole("dialog", { name: "Command palette" }).getByRole("combobox").fill("today's entry");
   await page.keyboard.press("Enter");
   const text = page.getByRole("textbox", { name: "Write today's entry" });
-  const tall = await page.evaluate(() => innerHeight);
+  // A tap on today's place, as a person would: the page has put the caret there already, and a click
+  // here raises the keyboard only if it moves the focus.
+  await expect(text).toBeFocused();
+  await text.evaluate((el) => el.blur());
   await text.click();
+  // Typing once Android has the keyboard up.
+  await expect.poll(() => /mInputShown=true/.test(adb("shell", "dumpsys", "input_method")), { timeout: 10_000 }).toBe(true);
   await page.keyboard.type("Written on the phone.");
   let entry = "";
   for (let i = 0; i < 40 && !entry; i++, await sleep(250)) entry = inApp("grep -rl \"Written on the phone.\" books/days/entries || true").trim();

@@ -213,6 +213,9 @@ function RunPiece({ piece, began, run, workspace, label, tools, want, onWanted, 
   const making = useRef(false);
   const [bound, setBound] = useState(!began);
   const keep = useRef(run.begin?.keep);
+  // Its editor keeps the place's name once its piece is made: changing the text box under the writer
+  // (its attributes) restarts Android's keyboard mid-word.
+  const [placeName] = useState(label);
 
   useEffect(() => {
     const el = at.current;
@@ -248,14 +251,6 @@ function RunPiece({ piece, began, run, workspace, label, tools, want, onWanted, 
     if (!editor || !path || !bound) return;
     return workspace.live(path, () => (editor.isDestroyed ? undefined : getMarkdown(editor)));
   }, [editor, workspace, path, bound]);
-
-  // The editor's name follows the piece made where it began: its name was the place's.
-  useEffect(() => {
-    if (!editor || editor.isDestroyed || !began) return;
-    const { editorProps } = editor.options;
-    const attributes = typeof editorProps.attributes === "object" ? editorProps.attributes : {};
-    if (attributes["aria-label"] !== label) editor.setOptions({ editorProps: { ...editorProps, attributes: { ...attributes, "aria-label": label } } });
-  }, [editor, began, label]);
 
   const latest = useRef({ onFocus });
   latest.current = { onFocus };
@@ -328,8 +323,8 @@ function RunPiece({ piece, began, run, workspace, label, tools, want, onWanted, 
         <div onKeyDown={onKeyDown}>
           <SceneEditor
             key={began ? BEGIN : path}
-            label={label}
-            {...(began ? { placeholder: `${run.begin?.label ?? label}…` } : {})}
+            label={began ? placeName : label}
+            {...(began ? { placeholder: `${placeName}…` } : {})}
             sceneId={path ?? BEGIN}
             markdown={file && bound ? file.body : typed.current}
             onChange={onChange}

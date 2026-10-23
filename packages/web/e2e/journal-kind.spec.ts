@@ -95,8 +95,9 @@ test("written where it's read: today on top, made with its first words, and earl
   await expect.poll(() => readFileSync(join(dir, made), "utf8"), { timeout: 10_000 }).toContain("\nFog on the water till noon. Then sun.\n");
   expect(Number(app.git(dir, "rev-list", "--count", "HEAD"))).toBe(commits + 1);
   expect(readFileSync(join(dir, made), "utf8")).toContain("when:\n  at: 2026-10-23\n");
-  const today = page.getByRole("textbox", { name: "Entry text: Friday, 23 October" });
-  await expect(today).toBeFocused();
+  // The same text box, still named as the place was, in the entry made.
+  await expect(entries.first()).toHaveAccessibleName("Friday, 23 October");
+  await expect(begin(page)).toBeFocused();
   await expect(entries.first().locator("time")).toHaveText("23 October 2026");
 
   // Down off its end, into the entry before it, written in where it is.
