@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { readAnchor } from "@writer/core";
 import type { Page } from "@playwright/test";
 import { axe, expect, palette, selectionSettled, test, type App } from "./fixtures.ts";
 
@@ -149,4 +150,49 @@ test("today's place, left untouched, makes nothing", async ({ page, app }) => {
   await expect(page.getByRole("heading", { level: 1, name: "Index" })).toBeVisible();
   expect(app.git(dir, "rev-parse", "HEAD")).toBe(head);
   expect(app.git(dir, "status", "--porcelain")).toBe("");
+});
+
+test("an issue is raised about a passage in today's entry, written in its place, and in an earlier entry written in place (#70)", async ({ page, app }) => {
+  const dir = await open(page, app);
+  const id = new URL(page.url()).pathname.split("/")[2]!;
+  // On the (fake) GitHub, signed in through the device flow without the dialog.
+  const headers = { origin: app.url };
+  expect((await page.request.post(`${app.url}/api/github/device`, { headers })).ok()).toBe(true);
+  app.github.approve();
+  await expect.poll(async () => ((await (await page.request.post(`${app.url}/api/github/device/poll`, { headers })).json()) as { status: string }).status).toBe("done");
+  const published = await page.request.post(`${app.url}/api/novels/${id}/publish`, { data: { name: "journal" }, headers });
+  expect(published.ok(), await published.text()).toBe(true);
+  const repo = app.github.issues("ada", "journal");
+  await expect(page.getByRole("navigation", { name: "Views" }).getByRole("link", { name: "Issues" })).toBeVisible();
+
+  // Today's entry, made on its first words in the editor of the place it began in.
+  await begin(page).click();
+  await selectionSettled(page);
+  await page.keyboard.type("Fog on the water till noon.");
+  await expect(page.getByRole("list", { name: "Day by day" }).getByRole("article").first().locator("time")).toHaveText("23 October 2026");
+  const today = begin(page);
+  const passage = today.getByText("Fog on the water till noon.");
+  await passage.click({ clickCount: 3 });
+  await passage.click({ button: "right" });
+  await expect(page.getByRole("menu", { name: "Selected text" }).getByRole("menuitem", { name: "Raise an issue…" })).toBeFocused();
+  await page.keyboard.press("Enter");
+  const panel = page.getByRole("complementary", { name: "Raise an issue" });
+  await expect(panel).toContainText("in “Friday, 23 October”");
+  await expect(panel).not.toContainText(novelWords);
+  await panel.getByRole("textbox", { name: "Title" }).fill("Which water?");
+  await panel.getByRole("textbox", { name: "Title" }).press("Enter");
+  await expect(panel).toHaveCount(0);
+  await expect(today).toBeFocused();
+  await expect.poll(() => repo.issues.length).toBe(1);
+  const made = readFileSync(join(dir, "entries/01-2026/02-october/04-friday-23-october.md"), "utf8");
+  expect(readAnchor(repo.issues[0]!.body)).toMatchObject({ scene: made.match(/^id: (ent_\w+)$/m)![1], quote: "Fog on the water till noon." });
+
+  // An earlier entry, from the palette.
+  const sunday = page.getByRole("textbox", { name: "Entry text: Sunday, 4 October" });
+  await sunday.getByText(/A quiet day is a day too\./).click({ clickCount: 3 });
+  await palette(page, "raise an issue about the selection");
+  await expect(panel).toContainText("in “Sunday, 4 October”");
+  await page.keyboard.press("Escape");
+  await expect(panel).toHaveCount(0);
+  await expect(sunday).toBeFocused();
 });

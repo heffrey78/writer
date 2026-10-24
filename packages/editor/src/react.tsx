@@ -193,6 +193,10 @@ export function SceneEditor({
   const mentionInfo = useMentionInfoExtension(onMention);
   const callbacks = useRef({ onChange, onReady });
   callbacks.current = { onChange, onReady };
+  // Read as it's needed, not when the editor is made: a run keeps the editor of the place where a
+  // piece began once the piece is made, and from then on it writes that piece.
+  const scene = useRef(sceneId);
+  scene.current = sceneId;
   // The Markdown the editor last loaded or reported, to tell its own output from a new value.
   const known = useRef(markdown);
   const pending = useRef<{ doc: Node; timer: ReturnType<typeof setTimeout> } | null>(null);
@@ -215,7 +219,7 @@ export function SceneEditor({
       SelectFocusExtension,
       issueMarksExtension,
       WritingModesExtension,
-      WordCountExtension.configure({ sceneId }),
+      WordCountExtension.configure({ sceneId: () => scene.current }),
       FindExtension,
       SearchHighlightExtension,
       spellExtension,

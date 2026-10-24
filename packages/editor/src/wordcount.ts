@@ -1,5 +1,5 @@
 import { countText, countWords, proseText } from "@writer/core";
-import { Extension } from "@tiptap/core";
+import { Extension, type Editor } from "@tiptap/core";
 import type { Node } from "@tiptap/pm/model";
 import { Plugin, PluginKey, type EditorState } from "@tiptap/pm/state";
 import { createJSONStorage, persist, type StateStorage } from "zustand/middleware";
@@ -155,8 +155,18 @@ export function sessionWords(session: WritingSession): number {
 // Extension
 
 export interface WordCountOptions {
-  /** The scene's ID in a single-scene editor, for session totals; chapter scenes carry their own. */
-  sceneId: string;
+  /**
+   * The scene's ID in a single-scene editor, for session totals; chapter scenes carry their own. A
+   * function is asked each time, for an editor kept as its scene changes (a run's piece, made where
+   * it began).
+   */
+  sceneId: string | (() => string);
+}
+
+/** The scene a single-scene editor writes, as its word count knows it. */
+export function editorSceneId(editor: Editor): string {
+  const id = editor.extensionManager.extensions.find((e) => e.name === "wordCount")?.options.sceneId as WordCountOptions["sceneId"] | undefined;
+  return (typeof id === "function" ? id() : id) ?? "scene";
 }
 
 const countKey = new PluginKey("ghwWordCount");
@@ -166,7 +176,8 @@ export const WordCountExtension = Extension.create<WordCountOptions>({
   name: "wordCount",
   addOptions: () => ({ sceneId: "scene" }),
   addProseMirrorPlugins() {
-    const { sceneId } = this.options;
+    const id = this.options.sceneId;
+    const sceneId = () => (typeof id === "function" ? id() : id);
     return [
       new Plugin({
         key: countKey,
@@ -174,23 +185,33 @@ export const WordCountExtension = Extension.create<WordCountOptions>({
           // Publish once per frame at most, off the keystroke's critical path.
           let frame = 0;
           let docChanged = true;
+          let recorded = sceneId();
+          const record = (doc: Node) => {
+            const session = writingSession.getState();
+            const now = sceneId();
+            // Its scene changed (a run's piece, made where it began): the words so far are the old
+            // one's, and the new one's baseline, so none is lost or counted twice.
+            if (now !== recorded) {
+              for (const [id, words] of documentCounts(doc, recorded).scenes) session.record(id, words);
+              recorded = now;
+            }
+            for (const [id, words] of documentCounts(doc, now).scenes) session.record(id, words);
+          };
           const publish = () => {
             frame = 0;
             if (view.isDestroyed) return;
             const { state } = view;
             if (docChanged) {
-              const session = writingSession.getState();
-              for (const [id, words] of documentCounts(state.doc, sceneId).scenes) session.record(id, words);
+              record(state.doc);
               docChanged = false;
             }
-            liveCounts.setState(caretCounts(state, sceneId));
+            liveCounts.setState(caretCounts(state, sceneId()));
           };
           const schedule = () => {
             if (!frame) frame = requestAnimationFrame(publish);
           };
           // The document as loaded is each scene's baseline, before any edit can land.
-          const session = writingSession.getState();
-          for (const [id, words] of documentCounts(view.state.doc, sceneId).scenes) session.record(id, words);
+          record(view.state.doc);
           docChanged = false;
           schedule();
           return {
@@ -201,10 +222,7 @@ export const WordCountExtension = Extension.create<WordCountOptions>({
             destroy: () => {
               if (frame) cancelAnimationFrame(frame);
               // Record a last edit made within the frame before the editor went away.
-              if (docChanged) {
-                const session = writingSession.getState();
-                for (const [id, words] of documentCounts(view.state.doc, sceneId).scenes) session.record(id, words);
-              }
+              if (docChanged) record(view.state.doc);
             },
           };
         },

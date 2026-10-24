@@ -7,6 +7,7 @@ import { Extension } from "@tiptap/core";
 import type { SceneMarkdown, SceneSource } from "./chapter.ts";
 import { parseProse, serializeProse } from "./markdown.ts";
 import { proseSchema } from "./schema.ts";
+import { editorSceneId } from "./wordcount.ts";
 
 /*
  * Find and replace across a manuscript.
@@ -203,8 +204,7 @@ export function editorScenes(editor: Editor): Map<string, { node: Node; contentS
   const { doc } = editor.state;
   if (doc.type.name === "chapter") doc.forEach((scene, offset) => void scenes.set(scene.attrs.id, { node: scene, contentStart: offset + 1 }));
   else {
-    const id = editor.extensionManager.extensions.find((e) => e.name === "wordCount")?.options.sceneId ?? "scene";
-    scenes.set(id, { node: doc, contentStart: 0 });
+    scenes.set(editorSceneId(editor), { node: doc, contentStart: 0 });
   }
   return scenes;
 }

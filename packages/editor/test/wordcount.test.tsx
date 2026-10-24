@@ -10,9 +10,11 @@ import { act, cleanup, render, screen } from "@testing-library/react";
 import fc from "fast-check";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import {
+  caretScene,
   chapterContent,
   countNode,
   documentCounts,
+  editorScenes,
   liveCounts,
   loadChapter,
   parseChapter,
@@ -190,6 +192,26 @@ describe("WordCount", () => {
     );
     await act(() => new Promise<void>((done) => requestAnimationFrame(() => done())));
     expect(screen.getByRole("group", { name: "Word count" }).textContent).toMatch(/Scene 2.*Chapter 1,234/);
+  });
+
+  test("a single-scene editor kept as its scene changes counts and finds the new one (#70)", async () => {
+    let editor: Editor | undefined;
+    const props = { label: "Entry text", markdown: "", onReady: (e: Editor) => (editor = e) };
+    const { rerender } = render(<SceneEditor sceneId="begin" {...props} />);
+    await act(() => new Promise<void>((done) => requestAnimationFrame(() => done())));
+    act(() => void editor!.chain().insertContent("One two three").run());
+    await act(() => new Promise<void>((done) => requestAnimationFrame(() => done())));
+    const first = editor;
+    // The piece is made on its first words, and the run keeps the editor it began in.
+    rerender(<SceneEditor sceneId="journal/2026-10/2026-10-24.md" {...props} />);
+    expect(editor).toBe(first);
+    expect(caretScene(editor!)).toBe("journal/2026-10/2026-10-24.md");
+    expect([...editorScenes(editor!).keys()]).toEqual(["journal/2026-10/2026-10-24.md"]);
+    act(() => void editor!.chain().insertContent(" four").run());
+    await act(() => new Promise<void>((done) => requestAnimationFrame(() => done())));
+    expect(liveCounts.getState()).toMatchObject({ sceneId: "journal/2026-10/2026-10-24.md", scene: 4 });
+    // The words typed before it was made still count once, under the place's name.
+    expect(sessionWords(writingSession.getState())).toBe(4);
   });
 
   test("hides in focus mode unless pinned", () => {

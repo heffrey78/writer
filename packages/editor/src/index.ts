@@ -35,6 +35,7 @@ export {
   liveCounts,
   sessionCommands,
   sessionWords,
+  editorSceneId,
   WordCountExtension,
   writingSession,
   type LiveCounts,
