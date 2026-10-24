@@ -8,6 +8,7 @@ import { chapterContent, loadChapter, parseChapter, replaceScene, Scene, type Sc
 import type { EditorWords } from "./words.ts";
 import { loadMarkdown, setInitialMarkdown } from "./editor.ts";
 import { Picture, proseContent } from "./extensions.ts";
+import { DictationExtension, leaveDictation } from "./dictation.ts";
 import { FootnotesExtension } from "./footnotes.ts";
 import { FindExtension } from "./find.ts";
 import { SearchHighlightExtension } from "./search.ts";
@@ -220,6 +221,7 @@ export function SceneEditor({
       issueMarksExtension,
       WritingModesExtension,
       WordCountExtension.configure({ sceneId: () => scene.current }),
+      DictationExtension,
       FindExtension,
       SearchHighlightExtension,
       spellExtension,
@@ -258,7 +260,7 @@ export function SceneEditor({
   }, [editor, markdown]);
 
   useIssueMarksRefresh(editor, issueMarks);
-  useFlushOnLeave(flush);
+  useFlushOnLeave(flush, editor);
 
   return <EditorContent editor={editor} className={className} />;
 }
@@ -270,18 +272,25 @@ export function useWritingModes<T>(select: (modes: WritingModes) => T = (m) => m
   return useStore(writingModes, select);
 }
 
-/** Report pending changes when the page is hidden or closed, and on unmount. */
-function useFlushOnLeave(flush: () => void) {
+/**
+ * Report pending changes when the page is hidden or closed, and on unmount: with the words being
+ * dictated written first, so they're reported with the rest.
+ */
+function useFlushOnLeave(flush: () => void, editor: Editor | null) {
   useEffect(() => {
-    const onHide = () => document.visibilityState === "hidden" && flush();
-    document.addEventListener("visibilitychange", onHide);
-    window.addEventListener("pagehide", flush);
-    return () => {
-      document.removeEventListener("visibilitychange", onHide);
-      window.removeEventListener("pagehide", flush);
+    const leave = () => {
+      if (editor) leaveDictation(editor);
       flush();
     };
-  }, [flush]);
+    const onHide = () => document.visibilityState === "hidden" && leave();
+    document.addEventListener("visibilitychange", onHide);
+    window.addEventListener("pagehide", leave);
+    return () => {
+      document.removeEventListener("visibilitychange", onHide);
+      window.removeEventListener("pagehide", leave);
+      leave();
+    };
+  }, [flush, editor]);
 }
 
 export interface ChapterEditorProps {
@@ -383,7 +392,7 @@ export function ChapterEditor({
   }).current;
 
   const editor = useEditor({
-    extensions: [...withPictures(chapterContent, pictureUrl).map((e) => ((e as unknown) === Scene ? Scene.configure({ label: words.piece.One }) : e)), UndoRedo, SelectFocusExtension, issueMarksExtension, pinnedLines, WritingModesExtension, WordCountExtension, FindExtension, SearchHighlightExtension, spellExtension, ...mentionExtension, mentionInfo, FootnotesExtension, picturesExtension, ...movingAround],
+    extensions: [...withPictures(chapterContent, pictureUrl).map((e) => ((e as unknown) === Scene ? Scene.configure({ label: words.piece.One }) : e)), UndoRedo, SelectFocusExtension, issueMarksExtension, pinnedLines, WritingModesExtension, WordCountExtension, DictationExtension, FindExtension, SearchHighlightExtension, spellExtension, ...mentionExtension, mentionInfo, FootnotesExtension, picturesExtension, ...movingAround],
     editorProps: {
       attributes: { role: "textbox", "aria-multiline": "true", "aria-label": label, class: "ghw-prose ghw-chapter" },
     },
@@ -436,7 +445,7 @@ export function ChapterEditor({
   useEffect(() => {
     if (editor) refreshPinnedLines(editor);
   }, [editor, pinnedKey]);
-  useFlushOnLeave(flush);
+  useFlushOnLeave(flush, editor);
 
   return <EditorContent editor={editor} className={className} />;
 }

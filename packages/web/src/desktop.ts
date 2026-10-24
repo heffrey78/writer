@@ -11,6 +11,8 @@ import { useNavigate } from "react-router";
 
 interface Invoke {
   invoke<T>(command: string, args?: Record<string, unknown>): Promise<T>;
+  /** A stream of messages from a command back to the page (Tauri's Channel). */
+  Channel: new <T>() => { onmessage: (message: T) => void };
 }
 
 /** A command from the shell, by name: "go" (a path in the app), "about", or "command" (a palette command, by its id). */
@@ -41,8 +43,12 @@ function run(command: ShellCommand): void {
   else waiting.push(command);
 }
 
+const settles = new Set<() => void>();
+
 window.writer = {
   async flushAll() {
+    // What's being dictated goes into the text first, so the flushes save it.
+    for (const settle of settles) settle();
     await Promise.allSettled([...flushes].map((flush) => flush()));
   },
   run,
@@ -55,6 +61,12 @@ if (shell) void shell.invoke<ShellCommand[]>("page_ready").then((commands) => co
 export function flushOnQuit(flush: () => Promise<void>): () => void {
   flushes.add(flush);
   return () => void flushes.delete(flush);
+}
+
+/** Before the saves when the app quits, put what's being dictated in the text. Returns a function that stops it. */
+export function settleOnQuit(settle: () => void): () => void {
+  settles.add(settle);
+  return () => void settles.delete(settle);
 }
 
 /** Run `handler` for the shell's command `name`, including one that came earlier. Returns a function that stops it. */
@@ -125,4 +137,32 @@ export function useShowLibrary(): (path?: string) => void {
     },
     [navigate],
   );
+}
+
+/**
+ * What the shell tells the page while it dictates (#79, D17): the phrase being heard so far, a phrase
+ * settled, that it has stopped (after settling what it heard), or why it couldn't go on.
+ */
+export type DictationEvent =
+  | { kind: "heard"; text: string }
+  | { kind: "settled"; text: string }
+  | { kind: "stopped" }
+  | { kind: "failed"; reason: "microphone" | "no-microphone" | "model" | "other"; message?: string };
+
+/** Whether the shell can hear the writer: false in a browser, and in a shell without dictation. */
+export function dictationAvailable(): Promise<boolean> {
+  return shell ? shell.invoke<boolean>("dictation_available").catch(() => false) : Promise.resolve(false);
+}
+
+/** Start the shell listening, in `language`, with names to spell as the book does; its events go to `onEvent`. */
+export function startDictation(language: string, hints: string[], onEvent: (event: DictationEvent) => void): Promise<void> {
+  if (!shell) return Promise.reject(new Error("There's nothing here to hear with."));
+  const events = new shell.Channel<DictationEvent>();
+  events.onmessage = onEvent;
+  return shell.invoke("dictate_start", { language, hints, events });
+}
+
+/** Ask the shell to stop: it settles the phrase it's hearing, then says it has stopped. */
+export function stopDictation(): Promise<void> {
+  return shell ? shell.invoke<void>("dictate_stop").catch(() => {}) : Promise.resolve();
 }

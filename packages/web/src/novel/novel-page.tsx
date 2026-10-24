@@ -52,6 +52,7 @@ import { IssuesPage } from "../issues/issues-page.tsx";
 import { WritingView } from "./writing-view.tsx";
 import { keptText } from "../engine/kept.ts";
 import { engineInPage } from "../platform.ts";
+import { DictationControls } from "../dictation/dictation-ui.tsx";
 
 // React Flow comes with the graph, loaded when it's first opened.
 const GraphPage = lazy(() => import("../graph/graph-page.tsx").then((m) => ({ default: m.GraphPage })));
@@ -363,6 +364,7 @@ export function NovelPage() {
         <ArrangeSidebar novelId={novelId} novel={book} onGitHub={!!repo} onNewFormat={newFormat.commands[0]?.run} />
         <ModuleCommands novelId={novelId} novel={book} workspace={workspace} />
         <NoticeBar />
+        <DictationControls />
         <NotesLeftDialog />
         {newFormat.dialog}
         {conversions.dialog}

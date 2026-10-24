@@ -58,6 +58,8 @@ export interface Shell {
   clipboard?: string | null;
   /** What can_inspect answers. */
   inspect?: boolean;
+  /** A shell that can hear (#79): dictation_available answers true, and the test says what's heard with `hear`. */
+  dictation?: boolean;
 }
 
 /**
@@ -78,12 +80,29 @@ export async function asDesktop(page: Page, shell: Shell = {}) {
           if (command === "edit") return Promise.resolve(false);
           if (command === "clipboard_text") return Promise.resolve(s.clipboard ?? null);
           if (command === "can_inspect") return Promise.resolve(s.inspect ?? false);
+          if (command === "dictation_available") return Promise.resolve(s.dictation ?? false);
+          if (command === "dictate_start") (window as unknown as { __hear: unknown }).__hear = (args as { events: Channel }).events.onmessage;
+          // Stopping settles what the test left to settle (window.__lastPhrase), then says it stopped.
+          if (command === "dictate_stop") {
+            const w = window as unknown as { __hear?: (e: unknown) => void; __lastPhrase?: string };
+            if (w.__lastPhrase) w.__hear?.({ kind: "settled", text: w.__lastPhrase });
+            w.__lastPhrase = undefined;
+            w.__hear?.({ kind: "stopped" });
+          }
           return Promise.resolve(null);
+        },
+        Channel: class {
+          onmessage: (message: unknown) => void = () => {};
         },
       },
     };
+    type Channel = { onmessage: (message: unknown) => void };
   }, shell);
 }
+
+/** What the stand-in shell hears, as the page is told it (asDesktop with `dictation`). */
+export const hear = (page: Page, event: { kind: "heard" | "settled"; text: string } | { kind: "failed"; reason: string } | { kind: "stopped" }) =>
+  page.evaluate((e) => (window as unknown as { __hear: (e: unknown) => void }).__hear(e), event);
 
 /** The arguments of each call the page made to the stand-in shell's `command`. */
 export const calls = (page: Page, command: string) =>

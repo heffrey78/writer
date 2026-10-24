@@ -53,6 +53,7 @@ import { mentionEdits } from "./mention-sync.ts";
 import { useNotice } from "./notice.tsx";
 import { isSidebarKey, RightSidebar, useRightSidebar, useWideSidebar } from "./right-sidebar.tsx";
 import { usePageMenu } from "../page-menu.ts";
+import { DictateButton } from "../dictation/dictation-ui.tsx";
 import { pinnedLine, SceneDetails, usePins } from "./scene-details.tsx";
 import { TodayCount } from "./today-count.tsx";
 import { useStructure } from "./structure.ts";
@@ -584,7 +585,7 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
           />
         )}
       </div>
-      <StatusBar novelId={novelId} workspace={workspace} />
+      <StatusBar novelId={novelId} workspace={workspace} editor={editor} />
       </div>
       {raising || issueOpen ? (
         // An issue being raised or read takes the sidebar's place until it's closed: beside the text,
@@ -721,15 +722,16 @@ function EmptyChapter({ autofocus, onAdd }: { autofocus: boolean; onAdd: (title:
 }
 
 /**
- * Under the text, quietly: the writing session's words, and today's against the daily goal. In
- * focus mode, only while the count is pinned there.
+ * Under the text, quietly: Dictate where the app can hear, the writing session's words, and today's
+ * against the daily goal. In focus mode, only while the count is pinned there.
  */
-function StatusBar({ novelId, workspace }: { novelId: string; workspace: Workspace }) {
+function StatusBar({ novelId, workspace, editor }: { novelId: string; workspace: Workspace; editor: Editor | undefined }) {
   const hidden = useWritingModes((m) => m.focus && !m.pinCount);
   const words = editorWords(useBookKind());
   if (hidden) return null;
   return (
     <div className="sticky bottom-0 z-10 flex flex-wrap items-baseline justify-end gap-x-4 gap-y-1 border-t border-rule bg-paper px-6 py-1.5 text-[13px] text-muted">
+      <DictateButton editor={editor} />
       <WordCount show={["session"]} label="This session" words={words} />
       <TodayCount novelId={novelId} workspace={workspace} />
     </div>

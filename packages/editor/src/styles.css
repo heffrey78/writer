@@ -97,6 +97,14 @@ img.ProseMirror-separator {
   background: var(--ghw-selection);
 }
 
+/* Dictation: the phrase being heard, greyed at the caret until it's settled into the text (#79). */
+.ghw-heard {
+  color: var(--ghw-muted);
+  font-style: italic;
+  pointer-events: none;
+  user-select: none;
+}
+
 .ghw-prose p {
   margin: 0 0 0.9em;
 }
