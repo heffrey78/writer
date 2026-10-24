@@ -1,0 +1,8 @@
+# Android 15 and later run on phones with 16 KB memory pages, and warn that an app whose native
+# library is laid out for 4 KB ones isn't compatible. NDK 27 links for 4 KB unless told to; NDK 28
+# and later do this by default.
+[target.aarch64-linux-android]
+rustflags = ["-C", "link-arg=-Wl,-z,max-page-size=16384"]
+
+[target.x86_64-linux-android]
+rustflags = ["-C", "link-arg=-Wl,-z,max-page-size=16384"]
