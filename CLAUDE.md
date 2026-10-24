@@ -12,9 +12,9 @@ The plan lives in this repository's issues (see *Project tracking*). Its order:
 2. Keep gh-writer v2 novels opening unchanged (#2).
 3. Generalize: kinds (#3, D15 #11) and modules (#4, D14 #10), starting from the inventory (#17).
 4. The Journal kind, the first proof of the base (#5).
-5. Roadmap: Campaign (#6), Non-fiction (#7), Android (#8, D16 #12).
+5. Roadmap: Campaign (#6), Non-fiction (#7), Android (#8, D16 #12), dictation (#71–#76, D17 #77), other languages (#92).
 
-D13–D15 are accepted (2026-10-18), and D16 (2026-10-21, amended from its spike: docs/architecture/d16-spike.md). Don't build on a proposed decision as if it were settled, and point it out when work depends on one.
+D13–D15 are accepted (2026-10-18), D16 (2026-10-21, amended from its spike: docs/architecture/d16-spike.md), and D17 (2026-10-24; its spike, #78, amends it with the engine and model). Don't build on a proposed decision as if it were settled, and point it out when work depends on one.
 
 ## gh-writer is the reference
 
