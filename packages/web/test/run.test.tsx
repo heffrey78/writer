@@ -140,6 +140,33 @@ describe("the place to begin a piece", () => {
     expect(sessionStorage.getItem("test:begin")).toBeNull();
   });
 
+  it("words reported as the piece's file opens, before the place has caught up, go into the file (#79)", async () => {
+    const make = vi.fn(async () => "ent_today");
+    const { ws, rerender } = mount(book.allPieces, { begin: begin(make) });
+    const editor = ((await screen.findByRole("textbox", { name: "Write today's entry" })) as unknown as { editor: Editor }).editor;
+    // A whole phrase at once, as dictation writes it: one change, and one report of it.
+    act(() => void editor.chain().focus("end").insertContent("Fog on the water.").run());
+    await act(async () => {});
+    expect(make).toHaveBeenCalledTimes(1);
+    // The made piece's file opens when the test says.
+    let opened!: () => void;
+    const gate = new Promise<void>((resolve) => (opened = resolve));
+    const open = ws.open.getMockImplementation()!;
+    ws.open.mockImplementation(async (paths) => {
+      await gate;
+      await open(paths);
+    });
+    const made = today();
+    rerender({ pieces: [made, ...book.allPieces], begin: undefined });
+    await act(async () => {
+      opened();
+      for (let i = 0; i < 5; i++) await Promise.resolve();
+      // The report comes now, before the place renders as the piece's.
+      vi.advanceTimersByTime(400);
+    });
+    expect(ws.store.getState().files[made.file]?.body).toBe("Fog on the water.\n");
+  });
+
   it("keeps the words typed before the piece is made, and after a reload makes it for them", async () => {
     const make = vi.fn(() => new Promise<string>(() => {}));
     const first = mount(book.allPieces, { begin: begin(make) });

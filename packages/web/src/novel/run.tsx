@@ -212,6 +212,8 @@ function RunPiece({ piece, began, run, workspace, label, tools, want, onWanted, 
   const typed = useRef(kept ?? "");
   const making = useRef(false);
   const [bound, setBound] = useState(!began);
+  // The same, at once: words reported between binding and the render after it go to the file.
+  const boundNow = useRef(!began);
   const keep = useRef(run.begin?.keep);
   // Its editor keeps the place's name once its piece is made: changing the text box under the writer
   // (its attributes) restarts Android's keyboard mid-word.
@@ -241,6 +243,7 @@ function RunPiece({ piece, began, run, workspace, label, tools, want, onWanted, 
       const f = workspace.store.getState().files[path];
       if (f && f.body !== typed.current) workspace.change(path, typed.current);
       if (keep.current) store(keep.current, undefined);
+      boundNow.current = true;
       setBound(true);
     });
     return () => void (gone = true);
@@ -285,7 +288,7 @@ function RunPiece({ piece, began, run, workspace, label, tools, want, onWanted, 
   };
   const onChange = (md: string) => {
     typed.current = md;
-    if (path && bound) return workspace.change(path, md);
+    if (path && boundNow.current) return workspace.change(path, md);
     if (keep.current) store(keep.current, md);
     make();
   };
