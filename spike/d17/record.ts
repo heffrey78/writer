@@ -37,6 +37,31 @@ const PASSAGES: Record<string, string[]> = {
   ],
 };
 
+/** What's wrong with a take's level, if anything: clipped, or too quiet. */
+function level(pcm: Buffer): string | undefined {
+  const n = pcm.length / 2;
+  let clipped = 0;
+  const frames: number[] = [];
+  let sum = 0;
+  for (let i = 0; i < n; i++) {
+    const s = pcm.readInt16LE(i * 2);
+    if (Math.abs(s) >= 32767) clipped++;
+    sum += s * s;
+    if ((i + 1) % 800 === 0) {
+      frames.push(Math.sqrt(sum / 800) / 32768);
+      sum = 0;
+    }
+  }
+  frames.sort((a, b) => a - b);
+  const db = (x: number) => 20 * Math.log10(Math.max(x, 1e-6));
+  const quiet = db(frames[Math.floor(frames.length * 0.1)] ?? 0);
+  const loud = db(frames[Math.floor(frames.length * 0.9)] ?? 0);
+  if (clipped / n > 0.005) return `Too loud for the microphone: ${((100 * clipped) / n).toFixed(1)}% of it clipped. Turn the input down in the system's sound settings (around a third is often right).`;
+  if (quiet > -30) return `Too loud even between words (${quiet.toFixed(0)} dBFS): turn the input down in the system's sound settings.`;
+  if (loud < -40) return `Too quiet (${loud.toFixed(0)} dBFS at its loudest): turn the input up, or move closer.`;
+  return undefined;
+}
+
 const ask = createInterface({ input: process.stdin, output: process.stdout });
 mkdirSync(clips, { recursive: true });
 
@@ -50,14 +75,22 @@ for (const name of process.argv[2] ? [process.argv[2]] : Object.keys(PASSAGES)) 
   let at = pause.length / 2;
   for (const [i, text] of paragraphs.entries()) {
     console.log(`\n[${i + 1}/${paragraphs.length}] ${text}\n`);
-    await ask.question("Enter to start…");
-    const take = join(clips, `.take-${i}.wav`);
-    const recorder = spawn("pw-record", ["--rate", String(RATE), "--channels", "1", "--format", "s16", take], { stdio: "ignore" });
-    await ask.question("Recording. Enter to stop.");
-    recorder.kill("SIGINT");
-    await new Promise((done) => recorder.on("exit", done));
-    const pcm = execFileSync("ffmpeg", ["-v", "error", "-i", take, "-f", "s16le", "-ac", "1", "-ar", String(RATE), "-"], { maxBuffer: 1 << 28 });
-    rmSync(take);
+    let pcm: Buffer;
+    for (;;) {
+      await ask.question("Enter to start…");
+      const take = join(clips, `.take-${i}.wav`);
+      const recorder = spawn("pw-record", ["--rate", String(RATE), "--channels", "1", "--format", "s16", take], { stdio: "ignore" });
+      await ask.question("Recording. Enter to stop.");
+      recorder.kill("SIGINT");
+      await new Promise((done) => recorder.on("exit", done));
+      pcm = execFileSync("ffmpeg", ["-v", "error", "-i", take, "-f", "s16le", "-ac", "1", "-ar", String(RATE), "-"], { maxBuffer: 1 << 28 });
+      rmSync(take);
+      // A take too loud for the microphone (clipped) or too quiet to hear is no test of an engine.
+      const problem = level(pcm);
+      if (!problem) break;
+      const again = await ask.question(`${problem} Enter to record this paragraph again, or k and Enter to keep it.`);
+      if (again.trim() === "k") break;
+    }
     said.push({ start: at / RATE, end: (at + pcm.length / 2) / RATE, text });
     parts.push(pcm, pause);
     at += pcm.length / 2 + pause.length / 2;

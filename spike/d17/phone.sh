@@ -5,6 +5,7 @@
 #
 #   ./phone.sh                 build for the phone, push, run
 #   ENGINES="parakeet-110m+zipformer" THREADS="1 2 4" ./phone.sh
+#   ONLY=android ./phone.sh    Android's own recognizer only
 set -euo pipefail
 cd "$(dirname "$0")"
 ADB="${ADB:-$HOME/.local/share/writer-android/platform-tools/adb}"
@@ -12,6 +13,8 @@ on=/data/local/tmp/hear
 engines=(${ENGINES:-zipformer+punct kroko+punct moonshine-tiny moonshine-base parakeet-110m parakeet-110m+zipformer moonshine-base+zipformer})
 threads=(${THREADS:-1 2})
 
+device=$("$ADB" shell getprop ro.product.model | tr -d '\r')
+if [[ "${ONLY:-}" != android ]]; then
 # Built with the app's Android toolchain, 16 KB pages as the app's library is.
 (
   cd hear
@@ -37,7 +40,6 @@ for d in sherpa-onnx-streaming-zipformer-en-2023-06-26 sherpa-onnx-streaming-zip
 done
 "$ADB" push -q clips/*.wav clips/*.json $on/clips/
 
-device=$("$ADB" shell getprop ro.product.model | tr -d '\r')
 "$ADB" shell rm -f $on/results/runs.jsonl
 for clip in clips/*.json; do
   clip=$(basename "$clip" .json)
@@ -50,6 +52,7 @@ for clip in clips/*.json; do
 done
 "$ADB" pull -q $on/results/runs.jsonl results/phone-run.jsonl
 cat results/phone-run.jsonl >> results/phone.jsonl && rm results/phone-run.jsonl
+fi
 
 # Android's own on-device recognizer, on the same clips at speaking pace (recognizer/), scored here.
 app=io.github.heffrey78.hearspike
