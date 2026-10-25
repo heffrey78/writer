@@ -21,7 +21,7 @@ fn main() {
     let (send, receive) = mpsc::channel::<Vec<f32>>();
     let stream = device
         .build_input_stream(
-            &config.into(),
+            config.into(),
             move |data: &[f32], _| {
                 // The first channel, mono.
                 let _ = send.send(data.chunks(channels).map(|frame| frame[0]).collect());
