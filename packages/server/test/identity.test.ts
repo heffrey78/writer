@@ -105,7 +105,8 @@ describe("PUT /api/identity", () => {
       const { suggestion } = (await call("GET", "/api/identity")).json as { suggestion: { name: string; email: string } };
       expect(await call("PUT", "/api/identity", suggestion)).toMatchObject({ status: 200, json: { identity: suggestion } });
       expect(execFileSync("git", ["config", "--global", "user.email"], { encoding: "utf8" }).trim()).toBe(suggestion.email);
-      expect(gitIn(novel, "log", "-1", "--format=%an <%ae>").trim()).toBe(`${suggestion.name} <${suggestion.email}>`);
+      // The waiting work is committed in the background, as the blocked commit was tried (#18).
+      await expect.poll(() => gitIn(novel, "log", "-1", "--format=%an <%ae>").trim(), { timeout: 10_000 }).toBe(`${suggestion.name} <${suggestion.email}>`);
       expect(gitIn(novel, "status", "--porcelain")).toBe("");
     });
   });
