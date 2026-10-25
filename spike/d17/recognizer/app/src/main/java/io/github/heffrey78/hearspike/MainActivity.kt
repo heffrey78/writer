@@ -9,6 +9,7 @@ import android.os.SystemClock
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+import android.view.WindowManager
 import android.widget.TextView
 import org.json.JSONObject
 import java.io.File
@@ -27,8 +28,11 @@ import java.io.FileOutputStream
 class MainActivity : Activity() {
     private lateinit var out: FileOutputStream
     private var t0 = 0L
+    private var done = false
 
     private fun event(kind: String, text: String = "") {
+        if (done) return
+        if (kind == "done") done = true
         val line = JSONObject().put("t", (SystemClock.elapsedRealtime() - t0) / 1000.0).put("kind", kind).put("text", text)
         out.write("$line\n".toByteArray())
         out.flush()
@@ -38,6 +42,8 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Android stops recognizing for an app that's no longer in front: the screen stays on.
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         val status = TextView(this)
         setContentView(status)
         val clip = intent.getStringExtra("clip") ?: "librispeech-test-clean"
@@ -110,5 +116,12 @@ class MainActivity : Activity() {
                 }
             }
         }.start()
+    }
+
+    // Sent to the background anyway (another app, the power button): say so, rather than go quiet.
+    override fun onStop() {
+        super.onStop()
+        event("error", "the app left the screen")
+        event("done")
     }
 }

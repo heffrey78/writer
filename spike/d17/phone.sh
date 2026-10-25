@@ -62,11 +62,21 @@ files=/sdcard/Android/data/$app/files
 "$ADB" shell mkdir -p $files
 for clip in clips/*.json; do
   clip=$(basename "$clip" .json)
-  echo "Android's recognizer on $clip, on the $device" >&2
+  echo "Android's recognizer on $clip, on the $device: keep the phone's screen on and Writer's scratch app in front" >&2
   "$ADB" push -q "clips/$clip.wav" $files/
   "$ADB" shell rm -f $files/$clip.events.jsonl
   "$ADB" shell am start -S -n $app/.MainActivity --es clip "$clip" > /dev/null
-  until "$ADB" shell "grep -q '\"done\"' $files/$clip.events.jsonl 2>/dev/null"; do sleep 5; done
+  # The clip's length at speaking pace, and a minute and a half more: then what it heard so far.
+  limit=$(( $(python3 -c "import json; print(int(json.load(open('clips/$clip.json'))['seconds']))") + 90 ))
+  waited=0
+  until "$ADB" shell "grep -q '\"done\"' $files/$clip.events.jsonl 2>/dev/null"; do
+    sleep 5
+    waited=$((waited + 5))
+    if (( waited > limit )); then
+      echo "  no end from the recognizer after ${waited} s: scoring what it heard" >&2
+      break
+    fi
+  done
   "$ADB" pull -q $files/$clip.events.jsonl "results/$clip.android.events.jsonl"
   HEAR_DEVICE="$device" hear/target/release/bench --events "results/$clip.android.events.jsonl" "$clip" android-on-device | tail -1 >> results/phone.jsonl
   # The bench logs every run; this one belongs with the phone's.

@@ -131,7 +131,7 @@ All 28 runs are in `results/phone.jsonl`.
   - Zipformer: Apache-2.0. The punctuation model: Apache-2.0. Moonshine's English models: MIT.
   - Parakeet 110M and FastConformer: CC-BY-4.0, free to ship with credit in About.
   - Kroko's community models: CC-BY-SA. Nemotron: NVIDIA's own licence.
-  - #72 asks for Apache-2.0 or MIT, so Parakeet needs the owner's word.
+  - #72 asked for Apache-2.0 or MIT; the owner accepted CC-BY-4.0 for Parakeet, with the model credited in About Writer (2026-10-25), and #72 now says so.
 
 ## Still to do
 
@@ -145,4 +145,4 @@ The engine is sherpa-onnx, as D17 says. Its model isn't the streaming Zipformer 
 - the streaming Zipformer shows the words as they're heard;
 - both run in the speech crate.
 
-The download is 208 MB. Moonshine base is the fallback if Parakeet's CC-BY-4.0 licence isn't acceptable. On Android, the same crate runs on the phone, quicker than here, unless Android's own recognizer proves better on the same clips (pending).
+The download is 208 MB. Moonshine base is the fallback, should Parakeet fall short on the owner's own clips. On Android, the same crate runs on the phone, quicker than here, unless Android's own recognizer proves better on the same clips (pending).
