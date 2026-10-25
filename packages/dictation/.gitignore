@@ -1,0 +1,3 @@
+target/
+# The models, fetched by fetch-models.sh for the tests: never committed.
+models/

@@ -42,6 +42,7 @@ The novel itself is the source of truth: plain Markdown and YAML files ([format 
 | [`desktop`](packages/desktop) | The desktop app: a Tauri shell that runs the server bundle on its own Node and git, and opens a window on it. |
 | [`mobile`](packages/mobile) | The Android app (D16): the web app and the engine in a Tauri webview, its git (libgit2, in process), files, GitHub's HTTP and the token in Rust. See *The Android app*. |
 | [`git2-port`](packages/git2-port) | The git port over libgit2, in Rust (D16): the same operations as the server's git, for Android, where there's no git binary. A stdio binary for the contract suite on the desktop. |
+| [`dictation`](packages/dictation) | The speech crate, in Rust (D17): 16 kHz samples in, the phrase being heard and each settled phrase out, heard on the device by Parakeet TDT 110M and the streaming Zipformer through sherpa-onnx. The model's manifest (pinned sources and checksums), `install` and `verify`; the microphone behind the `mic` feature, for the shells. `fetch-models.sh` installs the model for its tests; `cargo run --release --example bench` measures it. |
 | [`kinds`](packages/kinds) | The kinds of book the app ships, as data (D14, D15): the Novel's levels, ID prefixes, folders, built-in entry types, statuses, issue kinds, its scenes' fields (each field's type is how the schema, the validator, the Scene card, the outline, comparisons and mentions read it), the modules it uses and its words on screen. See *Kinds and modules*. |
 
 Other folders:

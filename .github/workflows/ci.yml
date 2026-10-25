@@ -71,6 +71,26 @@ jobs:
       - run: cargo test
         working-directory: packages/mobile/ports
 
+  dictation:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: packages/dictation
+      # The speech model (208 MB installed, 420 MB to download), kept until the manifest changes.
+      - uses: actions/cache@v4
+        with:
+          path: packages/dictation/models
+          key: dictation-models-${{ hashFiles('packages/dictation/src/model.rs') }}
+      - run: ./fetch-models.sh && rm -rf models/downloads
+        working-directory: packages/dictation
+      - run: cargo test --release
+        working-directory: packages/dictation
+      # The microphone's part, which the tests don't open: it builds.
+      - run: sudo apt-get install -y -qq libasound2-dev > /dev/null && cargo build --release --features mic
+        working-directory: packages/dictation
+
   e2e:
     runs-on: ubuntu-24.04
     steps:

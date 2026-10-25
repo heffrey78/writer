@@ -1,0 +1,31 @@
+[package]
+name = "writer-dictation"
+version = "0.1.0"
+edition = "2024"
+description = "Writer's speech crate (D17, #82): 16 kHz samples in, the phrase being heard and each settled phrase out, heard on the device."
+publish = false
+
+[lib]
+name = "dictation"
+path = "src/lib.rs"
+
+[features]
+default = ["static"]
+# sherpa-onnx linked in (the desktop shells), or as its shared libraries (Android, which only has those).
+static = ["sherpa-onnx/static"]
+shared = ["sherpa-onnx/shared"]
+# The microphone, through cpal: for the shells. Tests feed recorded clips instead.
+mic = ["dep:cpal"]
+
+[dependencies]
+sherpa-onnx = { version = "=2.0.0", default-features = false }
+sha2 = "0.10"
+tar = "0.4"
+bzip2 = "0.4"
+cpal = { version = "0.18", optional = true }
+
+[dev-dependencies]
+hound = "3.5"
+serde_json = "1"
+proptest = { version = "1", default-features = false, features = ["std"] }
+tempfile = "3"
