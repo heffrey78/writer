@@ -92,7 +92,8 @@ fn hears_the_clip_and_settles_each_phrase_at_its_pause() {
     }
     // What's heard is cleared once its phrase is settled.
     let last_settled = events.iter().rposition(|(_, e)| matches!(e, Event::Settled(_))).unwrap();
-    assert!(events[last_settled..].iter().all(|(_, e)| !matches!(e, Event::Heard(t) if !t.is_empty())));
+    let after: Vec<&Event> = events[last_settled..].iter().map(|(_, e)| e).filter(|e| matches!(e, Event::Heard(t) if !t.is_empty())).collect();
+    assert!(after.is_empty(), "heard after the last phrase settled, in the silence: {after:?}");
 }
 
 #[test]

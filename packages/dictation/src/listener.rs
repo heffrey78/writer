@@ -166,9 +166,11 @@ impl Listener {
         }
         self.pending.drain(..windows * WINDOW);
 
+        // What's heard is shown while there's speech: the Zipformer runs a little behind the voice
+        // detection, and can still give a word once the phrase has ended.
         if settled {
             self.afresh(&mut out);
-        } else if heard != self.heard && !heard.is_empty() {
+        } else if heard != self.heard && !heard.is_empty() && self.vad.detected() {
             out.push(Event::Heard(heard.clone()));
             self.heard = heard;
         }
