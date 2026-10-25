@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-dictation-download"
+description = "Enables the dictation_download command without any pre-configured scope."
+commands.allow = ["dictation_download"]
+
+[[permission]]
+identifier = "deny-dictation-download"
+description = "Denies the dictation_download command without any pre-configured scope."
+commands.deny = ["dictation_download"]

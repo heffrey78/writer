@@ -2,10 +2,11 @@
 //! the server run beside it on the app's own Node and git. The library has a window of its own, and
 //! each novel opens in one of its own. The app starts the server, sends its windows there once it's
 //! listening, keeps them to the server's pages (anything else opens in the writer's browser), and on
-//! closing a window or quitting has each page save what's typed, then stops the server, which commits
-//! waiting work. One copy runs at a time: opening it again (with a novel's folder, say) goes to it.
+//! closing a window or quitting has each page save what's typed (after any dictation there has
+//! settled its phrase), then stops the server, which commits waiting work. One copy runs at a time: opening it again (with a novel's folder, say) goes to it.
 
 pub mod askpass;
+mod dictation;
 mod settings;
 mod sidecar;
 
@@ -345,6 +346,8 @@ fn quit(app: &AppHandle) {
     let app = app.clone();
     thread::spawn(move || {
         let started = Instant::now();
+        // The phrase being heard is settled into its page before the page saves.
+        dictation::stop_running(&app, |_| true);
         flush_all(&app);
         let saved = started.elapsed();
         if let Some(sidecar) = app.state::<Shell>().sidecar.lock().unwrap().take() {
@@ -487,6 +490,8 @@ fn watch_server(app: AppHandle) {
 fn build_menu(app: &AppHandle) -> tauri::Result<()> {
     let shell = app.state::<Shell>();
     let recent = SubmenuBuilder::new(app, "Open Recent").build()?;
+    // The page's Dictate, where its page has an editor (dictation::focused).
+    let dictate = MenuItemBuilder::with_id("dictate", "Start Dictation").enabled(false).build(app)?;
     let system_git = CheckMenuItemBuilder::with_id("system-git", "Use This Computer's git").checked(shell.settings.lock().unwrap().system_git).build(app)?;
     let file = SubmenuBuilder::new(app, "File")
         .item(&MenuItemBuilder::with_id("new-novel", "New Book…").build(app)?)
@@ -510,11 +515,14 @@ fn build_menu(app: &AppHandle) -> tauri::Result<()> {
         .item(&PredefinedMenuItem::copy(app, None)?)
         .item(&PredefinedMenuItem::paste(app, None)?)
         .item(&PredefinedMenuItem::select_all(app, None)?)
+        .separator()
+        .item(&dictate)
         .build()?;
     let help = SubmenuBuilder::new(app, "Help").item(&MenuItemBuilder::with_id("about", "About Writer").build(app)?).build()?;
     app.set_menu(MenuBuilder::new(app).items(&[&file, &edit, &help]).build()?)?;
     *shell.recent_menu.lock().unwrap() = Some(recent);
     *shell.system_git_item.lock().unwrap() = Some(system_git);
+    *app.state::<dictation::Dictating>().menu.lock().unwrap() = Some(dictate);
     set_recent(app.clone(), Vec::new());
     Ok(())
 }
@@ -536,6 +544,12 @@ fn on_menu(app: &AppHandle, id: &str) {
                 let _ = open_window(app, LIBRARY, "/");
             }
             deliver(app, &label, PageCommand { name: "command", arg: Some("daily.today".into()) });
+        }
+        // The palette's Dictate (or Stop dictating), in the window in front.
+        "dictate" => {
+            if let Some(window) = focused() {
+                deliver(app, window.label(), PageCommand { name: "command", arg: Some("writing.dictate".into()) });
+            }
         }
         "about" => {
             let label = focused().map(|w| w.label().to_string()).unwrap_or_else(|| LIBRARY.into());
@@ -584,7 +598,27 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .manage(Shell::default())
-        .invoke_handler(tauri::generate_handler![flushed, page_ready, pick_folder, open_novel, show_library, set_recent, edit, clipboard_text, can_inspect, inspect])
+        .manage(dictation::Dictating::default())
+        .invoke_handler(tauri::generate_handler![
+            flushed,
+            page_ready,
+            pick_folder,
+            open_novel,
+            show_library,
+            set_recent,
+            edit,
+            clipboard_text,
+            can_inspect,
+            inspect,
+            dictation::dictation_available,
+            dictation::dictate_start,
+            dictation::dictate_stop,
+            dictation::dictation_model,
+            dictation::dictation_download,
+            dictation::dictation_cancel_download,
+            dictation::dictation_remove_model,
+            dictation::dictation_offered
+        ])
         .on_menu_event(|app, event| on_menu(app, event.id().as_ref()))
         .setup(|app| {
             let handle = app.handle();
@@ -609,12 +643,15 @@ pub fn run() {
                 if let Some(webview) = window.get_webview_window(window.label()) {
                     api.prevent_close();
                     thread::spawn(move || {
+                        dictation::closed(webview.app_handle(), webview.label());
                         flush(&webview);
                         let _ = webview.destroy();
                     });
                 }
             }
+            WindowEvent::Focused(true) => dictation::focused(window.app_handle(), window.label()),
             WindowEvent::Destroyed => {
+                dictation::closed(window.app_handle(), window.label());
                 let shell = window.state::<Shell>();
                 shell.ready.lock().unwrap().remove(window.label());
                 shell.pending.lock().unwrap().remove(window.label());

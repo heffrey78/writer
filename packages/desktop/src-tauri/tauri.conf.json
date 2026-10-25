@@ -26,7 +26,8 @@
     ],
     "resources": {
       "../../../dist/server/": "server/",
-      "../../../LICENSE.md": "licenses/writer-LICENSE.md"
+      "../../../LICENSE.md": "licenses/writer-LICENSE.md",
+      "../../dictation/licenses/": "licenses/"
     },
     "publisher": "Jeff Wikstrom",
     "copyright": "Copyright (c) 2026 Jeff Wikstrom"

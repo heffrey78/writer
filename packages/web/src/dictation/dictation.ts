@@ -1,7 +1,7 @@
 import type { Editor } from "@tiptap/core";
 import { heardText, offerDictation, settleHeard, showHeard, type DictationOffer } from "@writer/editor";
 import { create } from "zustand";
-import { dictationAvailable, settleOnQuit, startDictation, stopDictation, type DictationEvent } from "../desktop.ts";
+import { cancelDictationDownload, dictationAvailable, dictationModel, downloadDictationModel, settleOnQuit, startDictation, stopDictation, type DictationEvent } from "../desktop.ts";
 import { useNotice } from "../novel/notice.tsx";
 
 /*
@@ -74,8 +74,52 @@ const FAILED: Record<Extract<DictationEvent, { kind: "failed" }>["reason"], stri
 };
 
 function failed(event: Extract<DictationEvent, { kind: "failed" }>): void {
+  const into = live(get().editor) ?? live(get().last);
+  const heard = into ? heardText(into.state) : "";
   settleNow();
-  useNotice.getState().show({ message: `Dictation stopped. ${event.message ?? FAILED[event.reason]} What was heard so far is in the text.` });
+  // No model yet: the first Dictate offers to download it, where the shell keeps one.
+  if (event.reason === "model") return void offerModel(into, event.message);
+  useNotice.getState().show({ message: `Dictation stopped. ${event.message ?? FAILED[event.reason]}${heard ? " What was heard so far is in the text." : ""}` });
+}
+
+const mb = (bytes: number) => Math.round(bytes / 1e6);
+
+/** Say what dictation needs, and offer to download it. */
+async function offerModel(editor: Editor | undefined, why?: string): Promise<void> {
+  const model = await dictationModel();
+  const show = useNotice.getState().show;
+  if (!model) return show({ message: `Couldn't start dictating: ${why ?? FAILED.model}` });
+  const what = model.state === "damaged" ? "Writer's speech model is damaged on this computer and needs downloading again" : "Dictation hears with Writer's speech model, which isn't on this computer yet";
+  show({
+    message: `${what}: ${mb(model.downloadBytes)} MB to download, ${mb(model.installedBytes)} MB once it's in. What you say never leaves the computer.`,
+    action: { label: "Download it", run: () => void download(editor) },
+    secondary: { label: "Not now", run: () => {} },
+  });
+}
+
+/** Download the model, saying how far it is, and offer Dictate once it's in. */
+async function download(editor: Editor | undefined): Promise<void> {
+  const show = useNotice.getState().show;
+  const cancel = { label: "Cancel", run: cancelDictationDownload };
+  let shown = -1;
+  show({ message: "Downloading the speech model…", action: cancel });
+  try {
+    await downloadDictationModel((done, total) => {
+      const percent = Math.floor((100 * done) / Math.max(total, 1));
+      if (percent === shown) return;
+      shown = percent;
+      show({ message: `Downloading the speech model: ${percent}% of ${mb(total)} MB…`, action: cancel });
+    });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    if (message === "cancelled") return show({ message: "Download stopped. What's downloaded so far is kept: download again to go on from there.", action: { label: "Download", run: () => void download(editor) } });
+    return show({ message: `The speech model didn't download: ${message}`, action: { label: "Try again", run: () => void download(editor) } });
+  }
+  show({
+    message: "The speech model is in: dictation hears on this computer now.",
+    // From the notice back to the text, where the words will go.
+    ...(live(editor) ? { action: { label: "Dictate", run: () => void (editor!.commands.focus(null, { scrollIntoView: false }), start(editor!)) } } : {}),
+  });
 }
 
 function onEvent(event: DictationEvent): void {

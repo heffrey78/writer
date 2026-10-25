@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "The app's pages, served by its own server on 127.0.0.1, may ask the shell for what a browser page can't do: say they've saved, take its commands, choose a folder, open a novel's window, bring the library forward, list recent novels, run the webview's own Cut, Copy, Paste and Select all, read the clipboard's text (for the app's right-click menu), and open the inspector in a debug build. Nothing else of Tauri's is open to them.",
+  "description": "The app's pages, served by its own server on 127.0.0.1, may ask the shell for what a browser page can't do: say they've saved, take its commands, choose a folder, open a novel's window, bring the library forward, list recent novels, run the webview's own Cut, Copy, Paste and Select all, read the clipboard's text (for the app's right-click menu), open the inspector in a debug build, and dictate: hear through the microphone with Writer's speech model, and download, cancel or remove that model. Nothing else of Tauri's is open to them.",
   "windows": [
     "*"
   ],
@@ -20,6 +20,14 @@
     "allow-edit",
     "allow-clipboard-text",
     "allow-can-inspect",
-    "allow-inspect"
+    "allow-inspect",
+    "allow-dictation-available",
+    "allow-dictate-start",
+    "allow-dictate-stop",
+    "allow-dictation-model",
+    "allow-dictation-download",
+    "allow-dictation-cancel-download",
+    "allow-dictation-remove-model",
+    "allow-dictation-offered"
   ]
 }

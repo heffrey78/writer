@@ -166,3 +166,35 @@ export function startDictation(language: string, hints: string[], onEvent: (even
 export function stopDictation(): Promise<void> {
   return shell ? shell.invoke<void>("dictate_stop").catch(() => {}) : Promise.resolve();
 }
+
+/** The shell's speech model: ready, or what it takes to download (DEVELOPER.md, *Dictation*). */
+export interface DictationModel {
+  state: "ready" | "missing" | "damaged";
+  /** On this computer, once in. */
+  installedBytes: number;
+  /** Left to download. */
+  downloadBytes: number;
+}
+
+/** The speech model's state, where the shell keeps one (null otherwise). */
+export function dictationModel(): Promise<DictationModel | null> {
+  return shell ? shell.invoke<DictationModel>("dictation_model").catch(() => null) : Promise.resolve(null);
+}
+
+/** Download the speech model, `onProgress` hearing how far it is; rejects with why it stopped ("cancelled"). */
+export function downloadDictationModel(onProgress: (done: number, total: number) => void): Promise<void> {
+  if (!shell) return Promise.reject(new Error("There's nowhere to download to."));
+  const progress = new shell.Channel<{ done: number; total: number }>();
+  progress.onmessage = ({ done, total }) => onProgress(done, total);
+  return shell.invoke("dictation_download", { progress });
+}
+
+/** Stop the download under way; what's downloaded is kept for the next time. */
+export function cancelDictationDownload(): void {
+  void shell?.invoke("dictation_cancel_download");
+}
+
+/** Tell the shell whether this page offers Dictate (it has an editor), for its Edit menu. */
+export function offerDictationInMenu(offered: boolean): void {
+  void shell?.invoke("dictation_offered", { offered }).catch(() => {});
+}

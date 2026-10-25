@@ -13,6 +13,9 @@ const shell = {
   last: "" as string | undefined,
   events: undefined as ((e: DictationEvent) => void) | undefined,
   calls: [] as string[],
+  /** The speech model, and how its download goes: whole, or cancelled partway. */
+  model: "ready" as "ready" | "missing",
+  download: "whole" as "whole" | "cancelled",
 };
 class Channel<T> {
   onmessage: (message: T) => void = () => {};
@@ -20,11 +23,23 @@ class Channel<T> {
 (window as unknown as { __TAURI__: unknown }).__TAURI__ = {
   core: {
     Channel,
-    invoke: async (command: string, args?: { events?: Channel<DictationEvent> }) => {
+    invoke: async (command: string, args?: { events?: Channel<DictationEvent>; progress?: Channel<{ done: number; total: number }> }) => {
       shell.calls.push(command);
       if (command === "page_ready") return [];
       if (command === "dictation_available") return shell.available;
-      if (command === "dictate_start") shell.events = (e) => args!.events!.onmessage(e);
+      if (command === "dictation_model") return { state: shell.model, installedBytes: 208_048_243, downloadBytes: shell.model === "ready" ? 0 : 419_093_000 };
+      if (command === "dictation_download") {
+        for (const done of [0, 104_773_250, 209_546_500]) args!.progress!.onmessage({ done, total: 419_093_000 });
+        if (shell.download === "cancelled") throw "cancelled";
+        args!.progress!.onmessage({ done: 419_093_000, total: 419_093_000 });
+        shell.model = "ready";
+        return null;
+      }
+      if (command === "dictate_start") {
+        shell.events = (e) => args!.events!.onmessage(e);
+        // The shell says why it can't start on the channel, as it says anything else.
+        if (shell.model === "missing") shell.events({ kind: "failed", reason: "model", message: "the speech model isn't all there" });
+      }
       if (command === "dictate_stop" && shell.last !== undefined) {
         if (shell.last) shell.events?.({ kind: "settled", text: shell.last });
         shell.events?.({ kind: "stopped" });
@@ -57,6 +72,8 @@ const shown = (editor: Editor) => editor.view.dom.querySelector(".ghw-heard")?.t
 
 beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
+  shell.model = "ready";
+  shell.download = "whole";
   shell.last = "";
   shell.calls = [];
   notice.useNotice.setState({ notice: undefined });
@@ -177,5 +194,43 @@ describe("leaving", () => {
     await window.writer!.flushAll();
     unflush();
     expect(saved).toBe("Fog. Then sun\n");
+  });
+});
+
+describe("the speech model", () => {
+  const shown = () => notice.useNotice.getState().notice;
+
+  it("missing on the first Dictate: offered for download, with its size, then Dictate once it's in", async () => {
+    shell.model = "missing";
+    const editor = open("Fog.\n");
+    await dictation.start(editor);
+    expect(dictation.useDictation.getState().state).toBe("off");
+    await vi.waitFor(() => expect(shown()?.action?.label).toBe("Download it"));
+    expect(shown()?.message).toBe("Dictation hears with Writer's speech model, which isn't on this computer yet: 419 MB to download, 208 MB once it's in. What you say never leaves the computer.");
+    expect(shown()?.secondary?.label).toBe("Not now");
+
+    const messages: string[] = [];
+    const unsubscribe = notice.useNotice.subscribe((s) => s.notice && messages.push(s.notice.message));
+    shown()!.action!.run();
+    await vi.waitFor(() => expect(shown()?.message).toBe("The speech model is in: dictation hears on this computer now."));
+    unsubscribe();
+    expect(messages).toContain("Downloading the speech model: 50% of 419 MB…");
+    expect(messages.filter((m) => m.startsWith("Downloading")).every((m, i, all) => all.indexOf(m) === i)).toBe(true);
+
+    shown()!.action!.run();
+    await vi.waitFor(() => expect(dictation.useDictation.getState().state).toBe("listening"));
+  });
+
+  it("a download cancelled says what's kept, and goes on from there when asked", async () => {
+    shell.model = "missing";
+    shell.download = "cancelled";
+    const editor = open("Fog.\n");
+    await dictation.start(editor);
+    await vi.waitFor(() => expect(shown()?.action?.label).toBe("Download it"));
+    shown()!.action!.run();
+    await vi.waitFor(() => expect(shown()?.message).toBe("Download stopped. What's downloaded so far is kept: download again to go on from there."));
+    shell.download = "whole";
+    shown()!.action!.run();
+    await vi.waitFor(() => expect(shown()?.message).toBe("The speech model is in: dictation hears on this computer now."));
   });
 });

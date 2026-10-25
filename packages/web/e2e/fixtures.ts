@@ -60,6 +60,8 @@ export interface Shell {
   inspect?: boolean;
   /** A shell that can hear (#79): dictation_available answers true, and the test says what's heard with `hear`. */
   dictation?: boolean;
+  /** Its speech model (#83): missing until downloaded, which takes a moment. Ready by default. */
+  model?: "ready" | "missing";
 }
 
 /**
@@ -81,10 +83,29 @@ export async function asDesktop(page: Page, shell: Shell = {}) {
           if (command === "clipboard_text") return Promise.resolve(s.clipboard ?? null);
           if (command === "can_inspect") return Promise.resolve(s.inspect ?? false);
           if (command === "dictation_available") return Promise.resolve(s.dictation ?? false);
-          if (command === "dictate_start") (window as unknown as { __hear: unknown }).__hear = (args as { events: Channel }).events.onmessage;
+          const w = window as unknown as { __hear?: (e: unknown) => void; __lastPhrase?: string; __model?: string };
+          w.__model ??= s.model ?? "ready";
+          if (command === "dictation_model") return Promise.resolve({ state: w.__model, installedBytes: 208_048_243, downloadBytes: w.__model === "ready" ? 0 : 419_093_000 });
+          if (command === "dictation_download") {
+            const progress = (args as { progress: Channel }).progress;
+            return new Promise((done) => {
+              let at = 0;
+              const step = () => {
+                at = Math.min(at + 104_773_250, 419_093_000);
+                progress.onmessage({ done: at, total: 419_093_000 });
+                if (at < 419_093_000) return void setTimeout(step, 50);
+                w.__model = "ready";
+                done(null);
+              };
+              step();
+            });
+          }
+          if (command === "dictate_start") {
+            w.__hear = (args as { events: Channel }).events.onmessage;
+            if (w.__model !== "ready") w.__hear({ kind: "failed", reason: "model", message: "the speech model isn't all there" });
+          }
           // Stopping settles what the test left to settle (window.__lastPhrase), then says it stopped.
           if (command === "dictate_stop") {
-            const w = window as unknown as { __hear?: (e: unknown) => void; __lastPhrase?: string };
             if (w.__lastPhrase) w.__hear?.({ kind: "settled", text: w.__lastPhrase });
             w.__lastPhrase = undefined;
             w.__hear?.({ kind: "stopped" });

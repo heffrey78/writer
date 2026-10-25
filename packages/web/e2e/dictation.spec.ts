@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Locator, Page } from "@playwright/test";
-import { asDesktop, axe, caretAtEnd, expect, hear, launch, palette, selectionSettled, test, type App } from "./fixtures.ts";
+import { asDesktop, axe, calls, caretAtEnd, expect, hear, launch, palette, selectionSettled, test, type App } from "./fixtures.ts";
 
 /**
  * Dictation's page side (#79), with a stand-in shell that hears what the test says: the phrase being
@@ -15,7 +15,7 @@ const journal = fileURLToPath(new URL("../../../examples/sample-journal", import
 const novelWords = /\b(scenes?|chapters?|manuscript|story bible|novel)\b/i;
 
 /** The book in `dir`, opened in a page whose shell can hear. */
-async function open(page: Page, app: App, dir: string): Promise<string> {
+async function open(page: Page, app: App, dir: string, model: "ready" | "missing" = "ready"): Promise<string> {
   await app.restart(dir);
   // The book's address, from a browser tab: the desktop app's library would open it in a window of its own.
   const tab = await page.context().newPage();
@@ -23,7 +23,7 @@ async function open(page: Page, app: App, dir: string): Promise<string> {
   await expect(tab).toHaveURL(/\/novels\/[^/]+/);
   const id = new URL(tab.url()).pathname.split("/")[2]!;
   await tab.close();
-  await asDesktop(page, { dictation: true });
+  await asDesktop(page, { dictation: true, model });
   await launch(page, app, `/novels/${id}`);
   return id;
 }
@@ -150,4 +150,33 @@ test("a failure mid-phrase keeps the words heard so far and says what to do; in 
   await browser.keyboard.press("ControlOrMeta+k");
   await browser.keyboard.type("dictate");
   await expect(browser.getByRole("option", { name: /Dictate/ })).toHaveCount(0);
+});
+
+test("the first Dictate on a computer without the speech model offers it, says how far the download is, then dictates (#83)", async ({ page, app }) => {
+  const dir = app.novelRepo("varn");
+  await open(page, app, dir, "missing");
+  const text = page.getByRole("textbox", { name: "Chapter text" });
+  await caretAtEnd(page, text);
+  // The page tells the desktop app it offers Dictate, for Start Dictation in its Edit menu.
+  await expect.poll(() => calls(page, "dictation_offered")).toContainEqual({ offered: true });
+
+  // From the Edit menu: the shell runs the palette's command in the page.
+  await page.evaluate(() => window.writer!.run({ name: "command", arg: "writing.dictate" }));
+  const offer = page.getByRole("status").filter({ hasText: "Writer's speech model, which isn't on this computer yet" });
+  await expect(offer).toContainText("419 MB to download, 208 MB once it's in. What you say never leaves the computer.");
+  await expect(listening(page)).toHaveCount(0);
+  for (const colorScheme of ["light", "dark"] as const) {
+    await page.emulateMedia({ colorScheme });
+    await axe(page);
+  }
+  await offer.getByRole("button", { name: "Download it" }).click();
+  await expect(page.getByRole("status").filter({ hasText: /Downloading the speech model: \d+% of 419 MB…/ })).toBeVisible();
+  const ready = page.getByRole("status").filter({ hasText: "The speech model is in: dictation hears on this computer now." });
+  await expect(ready).toBeVisible();
+  await ready.getByRole("button", { name: "Dictate" }).click();
+  await expect(listening(page)).toContainText("Listening…");
+  await hear(page, { kind: "settled", text: "the clock was right for once." });
+  await expect(text).toContainText("he clock was right for once.");
+  await page.keyboard.press("Escape");
+  await expect(listening(page)).toHaveCount(0);
 });

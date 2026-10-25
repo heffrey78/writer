@@ -2,11 +2,10 @@
 //! default input through cpal, in its own format and rate, and are heard as 16 kHz mono on a thread
 //! of their own; events go to the shell's callback, never to disk.
 
-use crate::listener::{Event, Listener, Options, RATE};
+use crate::listener::{Event, Listener, RATE};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use sherpa_onnx::LinearResampler;
 use std::fmt;
-use std::path::PathBuf;
 use std::sync::mpsc::{self, RecvTimeoutError};
 use std::thread::JoinHandle;
 use std::time::Duration;
@@ -18,8 +17,6 @@ pub enum Failure {
     NoMicrophone,
     /// There is one, but it couldn't be opened (the system won't let Writer, or it's in use).
     Microphone(String),
-    /// The model isn't there, or isn't whole.
-    Model(String),
     Other(String),
 }
 
@@ -28,7 +25,7 @@ impl fmt::Display for Failure {
         match self {
             Failure::NoMicrophone => write!(f, "there's no microphone"),
             Failure::Microphone(e) => write!(f, "the microphone couldn't be used: {e}"),
-            Failure::Model(e) | Failure::Other(e) => write!(f, "{e}"),
+            Failure::Other(e) => write!(f, "{e}"),
         }
     }
 }
@@ -49,33 +46,35 @@ enum Message {
 /// Dictation running: the microphone open, and the listener hearing it.
 pub struct Dictation {
     send: mpsc::Sender<Message>,
-    thread: Option<JoinHandle<()>>,
+    thread: Option<JoinHandle<Listener>>,
 }
 
 impl Dictation {
-    /// Open the model in `models` and the default microphone, and start hearing; each update goes
-    /// to `on`. Returns once listening, or why it couldn't.
-    pub fn start(models: PathBuf, options: Options, on: impl FnMut(Update) + Send + 'static) -> Result<Dictation, Failure> {
+    /// Open the default microphone and hear it with `listener` (opened once and kept: opening the
+    /// model takes seconds); each update goes to `on`. Returns once listening, or why it couldn't,
+    /// with the listener back.
+    pub fn start(listener: Listener, on: impl FnMut(Update) + Send + 'static) -> Result<Dictation, (Failure, Listener)> {
         let (send, receive) = mpsc::channel::<Message>();
         let (started, ready) = mpsc::channel::<Result<(), Failure>>();
         let samples = send.clone();
-        let thread = std::thread::spawn(move || run(models, options, samples, receive, started, on));
+        let thread = std::thread::spawn(move || run(listener, samples, receive, started, on));
         match ready.recv() {
             Ok(Ok(())) => Ok(Dictation { send, thread: Some(thread) }),
-            Ok(Err(failure)) => {
-                let _ = thread.join();
-                Err(failure)
-            }
-            Err(_) => Err(Failure::Other("dictation stopped as it started".into())),
+            Ok(Err(failure)) => Err((failure, thread.join().expect("the dictation thread"))),
+            Err(_) => panic!("the dictation thread stopped as it started"),
         }
     }
 
-    /// Stop: the phrase being heard is settled and sent before this returns, and the microphone let go.
-    pub fn stop(mut self) {
+    /// Stop: the phrase being heard is settled and sent before this returns, and the microphone let
+    /// go. Gives the listener back, for the next time.
+    pub fn stop(mut self) -> Listener {
         let _ = self.send.send(Message::Stop);
-        if let Some(thread) = self.thread.take() {
-            let _ = thread.join();
-        }
+        self.thread.take().expect("running").join().expect("the dictation thread")
+    }
+
+    /// Whether it has stopped by itself (the microphone went away).
+    pub fn ended(&self) -> bool {
+        self.thread.as_ref().is_none_or(|t| t.is_finished())
     }
 }
 
@@ -88,15 +87,14 @@ impl Drop for Dictation {
     }
 }
 
-fn run(models: PathBuf, options: Options, samples: mpsc::Sender<Message>, receive: mpsc::Receiver<Message>, started: mpsc::Sender<Result<(), Failure>>, mut on: impl FnMut(Update)) {
-    let mut listener = match Listener::open(&models, &options) {
-        Ok(l) => l,
-        Err(e) => return void(started.send(Err(Failure::Model(e.to_string())))),
-    };
+fn run(mut listener: Listener, samples: mpsc::Sender<Message>, receive: mpsc::Receiver<Message>, started: mpsc::Sender<Result<(), Failure>>, mut on: impl FnMut(Update)) -> Listener {
     // The stream lives on this thread: cpal's isn't Send everywhere.
     let stream = match open_microphone(samples) {
         Ok(s) => s,
-        Err(f) => return void(started.send(Err(f))),
+        Err(f) => {
+            void(started.send(Err(f)));
+            return listener;
+        }
     };
     void(started.send(Ok(())));
     loop {
@@ -112,7 +110,7 @@ fn run(models: PathBuf, options: Options, samples: mpsc::Sender<Message>, receiv
                     on(Update::Event(event));
                 }
                 on(Update::Failed(Failure::Microphone(why)));
-                return;
+                return listener;
             }
             Ok(Message::Stop) | Err(RecvTimeoutError::Disconnected) => break,
             Err(RecvTimeoutError::Timeout) => {}
@@ -128,6 +126,7 @@ fn run(models: PathBuf, options: Options, samples: mpsc::Sender<Message>, receiv
     for event in listener.stop() {
         on(Update::Event(event));
     }
+    listener
 }
 
 fn void<T>(_: T) {}

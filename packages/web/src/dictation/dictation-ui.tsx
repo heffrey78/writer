@@ -3,6 +3,7 @@ import { DICTATE_KEYS } from "@writer/editor";
 import { Mic } from "lucide-react";
 import { useEffect, type MouseEvent } from "react";
 import { useCommands } from "../commands.ts";
+import { offerDictationInMenu } from "../desktop.ts";
 import { Button } from "../ui/button.tsx";
 import { cn } from "../ui/cn.ts";
 import { initDictation, stop, toggle, useDictation } from "./dictation.ts";
@@ -15,6 +16,13 @@ export function DictationControls() {
   const { available, state, last, announcement } = useDictation();
   const listening = state !== "off";
   useEffect(() => void initDictation(), []);
+  // The desktop app's Edit menu offers Start Dictation while this page has an editor.
+  const offered = available && !!last && !last.isDestroyed;
+  useEffect(() => {
+    if (!available) return;
+    offerDictationInMenu(offered);
+    return () => offerDictationInMenu(false);
+  }, [available, offered]);
 
   useCommands(
     () =>
