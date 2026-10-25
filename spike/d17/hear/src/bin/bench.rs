@@ -42,16 +42,41 @@ fn main() {
     let seconds = samples.len() as f64 / RATE as f64;
 
     let mut events: Vec<(f64, Event)> = Vec::new();
+    // A recorded recognizer's sessions, and the audio lost while none was listening.
+    let (mut sessions, mut lost_s) = (0, 0.0f64);
     let (mut clock, mut busy, mut cpu, mut load_s, mut files, mut streaming) = (0.0f64, f64::NAN, f64::NAN, f64::NAN, Vec::new(), true);
     if recorded {
+        // Android's recognizer, given audio this way, never returns a final result: what it shows
+        // starts over after a pause. What it showed before starting over is the phrase it settled.
+        let mut showing = String::new();
+        let settle_showing = |events: &mut Vec<(f64, Event)>, at: f64, showing: &mut String| {
+            if !showing.trim().is_empty() {
+                events.push((at, Event::Settled(showing.trim().to_string())));
+            }
+            showing.clear();
+        };
         for line in fs::read_to_string(&args[0]).unwrap().lines() {
             let e: serde_json::Value = serde_json::from_str(line).unwrap();
             let (t, text) = (e["t"].as_f64().unwrap(), e["text"].as_str().unwrap_or("").to_string());
             clock = clock.max(t);
             match e["kind"].as_str() {
-                Some("heard") => events.push((t, Event::Heard(text))),
-                Some("settled") if !text.is_empty() => events.push((t, Event::Settled(text))),
+                Some("heard") => {
+                    let (was, now) = (normalise(&showing), normalise(&text));
+                    let goes_on = !was.is_empty() && now.first() == was.first() && now.len() * 2 >= was.len();
+                    if !was.is_empty() && !goes_on {
+                        settle_showing(&mut events, t, &mut showing);
+                    }
+                    showing = text.clone();
+                    events.push((t, Event::Heard(text)));
+                }
+                Some("settled") if !text.is_empty() => {
+                    showing.clear();
+                    events.push((t, Event::Settled(text)));
+                }
+                Some("settled") | Some("done") => settle_showing(&mut events, t, &mut showing),
                 Some("error") => eprintln!("{text} at {t:.1} s"),
+                Some("session") => sessions += 1,
+                Some("lost") => lost_s = text.parse::<f64>().unwrap_or(0.0) / 1000.0,
                 _ => {}
             }
         }
@@ -82,6 +107,13 @@ fn main() {
         events.extend(out.drain(..).map(|e| (clock, e)));
         cpu = cpu_seconds() - cpu_listening;
     }
+
+    // A recorded recognizer that stopped early is scored on what it was given before it stopped.
+    let mut passage = passage;
+    if recorded {
+        passage.utterances.retain(|u| u.end <= clock);
+    }
+    let scored_s = passage.utterances.last().map(|u| u.end).unwrap_or(0.0);
 
     // Where each utterance's voice starts and stops, by its loudness, not counting its own silence.
     let voiced: Vec<(f64, f64)> = passage.utterances.iter().map(|u| voice(&samples, u.start, u.end)).collect();
@@ -147,6 +179,9 @@ fn main() {
         "phrases": settled.len(),
         "prose_phrases": prose,
         "lag_at_end_s": round(clock - seconds, 2),
+        "sessions": recorded.then_some(sessions),
+        "scored_s": round(scored_s, 1),
+        "lost_s": recorded.then_some(round(lost_s, 1)),
         "hypothesis": hypothesis,
     });
     println!("{result}");

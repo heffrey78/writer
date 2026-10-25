@@ -2,9 +2,14 @@
 
 Task #78, for decision D17 (#77) and requirements #71 (dictation), #72 (Linux) and #73 (Android). The question: which engine and model hear a writer best on the owner's machines, quickly, privately and cheaply enough to leave running while they write?
 
-In short, on this computer: **Parakeet TDT 110M settling each phrase, with the streaming Zipformer showing the words as they're heard, both through sherpa-onnx.** Words show 0.7 s after the voice starts. A phrase settles 1.1 s after the voice stops (1.5 s at p90). It gets 3.4% of words wrong on clean read speech and 5.5% on harder speech, the best of everything tried that keeps up. It uses an eighth of one core, about 600 MB of memory, and 208 MB of models downloaded once. Moonshine base in Parakeet's place writes better prose, but it gets more than twice as many words wrong on harder speech. whisper.cpp can't keep up on this machine, and Vosk is too inaccurate.
-
-On the owner's Pixel 10 Pro, the same pair is a little quicker. Phrases settle at 0.9 s (1.1 s at p90), words still show at 0.7 s, and it uses a tenth of one core, with the same accuracy. The owner's own clips and Android's own recognizer are still to come (*Still to do*, below).
+In short: **Parakeet TDT 110M settling each phrase, with the streaming Zipformer showing the words as they're heard, both through sherpa-onnx, on the desktop and on Android alike.**
+- **Speed:** words show 0.7 s after the voice starts, and a phrase settles about 1 s after it stops. On the owner's Pixel 10 Pro it settles sooner still.
+- **Accuracy:** on the owner reading the sample novel and a journal entry, 5.2% and 6.0% of words are wrong, and 9.6% and 14.3% once capitals and punctuation count. On LibriSpeech, 3.4% and 5.5% (with beam search).
+- **Cost:** an eighth of one core here, a tenth on the phone, about 600 MB of memory, and 208 MB of models downloaded once.
+- **The rest:**
+  - Android's own on-device recognizer is less accurate, and it gives no end of a phrase.
+  - Moonshine writes prose nearly as well, but errs more on harder speech.
+  - whisper.cpp can't keep up, and Vosk is too inaccurate.
 
 ## What was built
 
@@ -93,7 +98,7 @@ Parakeet can be biased towards given words, the book's names, through beam searc
 - at score 5, "angor" was written where it was said, and also where it wasn't;
 - at score 10, the passage turned to hotwords.
 
-So hints work, and their strength needs tuning, on the owner's clips with the book's names in them. The spike splits a hotword into the model's word pieces by longest match, not the model's own tokenizer; the crate should use the tokenizer.
+So hotwords do bias Parakeet, but they over-insert soon after they help. On the owner's clips they didn't help at all (*Results on the owner's own clips*). The spike splits a hotword into the model's word pieces by longest match, not the model's own tokenizer, so a fairer test would use the tokenizer; that's for #81 to try.
 
 ### whisper.cpp and Vosk
 
@@ -121,6 +126,41 @@ All 28 runs are in `results/phone.jsonl`.
 - **Two threads don't help.** They settle no sooner, and they cost twice the CPU.
 - **Memory is the price**: about 600 MB while dictating, for the two models. The Pixel has room for it. A phone with 4 GB might not; Moonshine tiny (45 MB, 240 MB in memory) is the small choice there, at the accuracy cost above.
 
+## Results on the owner's own clips
+
+The owner read the sample novel's first two scenes (113 s, nine paragraphs) and a journal entry in the sample journal's voice (60 s, five paragraphs) with `record.ts`. Their own punctuation is the reference, so a second error rate counts capitals and punctuation too ("with prose"). One thread on this computer, except where it says the phone:
+
+| Engine | Wrong words, novel / journal | With prose, novel / journal | Words show (p50) | Phrase settles (p50 / p90) | Missed | Names written as the book has them |
+|---|---:|---:|---:|---:|---:|---|
+| **parakeet-110m+zipformer** | **5.2% / 6.0%** | **9.6% / 14.3%** | 0.7 s | 0.9 / 1.0 s | 1 | Ada, Ben, Varn ×2, Mira; not Tomas |
+| parakeet-110m+zipformer, on the phone | 5.6% / 6.8% | 10.4% / 15.0% | 0.7 s | 0.8 / 0.9 s | 0 | the same |
+| moonshine-base+zipformer | 6.9% / 6.8% | 12.3% / 13.5% | 0.7 s | 0.9 / 1.0 s | 0 | Ada, Ben, Mira |
+| moonshine-tiny | 10.4% / 10.3% | 15.0% / 15.8% | 1.4 s | 0.8 / 0.9 s | 0 | Ben, Varn, Mira |
+| kroko+punct | 2.2% / 7.7% | 13.5% / 24.1% | 0.9 s | 2.3 / 2.6 s | 0 | Ada, Ben, Mira |
+| zipformer+punct | 6.1% / 12.0% | 18.1% / 24.8% | 0.7 s | 1.7 / 1.8 s | 0 | Ben, Mira |
+| whisper-small+zipformer | 3.0% / 5.1% | 7.3% / 11.3% | 5.7 s | 5.7 / 10.4 s | 9 | Ada, Ben, Varn ×2, Mira |
+| vosk-small | 16.4% / 22.2% | 33.1% / 41.4% | 0.5 s | 1.2 / 1.5 s | 0 | none |
+| Android's on-device recognizer, on the phone | 9.5% / 9.4% | 23.5% / 24.1% | 0.7 s | 1.9 / 5.2 s | – | Ada, Ben, Mira |
+
+- **Parakeet writes the owner's prose best** of the engines that keep up, and spells the novel's names as the book does.
+- **whisper.cpp small writes it better still, but can't keep up.** Phrases settle 6 to 10 s late, and it misses some.
+- **Kroko gets the fewest words wrong on the novel**, but it settles at 2.3 s, and its punctuation model is weaker.
+- **Every engine, and Android's recognizer, writes "Thomas" for Tomas.** That's how the name sounds, so it isn't a mishearing: no hotword will change it. Putting the writer's names right afterwards does, with the book's index as the list (#81), as long as it matches by how names sound, not only how they're spelled.
+- **Hotwords made no difference here.** Scores 1 to 2 changed nothing; 3 cost both "Varn"s, as over-biasing did on LibriSpeech. Since the names were mostly right without them, the crate starts without hotwords. It keeps beam search, which is better without them too, and leaves the names to #81.
+
+## Android's own recognizer
+
+`recognizer/` fed each clip, at speaking pace, to Android's on-device recognizer (`createOnDeviceSpeechRecognizer`, with Android 13's audio from a file), and logged what it showed with the times.
+
+- **It never ends a phrase.** Given audio this way, a session never ends at a pause, and it never returns a final result: the session's result is empty.
+- **A segmented session doesn't help.** It returned no segments either, and stopped reading after 22 s without a word to say so. That crashed the first version of the scratch app.
+- **So phrases settle late.** The recognizer shows the words as it hears them, then starts over, so the phrase before only counts as settled when the next phrase begins: 1.9 s at p50, and up to 6 s after a long pause.
+- **It stalled.** On LibriSpeech it stopped responding partway through one passage, and the app was sent to the background partway through the other. It was scored on what it was given before that: 88 s and 46 s, about 32% wrong. That figure is harsh, since "starting over" only approximates what it settled.
+- **It writes no prose.** No phrase came back capitalised and punctuated as a sentence.
+- **It's less accurate on the owner's clips**: 9.5% to Parakeet's 5.6% on the same phone.
+
+So D17's point 4 goes the other way: on Android, Writer's own crate, not Android's recognizer. The crate keeps up on the phone with room to spare, and the system keyboard's own voice typing stays available as an input method (#85).
+
 ## The cost to the apps
 
 - **Desktop**: sherpa-onnx and onnxruntime linked in statically add 30 MB to the shell's binary, about 8 MB compressed. The Arch package would go from 59.5 MB to about 68 MB, within its 100 MB budget. The model isn't in the package: it's downloaded on first use (D17).
@@ -133,16 +173,12 @@ All 28 runs are in `results/phone.jsonl`.
   - Kroko's community models: CC-BY-SA. Nemotron: NVIDIA's own licence.
   - #72 asked for Apache-2.0 or MIT; the owner accepted CC-BY-4.0 for Parakeet, with the model credited in About Writer (2026-10-25), and #72 now says so.
 
-## Still to do
+## What D17 is amended with
 
-- **The owner's own clips.** The first recording of the novel passage came out clipped throughout: 37% of its samples were at full scale, recorded from the laptop's built-in microphone with the input at 94%. So nothing could be heard as phrases, and its runs were set aside. `record.ts` now checks each take's level, and offers to record the paragraph again when it's clipped or too quiet. With the input turned down, run `node record.ts`, then `./run-all.sh`. The bench scores those clips with capitals and punctuation counted, and counts the book's names written as the book spells them. They decide the hotword score.
-- **Android's own recognizer.** `phone.sh` ran the engines on the phone but left no results from its last step, Android's on-device recognizer through the scratch app. Rerun that step alone with `ONLY=android ./phone.sh`, with the phone attached. That settles D17's point 4: Android's recognizer, or the crate built for aarch64.
-
-## What D17 would be amended with
-
-The engine is sherpa-onnx, as D17 says. Its model isn't the streaming Zipformer alone:
-- Parakeet TDT 110M (int8, beam search, with the book's names as hotwords) settles each phrase, cut at pauses by Silero's voice detection;
-- the streaming Zipformer shows the words as they're heard;
-- both run in the speech crate.
-
-The download is 208 MB. Moonshine base is the fallback, should Parakeet fall short on the owner's own clips. On Android, the same crate runs on the phone, quicker than here, unless Android's own recognizer proves better on the same clips (pending).
+- **The engine** is sherpa-onnx, as D17 says, on the desktop and on Android.
+- **Its models**, in the speech crate (#82), downloaded on first use (208 MB):
+  - Parakeet TDT 110M (int8, beam search) settles each phrase, cut at pauses of 0.5 s by Silero's voice detection;
+  - the streaming Zipformer (2023-06-26, int8) shows the words as they're heard.
+- **The book's names** are put right after a phrase settles (#81), not given as hotwords.
+- **The fallback** is Moonshine base (MIT) in Parakeet's place. Moonshine tiny (45 MB) is the choice for a phone short of memory.
+- **On Android**, the same crate, built for arm64 with 16 KB pages. Not Android's on-device recognizer, which gives no end of a phrase and is less accurate. The system keyboard's voice typing keeps working beside it.
