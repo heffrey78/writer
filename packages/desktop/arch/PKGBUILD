@@ -11,8 +11,8 @@ url="https://github.com/heffrey78/writer"
 # /usr/lib/writer/runtime/licenses).
 license=('MIT' 'GPL-2.0-only')
 # The keychain needs libsecret (and a Secret Service, such as GNOME Keyring or KWallet); the git
-# inside uses the system's libcurl for https.
-depends=('webkit2gtk-4.1' 'gtk3' 'libsecret' 'curl')
+# inside uses the system's libcurl for https; dictation hears the microphone through ALSA.
+depends=('webkit2gtk-4.1' 'gtk3' 'libsecret' 'curl' 'alsa-lib')
 # Node's and git's own binaries ship as their makers built them.
 options=('!strip' '!debug')
 source=("writer_${pkgver}_amd64.deb")
