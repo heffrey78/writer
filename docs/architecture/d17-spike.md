@@ -102,7 +102,7 @@ Each crashed when linked beside sherpa-onnx's static libraries, which carry thei
 ## The cost to the apps
 
 - **Desktop**: sherpa-onnx and onnxruntime linked in statically add 30 MB to the shell's binary, about 8 MB compressed. The Arch package would go from 59.5 MB to about 68 MB, within its 100 MB budget. The model isn't in the package: it's downloaded on first use (D17).
-- **Ubuntu 22.04**: not run, since Docker wasn't available on this machine. The binary built here asks for nothing newer than glibc 2.34, apart from float maths functions bound at link time to this machine's glibc. So the prebuilt static libraries should link on 22.04's glibc 2.35. #83's CI build is the real check.
+- **Ubuntu 22.04**: `ubuntu-22.04.sh` builds the bench in an Ubuntu 22.04 container (glibc 2.35, where the desktop's .deb is built), with sherpa-onnx's prebuilt static libraries, and runs the leading engine there: the same 4.2% of words wrong on test-clean, settling at 1.0 s.
 - **Android**: sherpa-onnx's prebuilt arm64 libraries are already aligned for 16 KB pages (Android 15 and later). They're `libonnxruntime.so` (22.2 MB) and `libsherpa-onnx-c-api.so` (4.3 MB), 9.7 MB compressed. The APK would go from 29.5 MB to about 39 MB, with the model downloaded on first use.
 - **Licences**:
   - sherpa-onnx: Apache-2.0. onnxruntime: MIT. Silero: MIT.
@@ -115,7 +115,6 @@ Each crashed when linked beside sherpa-onnx's static libraries, which carry thei
 
 - **The owner's clips.** Run `node record.ts`, which takes about ten minutes: the sample novel's first two scenes and a journal entry, read a paragraph at a time. Then `./run-all.sh` again. The bench scores them with capitals and punctuation counted, and counts the book's names written as the book spells them. Those clips decide the hotword score.
 - **The phone.** With the Pixel attached, `./phone.sh`. It runs the leading engines on the phone over adb, on one and two threads. Then it runs Android's own on-device recognizer on the same clips at speaking pace, through the scratch app (`recognizer/`, Android 13's audio-from-file), scored by the same rules. That settles D17's point 4: Android's recognizer, or the crate built for aarch64.
-- **Ubuntu 22.04**, in #83's CI.
 
 ## What D17 would be amended with
 
