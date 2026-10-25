@@ -169,7 +169,8 @@ test("an issue is raised about a passage in today's entry, written in its place,
   await begin(page).click();
   await selectionSettled(page);
   await page.keyboard.type("Fog on the water till noon.");
-  await expect(page.getByRole("list", { name: "Day by day" }).getByRole("article").first().locator("time")).toHaveText("23 October 2026");
+  // Made: its title is a link to it (today's place has the date before there's an entry to raise an issue about).
+  await expect(page.getByRole("list", { name: "Day by day" }).getByRole("article").first().getByRole("link", { name: "Friday, 23 October" })).toBeVisible();
   const today = begin(page);
   const passage = today.getByText("Fog on the water till noon.");
   await passage.click({ clickCount: 3 });
