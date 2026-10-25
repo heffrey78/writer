@@ -26,7 +26,8 @@ fn main() {
     let cpu_before = cpu_seconds();
     let (mut clock, mut busy) = (0.0f64, 0.0f64);
     let mut settled: Vec<(f64, String)> = Vec::new();
-    let piece = RATE / 10;
+    // BENCH_PIECE_MS=10 to feed it as a microphone does, a few milliseconds at a time.
+    let piece = RATE * std::env::var("BENCH_PIECE_MS").ok().and_then(|ms| ms.parse::<usize>().ok()).unwrap_or(100) / 1000;
     for (i, chunk) in samples.chunks(piece).enumerate() {
         let spoken = ((i + 1) * piece).min(samples.len()) as f64 / RATE as f64;
         let t = Instant::now();
