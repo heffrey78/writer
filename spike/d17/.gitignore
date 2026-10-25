@@ -1,0 +1,10 @@
+# Downloaded or recorded: never committed.
+models/
+clips/
+target/
+lib/
+hear/target-*/
+recognizer/.gradle/
+recognizer/build/
+recognizer/app/build/
+recognizer/local.properties
