@@ -53,7 +53,8 @@ export function DictationControls() {
       </div>
       {listening && (
         <div role="group" aria-label="Dictation" className="fixed right-4 bottom-12 z-[60] flex items-center gap-3 rounded-lg border border-rule bg-raised py-1.5 pr-1.5 pl-3 text-sm shadow-lg">
-          <span className="size-2.5 animate-pulse rounded-full bg-danger motion-reduce:animate-none" aria-hidden />
+          {/* Still, not pulsing: an animation is repainted every frame, at a cost to the whole desktop on Linux. */}
+          <span className="size-2.5 rounded-full bg-danger" aria-hidden />
           <span>{state === "stopping" ? "Stopping…" : state === "starting" ? "Starting…" : "Listening…"}</span>
           {/* The caret stays in the text: a press here doesn't take the focus. */}
           <Button size="sm" onMouseDown={keepFocus} onClick={() => void stop()} disabled={state === "stopping"}>
