@@ -11,9 +11,16 @@ source env.sh
 tauri=(node "$(realpath ../../node_modules/@tauri-apps/cli/tauri.js)")
 cd src-tauri
 [[ -d gen/android ]] || "${tauri[@]}" android init --ci
-sed -i -E 's/compileSdk = [0-9]+/compileSdk = 36/; s/targetSdk = [0-9]+/targetSdk = 34/' gen/android/app/build.gradle.kts
+# Android 8 (API 26) at least: dictation hears through AAudio (#86).
+sed -i -E 's/compileSdk = [0-9]+/compileSdk = 36/; s/targetSdk = [0-9]+/targetSdk = 34/; s/minSdk = [0-9]+/minSdk = 26/' gen/android/app/build.gradle.kts
 # Gradle runs `node tauri …` from src-tauri, where there's no "tauri": give it the CLI's script.
 sed -i "s|listOf(\"tauri\", \"android\", \"android-studio-script\")|listOf(\"${tauri[1]}\", \"android\", \"android-studio-script\")|" gen/android/buildSrc/src/main/java/io/github/heffrey78/writer/kotlin/BuildTask.kt
+# sherpa-onnx's build copies all its Android libraries into jniLibs (dictation, #86): the app needs
+# the C API's and ONNX Runtime's, not the JNI's or the C++ API's (4.8 MB).
+grep -q 'libsherpa-onnx-jni.so' gen/android/app/build.gradle.kts || cat >> gen/android/app/build.gradle.kts <<'GRADLE'
+
+android { packaging { jniLibs { excludes += listOf("**/libsherpa-onnx-jni.so", "**/libsherpa-onnx-cxx-api.so") } } }
+GRADLE
 # An APK of the last build would be taken for this one's.
 rm -rf gen/android/app/build/outputs/apk
 "${tauri[@]}" android build --debug --apk --target "$target"

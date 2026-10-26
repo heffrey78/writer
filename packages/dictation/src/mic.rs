@@ -10,8 +10,12 @@ use crate::listener::{Event, Listener, RATE};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{DeviceDescription, DeviceDirection, InterfaceType};
 use sherpa_onnx::LinearResampler;
+use std::any::Any;
 use std::fmt;
+use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, RecvTimeoutError};
+use std::sync::Arc;
 use std::thread::JoinHandle;
 use std::time::Duration;
 
@@ -62,10 +66,20 @@ impl Dictation {
     /// `listener` (opened once and kept: opening the model takes seconds); each update goes to `on`.
     /// Returns once listening, or why it couldn't, with the listener back.
     pub fn start(listener: Listener, chosen: Option<Chosen>, on: impl FnMut(Update) + Send + 'static) -> Result<Dictation, (Failure, Listener)> {
+        Self::begin(listener, Input::Microphone(chosen), on)
+    }
+
+    /// Hear `samples` (16 kHz mono) in place of the microphone, at the pace they were spoken, then
+    /// silence until stopped: for a test on a device, where no one speaks (the Android e2e).
+    pub fn play(listener: Listener, samples: Vec<f32>, on: impl FnMut(Update) + Send + 'static) -> Result<Dictation, (Failure, Listener)> {
+        Self::begin(listener, Input::Clip(samples), on)
+    }
+
+    fn begin(listener: Listener, input: Input, on: impl FnMut(Update) + Send + 'static) -> Result<Dictation, (Failure, Listener)> {
         let (send, receive) = mpsc::channel::<Message>();
         let (started, ready) = mpsc::channel::<Result<(), Failure>>();
         let samples = send.clone();
-        let thread = std::thread::spawn(move || run(listener, chosen, samples, receive, started, on));
+        let thread = std::thread::spawn(move || run(listener, input, samples, receive, started, on));
         match ready.recv() {
             Ok(Ok(())) => Ok(Dictation { send, thread: Some(thread) }),
             Ok(Err(failure)) => Err((failure, thread.join().expect("the dictation thread"))),
@@ -95,16 +109,25 @@ impl Drop for Dictation {
     }
 }
 
+enum Input {
+    Microphone(Option<Chosen>),
+    Clip(Vec<f32>),
+}
+
 fn run(
     mut listener: Listener,
-    chosen: Option<Chosen>,
+    input: Input,
     samples: mpsc::Sender<Message>,
     receive: mpsc::Receiver<Message>,
     started: mpsc::Sender<Result<(), Failure>>,
     mut on: impl FnMut(Update),
 ) -> Listener {
     // The stream lives on this thread: cpal's isn't Send everywhere.
-    let stream = match open_microphone(chosen.as_ref(), samples) {
+    let opened = match input {
+        Input::Microphone(chosen) => open_microphone(chosen.as_ref(), samples).map(|s| Box::new(s) as Box<dyn Any>),
+        Input::Clip(clip) => Ok(Box::new(Playing::start(clip, samples)) as Box<dyn Any>),
+    };
+    let stream = match opened {
         Ok(s) => s,
         Err(f) => {
             void(started.send(Err(f)));
@@ -145,6 +168,50 @@ fn run(
 }
 
 fn void<T>(_: T) {}
+
+/// A clip being played as if spoken: a piece every 100 ms, then silence, until it's dropped.
+struct Playing {
+    stop: Arc<AtomicBool>,
+    thread: Option<JoinHandle<()>>,
+}
+
+impl Playing {
+    fn start(clip: Vec<f32>, send: mpsc::Sender<Message>) -> Playing {
+        let stop = Arc::new(AtomicBool::new(false));
+        let stopped = stop.clone();
+        let thread = std::thread::spawn(move || {
+            let piece = RATE / 10;
+            let silence = vec![0.0; piece];
+            let mut pieces = clip.chunks(piece);
+            while !stopped.load(Ordering::SeqCst) {
+                if send.send(Message::Samples(pieces.next().unwrap_or(&silence).to_vec())).is_err() {
+                    break;
+                }
+                std::thread::sleep(Duration::from_millis(100));
+            }
+        });
+        Playing { stop, thread: Some(thread) }
+    }
+}
+
+impl Drop for Playing {
+    fn drop(&mut self) {
+        self.stop.store(true, Ordering::SeqCst);
+        if let Some(thread) = self.thread.take() {
+            let _ = thread.join();
+        }
+    }
+}
+
+/// A recording to `play`: a WAV file, 16 kHz mono, 16-bit.
+pub fn clip(path: &Path) -> Result<Vec<f32>, String> {
+    let mut reader = hound::WavReader::open(path).map_err(|e| format!("{}: {e}", path.display()))?;
+    let spec = reader.spec();
+    if spec.sample_rate as usize != RATE || spec.channels != 1 || spec.bits_per_sample != 16 {
+        return Err(format!("{}: not 16 kHz mono 16-bit", path.display()));
+    }
+    reader.samples::<i16>().map(|s| s.map(|s| s as f32 / 32768.0).map_err(|e| e.to_string())).collect()
+}
 
 /// A microphone the writer can choose.
 #[derive(Clone, Debug, PartialEq)]

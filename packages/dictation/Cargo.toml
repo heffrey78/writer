@@ -14,8 +14,11 @@ default = ["static"]
 # sherpa-onnx linked in (the desktop shells), or as its shared libraries (Android, which only has those).
 static = ["sherpa-onnx/static"]
 shared = ["sherpa-onnx/shared"]
-# The microphone, through cpal: for the shells. Tests feed recorded clips instead.
-mic = ["dep:cpal"]
+# The microphone, through cpal: for the shells. Tests feed recorded clips instead, as the Android
+# e2e does through the shell (hound reads them).
+mic = ["dep:cpal", "dep:hound"]
+# The model's download, for the shells.
+download = ["dep:reqwest"]
 
 [dependencies]
 sherpa-onnx = { version = "=2.0.0", default-features = false }
@@ -23,6 +26,8 @@ sha2 = "0.10"
 tar = "0.4"
 bzip2 = "0.4"
 cpal = { version = "0.18", optional = true }
+hound = { version = "3.5", optional = true }
+reqwest = { version = "0.12", optional = true, default-features = false, features = ["rustls-tls", "blocking"] }
 
 # On Linux, PulseAudio's protocol where a server runs (PipeWire's or PulseAudio's; ALSA otherwise):
 # it names the microphones and lists them without opening one. Its client is Rust, linking nothing.

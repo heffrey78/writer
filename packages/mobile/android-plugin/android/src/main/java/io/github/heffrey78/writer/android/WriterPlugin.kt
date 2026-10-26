@@ -1,5 +1,6 @@
 package io.github.heffrey78.writer.android
 
+import android.Manifest
 import android.app.Activity
 import android.content.Intent
 import android.net.Uri
@@ -17,7 +18,10 @@ import androidx.webkit.ServiceWorkerClientCompat
 import androidx.webkit.ServiceWorkerControllerCompat
 import androidx.webkit.WebViewFeature
 import app.tauri.annotation.Command
+import app.tauri.PermissionState
 import app.tauri.annotation.InvokeArg
+import app.tauri.annotation.Permission
+import app.tauri.annotation.PermissionCallback
 import app.tauri.annotation.TauriPlugin
 import app.tauri.plugin.Invoke
 import app.tauri.plugin.JSObject
@@ -34,6 +38,12 @@ class UrlArgs {
 }
 
 @InvokeArg
+class MicrophoneArgs {
+    /** Ask for it, with Android's prompt, if it isn't allowed yet. */
+    var ask: Boolean = false
+}
+
+@InvokeArg
 class BytesArgs {
     /** Base64. */
     lateinit var data: String
@@ -41,14 +51,26 @@ class BytesArgs {
 
 /**
  * Writer's Android plugin (#52): the GitHub token sealed by an AES key kept in Android's keystore,
- * other sites opened in the phone's browser, the page kept clear of the system's bars, and the page's
- * service worker given the app's own files.
+ * other sites opened in the phone's browser, the page kept clear of the system's bars, the page's
+ * service worker given the app's own files, and the microphone asked for, for dictation (#86).
  */
-@TauriPlugin
+@TauriPlugin(permissions = [Permission(strings = [Manifest.permission.RECORD_AUDIO], alias = "microphone")])
 class WriterPlugin(private val activity: Activity) : Plugin(activity) {
+    private var webView: WebView? = null
+
     override fun load(webView: WebView) {
+        this.webView = webView
         keepClearOfBars(webView)
         serveTheWorker(webView)
+    }
+
+    /**
+     * The app went to the background: the page is told, with a `writer-background` event. Its
+     * document stays "visible" (the webview's own onPause, which wry calls, doesn't hide it), and
+     * the page saves the text it holds, and stops dictating, as it does when a browser hides it (#86).
+     */
+    override fun onPause() {
+        webView?.evaluateJavascript("dispatchEvent(new Event('writer-background'))", null)
     }
 
     /**
@@ -90,6 +112,28 @@ class WriterPlugin(private val activity: Activity) : Plugin(activity) {
         } catch (e: Exception) {
             invoke.reject(e.message ?: e.javaClass.simpleName)
         }
+    }
+
+    /**
+     * Whether dictation may use the microphone: "granted", "prompt" (not asked yet, or Android
+     * would ask again) or "denied" (refused for good: only Android's settings can allow it now).
+     * With `ask`, Android's prompt first, where it would show one.
+     */
+    @Command
+    fun microphone(invoke: Invoke) {
+        val state = getPermissionState("microphone")
+        if (state == PermissionState.GRANTED || state == PermissionState.DENIED || !invoke.parseArgs(MicrophoneArgs::class.java).ask) return microphoneAnswered(invoke)
+        requestPermissionForAlias("microphone", invoke, "microphoneAnswered")
+    }
+
+    @PermissionCallback
+    private fun microphoneAnswered(invoke: Invoke) {
+        val state = when (getPermissionState("microphone")) {
+            PermissionState.GRANTED -> "granted"
+            PermissionState.DENIED -> "denied"
+            else -> "prompt"
+        }
+        invoke.resolve(JSObject().put("state", state))
     }
 
     @Command

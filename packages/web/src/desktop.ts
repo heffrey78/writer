@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import { useNavigate } from "react-router";
+import { onAndroid } from "./platform.ts";
 
 /**
  * The page's side of the desktop app (D9). In the app, a page can ask the shell for what a browser
@@ -147,24 +148,43 @@ export type DictationEvent =
   | { kind: "heard"; text: string }
   | { kind: "settled"; text: string }
   | { kind: "stopped" }
-  | { kind: "failed"; reason: "microphone" | "no-microphone" | "model" | "other"; message?: string };
+  | { kind: "failed"; reason: "microphone" | "no-microphone" | "permission" | "model" | "other"; message?: string };
+
+/**
+ * Where dictation's commands go: the desktop shell, or the Android app's Rust (#86), which has the
+ * same ones and is reached through Tauri's own invoke, as the engine's host is (engine/in-page.ts).
+ */
+let hearing: Promise<Invoke | undefined> | undefined;
+function hearer(): Promise<Invoke | undefined> {
+  hearing ??= shell ? Promise.resolve(shell) : onAndroid ? import("@tauri-apps/api/core").then((core) => ({ invoke: core.invoke, Channel: core.Channel }) as unknown as Invoke) : Promise.resolve(undefined);
+  return hearing;
+}
 
 /** Whether the shell can hear the writer: false in a browser, and in a shell without dictation. */
-export function dictationAvailable(): Promise<boolean> {
-  return shell ? shell.invoke<boolean>("dictation_available").catch(() => false) : Promise.resolve(false);
+export async function dictationAvailable(): Promise<boolean> {
+  return (await hearer())?.invoke<boolean>("dictation_available").catch(() => false) ?? false;
 }
 
 /** Start the shell listening, in `language`, with names to spell as the book does; its events go to `onEvent`. */
-export function startDictation(language: string, hints: string[], onEvent: (event: DictationEvent) => void): Promise<void> {
-  if (!shell) return Promise.reject(new Error("There's nothing here to hear with."));
-  const events = new shell.Channel<DictationEvent>();
+export async function startDictation(language: string, hints: string[], onEvent: (event: DictationEvent) => void): Promise<void> {
+  const host = await hearer();
+  if (!host) throw new Error("There's nothing here to hear with.");
+  const events = new host.Channel<DictationEvent>();
   events.onmessage = onEvent;
-  return shell.invoke("dictate_start", { language, hints, events });
+  return host.invoke("dictate_start", { language, hints, events });
 }
 
 /** Ask the shell to stop: it settles the phrase it's hearing, then says it has stopped. */
-export function stopDictation(): Promise<void> {
-  return shell ? shell.invoke<void>("dictate_stop").catch(() => {}) : Promise.resolve();
+export async function stopDictation(): Promise<void> {
+  await (await hearer())?.invoke<void>("dictate_stop").catch(() => {});
+}
+
+/**
+ * Android's prompt for the microphone (#86), once the page has said why it's wanted: "granted",
+ * "prompt" (not allowed, and Android would ask again) or "denied" (only its settings can allow it).
+ */
+export async function allowMicrophone(): Promise<"granted" | "prompt" | "denied"> {
+  return ((await hearer())?.invoke<"granted" | "prompt" | "denied">("dictation_allow_microphone").catch(() => "denied" as const)) ?? "denied";
 }
 
 /** The shell's speech model: ready, or what it takes to download (DEVELOPER.md, *Dictation*). */
@@ -177,21 +197,22 @@ export interface DictationModel {
 }
 
 /** The speech model's state, where the shell keeps one (null otherwise). */
-export function dictationModel(): Promise<DictationModel | null> {
-  return shell ? shell.invoke<DictationModel>("dictation_model").catch(() => null) : Promise.resolve(null);
+export async function dictationModel(): Promise<DictationModel | null> {
+  return (await hearer())?.invoke<DictationModel>("dictation_model").catch(() => null) ?? null;
 }
 
 /** Download the speech model, `onProgress` hearing how far it is; rejects with why it stopped ("cancelled"). */
-export function downloadDictationModel(onProgress: (done: number, total: number) => void): Promise<void> {
-  if (!shell) return Promise.reject(new Error("There's nowhere to download to."));
-  const progress = new shell.Channel<{ done: number; total: number }>();
+export async function downloadDictationModel(onProgress: (done: number, total: number) => void): Promise<void> {
+  const host = await hearer();
+  if (!host) throw new Error("There's nowhere to download to.");
+  const progress = new host.Channel<{ done: number; total: number }>();
   progress.onmessage = ({ done, total }) => onProgress(done, total);
-  return shell.invoke("dictation_download", { progress });
+  return host.invoke("dictation_download", { progress });
 }
 
 /** Stop the download under way; what's downloaded is kept for the next time. */
 export function cancelDictationDownload(): void {
-  void shell?.invoke("dictation_cancel_download");
+  void hearer().then((host) => host?.invoke("dictation_cancel_download"));
 }
 
 /** Tell the shell whether this page offers Dictate (it has an editor), for its Edit menu. */
@@ -228,16 +249,16 @@ export interface DictationSetup {
 }
 
 /** Dictation's settings and what they choose from, where the shell keeps them (null otherwise). */
-export function dictationSettings(): Promise<DictationSetup | null> {
-  return shell ? shell.invoke<DictationSetup>("dictation_settings").catch(() => null) : Promise.resolve(null);
+export async function dictationSettings(): Promise<DictationSetup | null> {
+  return (await hearer())?.invoke<DictationSetup>("dictation_settings").catch(() => null) ?? null;
 }
 
 /** Keep dictation's settings: the next dictation hears with them. */
-export function saveDictationSettings(settings: DictationSettings): Promise<void> {
-  return shell ? shell.invoke<void>("dictation_save_settings", { settings }) : Promise.resolve();
+export async function saveDictationSettings(settings: DictationSettings): Promise<void> {
+  await (await hearer())?.invoke<void>("dictation_save_settings", { settings });
 }
 
-/** Remove the speech model from this computer; it can be downloaded again. */
-export function removeDictationModel(): Promise<void> {
-  return shell ? shell.invoke<void>("dictation_remove_model") : Promise.resolve();
+/** Remove the speech model from this device; it can be downloaded again. */
+export async function removeDictationModel(): Promise<void> {
+  await (await hearer())?.invoke<void>("dictation_remove_model");
 }

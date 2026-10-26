@@ -263,7 +263,10 @@ export function createAutosave({
       target.addEventListener("pagehide", onHide);
       target.addEventListener("beforeunload", onHide);
       target.addEventListener("visibilitychange", onVisibility);
+      // Android's app goes to the background without hiding its page: its plugin says so instead.
+      target.addEventListener("writer-background", onHide);
       return () => {
+        target.removeEventListener("writer-background", onHide);
         target.removeEventListener("pagehide", onHide);
         target.removeEventListener("beforeunload", onHide);
         target.removeEventListener("visibilitychange", onVisibility);

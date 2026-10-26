@@ -8,10 +8,13 @@
 //! - `model`: the files, where they come from, and whether the ones on disk are whole.
 //! - `Listener`: hearing samples, from a clip or a microphone.
 //! - `mic::Dictation` (feature `mic`): the microphone, heard on a thread of its own.
+//! - `download` (feature `download`): the model's state in the host's folder, and its download.
 
 pub mod model;
 mod listener;
 #[cfg(feature = "mic")]
 pub mod mic;
+#[cfg(feature = "download")]
+pub mod download;
 
 pub use listener::{Error, Event, Listener, Options, RATE};

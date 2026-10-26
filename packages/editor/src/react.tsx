@@ -285,9 +285,12 @@ function useFlushOnLeave(flush: () => void, editor: Editor | null) {
     const onHide = () => document.visibilityState === "hidden" && leave();
     document.addEventListener("visibilitychange", onHide);
     window.addEventListener("pagehide", leave);
+    // Android's app goes to the background without hiding its page: its plugin says so instead.
+    window.addEventListener("writer-background", leave);
     return () => {
       document.removeEventListener("visibilitychange", onHide);
       window.removeEventListener("pagehide", leave);
+      window.removeEventListener("writer-background", leave);
       leave();
     };
   }, [flush, editor]);

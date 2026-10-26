@@ -1,7 +1,8 @@
 //! Writer on Android (D16, #52): the web app, and the engine that serves it, run in the webview
 //! (packages/web/src/engine). This Rust is the engine's host: it gives it git (packages/git2-port, in
 //! process), the app's storage, GitHub's HTTP and the token, through three commands: `git`, `port` for
-//! the rest, and `listen` for the watches' events.
+//! the rest, and `listen` for the watches' events. It also hears the writer, for the page's Dictate
+//! (dictation.rs, #86), on Android only.
 
 
 use base64::Engine;
@@ -12,6 +13,9 @@ use std::sync::{Arc, Mutex};
 use tauri::ipc::Channel;
 use tauri::{AppHandle, Manager, Runtime, State};
 use writer_mobile_ports::{files, host, secrets};
+
+#[cfg(target_os = "android")]
+mod dictation;
 
 struct App {
     root: PathBuf,
@@ -111,6 +115,28 @@ impl<R: Runtime> secrets::Cipher for Keystore<R> {
     }
 }
 
+/// The page's commands: the engine's ports, and dictation's where the phone can hear.
+fn handlers() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
+    #[cfg(target_os = "android")]
+    return tauri::generate_handler![
+        git,
+        listen,
+        port,
+        dictation::dictation_available,
+        dictation::dictate_start,
+        dictation::dictate_stop,
+        dictation::dictation_allow_microphone,
+        dictation::dictation_model,
+        dictation::dictation_download,
+        dictation::dictation_cancel_download,
+        dictation::dictation_remove_model,
+        dictation::dictation_settings,
+        dictation::dictation_save_settings
+    ];
+    #[cfg(not(target_os = "android"))]
+    return tauri::generate_handler![git, listen, port];
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -133,10 +159,12 @@ pub fn run() {
             // (git2_port::trust_certificates_in says why): Conscrypt's, which Android keeps up to date, then the system's.
             #[cfg(target_os = "android")]
             git2_port::trust_certificates_in(&["/apex/com.android.conscrypt/cacerts", "/system/etc/security/cacerts"])?;
+            #[cfg(target_os = "android")]
+            app.manage(dictation::Dictating::default());
             app.manage(App { root, watches: files::Watches::default(), events: Arc::default(), http: reqwest::Client::builder().user_agent("Writer").build()? });
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![git, listen, port])
+        .invoke_handler(handlers())
         .run(tauri::generate_context!())
         .expect("Writer couldn't start");
 }

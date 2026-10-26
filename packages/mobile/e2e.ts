@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,12 +9,14 @@ import { fakeGitHub } from "../server/test/fake-github.ts";
 /**
  * Writer on Android, end to end (#52): the app on a device or the emulator, its webview driven by
  * Playwright, against a fake GitHub on this computer that the device
- * reaches through `adb reverse`. It signs in with a code, starts a journal and writes in it, puts it
- * on GitHub and syncs; clones a novel, takes a change made elsewhere by syncing, and checks the
- * files on the device and on GitHub.
+ * reaches through `adb reverse`. It signs in with a code, starts a journal and writes in it,
+ * dictates into it (#86: Writer's own speech model on the device, hearing a recording in place of
+ * the microphone), puts it on GitHub and syncs; clones a novel, takes a change made elsewhere by
+ * syncing, and checks the files on the device and on GitHub.
  *
  * `node packages/mobile/e2e.ts [APK]`, with one device attached (ADB names adb, if not on PATH). The
- * APK is installed and the app's data cleared first.
+ * APK is installed and the app's data cleared first. The speech model comes from
+ * packages/dictation/models (its fetch-models.sh), pushed once and copied into the app each run.
  */
 
 const PACKAGE = "io.github.heffrey78.writer";
@@ -26,6 +28,19 @@ const inApp = (command: string, input?: string) => execFileSync(ADB, ["shell", `
 // A phone, or the emulator, is slower than this computer.
 const expect = baseExpect.configure({ timeout: 20_000 });
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/** Tap what Android shows with text matching `text` (its own dialogs, outside the webview), once it's there. */
+async function tapAndroid(text: RegExp) {
+  for (let i = 0; i < 40; i++, await sleep(500)) {
+    const ui = execFileSync(ADB, ["exec-out", "uiautomator", "dump", "/dev/tty"], { encoding: "utf8" });
+    const node = [...ui.matchAll(/<node [^>]*>/g)].map((m) => m[0]).find((n) => text.test(/ text="([^"]*)"/.exec(n)?.[1] ?? ""));
+    const bounds = node && /bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/.exec(node);
+    if (bounds) {
+      const [x1, y1, x2, y2] = bounds.slice(1).map(Number) as [number, number, number, number];
+      return void adb("shell", "input", "tap", String((x1 + x2) >> 1), String((y1 + y2) >> 1));
+    }
+  }
+  throw new Error(`Android showed nothing matching ${text}.`);
+}
 
 const tmp = mkdtempSync(join(tmpdir(), "writer-mobile-"));
 const fake = await fakeGitHub({ gitRoot: join(tmp, "github") });
@@ -42,6 +57,18 @@ git(seed, "add", "-A");
 git(seed, "commit", "-q", "-m", "The Bridge at Varn");
 git(seed, "push", "-q", varn, "main");
 fake.repos.push({ owner: "ada", name: "varn", private: true, pushedAt: new Date().toISOString() });
+
+// What dictation hears in place of the microphone: the first sentence of the speech crate's clip,
+// "Then dear, said Missus Whitney, you must be kinder to her than ever…", and a moment's quiet.
+const wav = readFileSync(join(repo, "packages/dictation/tests/clips/librispeech.wav"));
+const data = wav.indexOf("data") + 8;
+const sentence = join(tmp, "dictated.wav");
+const pcm = wav.subarray(data, data + 2 * 16_000 * 11);
+const header = Buffer.from(wav.subarray(0, data));
+header.writeUInt32LE(header.length - 8 + pcm.length, 4);
+header.writeUInt32LE(pcm.length, data - 4);
+writeFileSync(sentence, Buffer.concat([header, pcm]));
+const MODELS = "/data/local/tmp/writer-dictation";
 
 const port = new URL(fake.url).port;
 const steps: [string, number][] = [];
@@ -62,7 +89,15 @@ try {
   if (apk) adb("install", "-r", apk);
   adb("shell", "am", "force-stop", PACKAGE);
   adb("shell", "pm", "clear", PACKAGE);
-  inApp("cat > env.json", JSON.stringify({ WRITER_GITHUB_URL: fake.url, WRITER_GITHUB_API_URL: fake.url, WRITER_GITHUB_CLIENT_ID: fake.clientId }));
+  inApp("cat > env.json", JSON.stringify({ WRITER_GITHUB_URL: fake.url, WRITER_GITHUB_API_URL: fake.url, WRITER_GITHUB_CLIENT_ID: fake.clientId, WRITER_DICTATION_CLIP: "dictated.wav" }));
+  // The speech model, as its download leaves it (pushed once: 208 MB), and the recording.
+  if (adb("shell", `test -f ${MODELS}/models/parakeet/encoder.int8.onnx && echo there || true`).trim() !== "there") {
+    adb("shell", "mkdir", "-p", `${MODELS}/models`);
+    for (const part of ["parakeet", "zipformer", "silero_vad.onnx"]) adb("push", "-q", join(repo, "packages/dictation/models", part), `${MODELS}/models/`);
+  }
+  adb("push", "-q", sentence, `${MODELS}/dictated.wav`);
+  inApp(`cp -r ${MODELS}/models ${MODELS}/dictated.wav .`);
+  adb("shell", "pm", "revoke", PACKAGE, "android.permission.RECORD_AUDIO");
   adb("shell", "monkey", "-p", PACKAGE, "-c", "android.intent.category.LAUNCHER", "1");
 
   // The app's webview, through Playwright's own adb driver (its CDP connection wants a browser's
@@ -137,6 +172,38 @@ try {
   // The keyboard takes room from the page rather than covering it.
   await expect.poll(() => page.evaluate(() => innerHeight)).toBeLessThan(tall);
   step("a journal started, and today's entry saved on the device");
+
+  // Dictated (#86): Writer says why it wants the microphone, Android asks, and the sentence is heard
+  // by the speech model on the device and written into the entry.
+  await page.keyboard.press("Control+End");
+  await page.getByRole("button", { name: "Dictate", exact: true }).click();
+  const why = page.getByRole("status").filter({ hasText: "Writer hears you through the phone's microphone." });
+  await expect(why).toContainText("What you say is heard on this phone and never leaves it, and nothing is recorded.");
+  await why.getByRole("button", { name: "Allow the microphone" }).click();
+  await tapAndroid(/^While using the app$/i);
+  const dictating = page.getByRole("group", { name: "Dictation" });
+  await expect(dictating).toContainText("Listening…", { timeout: 30_000 });
+  await expect(page.locator(".ghw-heard")).toBeVisible({ timeout: 30_000 });
+  await expect(text).toContainText(/kinder to her than ever/i, { timeout: 60_000 });
+  await dictating.getByRole("button", { name: "Stop dictating" }).click();
+  await expect(dictating).toHaveCount(0);
+  let dictated = "";
+  for (let i = 0; i < 40 && !dictated; i++, await sleep(250)) dictated = inApp("grep -rli \"kinder to her than ever\" books/days/entries || true").trim();
+  if (!dictated) throw new Error("The dictated words weren't saved.");
+  console.log(`     heard: ${inApp(`cat ${dictated}`).split("Written on the phone.")[1]?.trim()}`);
+  step("dictated: the microphone allowed when asked, the words heard on the device and saved");
+
+  // To the background mid-phrase: the words heard so far are written and saved, and it stops.
+  const said = () => Number(inApp(`grep -oi "dear" ${dictated} | wc -l`).trim());
+  await page.getByRole("button", { name: "Dictate", exact: true }).click();
+  await expect(dictating).toContainText("Listening…", { timeout: 30_000 });
+  await expect(page.locator(".ghw-heard")).toContainText(/dear/i, { timeout: 30_000 });
+  adb("shell", "input", "keyevent", "KEYCODE_HOME");
+  await expect.poll(said, { timeout: 20_000 }).toBe(2);
+  adb("shell", "monkey", "-p", PACKAGE, "-c", "android.intent.category.LAUNCHER", "1");
+  await expect(dictating).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Dictate", exact: true })).toBeVisible();
+  step("to the background mid-phrase: what was heard saved, and listening stopped");
 
   // Put on GitHub, then synced.
   const badge = page.getByRole("button", { name: /^Sync: / });

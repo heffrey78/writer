@@ -2,6 +2,7 @@ import type { Editor } from "@tiptap/core";
 import { heardText, offerDictation, settleHeard, showHeard, type DictationOffer } from "@writer/editor";
 import { create } from "zustand";
 import {
+  allowMicrophone,
   cancelDictationDownload,
   DEFAULT_DICTATION_SETTINGS,
   dictationAvailable,
@@ -17,6 +18,7 @@ import {
   type DictationSettings,
 } from "../desktop.ts";
 import { useNotice } from "../novel/notice.tsx";
+import { onAndroid } from "../platform.ts";
 
 /*
  * Dictation (#71, #79, D17): the page's side. The host hears (the desktop shell; Android's plugin
@@ -58,8 +60,10 @@ export const useDictation = create<Dictation>(() => ({
 
 /** English first (D17); other languages come with #92. */
 const LANGUAGE = "en";
-/** How long the host has to settle its last phrase once asked to stop. */
-const STOP_MS = 2_000;
+/** Where it hears, in the writer's words. */
+export const DEVICE = onAndroid ? "phone" : "computer";
+/** How long the host has to settle its last phrase once asked to stop: a slow phone's decoding of a long one. */
+const STOP_MS = 10_000;
 
 // Each start is a session; events from an earlier one are dropped.
 let session = 0;
@@ -97,6 +101,7 @@ function settleNow(): void {
 const FAILED: Record<Extract<DictationEvent, { kind: "failed" }>["reason"], string> = {
   microphone: "Writer couldn't use the microphone. Allow it in the system's settings, then dictate again.",
   "no-microphone": "There's no microphone. Plug one in, then dictate again.",
+  permission: "Writer isn't allowed to use the microphone.",
   model: "The speech model isn't ready on this device yet.",
   other: "Something went wrong while listening. Dictate again to go on.",
 };
@@ -107,19 +112,41 @@ function failed(event: Extract<DictationEvent, { kind: "failed" }>): void {
   settleNow();
   // No model yet: the first Dictate offers to download it, where the shell keeps one.
   if (event.reason === "model") return void offerModel(into, event.message);
+  // Android's to allow (#86): Writer says why first, then Android asks.
+  if (event.reason === "permission") return askForMicrophone(into, event.message === "denied");
   useNotice.getState().show({ message: `Dictation stopped. ${event.message ?? FAILED[event.reason]}${heard ? " What was heard so far is in the text." : ""}` });
 }
 
 const mb = (bytes: number) => Math.round(bytes / 1e6);
+
+const REFUSED = "Writer can't use the microphone: Android won't ask again. Allow it in Android's Settings, under Apps › Writer › Permissions, then dictate again.";
+
+/** Why the microphone's wanted, then Android's prompt; allowed, it dictates into `editor`. */
+function askForMicrophone(editor: Editor | undefined, refused: boolean): void {
+  const show = useNotice.getState().show;
+  if (refused) return show({ message: REFUSED });
+  show({
+    message: `Writer hears you through the ${DEVICE}'s microphone. What you say is heard on this ${DEVICE} and never leaves it, and nothing is recorded.`,
+    action: {
+      label: "Allow the microphone",
+      run: () =>
+        void allowMicrophone().then((state) => {
+          if (state === "granted") return live(editor) && void (editor!.commands.focus(null, { scrollIntoView: false }), start(editor!));
+          show({ message: state === "denied" ? REFUSED : "Writer can't dictate without the microphone. Dictate again to be asked again." });
+        }),
+    },
+    secondary: { label: "Not now", run: () => {} },
+  });
+}
 
 /** Say what dictation needs, and offer to download it. */
 async function offerModel(editor: Editor | undefined, why?: string): Promise<void> {
   const model = await dictationModel();
   const show = useNotice.getState().show;
   if (!model) return show({ message: `Couldn't start dictating: ${why ?? FAILED.model}` });
-  const what = model.state === "damaged" ? "Writer's speech model is damaged on this computer and needs downloading again" : "Dictation hears with Writer's speech model, which isn't on this computer yet";
+  const what = model.state === "damaged" ? `Writer's speech model is damaged on this ${DEVICE} and needs downloading again` : `Dictation hears with Writer's speech model, which isn't on this ${DEVICE} yet`;
   show({
-    message: `${what}: ${mb(model.downloadBytes)} MB to download, ${mb(model.installedBytes)} MB once it's in. What you say never leaves the computer.`,
+    message: `${what}: ${mb(model.downloadBytes)} MB to download, ${mb(model.installedBytes)} MB once it's in. What you say never leaves the ${DEVICE}.`,
     action: { label: "Download it", run: () => void download(editor) },
     secondary: { label: "Not now", run: () => {} },
   });
@@ -153,7 +180,7 @@ export async function download(editor: Editor | undefined, notify = true): Promi
   }
   set({ downloading: undefined });
   show({
-    message: "The speech model is in: dictation hears on this computer now.",
+    message: `The speech model is in: dictation hears on this ${DEVICE} now.`,
     // From the notice back to the text, where the words will go.
     ...(live(editor) ? { action: { label: "Dictate", run: () => void (editor!.commands.focus(null, { scrollIntoView: false }), start(editor!)) } } : {}),
   });
@@ -235,7 +262,7 @@ export async function saveSettings(changes: Partial<DictationSettings>): Promise
   await saveDictationSettings(settings);
 }
 
-/** Remove the speech model from this computer, stopping dictation first if it's listening. */
+/** Remove the speech model from this device, stopping dictation first if it's listening. */
 export async function removeModel(): Promise<void> {
   if (get().state !== "off") settleNow();
   await removeDictationModel();
@@ -252,6 +279,8 @@ export function initDictation(): Promise<void> {
     offerDictation(offer);
     settleOnQuit(settleNow);
     document.addEventListener("visibilitychange", () => document.visibilityState === "hidden" && settleNow());
+    // Android's app goes to the background without hiding its page: its plugin says so instead.
+    window.addEventListener("writer-background", settleNow);
   });
   return started;
 }

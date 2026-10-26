@@ -31,6 +31,9 @@ reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"
 # No system OpenSSL on Android: built from source for the target.
 [target.'cfg(target_os = "android")'.dependencies]
 git2-port = { path = "../../git2-port", features = ["vendored-openssl"] }
+# Dictation (#86): the speech crate with sherpa-onnx's shared libraries (all Android has), which its
+# build puts in the Gradle project's jniLibs; the microphone through AAudio; the model's download.
+writer-dictation = { path = "../../dictation", default-features = false, features = ["shared", "mic", "download"] }
 
 # `tauri android build --debug` uses this profile: optimized and stripped, so the APK is a download
 # a phone can take, and still signed with the debug key for sideloading.

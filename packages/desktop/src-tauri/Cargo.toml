@@ -25,7 +25,7 @@ tauri-plugin-window-state = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # Dictation (#83, D17): Writer's speech crate with the microphone, and the model's download.
-writer-dictation = { path = "../../dictation", features = ["mic"] }
+writer-dictation = { path = "../../dictation", features = ["mic", "download"] }
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "blocking"] }
 
 [dev-dependencies]

@@ -6,7 +6,7 @@ import { ErrorAlert } from "../ui/alert.tsx";
 import { Button } from "../ui/button.tsx";
 import { Confirm } from "../ui/confirm.tsx";
 import { Modal } from "../ui/dialog.tsx";
-import { download, initDictation, removeModel, saveSettings, useDictation } from "./dictation.ts";
+import { DEVICE, download, initDictation, removeModel, saveSettings, useDictation } from "./dictation.ts";
 
 /** Whether dictation's settings are open: from the ⋯ menu or the palette, where the shell can hear. */
 export const useDictationSettings = create<{ open: boolean; set: (open: boolean) => void }>((set) => ({ open: false, set: (open) => set({ open }) }));
@@ -26,7 +26,7 @@ const SILENCES: [number, string][] = [
 const mb = (bytes: number) => Math.round(bytes / 1e6);
 
 /**
- * Dictation's settings (#80): how Writer hears the writer, all of it on this computer. The speech
+ * Dictation's settings (#80): how Writer hears the writer, all of it on this device. The speech
  * model's state, with Download, Cancel and Remove; which microphone; when listening stops by itself;
  * and whether a screen reader reads out each phrase written. Kept by the shell, never in a book.
  */
@@ -64,7 +64,7 @@ function DictationSettingsForm({ onClose }: { onClose: () => void }) {
 
   return (
     <Modal title="Dictation" onClose={onClose} className="max-w-lg">
-      <p className="text-sm text-muted">What you say is heard on this computer, by Writer itself, and never leaves it. Nothing you say is recorded or kept.</p>
+      <p className="text-sm text-muted">What you say is heard on this {DEVICE}, by Writer itself, and never leaves it. Nothing you say is recorded or kept.</p>
 
       {recognizers.length > 1 ? (
         <fieldset className="grid gap-1.5">
@@ -102,7 +102,7 @@ function DictationSettingsForm({ onClose }: { onClose: () => void }) {
             </Button>
           ) : model.data?.state === "ready" ? (
             <Confirm
-              trigger={<Button size="sm">Remove from this computer</Button>}
+              trigger={<Button size="sm">Remove from this {DEVICE}</Button>}
               title="Remove the speech model?"
               description={`It frees ${mb(model.data.installedBytes)} MB. Dictation can't hear you until it's downloaded again.`}
               action="Remove it"
@@ -178,7 +178,7 @@ function DictationSettingsForm({ onClose }: { onClose: () => void }) {
   );
 }
 
-/** Where the speech model is: on this computer, downloading, or to download. */
+/** Where the speech model is: on this device, downloading, or to download. */
 function ModelState({ model, downloading }: { model: DictationModel | undefined; downloading: { done: number; total: number } | undefined }) {
   if (downloading) {
     const percent = downloading.total ? Math.floor((100 * downloading.done) / downloading.total) : 0;
@@ -192,11 +192,15 @@ function ModelState({ model, downloading }: { model: DictationModel | undefined;
     );
   }
   if (!model) return <p className="text-sm text-muted">…</p>;
-  if (model.state === "ready") return <p className="text-sm">Writer's speech model for English is on this computer: {mb(model.installedBytes)} MB.</p>;
-  if (model.state === "damaged") return <p className="text-sm">The speech model is damaged on this computer: download it again, {mb(model.downloadBytes)} MB.</p>;
+  if (model.state === "ready") return <p className="text-sm">
+        Writer's speech model for English is on this {DEVICE}: {mb(model.installedBytes)} MB.
+      </p>;
+  if (model.state === "damaged") return <p className="text-sm">
+        The speech model is damaged on this {DEVICE}: download it again, {mb(model.downloadBytes)} MB.
+      </p>;
   return (
     <p className="text-sm">
-      Writer's speech model for English isn't on this computer yet: {mb(model.downloadBytes)} MB to download, {mb(model.installedBytes)} MB once it's in. It's downloaded once, from GitHub.
+      Writer's speech model for English isn't on this {DEVICE} yet: {mb(model.downloadBytes)} MB to download, {mb(model.installedBytes)} MB once it's in. It's downloaded once, from GitHub.
     </p>
   );
 }

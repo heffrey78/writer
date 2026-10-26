@@ -16,6 +16,10 @@ const shell = {
   /** The speech model, and how its download goes: whole, or cancelled partway. */
   model: "ready" as "ready" | "missing",
   download: "whole" as "whole" | "cancelled",
+  /** The microphone, as Android's permission has it (#86); "granted" on a desktop, which never asks. */
+  microphone: "granted" as "granted" | "prompt" | "denied",
+  /** What Android's prompt answers. */
+  answer: "granted" as "granted" | "prompt" | "denied",
   /** Dictation's settings as the shell keeps them (#80). */
   settings: { recognizer: null, microphone: null, silenceSeconds: 60, announce: false } as import("../src/desktop.ts").DictationSettings,
 };
@@ -39,8 +43,10 @@ class Channel<T> {
         shell.model = "ready";
         return null;
       }
+      if (command === "dictation_allow_microphone") return (shell.microphone = shell.answer);
       if (command === "dictate_start") {
         shell.events = (e) => args!.events!.onmessage(e);
+        if (shell.microphone !== "granted") return void shell.events({ kind: "failed", reason: "permission", message: shell.microphone });
         // The shell says why it can't start on the channel, as it says anything else.
         if (shell.model === "missing") shell.events({ kind: "failed", reason: "model", message: "the speech model isn't all there" });
       }
@@ -78,6 +84,8 @@ beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
   shell.model = "ready";
   shell.download = "whole";
+  shell.microphone = "granted";
+  shell.answer = "granted";
   shell.last = "";
   shell.calls = [];
   notice.useNotice.setState({ notice: undefined });
@@ -125,7 +133,7 @@ describe("dictating", () => {
     shell.last = undefined;
     await dictation.stop();
     expect(dictation.useDictation.getState().state).toBe("stopping");
-    await vi.advanceTimersByTimeAsync(2_000);
+    await vi.advanceTimersByTimeAsync(10_000);
     expect(ed.getMarkdown(editor)).toBe("Fog. Then sun\n");
     expect(dictation.useDictation.getState().state).toBe("off");
   });
@@ -287,5 +295,38 @@ describe("the speech model", () => {
     await dictation.download(undefined, false);
     expect(dictation.useDictation.getState().downloadStopped).toBe("Download stopped. What's downloaded so far is kept: download again to go on from there.");
     expect(shown()).toBeUndefined();
+  });
+});
+
+describe("the microphone, on a phone (#86)", () => {
+  const shown = () => notice.useNotice.getState().notice;
+
+  it("not allowed yet: Writer says why, then Android asks, and once it's allowed it dictates", async () => {
+    shell.microphone = "prompt";
+    const editor = open("Fog.\n");
+    await dictation.start(editor);
+    expect(dictation.useDictation.getState().state).toBe("off");
+    await vi.waitFor(() => expect(shown()?.action?.label).toBe("Allow the microphone"));
+    expect(shown()?.message).toMatch(/microphone\. What you say is heard on this \w+ and never leaves it, and nothing is recorded\.$/);
+    expect(shown()?.secondary?.label).toBe("Not now");
+    shown()!.action!.run();
+    await vi.waitFor(() => expect(dictation.useDictation.getState().state).toBe("listening"));
+    expect(shell.calls).toContain("dictation_allow_microphone");
+    await dictation.stop();
+  });
+
+  it("refused for good: says where to allow it, and asks nothing", async () => {
+    shell.microphone = "prompt";
+    shell.answer = "denied";
+    const editor = open("Fog.\n");
+    await dictation.start(editor);
+    await vi.waitFor(() => expect(shown()?.action?.label).toBe("Allow the microphone"));
+    shown()!.action!.run();
+    await vi.waitFor(() => expect(shown()?.message).toBe("Writer can't use the microphone: Android won't ask again. Allow it in Android's Settings, under Apps › Writer › Permissions, then dictate again."));
+    shell.calls = [];
+    await dictation.start(editor);
+    await vi.waitFor(() => expect(shown()?.message).toMatch(/^Writer can't use the microphone: Android won't ask again/));
+    expect(shown()?.action).toBeUndefined();
+    expect(shell.calls).not.toContain("dictation_allow_microphone");
   });
 });
