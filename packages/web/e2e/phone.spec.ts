@@ -135,3 +135,55 @@ test("on a phone, Arrange the sidebar fits, from the ⋯ menu, and closes by its
   await dialog.getByRole("button", { name: "Cancel" }).tap();
   await expect(dialog).toHaveCount(0);
 });
+
+test("on a phone, writing: the bar on top of the keyboard, every tap leaving the text its focus (#96)", async ({ page, app }) => {
+  test.setTimeout(90_000);
+  await app.restart(app.novelRepo("varn"));
+  await page.goto(app.launchUrl);
+  const text = page.getByRole("textbox", { name: "Chapter text" });
+  await expect(text).toBeVisible();
+  // On GitHub, for Raise an issue… on selected text.
+  const id = new URL(page.url()).pathname.split("/")[2]!;
+  const headers = { origin: app.url };
+  expect((await page.request.post(`${app.url}/api/github/device`, { headers })).ok()).toBe(true);
+  app.github.approve();
+  await expect.poll(async () => ((await (await page.request.post(`${app.url}/api/github/device/poll`, { headers })).json()) as { status: string }).status).toBe("done");
+  expect((await page.request.post(`${app.url}/api/novels/${id}/publish`, { data: { name: "varn" }, headers })).ok()).toBe(true);
+  await page.reload();
+
+  const bar = page.getByRole("toolbar", { name: "Writing" });
+  // Only while writing.
+  await expect(bar).toHaveCount(0);
+  await text.tap();
+  await expect(bar).toBeVisible();
+  await fits(page);
+  await audit(page);
+  await page.keyboard.press("Control+End");
+  await page.keyboard.type(" Rain.");
+  await bar.getByRole("button", { name: "Undo" }).tap();
+  await expect(text).toBeFocused();
+  await expect(text).not.toContainText("Rain.");
+  await bar.getByRole("button", { name: "Redo" }).tap();
+  await expect(text).toContainText("Rain.");
+
+  // @ in the text, the mention menu open.
+  await bar.getByRole("button", { name: "Mention" }).tap();
+  await expect(page.getByRole("listbox")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(text).toBeFocused();
+
+  // The palette, then back to the text with the caret where it was.
+  await bar.getByRole("button", { name: "Commands" }).tap();
+  const palette = page.getByRole("dialog", { name: "Command palette" });
+  await expect(palette).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(text).toBeFocused();
+  await page.keyboard.type(" Wind.");
+  await expect(text).toContainText("Wind.");
+
+  // A selection's actions while there's one.
+  await expect(bar.getByRole("button", { name: "Raise an issue…" })).toHaveCount(0);
+  await page.keyboard.press("Shift+Home");
+  await bar.getByRole("button", { name: "Raise an issue…" }).tap();
+  await expect(page.getByRole("complementary", { name: "Raise an issue" })).toBeVisible();
+});

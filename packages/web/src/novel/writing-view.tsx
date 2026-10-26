@@ -64,6 +64,8 @@ import { RunPieces, type Run, type RunTools } from "./run.tsx";
 import type { Workspace } from "./workspace.ts";
 import { onAndroid } from "../platform.ts";
 import { useSelectionToolbar } from "../selection-toolbar.ts";
+import { useNarrow } from "./sidebar.tsx";
+import { useTextFocused, WritingBar, type BarAction } from "./writing-bar.tsx";
 
 interface Props {
   novelId: string;
@@ -591,7 +593,7 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
           />
         )}
       </div>
-      <StatusBar novelId={novelId} workspace={workspace} editor={editor} />
+      <StatusBar novelId={novelId} workspace={workspace} editor={editor} selection={repo ? [{ label: "Raise an issue…", run: raiseFromSelection }] : []} />
       </div>
       {raising || issueOpen ? (
         // An issue being raised or read takes the sidebar's place until it's closed: beside the text,
@@ -729,11 +731,21 @@ function EmptyChapter({ autofocus, onAdd }: { autofocus: boolean; onAdd: (title:
 
 /**
  * Under the text, quietly: Dictate where the app can hear, the writing session's words, and today's
- * against the daily goal. In focus mode, only while the count is pinned there.
+ * against the daily goal. In focus mode, only while the count is pinned there. On a phone while
+ * writing, the writing bar instead (#96), on top of the keyboard: the page ends there.
  */
-function StatusBar({ novelId, workspace, editor }: { novelId: string; workspace: Workspace; editor: Editor | undefined }) {
+function StatusBar({ novelId, workspace, editor, selection }: { novelId: string; workspace: Workspace; editor: Editor | undefined; selection: BarAction[] }) {
   const hidden = useWritingModes((m) => m.focus && !m.pinCount);
   const words = editorWords(useBookKind());
+  const narrow = useNarrow();
+  const focused = useTextFocused();
+  const writing = narrow && focused;
+  if (writing)
+    return (
+      <div className="sticky bottom-0 z-10 border-t border-rule bg-paper px-2 py-1 text-[13px] text-muted">
+        <WritingBar editor={editor} dictate={<DictateButton editor={editor} />} selection={selection} />
+      </div>
+    );
   if (hidden) return null;
   return (
     <div className="sticky bottom-0 z-10 flex flex-wrap items-baseline justify-end gap-x-4 gap-y-1 border-t border-rule bg-paper px-6 py-1.5 text-[13px] text-muted">

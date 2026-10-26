@@ -283,6 +283,18 @@ try {
   await raising.getByRole("button", { name: "Back to the text" }).click();
   step("a word selected by long-press: Android's toolbar, Raise an issue… in it, the keyboard kept");
 
+  // Writing: the bar on top of the keyboard (#96); its Commands opens the palette, the keyboard kept.
+  await (await page.getByRole("textbox", { name: /Write today's entry|Entry text/ }).first()).click();
+  const bar = page.getByRole("toolbar", { name: "Writing" });
+  await expect(bar).toBeVisible();
+  writeFileSync(join(tmp, "..", "writing-bar.png"), execFileSync(ADB, ["exec-out", "screencap", "-p"]));
+  await bar.getByRole("button", { name: "Commands" }).click();
+  await expect(page.getByRole("dialog", { name: "Command palette" })).toBeVisible();
+  if (!/mInputShown=true/.test(adb("shell", "dumpsys", "input_method"))) throw new Error("The keyboard went away as the palette opened.");
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog", { name: "Command palette" })).toHaveCount(0);
+  step("writing: the bar on top of the keyboard, Commands from it with the keyboard kept");
+
   // A novel cloned from GitHub, opened; a change made elsewhere, taken by a sync.
   await page.goto("http://tauri.localhost/");
   await page.getByRole("button", { name: "Clone from GitHub" }).click();

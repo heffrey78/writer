@@ -81,15 +81,31 @@ function Keys({ keys }: { keys: string }) {
  * Mod+K: every registered command, searchable, recent ones first. Mod+/: the keyboard shortcuts.
  * Choosing a command closes the palette, returns focus to where it was, then runs the command.
  */
+/** Where the focus was when the palette or the shortcuts opened, to go back to. */
+const returnTo: { current: HTMLElement | null } = { current: null };
+/** The text selection when the palette opened: focusing a contenteditable again would put the caret at its start. */
+const returnRange: { current: Range | null } = { current: null };
+
+/**
+ * Open the palette or the shortcuts, to come back to the focus and the caret as they are now: from
+ * their keys, or a button that doesn't take the focus (the writing bar on a phone, #96).
+ */
+export function openOverlay(which: "palette" | "shortcuts"): void {
+  const state = useOverlay.getState();
+  if (!state.open) {
+    returnTo.current = document.activeElement as HTMLElement | null;
+    const sel = window.getSelection();
+    returnRange.current = returnTo.current?.isContentEditable && sel?.rangeCount ? sel.getRangeAt(0).cloneRange() : null;
+  }
+  state.set(which);
+}
+
 export function CommandPalette() {
   const { open, set } = useOverlay();
   const owners = useCommandRegistry((s) => s.owners);
   const commands = useMemo(() => allCommands(owners), [owners]);
   const [search, setSearch] = useState("");
   const [recent, setRecent] = useState<string[]>([]);
-  const returnTo = useRef<HTMLElement | null>(null);
-  /** The text selection when the palette opened: focusing a contenteditable again would put the caret at its start. */
-  const returnRange = useRef<Range | null>(null);
   const pending = useRef<Command | undefined>(undefined);
 
   useEffect(() => {
@@ -100,16 +116,8 @@ export function CommandPalette() {
       if (!which) return;
       e.preventDefault();
       e.stopPropagation();
-      const state = useOverlay.getState();
-      if (state.open === which) state.set(undefined);
-      else {
-        if (!state.open) {
-          returnTo.current = document.activeElement as HTMLElement | null;
-          const sel = window.getSelection();
-          returnRange.current = returnTo.current?.isContentEditable && sel?.rangeCount ? sel.getRangeAt(0).cloneRange() : null;
-        }
-        state.set(which);
-      }
+      if (useOverlay.getState().open === which) useOverlay.getState().set(undefined);
+      else openOverlay(which);
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
