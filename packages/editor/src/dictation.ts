@@ -4,12 +4,14 @@ import type { ResolvedPos } from "@tiptap/pm/model";
 import { Plugin, PluginKey, type EditorState } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import { appContextMenu, contributeMenuItems } from "./context-menu.ts";
+import { spokenPhrase, type SpokenName } from "./spoken.ts";
 
 /*
  * Dictation's part in the editor (#79, D17). While a phrase is being heard its words show at the
  * caret, greyed, as a decoration: not in the document, so they're never saved, counted, found or
  * undone. When the recognizer settles the phrase it's inserted at the caret as one change, spaced and
- * capitalised for where it lands. The app hears, through its host; the editor only shows and writes,
+ * capitalised for where it lands, with the book's names spelled as its index has them; "new
+ * paragraph" or "new line" said alone makes one (spoken.ts, #81). The app hears, through its host; the editor only shows and writes,
  * and offers the app's Dictate on its key and in its right-click menu once the app says it can hear.
  */
 
@@ -54,13 +56,30 @@ export function showHeard(editor: Editor, text: string): void {
  */
 export function settleHeard(editor: Editor, text: string): void {
   if (editor.isDestroyed) return;
+  const spoken = spokenPhrase(text, bookNames(editor));
+  if (spoken.kind !== "text") {
+    // Its own undo step too, in place of a selection.
+    const chain = editor.chain().command(({ tr }) => {
+      closeHistory(tr.setMeta(key, ""));
+      if (!tr.selection.empty) tr.deleteSelection();
+      return true;
+    });
+    (spoken.kind === "paragraph" ? chain.splitBlock() : chain.insertContent({ type: "hard_break" })).scrollIntoView().run();
+    return;
+  }
   const { state } = editor;
   const { from, to, $from, $to } = state.selection;
-  const words = joinPhrase(textBefore($from), text, $to.parent.isTextblock ? $to.parent.textBetween($to.parentOffset, $to.parent.content.size, undefined, "￼") : "");
+  const words = joinPhrase(textBefore($from), spoken.text, $to.parent.isTextblock ? $to.parent.textBetween($to.parentOffset, $to.parent.content.size, undefined, "￼") : "");
   const tr = state.tr.setMeta(key, "");
   // Its own undo step, never merged with the typing before it.
   if (words) closeHistory(tr).insertText(words, from, to).scrollIntoView();
   editor.view.dispatch(tr);
+}
+
+/** The book's names, as the editor's @ menu has them: none in an editor without it. */
+function bookNames(editor: Editor): readonly SpokenName[] {
+  const suggest = editor.extensionManager.extensions.find((e) => e.name === "mentionSuggest");
+  return (suggest?.options as { entities?: () => readonly SpokenName[] } | undefined)?.entities?.() ?? [];
 }
 
 /** Write the words heard so far and say the editor is going, before it's flushed for the last time. */

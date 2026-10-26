@@ -83,7 +83,7 @@ export async function asDesktop(page: Page, shell: Shell = {}) {
           if (command === "clipboard_text") return Promise.resolve(s.clipboard ?? null);
           if (command === "can_inspect") return Promise.resolve(s.inspect ?? false);
           if (command === "dictation_available") return Promise.resolve(s.dictation ?? false);
-          const w = window as unknown as { __hear?: (e: unknown) => void; __lastPhrase?: string; __model?: string; __dictationSettings?: unknown };
+          const w = window as unknown as { __hear?: (e: unknown) => void; __lastPhrase?: string; __model?: string; __dictationSettings?: unknown; __holdDownload?: () => void };
           w.__model ??= s.model ?? "ready";
           // Its settings (#80): two recognizers, for the choice, and a microphone that's Bluetooth.
           w.__dictationSettings ??= { recognizer: null, microphone: null, silenceSeconds: 60, announce: false };
@@ -106,9 +106,11 @@ export async function asDesktop(page: Page, shell: Shell = {}) {
             const progress = (args as { progress: Channel }).progress;
             return new Promise((done) => {
               let at = 0;
+              // Held halfway while the test has set window.__holdDownload, until it calls it.
               const step = () => {
                 at = Math.min(at + 104_773_250, 419_093_000);
                 progress.onmessage({ done: at, total: 419_093_000 });
+                if (at === 209_546_500 && w.__holdDownload) return void (w.__holdDownload = () => setTimeout(step, 50));
                 if (at < 419_093_000) return void setTimeout(step, 50);
                 w.__model = "ready";
                 done(null);

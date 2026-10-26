@@ -198,8 +198,11 @@ test("dictation's settings: the speech model downloaded and removed, the microph
   }
 
   // The download, said in the settings rather than a notice.
+  await page.evaluate(() => void ((window as unknown as { __holdDownload: () => void }).__holdDownload = () => {}));
   await dialog.getByRole("button", { name: "Download it" }).click();
+  await expect(dialog).toContainText("Downloading: 50% of 419 MB…");
   await expect(dialog.getByRole("button", { name: "Cancel download" })).toBeVisible();
+  await page.evaluate(() => (window as unknown as { __holdDownload: () => void }).__holdDownload());
   await expect(dialog).toContainText("Writer's speech model for English is on this computer: 208 MB.");
   await expect(page.getByRole("status").filter({ hasText: "speech model" })).toHaveCount(0);
 
@@ -238,4 +241,23 @@ test("dictation's settings: the speech model downloaded and removed, the microph
   await expect(dialog.getByLabel("Microphone", { exact: true })).toHaveValue("pulseaudio:alsa_input.pci");
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
+});
+
+test("names written as the book spells them, and a new paragraph said alone, into the file (#81)", async ({ page, app }) => {
+  const dir = app.novelRepo("varn");
+  await open(page, app, dir);
+  const text = page.getByRole("textbox", { name: "Chapter text" });
+  await caretAtEnd(page, text);
+  const file = join(dir, "manuscript/01-return/01-arrival/02-the-bridge.md");
+
+  await page.keyboard.press("ControlOrMeta+Shift+D");
+  await expect(listening(page)).toContainText("Listening…");
+  await hear(page, { kind: "settled", text: "Thomas was waiting." });
+  await hear(page, { kind: "settled", text: "New paragraph." });
+  await hear(page, { kind: "settled", text: "the lamps came on." });
+  await expect(text).toContainText("Tomas was waiting.");
+  await expect.poll(() => readFileSync(file, "utf8"), { timeout: 10_000 }).toMatch(/ Tomas was waiting\.\n\nThe lamps came on\.\n$/);
+  expect(readFileSync(file, "utf8")).not.toContain("Thomas");
+  await page.keyboard.press("Escape");
+  await expect(listening(page)).toHaveCount(0);
 });
