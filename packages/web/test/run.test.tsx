@@ -27,7 +27,8 @@ function workspace() {
   const store = createStore<WorkspaceState>(() => ({ files: {}, conflicts: [], error: undefined }));
   const change = vi.fn((path: string, body: string) => store.setState((s) => ({ files: { ...s.files, [path]: { ...s.files[path]!, body } } })));
   const open = vi.fn(async (paths: string[]) => {
-    for (const path of paths) {
+    // As the workspace's: a file open already stays as it is.
+    for (const path of paths.filter((p) => !store.getState().files[p])) {
       // A piece just made is empty.
       const body = book.allPieces.find((p) => p.file === path)?.body ?? "";
       store.setState((s) => ({ files: { ...s.files, [path]: { path, frontMatter: "", body, disk: body, hash: "h" } } }));
@@ -165,6 +166,106 @@ describe("the place to begin a piece", () => {
       vi.advanceTimersByTime(400);
     });
     expect(ws.store.getState().files[made.file]?.body).toBe("Fog on the water.\n");
+  });
+
+  it("the book has the piece before make() answers: the same editor goes on, with the words not yet reported (CI, under load)", async () => {
+    let answer!: (id: string) => void;
+    const make = vi.fn(() => new Promise<string>((resolve) => (answer = resolve)));
+    const { ws, rerender } = mount(book.allPieces, { begin: begin(make) });
+    const box = await screen.findByRole("textbox", { name: "Write today's entry" });
+    const editor = (box as unknown as { editor: Editor }).editor;
+    // The first keystroke makes it, before the editor's pause has reported anything.
+    act(() => void editor.chain().focus("end").insertContent("W").run());
+    expect(make).toHaveBeenCalledTimes(1);
+    // The file's arrival reloads the book: the run has the piece, says it's the one begun, and
+    // no longer offers the place, all before make() has answered.
+    const made = today();
+    rerender({ pieces: [made, ...book.allPieces], begin: undefined, begun: { id: made.id, keep: "test:begin" } });
+    await act(async () => {});
+    expect(screen.getAllByRole("textbox")[0]).toBe(box);
+    act(() => void editor.chain().focus("end").insertContent("ritten without a pause.").run());
+    await act(async () => void answer(made.id));
+    act(() => void vi.advanceTimersByTime(400));
+    await act(async () => {});
+    expect(screen.getAllByRole("textbox")[0]).toBe(box);
+    expect(ws.store.getState().files[made.file]?.body).toBe("Written without a pause.\n");
+  });
+
+  it("the next day's place is its own, not the piece the last one made", async () => {
+    const make = vi.fn(async () => "ent_today");
+    const { rerender } = mount(book.allPieces, { begin: begin(make) });
+    const editor = ((await screen.findByRole("textbox", { name: "Write today's entry" })) as unknown as { editor: Editor }).editor;
+    typeIn(editor, "Rain");
+    await act(async () => {});
+    const made = today();
+    rerender({ pieces: [made, ...book.allPieces], begin: undefined, begun: { id: made.id, keep: "test:begin" } });
+    await act(async () => {});
+    // Midnight: a place for the new day, and yesterday's piece is a piece.
+    rerender({ pieces: [made, ...book.allPieces], begin: { ...begin(make), keep: "test:tomorrow" } });
+    await act(async () => {});
+    expect(screen.getAllByRole("article")[0]!.getAttribute("aria-label")).toBe("Write today's entry");
+    expect(screen.getAllByRole("article")[1]!.getAttribute("aria-label")).toBe(made.title);
+  });
+
+  it("a letter typed into yesterday's piece as the new day's place comes is kept in yesterday's file", async () => {
+    const make = vi.fn(async () => "ent_today");
+    const { ws, rerender } = mount(book.allPieces, { begin: begin(make) });
+    const editor = ((await screen.findByRole("textbox", { name: "Write today's entry" })) as unknown as { editor: Editor }).editor;
+    typeIn(editor, "Rain");
+    await act(async () => {});
+    const made = today();
+    rerender({ pieces: [made, ...book.allPieces], begin: undefined, begun: { id: made.id, keep: "test:begin" } });
+    await act(async () => {});
+    // Not reported yet when midnight's render comes.
+    act(() => void editor.chain().focus("end").insertContent("W").run());
+    rerender({ pieces: [made, ...book.allPieces], begin: { ...begin(make), keep: "test:tomorrow" } });
+    await act(async () => {});
+    act(() => void vi.advanceTimersByTime(400));
+    expect(ws.store.getState().files[made.file]?.body).toBe("RainW\n");
+  });
+
+  it("made, but the next day came before the book had it: the piece takes the words its place kept", async () => {
+    const make = vi.fn(async () => "ent_today");
+    const { ws, rerender } = mount(book.allPieces, { begin: begin(make) });
+    const editor = ((await screen.findByRole("textbox", { name: "Write today's entry" })) as unknown as { editor: Editor }).editor;
+    typeIn(editor, "Rain, then wind.");
+    await act(async () => {});
+    expect(make).toHaveBeenCalledTimes(1);
+    // Midnight before the reload: the next day's place, then the book with yesterday's piece in it.
+    rerender({ pieces: book.allPieces, begin: { ...begin(make), keep: "test:tomorrow" } });
+    await act(async () => {});
+    const made = today();
+    rerender({ pieces: [made, ...book.allPieces], begin: { ...begin(make), keep: "test:tomorrow" } });
+    await act(async () => {});
+    await act(async () => {});
+    expect(ws.store.getState().files[made.file]?.body).toBe("Rain, then wind.\n");
+    expect(sessionStorage.getItem("test:begin")).toBeNull();
+  });
+
+  it("the next day's place starts making its own before the book has yesterday's: yesterday's still takes its words", async () => {
+    const make = vi.fn(async () => "ent_today");
+    const { ws, rerender } = mount(book.allPieces, { begin: begin(make) });
+    const editor = ((await screen.findByRole("textbox", { name: "Write today's entry" })) as unknown as { editor: Editor }).editor;
+    typeIn(editor, "Rain, then wind.");
+    await act(async () => {});
+    rerender({ pieces: book.allPieces, begin: { ...begin(vi.fn(async () => "ent_tomorrow")), keep: "test:tomorrow" } });
+    const next = ((await screen.findByRole("textbox", { name: "Write today's entry" })) as unknown as { editor: Editor }).editor;
+    typeIn(next, "Frost.");
+    await act(async () => {});
+    const made = today();
+    rerender({ pieces: [made, ...book.allPieces], begin: { ...begin(vi.fn(async () => "ent_tomorrow")), keep: "test:tomorrow" } });
+    await act(async () => {});
+    await act(async () => {});
+    expect(ws.store.getState().files[made.file]?.body).toBe("Rain, then wind.\n");
+  });
+
+  it("the page left before the book had today's piece, and come back to: the piece takes the words its place kept", async () => {
+    sessionStorage.setItem("test:begin", "Fog till noon.\n");
+    const made = today();
+    const { ws } = mount([made, ...book.allPieces], { begun: { id: made.id, keep: "test:begin" } });
+    await act(async () => {});
+    await act(async () => {});
+    expect(ws.store.getState().files[made.file]?.body).toBe("Fog till noon.\n");
   });
 
   it("keeps the words typed before the piece is made, and after a reload makes it for them", async () => {

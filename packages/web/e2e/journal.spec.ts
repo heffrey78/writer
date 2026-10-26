@@ -27,7 +27,9 @@ async function write(page: Page, day: string, words: () => Promise<void>) {
   await page.clock.setFixedTime(new Date(`${day}T08:00:00`));
   await palette(page, "today's entry");
   await expect(page).toHaveURL(/\/read$/);
-  await expect(page.getByRole("textbox", { name: "Write today's entry" })).toBeFocused();
+  // Today's place, not yesterday's entry made in the place before (which keeps its name): the
+  // command runs a frame after the palette closes, and the page sees the new day then.
+  await expect(page.getByRole("article", { name: "Write today's entry" }).getByRole("textbox", { name: "Write today's entry" })).toBeFocused();
   await selectionSettled(page);
   await words();
 }

@@ -115,11 +115,11 @@ export function CommandPalette() {
     return () => window.removeEventListener("keydown", onKey, true);
   }, []);
 
+  // Emptied as it closes, so it opens empty: emptied as it opened, after its input had the focus,
+  // it wiped what was typed first (CI, under load: "index" became "ex").
   useEffect(() => {
-    if (open === "palette") {
-      setSearch("");
-      setRecent(readRecent());
-    }
+    if (open === "palette") setRecent(readRecent());
+    else setSearch("");
   }, [open]);
 
   const groups = useMemo(() => {

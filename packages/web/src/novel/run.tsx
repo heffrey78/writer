@@ -34,6 +34,13 @@ export interface Run {
   /** A place at the top of the run to begin a new piece in: today's entry. */
   begin?: Begin;
   /**
+   * The piece the place to begin one makes, once the run has it (today's entry), and where that place
+   * keeps its words (Begin.keep). It's the place's own as soon as the place starts making it, even if
+   * the book reloads with it before make() answers. Shown without the place (the page left and come
+   * back to), it takes the words kept for it, if its file has none yet.
+   */
+  begun?: { id: string; keep: string };
+  /**
    * Where the caret goes, at the end: a piece's ID, or BEGIN for the place to begin one. Once for each
    * `asked`: the navigation that asked for it (Today's entry, again).
    */
@@ -51,8 +58,8 @@ export interface Begin {
   /** Over it, as a piece's header is. */
   header: ReactNode;
   /**
-   * Make the piece: its ID, as soon as it's made and before the run has it (the book reloaded after),
-   * so the place knows the piece as its own when it arrives.
+   * Make the piece: its ID, as soon as it's made. The run may have it first (the book reloaded on
+   * the file's arrival, under load): `Run.begun` says which it is meanwhile.
    */
   make(): Promise<string>;
   /**
@@ -88,8 +95,28 @@ interface Props {
 export function RunPieces({ run, workspace, label, tools, onFocus, piece: noun }: Props) {
   const [shown, setShown] = useState(BATCH);
   const [want, setWant] = useState<{ key: string; at: "start" | "end" }>();
-  // The piece made in the place to begin one: it keeps the place's key, so React keeps its editor.
-  const [begun, setBegun] = useState<string>();
+  // The piece made in the place to begin one: it keeps the place's key, so React keeps its editor
+  // and what's typed in it. Known from make()'s answer, or from the run (`begun`) once the place
+  // starts making it: the book can reload with the piece before make() answers, and a piece the
+  // place doesn't know as its own would be another editor, without the words not yet reported.
+  // Each place's piece being made or made, by where the place keeps its words (Begin.keep): the
+  // next day's place isn't the last one's, and the last one's piece still finds its words.
+  const [made, setMade] = useState<ReadonlyMap<string, string | undefined>>(() => new Map());
+  // The place shown, or the one its piece took the place of (a run that doesn't say which: the last).
+  const lastPlace = useRef<string | undefined>(undefined);
+  if (run.begin) lastPlace.current = run.begin.keep;
+  const placeKeep = run.begin?.keep ?? run.begun?.keep ?? lastPlace.current;
+  const making = placeKeep !== undefined && made.has(placeKeep);
+  const begun = making ? (made.get(placeKeep!) ?? (run.begun?.keep === placeKeep ? run.begun.id : undefined)) : undefined;
+  /** Where the words were kept for a piece made in a place that went before they reached its file. */
+  const keptFor = (piece: Piece) => [...made].find(([, id]) => id === piece.id)?.[0] ?? (run.begun?.id === piece.id ? run.begun.keep : undefined);
+  const remember = (keep: string, id: string | undefined, gone = false) =>
+    setMade((m) => {
+      const next = new Map(m);
+      if (gone) next.delete(keep);
+      else next.set(keep, id);
+      return next;
+    });
   const active = useRef<string | undefined>(undefined);
   const end = useRef<HTMLDivElement>(null);
   const notify = useNotice((s) => s.show);
@@ -145,10 +172,13 @@ export function RunPieces({ run, workspace, label, tools, onFocus, piece: noun }
     <>
       <ol aria-label={run.heading} className="grid gap-10">
         {items.slice(0, shown).map(({ key, piece }) => (
-          <li key={key}>
+          // Each day's place its own: React would give the next day's the component, and the state,
+          // of the piece the last one made.
+          <li key={key === BEGIN ? `${BEGIN}:${placeKeep ?? ""}` : key}>
             <RunPiece
               piece={piece}
               began={key === BEGIN}
+              {...(piece && key !== BEGIN && keptFor(piece) ? { adopt: keptFor(piece) } : {})}
               run={run}
               workspace={workspace}
               label={piece ? label(piece) : (run.begin?.label ?? "")}
@@ -160,8 +190,12 @@ export function RunPieces({ run, workspace, label, tools, onFocus, piece: noun }
                 onFocus(editor, piece);
               }}
               onStep={(by) => step(by, key)}
-              onMade={setBegun}
-              onFailed={(e) => notify({ message: `Couldn't start the ${noun}: ${e instanceof Error ? e.message : String(e)}. Your words are kept here: type on to try again.` })}
+              onMaking={(keep) => remember(keep, undefined)}
+              onMade={(keep, id) => remember(keep, id)}
+              onFailed={(keep, e) => {
+                remember(keep, undefined, true);
+                notify({ message: `Couldn't start the ${noun}: ${e instanceof Error ? e.message : String(e)}. Your words are kept here: type on to try again.` });
+              }}
             />
           </li>
         ))}
@@ -180,6 +214,8 @@ interface PieceProps {
   piece: Piece | undefined;
   /** It's the place to begin a piece, or the piece made there. */
   began: boolean;
+  /** Made in a place that went before its words reached the piece's file: where they're kept. */
+  adopt?: string;
   run: Run;
   workspace: Workspace;
   label: string;
@@ -190,15 +226,17 @@ interface PieceProps {
   onFocus: (editor: Editor) => void;
   /** Off the end or the start of the text by arrow: on to the next piece or back to the one before. */
   onStep: (by: 1 | -1) => boolean;
-  onMade: (id: string) => void;
-  onFailed: (e: unknown) => void;
+  /** The place to begin a piece, which keeps its words at `keep`, has started making it. */
+  onMaking: (keep: string) => void;
+  onMade: (keep: string, id: string) => void;
+  onFailed: (keep: string, e: unknown) => void;
 }
 
 /**
  * One piece of a run: its header, then its text, as a preview until it comes near the screen and as
  * an editor from then on. Or the place to begin one, whose editor becomes the piece's once it's made.
  */
-function RunPiece({ piece, began, run, workspace, label, tools, want, onWanted, onFocus, onStep, onMade, onFailed }: PieceProps) {
+function RunPiece({ piece, began, adopt, run, workspace, label, tools, want, onWanted, onFocus, onStep, onMaking, onMade, onFailed }: PieceProps) {
   const at = useRef<HTMLElement>(null);
   const [near, setNear] = useState(false);
   const [editor, setEditor] = useState<Editor>();
@@ -208,13 +246,16 @@ function RunPiece({ piece, began, run, workspace, label, tools, want, onWanted, 
   const writing = !run.reading && (near || want !== undefined || began);
   // In the place to begin a piece: the text last reported, which is the editor's until its piece's
   // file is open and has it (bound); and whether the piece is being made.
-  const [kept] = useState(() => (began && !piece && run.begin ? stored(run.begin.keep) : undefined));
+  // Or a piece made in a place that went first (the next day came, the page was left): the words
+  // kept for it go into its file, if it has none yet, as the place's would have.
+  const [kept] = useState(() => (began && !piece && run.begin ? stored(run.begin.keep) : adopt ? stored(adopt) : undefined));
+  const adopting = !began && kept !== undefined;
   const typed = useRef(kept ?? "");
   const making = useRef(false);
-  const [bound, setBound] = useState(!began);
+  const [bound, setBound] = useState(!began && !adopting);
   // The same, at once: words reported between binding and the render after it go to the file.
-  const boundNow = useRef(!began);
-  const keep = useRef(run.begin?.keep);
+  const boundNow = useRef(!began && !adopting);
+  const keep = useRef(adopting ? adopt : run.begin?.keep);
   // Its editor keeps the place's name once its piece is made: changing the text box under the writer
   // (its attributes) restarts Android's keyboard mid-word.
   const [placeName] = useState(label);
@@ -241,8 +282,11 @@ function RunPiece({ piece, began, run, workspace, label, tools, want, onWanted, 
     void workspace.open([path]).then(() => {
       if (gone) return;
       const f = workspace.store.getState().files[path];
-      if (f && f.body !== typed.current) workspace.change(path, typed.current);
-      if (keep.current) store(keep.current, undefined);
+      // Taken in only where nothing's been written yet: never over words from elsewhere, and
+      // kept where they are if the file has others.
+      const take = !adopting || !f || f.body.trim() === "";
+      if (f && f.body !== typed.current && take) workspace.change(path, typed.current);
+      if (keep.current && (take || f?.body.includes(typed.current.trim()))) store(keep.current, undefined);
       boundNow.current = true;
       setBound(true);
     });
@@ -281,10 +325,15 @@ function RunPiece({ piece, began, run, workspace, label, tools, want, onWanted, 
   const make = () => {
     if (path || making.current || !run.begin) return;
     making.current = true;
-    run.begin.make().then(onMade, (e: unknown) => {
-      making.current = false;
-      onFailed(e);
-    });
+    const at = run.begin.keep;
+    onMaking(at);
+    run.begin.make().then(
+      (id) => onMade(at, id),
+      (e: unknown) => {
+        making.current = false;
+        onFailed(at, e);
+      },
+    );
   };
   const onChange = (md: string) => {
     typed.current = md;
@@ -301,7 +350,7 @@ function RunPiece({ piece, began, run, workspace, label, tools, want, onWanted, 
   }, [editor, path]); // eslint-disable-line react-hooks/exhaustive-deps
   // Words kept from before a reload or a crash: the piece is made for them at once.
   useEffect(() => {
-    if (kept) make();
+    if (kept && !adopting) make();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Arrow keys off the text's last line go on to the next piece, off its first back to the one

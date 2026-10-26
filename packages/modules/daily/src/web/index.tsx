@@ -18,5 +18,7 @@ export const dailyWeb: WebModule = {
     { path: "read", label: DAY_BY_DAY, icon: BookOpenText, group: "Plan", render: (view) => <ReadPage {...view} /> },
   ],
   shelfActions: [{ label: "Today's entry", path: "today", command: "daily.today" }],
-  commands: ({ novelId, navigate }) => [{ id: "daily.today", title: "Today's entry", group: "Write", keywords: ["today", "daily", "journal", "new entry"], run: () => navigate(`/novels/${novelId}/today`) }],
+  // Straight to the journal page, not by /today: on the page already, a redirect would make it
+  // afresh, and the place's first words, typed as the palette closed, went with the one before.
+  commands: ({ novelId, navigate }) => [{ id: "daily.today", title: "Today's entry", group: "Write", keywords: ["today", "daily", "journal", "new entry"], run: () => navigate(`/novels/${novelId}/read`) }],
 };

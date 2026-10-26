@@ -54,3 +54,32 @@ describe("palette ranking", async () => {
     expect(score("Sync now")("")).toBe(1);
   });
 });
+
+describe("the palette", async () => {
+  const { CommandPalette, useOverlay } = await import("../src/palette.tsx");
+  const { act, fireEvent, screen } = await import("@testing-library/react");
+
+  // What cmdk asks of a browser that jsdom hasn't.
+  globalThis.ResizeObserver ??= class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as unknown as typeof ResizeObserver;
+  Element.prototype.scrollIntoView ??= () => {};
+
+  it("opens empty, with what was typed the time before gone as it closed", async () => {
+    render(
+      <>
+        <Owner commands={[command("a", "Alpha")]} />
+        <CommandPalette />
+      </>,
+    );
+    act(() => useOverlay.getState().set("palette"));
+    const input = await screen.findByRole("combobox");
+    fireEvent.change(input, { target: { value: "alp" } });
+    expect(input).toHaveProperty("value", "alp");
+    act(() => useOverlay.getState().set(undefined));
+    act(() => useOverlay.getState().set("palette"));
+    expect(await screen.findByRole("combobox")).toHaveProperty("value", "");
+  });
+});
