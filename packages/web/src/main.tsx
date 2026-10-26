@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter, Route, Routes } from "react-router";
 import { HistoryKeeper } from "./history.tsx";
 import { AboutDialog } from "./about.tsx";
+import { DictationSettingsDialog } from "./dictation/dictation-settings.tsx";
 import { queryClient } from "./api.ts";
 import { AppContextMenu } from "./context-menu.tsx";
 import { DesktopBridge } from "./desktop-bridge.tsx";
@@ -66,6 +67,7 @@ void ready.then(() =>
             <PublishDialog />
             <AboutDialog />
             <IdentityDialog />
+            <DictationSettingsDialog />
             <FirstRunIdentity />
             <DesktopBridge />
             <ErrorBoundary what="this page">

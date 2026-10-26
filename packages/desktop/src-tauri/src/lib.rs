@@ -617,7 +617,9 @@ pub fn run() {
             dictation::dictation_download,
             dictation::dictation_cancel_download,
             dictation::dictation_remove_model,
-            dictation::dictation_offered
+            dictation::dictation_offered,
+            dictation::dictation_settings,
+            dictation::dictation_save_settings
         ])
         .on_menu_event(|app, event| on_menu(app, event.id().as_ref()))
         .setup(|app| {

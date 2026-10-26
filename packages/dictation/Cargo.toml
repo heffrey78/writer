@@ -24,8 +24,17 @@ tar = "0.4"
 bzip2 = "0.4"
 cpal = { version = "0.18", optional = true }
 
+# On Linux, PulseAudio's protocol where a server runs (PipeWire's or PulseAudio's; ALSA otherwise):
+# it names the microphones and lists them without opening one. Its client is Rust, linking nothing.
+[target.'cfg(target_os = "linux")'.dependencies]
+cpal = { version = "0.18", optional = true, features = ["pulseaudio"] }
+
 [dev-dependencies]
 hound = "3.5"
 serde_json = "1"
 proptest = { version = "1", default-features = false, features = ["std"] }
 tempfile = "3"
+
+[[example]]
+name = "microphones"
+required-features = ["mic"]

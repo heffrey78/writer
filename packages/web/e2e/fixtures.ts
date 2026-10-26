@@ -83,8 +83,24 @@ export async function asDesktop(page: Page, shell: Shell = {}) {
           if (command === "clipboard_text") return Promise.resolve(s.clipboard ?? null);
           if (command === "can_inspect") return Promise.resolve(s.inspect ?? false);
           if (command === "dictation_available") return Promise.resolve(s.dictation ?? false);
-          const w = window as unknown as { __hear?: (e: unknown) => void; __lastPhrase?: string; __model?: string };
+          const w = window as unknown as { __hear?: (e: unknown) => void; __lastPhrase?: string; __model?: string; __dictationSettings?: unknown };
           w.__model ??= s.model ?? "ready";
+          // Its settings (#80): two recognizers, for the choice, and a microphone that's Bluetooth.
+          w.__dictationSettings ??= { recognizer: null, microphone: null, silenceSeconds: 60, announce: false };
+          if (command === "dictation_settings")
+            return Promise.resolve({
+              settings: w.__dictationSettings,
+              recognizers: [
+                { id: "writer", words: "On this computer, with Writer's speech model" },
+                { id: "system", words: "On this computer, by the system" },
+              ],
+              microphones: [
+                { id: "pulseaudio:alsa_input.pci", name: "Built-in Audio Analog Stereo", bluetooth: false },
+                { id: "pulseaudio:bluez_input.4C", name: "Bose NC 700", bluetooth: true },
+              ],
+            });
+          if (command === "dictation_save_settings") w.__dictationSettings = (args as { settings: unknown }).settings;
+          if (command === "dictation_remove_model") w.__model = "missing";
           if (command === "dictation_model") return Promise.resolve({ state: w.__model, installedBytes: 208_048_243, downloadBytes: w.__model === "ready" ? 0 : 419_093_000 });
           if (command === "dictation_download") {
             const progress = (args as { progress: Channel }).progress;

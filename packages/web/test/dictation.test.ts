@@ -16,6 +16,8 @@ const shell = {
   /** The speech model, and how its download goes: whole, or cancelled partway. */
   model: "ready" as "ready" | "missing",
   download: "whole" as "whole" | "cancelled",
+  /** Dictation's settings as the shell keeps them (#80). */
+  settings: { recognizer: null, microphone: null, silenceSeconds: 60, announce: false } as import("../src/desktop.ts").DictationSettings,
 };
 class Channel<T> {
   onmessage: (message: T) => void = () => {};
@@ -23,11 +25,13 @@ class Channel<T> {
 (window as unknown as { __TAURI__: unknown }).__TAURI__ = {
   core: {
     Channel,
-    invoke: async (command: string, args?: { events?: Channel<DictationEvent>; progress?: Channel<{ done: number; total: number }> }) => {
+    invoke: async (command: string, args?: { events?: Channel<DictationEvent>; progress?: Channel<{ done: number; total: number }>; settings?: typeof shell.settings }) => {
       shell.calls.push(command);
       if (command === "page_ready") return [];
       if (command === "dictation_available") return shell.available;
       if (command === "dictation_model") return { state: shell.model, installedBytes: 208_048_243, downloadBytes: shell.model === "ready" ? 0 : 419_093_000 };
+      if (command === "dictation_settings") return { settings: shell.settings, recognizers: [{ id: "writer", words: "On this computer, with Writer's speech model" }], microphones: [] };
+      if (command === "dictation_save_settings") return void (shell.settings = args!.settings!);
       if (command === "dictation_download") {
         for (const done of [0, 104_773_250, 209_546_500]) args!.progress!.onmessage({ done, total: 419_093_000 });
         if (shell.download === "cancelled") throw "cancelled";
@@ -77,6 +81,7 @@ beforeEach(() => {
   shell.last = "";
   shell.calls = [];
   notice.useNotice.setState({ notice: undefined });
+  dictation.useDictation.setState({ settings: desktop.DEFAULT_DICTATION_SETTINGS, downloadStopped: undefined });
 });
 afterEach(async () => {
   await dictation.stop();
@@ -162,6 +167,39 @@ describe("dictating", () => {
   });
 });
 
+describe("its settings", () => {
+  it("are the shell's, kept by it when changed", async () => {
+    expect(dictation.useDictation.getState().settings).toEqual(desktop.DEFAULT_DICTATION_SETTINGS);
+    await dictation.saveSettings({ silenceSeconds: 120, microphone: { id: "pulseaudio:alsa_input.usb", name: "USB Microphone" } });
+    expect(shell.settings).toEqual({ recognizer: null, microphone: { id: "pulseaudio:alsa_input.usb", name: "USB Microphone" }, silenceSeconds: 120, announce: false });
+    expect(dictation.useDictation.getState().settings.silenceSeconds).toBe(120);
+  });
+
+  it("stop listening after the silence chosen", async () => {
+    await dictation.saveSettings({ silenceSeconds: 30 });
+    const editor = open("Fog.\n");
+    await dictation.start(editor);
+    say({ kind: "settled", text: "then sun" });
+    await vi.advanceTimersByTimeAsync(29_000);
+    expect(dictation.useDictation.getState().state).toBe("listening");
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(dictation.useDictation.getState().state).toBe("off");
+  });
+
+  it("read each settled phrase to a screen reader only when asked to", async () => {
+    const editor = open("Fog.\n");
+    await dictation.start(editor);
+    say({ kind: "settled", text: "then sun" });
+    expect(dictation.useDictation.getState().announcement).toBe("Listening");
+    await dictation.saveSettings({ announce: true });
+    say({ kind: "heard", text: "and rain" });
+    expect(dictation.useDictation.getState().announcement).toBe("Listening");
+    say({ kind: "settled", text: "and rain." });
+    expect(dictation.useDictation.getState().announcement).toBe("and rain.");
+    await dictation.stop();
+  });
+});
+
 describe("leaving", () => {
   it("the page hidden: the words heard so far are written, and what comes after is dropped", async () => {
     const editor = open("Fog.\n");
@@ -232,5 +270,22 @@ describe("the speech model", () => {
     shell.download = "whole";
     shown()!.action!.run();
     await vi.waitFor(() => expect(shown()?.message).toBe("The speech model is in: dictation hears on this computer now."));
+  });
+
+  it("downloaded from the settings: they say how far it is, and nothing else does", async () => {
+    shell.model = "missing";
+    const seen: (number | undefined)[] = [];
+    const unsubscribe = dictation.useDictation.subscribe((s) => seen.push(s.downloading?.done));
+    await dictation.download(undefined, false);
+    unsubscribe();
+    expect(seen).toContain(209_546_500);
+    expect(dictation.useDictation.getState().downloading).toBeUndefined();
+    expect(shown()).toBeUndefined();
+
+    shell.model = "missing";
+    shell.download = "cancelled";
+    await dictation.download(undefined, false);
+    expect(dictation.useDictation.getState().downloadStopped).toBe("Download stopped. What's downloaded so far is kept: download again to go on from there.");
+    expect(shown()).toBeUndefined();
   });
 });

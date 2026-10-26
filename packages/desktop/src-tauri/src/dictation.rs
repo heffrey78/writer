@@ -1,5 +1,6 @@
 //! Dictation in the desktop app (#83, D17): the page's Dictate, heard on this computer by Writer's
-//! speech crate (packages/dictation) through the default microphone. The page's side, and the
+//! speech crate (packages/dictation) through the default microphone, or the one chosen in its
+//! settings (#80, kept in the app's settings.json). The page's side, and the
 //! events between them, are in DEVELOPER.md (*Dictation*). The model is downloaded the first time
 //! the writer wants it, into the app's data folder, from the pinned sources the crate lists, each
 //! checked against its checksum. No audio is kept, and nothing heard leaves the computer.
@@ -11,7 +12,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
-use dictation::mic::{Dictation, Failure, Update};
+use dictation::mic::{self, Chosen, Dictation, Failure, Update};
 use dictation::{model, Error, Event, Listener, Options};
 use serde_json::{json, Value};
 use tauri::ipc::Channel;
@@ -78,7 +79,8 @@ fn start(app: &AppHandle, window: String, language: String, events: Channel<Valu
             Update::Failed(failure) => failed(&failure),
         });
     };
-    match Dictation::start(listener, on) {
+    let chosen = app.state::<crate::Shell>().settings.lock().unwrap().dictation.microphone.clone().map(|m| Chosen { id: m.id, name: m.name });
+    match Dictation::start(listener, chosen, on) {
         Ok(dictation) => {
             *state.running.lock().unwrap() = Some(Running { window, dictation, events });
             set_menu(app, true);
@@ -108,6 +110,7 @@ impl From<Error> for Opened {
 fn failed(failure: &Failure) -> Value {
     match failure {
         Failure::NoMicrophone => json!({ "kind": "failed", "reason": "no-microphone" }),
+        Failure::NotConnected(name) => json!({ "kind": "failed", "reason": "no-microphone", "message": format!("The microphone chosen for dictation, {name}, isn't connected. Connect it, or choose another in Dictation settings.") }),
         Failure::Microphone(e) => json!({ "kind": "failed", "reason": "microphone", "message": format!("Writer couldn't use the microphone ({e}). Check it's plugged in and that the system lets Writer use it, then dictate again.") }),
         Failure::Other(e) => json!({ "kind": "failed", "reason": "other", "message": e }),
     }
@@ -258,6 +261,31 @@ pub fn dictation_remove_model(app: AppHandle) -> Result<(), String> {
         Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(e.to_string()),
         _ => Ok(()),
     }
+}
+
+/// What dictation's settings show (#80): what's kept, the recognizers this app has (one: every one is
+/// on the device, D17), and the microphones connected now, none of them opened.
+#[tauri::command]
+pub async fn dictation_settings(app: AppHandle) -> Value {
+    let settings = app.state::<crate::Shell>().settings.lock().unwrap().dictation.clone();
+    let microphones = tauri::async_runtime::spawn_blocking(mic::microphones).await.unwrap_or_default();
+    json!({
+        "settings": settings,
+        "recognizers": [{ "id": "writer", "words": "On this computer, with Writer's speech model" }],
+        "microphones": microphones.iter().map(|m| json!({ "id": m.id, "name": m.name, "bluetooth": m.bluetooth })).collect::<Vec<_>>(),
+    })
+}
+
+/// Keep dictation's settings, beside the app's others. The next dictation hears with them.
+#[tauri::command]
+pub fn dictation_save_settings(app: AppHandle, settings: crate::settings::Dictation) -> Result<(), String> {
+    let all = {
+        let shell = app.state::<crate::Shell>();
+        let mut kept = shell.settings.lock().unwrap();
+        kept.dictation = settings;
+        kept.clone()
+    };
+    all.save(&app.path().app_config_dir().map_err(|e| e.to_string())?)
 }
 
 /// The window's page offers Dictate (it has an editor), or no longer does: the Edit menu follows.

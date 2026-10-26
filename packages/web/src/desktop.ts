@@ -198,3 +198,46 @@ export function cancelDictationDownload(): void {
 export function offerDictationInMenu(offered: boolean): void {
   void shell?.invoke("dictation_offered", { offered }).catch(() => {});
 }
+
+/** How dictation hears the writer (#80), kept by the shell on this computer, never in a book. */
+export interface DictationSettings {
+  /** The recognizer chosen, where the shell has more than one; null for its first. */
+  recognizer: string | null;
+  /** The microphone chosen, with its name for when it isn't connected; null for the system's default. */
+  microphone: { id: string; name: string } | null;
+  /** Listening stops after this long without a word heard. */
+  silenceSeconds: number;
+  /** Each settled phrase is read out to a screen reader. */
+  announce: boolean;
+}
+
+export const DEFAULT_DICTATION_SETTINGS: DictationSettings = { recognizer: null, microphone: null, silenceSeconds: 60, announce: false };
+
+/** A microphone connected now. Choosing a Bluetooth one switches the headphones into their headset mode while it listens. */
+export interface Microphone {
+  id: string;
+  name: string;
+  bluetooth: boolean;
+}
+
+/** What dictation's settings show: what's kept, the shell's recognizers (each on the device, in its words), and the microphones. */
+export interface DictationSetup {
+  settings: DictationSettings;
+  recognizers: { id: string; words: string }[];
+  microphones: Microphone[];
+}
+
+/** Dictation's settings and what they choose from, where the shell keeps them (null otherwise). */
+export function dictationSettings(): Promise<DictationSetup | null> {
+  return shell ? shell.invoke<DictationSetup>("dictation_settings").catch(() => null) : Promise.resolve(null);
+}
+
+/** Keep dictation's settings: the next dictation hears with them. */
+export function saveDictationSettings(settings: DictationSettings): Promise<void> {
+  return shell ? shell.invoke<void>("dictation_save_settings", { settings }) : Promise.resolve();
+}
+
+/** Remove the speech model from this computer; it can be downloaded again. */
+export function removeDictationModel(): Promise<void> {
+  return shell ? shell.invoke<void>("dictation_remove_model") : Promise.resolve();
+}

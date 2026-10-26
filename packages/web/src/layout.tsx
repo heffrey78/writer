@@ -1,9 +1,11 @@
-import { Check, Command, Ellipsis, Info, Keyboard, PanelRight, UserPen } from "lucide-react";
+import { Check, Command, Ellipsis, Info, Keyboard, Mic, PanelRight, UserPen } from "lucide-react";
 import { DropdownMenu } from "radix-ui";
 import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import { UpdateButton, useAbout } from "./about.tsx";
 import { desktop, useShowLibrary } from "./desktop.ts";
+import { useDictation } from "./dictation/dictation.ts";
+import { useDictationSettings } from "./dictation/dictation-settings.tsx";
 import { AccountItems, useGitHubAttention } from "./github/connect.tsx";
 import { HistoryButtons } from "./history.tsx";
 import { useIdentityDialog } from "./identity.tsx";
@@ -83,6 +85,7 @@ export function Shell({
 function MoreMenu({ items }: { items?: ReactNode }) {
   const pageItems = usePageMenu((s) => s.items);
   const { theme, setTheme } = useTheme();
+  const dictation = useDictation((s) => s.available);
   const { expired, missingScopes } = useGitHubAttention();
   const attention = expired || missingScopes;
   // The menu opens inside the top bar's landmark, not at the end of the page.
@@ -131,6 +134,11 @@ function MoreMenu({ items }: { items?: ReactNode }) {
             <DropdownMenu.Item className={MENU_ITEM} onSelect={() => useIdentityDialog.getState().show()}>
               <UserPen className="size-4" aria-hidden /> Your name and email…
             </DropdownMenu.Item>
+            {dictation && (
+              <DropdownMenu.Item className={MENU_ITEM} onSelect={() => useDictationSettings.getState().set(true)}>
+                <Mic className="size-4" aria-hidden /> Dictation…
+              </DropdownMenu.Item>
+            )}
             <DropdownMenu.Separator className="my-1 h-px bg-rule" />
             {/* The palette, for a hand with no keyboard (a phone's). */}
             <DropdownMenu.Item className={MENU_ITEM} onSelect={() => useOverlay.getState().set("palette")}>

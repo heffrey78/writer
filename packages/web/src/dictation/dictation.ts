@@ -1,7 +1,21 @@
 import type { Editor } from "@tiptap/core";
 import { heardText, offerDictation, settleHeard, showHeard, type DictationOffer } from "@writer/editor";
 import { create } from "zustand";
-import { cancelDictationDownload, dictationAvailable, dictationModel, downloadDictationModel, settleOnQuit, startDictation, stopDictation, type DictationEvent } from "../desktop.ts";
+import {
+  cancelDictationDownload,
+  DEFAULT_DICTATION_SETTINGS,
+  dictationAvailable,
+  dictationModel,
+  dictationSettings,
+  downloadDictationModel,
+  removeDictationModel,
+  saveDictationSettings,
+  settleOnQuit,
+  startDictation,
+  stopDictation,
+  type DictationEvent,
+  type DictationSettings,
+} from "../desktop.ts";
 import { useNotice } from "../novel/notice.tsx";
 
 /*
@@ -21,16 +35,29 @@ interface Dictation {
   editor: Editor | undefined;
   /** The editor that last had the caret: where Dictate from the palette or a button goes. */
   last: Editor | undefined;
-  /** For screen readers: listening, stopped. */
+  /** For screen readers: listening, stopped, and each settled phrase if the writer wants it read. */
   announcement: string;
+  /** As the shell keeps them (#80). */
+  settings: DictationSettings;
+  /** The speech model's download under way, in bytes. */
+  downloading: { done: number; total: number } | undefined;
+  /** Why the last download stopped, for the settings to say. */
+  downloadStopped: string | undefined;
 }
 
-export const useDictation = create<Dictation>(() => ({ available: false, state: "off", editor: undefined, last: undefined, announcement: "" }));
+export const useDictation = create<Dictation>(() => ({
+  available: false,
+  state: "off",
+  editor: undefined,
+  last: undefined,
+  announcement: "",
+  settings: DEFAULT_DICTATION_SETTINGS,
+  downloading: undefined,
+  downloadStopped: undefined,
+}));
 
 /** English first (D17); other languages come with #92. */
 const LANGUAGE = "en";
-/** Listening stops after this long without a word heard. */
-const SILENCE_MS = 60_000;
 /** How long the host has to settle its last phrase once asked to stop. */
 const STOP_MS = 2_000;
 
@@ -47,7 +74,8 @@ const live = (editor: Editor | undefined) => (editor && !editor.isDestroyed ? ed
 
 function quiet(): void {
   clearTimeout(silence);
-  silence = setTimeout(() => void stop(), SILENCE_MS);
+  // Listening stops after the settings' while without a word heard.
+  silence = setTimeout(() => void stop(), get().settings.silenceSeconds * 1000);
 }
 
 function end(announcement = "Dictation stopped"): void {
@@ -97,14 +125,20 @@ async function offerModel(editor: Editor | undefined, why?: string): Promise<voi
   });
 }
 
-/** Download the model, saying how far it is, and offer Dictate once it's in. */
-async function download(editor: Editor | undefined): Promise<void> {
-  const show = useNotice.getState().show;
+/**
+ * Download the model, saying how far it is, and offer Dictate into `editor` once it's in. From the
+ * settings (`notify` false) only they say how it goes, from `downloading` and `downloadStopped`.
+ */
+export async function download(editor: Editor | undefined, notify = true): Promise<void> {
+  if (get().downloading) return;
+  const show = notify ? useNotice.getState().show : () => {};
   const cancel = { label: "Cancel", run: cancelDictationDownload };
   let shown = -1;
+  set({ downloading: { done: 0, total: 0 }, downloadStopped: undefined });
   show({ message: "Downloading the speech model…", action: cancel });
   try {
     await downloadDictationModel((done, total) => {
+      set({ downloading: { done, total } });
       const percent = Math.floor((100 * done) / Math.max(total, 1));
       if (percent === shown) return;
       shown = percent;
@@ -112,9 +146,12 @@ async function download(editor: Editor | undefined): Promise<void> {
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    if (message === "cancelled") return show({ message: "Download stopped. What's downloaded so far is kept: download again to go on from there.", action: { label: "Download", run: () => void download(editor) } });
-    return show({ message: `The speech model didn't download: ${message}`, action: { label: "Try again", run: () => void download(editor) } });
+    const cancelled = message === "cancelled";
+    set({ downloading: undefined, downloadStopped: cancelled ? "Download stopped. What's downloaded so far is kept: download again to go on from there." : `The speech model didn't download: ${message}` });
+    if (cancelled) return show({ message: get().downloadStopped!, action: { label: "Download", run: () => void download(editor) } });
+    return show({ message: get().downloadStopped!, action: { label: "Try again", run: () => void download(editor) } });
   }
+  set({ downloading: undefined });
   show({
     message: "The speech model is in: dictation hears on this computer now.",
     // From the notice back to the text, where the words will go.
@@ -132,8 +169,9 @@ function onEvent(event: DictationEvent): void {
   // The editor's gone without saying so: there's nowhere for the words to go.
   if (!editor) return settleNow();
   quiet();
-  if (event.kind === "heard") showHeard(editor, event.text);
-  else settleHeard(editor, event.text);
+  if (event.kind === "heard") return showHeard(editor, event.text);
+  settleHeard(editor, event.text);
+  if (get().settings.announce) set({ announcement: event.text });
 }
 
 /** Start dictating into `editor`. */
@@ -190,6 +228,19 @@ const offer: DictationOffer = {
   },
 };
 
+/** Keep `changes` to dictation's settings: the next dictation hears with them. */
+export async function saveSettings(changes: Partial<DictationSettings>): Promise<void> {
+  const settings = { ...get().settings, ...changes };
+  set({ settings });
+  await saveDictationSettings(settings);
+}
+
+/** Remove the speech model from this computer, stopping dictation first if it's listening. */
+export async function removeModel(): Promise<void> {
+  if (get().state !== "off") settleNow();
+  await removeDictationModel();
+}
+
 let started: Promise<void> | undefined;
 
 /** Ask the host whether it can hear, once, and offer Dictate in every editor if it can. */
@@ -197,6 +248,7 @@ export function initDictation(): Promise<void> {
   started ??= dictationAvailable().then((available) => {
     set({ available });
     if (!available) return;
+    void dictationSettings().then((setup) => setup && set({ settings: { ...DEFAULT_DICTATION_SETTINGS, ...setup.settings } }));
     offerDictation(offer);
     settleOnQuit(settleNow);
     document.addEventListener("visibilitychange", () => document.visibilityState === "hidden" && settleNow());

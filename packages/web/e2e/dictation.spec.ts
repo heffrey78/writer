@@ -180,3 +180,62 @@ test("the first Dictate on a computer without the speech model offers it, says h
   await page.keyboard.press("Escape");
   await expect(listening(page)).toHaveCount(0);
 });
+
+test("dictation's settings: the speech model downloaded and removed, the microphone, the silence and reading out, all kept by the shell (#80)", async ({ page, app }) => {
+  const dir = app.novelRepo("varn");
+  await open(page, app, dir, "missing");
+  const dialog = page.getByRole("dialog", { name: "Dictation" });
+  await expect(page.getByRole("textbox", { name: "Chapter text" })).toBeVisible();
+  await page.getByRole("banner").getByRole("button", { name: "More" }).click();
+  await page.getByRole("menuitem", { name: "Dictation…" }).click();
+  await expect(dialog).toContainText("What you say is heard on this computer, by Writer itself, and never leaves it.");
+  await expect(dialog.getByRole("radio", { name: "On this computer, with Writer's speech model" })).toBeChecked();
+  await expect(dialog).toContainText("419 MB to download, 208 MB once it's in");
+  await expect(dialog).toContainText("If the system's choice is Bluetooth headphones, they switch to headset mode while you dictate");
+  for (const colorScheme of ["light", "dark"] as const) {
+    await page.emulateMedia({ colorScheme });
+    await axe(page);
+  }
+
+  // The download, said in the settings rather than a notice.
+  await dialog.getByRole("button", { name: "Download it" }).click();
+  await expect(dialog.getByRole("button", { name: "Cancel download" })).toBeVisible();
+  await expect(dialog).toContainText("Writer's speech model for English is on this computer: 208 MB.");
+  await expect(page.getByRole("status").filter({ hasText: "speech model" })).toHaveCount(0);
+
+  const microphone = dialog.getByLabel("Microphone", { exact: true });
+  await expect(microphone).toHaveValue("");
+  await microphone.selectOption({ label: "Bose NC 700 (Bluetooth)" });
+  await expect(dialog).toContainText("This is Bluetooth headphones' microphone. They switch to headset mode while you dictate");
+  await microphone.selectOption({ label: "Built-in Audio Analog Stereo" });
+  await expect(dialog).not.toContainText("headset mode");
+  await dialog.getByLabel("Stop listening after").selectOption({ label: "2 minutes without a word" });
+  await dialog.getByLabel("Read each phrase out to a screen reader as it's written").check();
+  await dialog.getByRole("radio", { name: "On this computer, by the system" }).check();
+  await expect
+    .poll(async () => (await calls(page, "dictation_save_settings")).at(-1))
+    .toEqual({ settings: { recognizer: "system", microphone: { id: "pulseaudio:alsa_input.pci", name: "Built-in Audio Analog Stereo" }, silenceSeconds: 120, announce: true } });
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  for (const colorScheme of ["light", "dark"] as const) {
+    await page.emulateMedia({ colorScheme });
+    await axe(page);
+  }
+
+  // Removing the model asks first.
+  await dialog.getByRole("button", { name: "Remove from this computer" }).click();
+  const confirm = page.getByRole("alertdialog", { name: "Remove the speech model?" });
+  await expect(confirm).toContainText("It frees 208 MB.");
+  await confirm.getByRole("button", { name: "Remove it" }).click();
+  await expect(dialog).toContainText("isn't on this computer yet");
+  await dialog.getByRole("button", { name: "Done" }).click();
+  await expect(dialog).toHaveCount(0);
+
+  // From the palette, as they were left.
+  await palette(page, "dictation settings");
+  await expect(dialog.getByLabel("Stop listening after")).toHaveValue("120");
+  await expect(dialog.getByLabel("Microphone", { exact: true })).toHaveValue("pulseaudio:alsa_input.pci");
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+});

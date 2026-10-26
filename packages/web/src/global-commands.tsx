@@ -8,6 +8,8 @@ import { useOpenNovel, useShowLibrary } from "./desktop.ts";
 import { APP_KEYS, useOverlay } from "./palette.tsx";
 import { useTheme, type ThemeChoice } from "./theme.ts";
 import { onAndroid } from "./platform.ts";
+import { useDictation } from "./dictation/dictation.ts";
+import { useDictationSettings } from "./dictation/dictation-settings.tsx";
 
 /** Commands available everywhere: the library, each novel, the theme, the shortcut reference. */
 export function GlobalCommands() {
@@ -18,6 +20,7 @@ export function GlobalCommands() {
   const novels = library.data?.novels ?? [];
   const github = useGitHub();
   const signedIn = github.data?.signedIn ?? false;
+  const dictation = useDictation((s) => s.available);
   useCommands(
     () => [
       { id: "app.library", title: "Go to your books", group: "Go to", run: () => showLibrary() },
@@ -42,9 +45,12 @@ export function GlobalCommands() {
         : { id: "app.github.connect", title: "Connect to GitHub…", group: "App", keywords: ["sign in", "log in", "account"], run: () => useConnect.getState().show() },
       { id: "app.shortcuts", title: "Keyboard shortcuts", group: "App", keys: APP_KEYS[1]!.keys, run: () => useOverlay.getState().set("shortcuts") },
       { id: "app.identity", title: "Your name and email…", group: "App", keywords: ["git", "author", "identity", "signature"], run: () => useIdentityDialog.getState().show() },
+      ...(dictation
+        ? [{ id: "app.dictation", title: "Dictation settings…", group: "App", keywords: ["microphone", "voice", "speech", "model"], run: () => useDictationSettings.getState().set(true) }]
+        : []),
       { id: "app.about", title: "About Writer", group: "App", keywords: ["version", "update", "licence", "license"], run: () => useAbout.getState().set(true) },
     ],
-    [openNovel, showLibrary, novels, signedIn, queryClient],
+    [openNovel, showLibrary, novels, signedIn, queryClient, dictation],
   );
   return null;
 }

@@ -11,6 +11,35 @@ use serde::{Deserialize, Serialize};
 pub struct Settings {
     /// Use the computer's own git instead of the one inside the app.
     pub system_git: bool,
+    pub dictation: Dictation,
+}
+
+/// How dictation hears the writer (#80): kept on this computer, never in a book. The page shows and
+/// changes them (DEVELOPER.md, *Dictation*).
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Dictation {
+    /// The recognizer chosen, where there's more than one; none for the first.
+    pub recognizer: Option<String>,
+    /// The microphone chosen; none for the system's default.
+    pub microphone: Option<Microphone>,
+    /// Listening stops after this long without a word heard.
+    pub silence_seconds: u32,
+    /// Each settled phrase is read out to a screen reader.
+    pub announce: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct Microphone {
+    pub id: String,
+    /// Its name when chosen, for saying it isn't connected.
+    pub name: String,
+}
+
+impl Default for Dictation {
+    fn default() -> Self {
+        Dictation { recognizer: None, microphone: None, silence_seconds: 60, announce: false }
+    }
 }
 
 impl Settings {
@@ -32,16 +61,31 @@ impl Settings {
 
 #[cfg(test)]
 mod tests {
-    use super::Settings;
+    use super::{Dictation, Microphone, Settings};
 
     #[test]
     fn keeps_what_it_saved_and_defaults_otherwise() {
         let dir = std::env::temp_dir().join(format!("writer-settings-{}", std::process::id()));
         assert!(!Settings::load(&dir).system_git);
-        Settings { system_git: true }.save(&dir).unwrap();
+        Settings { system_git: true, ..Settings::default() }.save(&dir).unwrap();
         assert!(Settings::load(&dir).system_git);
+        assert_eq!(Settings::load(&dir).dictation, Dictation::default());
         std::fs::write(dir.join("settings.json"), "not json").unwrap();
         assert!(!Settings::load(&dir).system_git);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn keeps_dictation_settings_beside_the_others() {
+        let dir = std::env::temp_dir().join(format!("writer-dictation-settings-{}", std::process::id()));
+        let dictation = Dictation { microphone: Some(Microphone { id: "pulseaudio:alsa_input.usb".into(), name: "USB Microphone".into() }), silence_seconds: 120, announce: true, ..Dictation::default() };
+        Settings { system_git: true, dictation: dictation.clone() }.save(&dir).unwrap();
+        assert_eq!(Settings::load(&dir).dictation, dictation);
+        // Settings saved before dictation had any keep theirs, and dictation's defaults.
+        std::fs::write(dir.join("settings.json"), r#"{ "systemGit": true }"#).unwrap();
+        let loaded = Settings::load(&dir);
+        assert!(loaded.system_git);
+        assert_eq!(loaded.dictation.silence_seconds, 60);
         std::fs::remove_dir_all(&dir).unwrap();
     }
 }

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-dictation-save-settings"
+description = "Enables the dictation_save_settings command without any pre-configured scope."
+commands.allow = ["dictation_save_settings"]
+
+[[permission]]
+identifier = "deny-dictation-save-settings"
+description = "Denies the dictation_save_settings command without any pre-configured scope."
+commands.deny = ["dictation_save_settings"]
