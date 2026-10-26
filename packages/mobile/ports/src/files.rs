@@ -12,7 +12,7 @@ use std::io::{ErrorKind, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 /// Suffix of the temporary files atomic writes leave behind if the app dies mid-write (files-port/port.ts).
 pub const TEMP_SUFFIX: &str = ".ghw-tmp";
@@ -198,9 +198,31 @@ pub fn watch(root: &str, sink: Sink) -> Result<Watch, Failure> {
         }
     }
     let base = root.clone();
+    let all = Arc::clone(&known);
     let mut watcher = notify::recommended_watcher(move |event: notify::Result<notify::Event>| {
         let Ok(event) = event else { return };
-        let mut known = known.lock().unwrap();
+        // A folder just made is looked through again a moment later, for the files it had by the
+        // time its own watch was in place: one written there in between (an atomic write's rename)
+        // would be missed otherwise. Only those not known yet are told of then.
+        if let EventKind::Create(CreateKind::Folder | CreateKind::Any) = event.kind {
+            for dir in event.paths.iter().filter(|p| p.is_dir()).cloned() {
+                let (known, sink, base) = (Arc::clone(&all), Arc::clone(&sink), base.clone());
+                std::thread::spawn(move || {
+                    std::thread::sleep(Duration::from_millis(250));
+                    let mut known = known.lock().unwrap();
+                    for e in list(&dir.to_string_lossy(), true).unwrap_or_default() {
+                        if e["kind"] != "file" {
+                            continue;
+                        }
+                        let p = rel(&base, &dir.join(e["path"].as_str().unwrap_or("")));
+                        if !skipped(&p) && known.insert(p.clone()) {
+                            sink("add", &p);
+                        }
+                    }
+                });
+            }
+        }
+        let mut known = all.lock().unwrap();
         // A file, or a folder that's new and everything already in it: inotify watches a new folder
         // only once it's seen, so what's written there first would be missed.
         fn appeared(base: &Path, path: &Path, known: &mut HashSet<String>, sink: &Sink) {
@@ -325,7 +347,7 @@ impl Watches {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::{Duration, Instant};
+    use std::time::Instant;
 
     fn text(b: Option<Vec<u8>>) -> Option<String> {
         b.map(|b| String::from_utf8(b).unwrap())
@@ -426,13 +448,6 @@ mod tests {
         let events = Arc::new(Mutex::new(Vec::<String>::new()));
         let seen = Arc::clone(&events);
         let w = watch(&root, Arc::new(move |t: &str, p: &str| seen.lock().unwrap().push(format!("{t} {p}")))).unwrap();
-        write(&format!("{root}/b.md"), b"b").unwrap();
-        write(&format!("{root}/a.md"), b"a2").unwrap();
-        write(&format!("{root}/.git/objects/ab/cd"), b"object").unwrap();
-        remove(&format!("{root}/b.md")).unwrap();
-        // Another app's write in place, then a folder gone with what's in it.
-        std::fs::write(format!("{root}/a.md"), b"a3").unwrap();
-        write(&format!("{root}/gone/c.md"), b"c").unwrap();
         let until = |want: &[&str]| {
             let start = Instant::now();
             loop {
@@ -443,6 +458,16 @@ mod tests {
                 std::thread::sleep(Duration::from_millis(20));
             }
         };
+        write(&format!("{root}/b.md"), b"b").unwrap();
+        // Seen before it's removed: a file gone by the time its arrival is read is told of neither way.
+        until(&["add b.md"]);
+        write(&format!("{root}/a.md"), b"a2").unwrap();
+        write(&format!("{root}/.git/objects/ab/cd"), b"object").unwrap();
+        remove(&format!("{root}/b.md")).unwrap();
+        // Another app's write in place; a file written in a folder as it's made; then that folder
+        // gone with what's in it.
+        std::fs::write(format!("{root}/a.md"), b"a3").unwrap();
+        write(&format!("{root}/gone/c.md"), b"c").unwrap();
         let got = until(&["add b.md", "change a.md", "unlink b.md", "add gone/c.md"]);
         assert!(["add b.md", "change a.md", "unlink b.md", "add gone/c.md"].iter().all(|w| got.iter().any(|g| g == w)), "{got:?}");
         assert!(got.iter().all(|g| !g.contains(".git") && !g.contains(TEMP_SUFFIX)), "{got:?}");
