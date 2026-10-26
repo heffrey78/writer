@@ -98,6 +98,8 @@ jobs:
 
   e2e:
     runs-on: ubuntu-24.04
+    # A run takes half an hour; one that hangs stops here, not at GitHub's six.
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -105,9 +107,33 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      # The browsers, and the Ubuntu packages they need, from the cache: Ubuntu's mirror has taken 47
+      # minutes to hand over the packages. Saved as soon as they're in, whatever the tests do after.
+      - id: browsers
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.cache/ms-playwright
+            ~/apt-debs
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - name: Install Chromium and WebKit
-        run: npx playwright install --with-deps chromium webkit
+        run: |
+          mkdir -p ~/apt-debs
+          # apt installs the packages it has in its archive without downloading them, and keeps
+          # what it downloads there, for the cache.
+          echo 'APT::Keep-Downloaded-Packages "true";' | sudo tee /etc/apt/apt.conf.d/99-keep-debs > /dev/null
+          sudo rm -f /etc/apt/apt.conf.d/docker-clean
+          sudo cp ~/apt-debs/*.deb /var/cache/apt/archives/ 2> /dev/null || true
+          npx playwright install --with-deps chromium webkit
+          cp /var/cache/apt/archives/*.deb ~/apt-debs/ 2> /dev/null || true
         working-directory: packages/editor
+      - if: steps.browsers.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.cache/ms-playwright
+            ~/apt-debs
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - run: npm run test:e2e
       - uses: actions/upload-artifact@v4
         if: failure()
