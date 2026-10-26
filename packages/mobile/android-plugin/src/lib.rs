@@ -1,6 +1,7 @@
 //! Writer's Android plugin (#52). Its Kotlin (android/) seals and opens bytes with an AES key that
 //! lives in Android's keystore and can't leave it, for the GitHub token; opens other sites in the
-//! phone's browser; asks for the microphone, for dictation (#86); and, when the webview loads, keeps the page clear of the system's bars and gives
+//! phone's browser; asks for the microphone, for dictation (#86); adds Writer's actions on selected
+//! text to Android's selection toolbar (#95); and, when the webview loads, keeps the page clear of the system's bars and gives
 //! the page's service worker (packages/web/public/engine-sw.js) the same answers as the page, which
 //! Android's webview otherwise asks the network for.
 
@@ -35,6 +36,19 @@ struct Allowed {
     state: String,
 }
 
+/// One of Writer's actions on selected text, for Android's selection toolbar.
+#[derive(Clone, Deserialize, Serialize)]
+pub struct SelectionAction {
+    pub id: String,
+    pub label: String,
+}
+
+#[derive(Serialize)]
+#[cfg_attr(not(target_os = "android"), allow(dead_code))]
+struct SelectionActions {
+    items: Vec<SelectionAction>,
+}
+
 /// The plugin's Kotlin: the keystore's cipher, as the app's secrets store (secrets.rs there) uses
 /// it, and the phone's browser.
 pub struct Android<R: Runtime>(#[allow(dead_code)] tauri::plugin::PluginHandle<R>);
@@ -65,6 +79,18 @@ impl<R: Runtime> Android<R> {
         return self.0.run_mobile_plugin::<Allowed>("microphone", Ask { ask }).map(|a| a.state).map_err(|e| e.to_string());
         #[cfg(not(target_os = "android"))]
         return Err(format!("No microphone to ask for here (ask: {ask}): it's Android's."));
+    }
+
+    /// The page's actions on selected text (#95), added to Android's own selection toolbar from now
+    /// on; a tap on one is a `writer-selection-action` event in the page, with its id.
+    pub fn selection_actions(&self, items: Vec<SelectionAction>) -> Result<(), String> {
+        #[cfg(target_os = "android")]
+        return self.0.run_mobile_plugin::<()>("selectionActions", SelectionActions { items }).map_err(|e| e.to_string());
+        #[cfg(not(target_os = "android"))]
+        return {
+            let _ = items;
+            Ok(())
+        };
     }
 
     /// `url` opened by the phone (its browser), from a thread of its own: the Kotlin runs on the

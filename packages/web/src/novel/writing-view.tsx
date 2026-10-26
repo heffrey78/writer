@@ -62,6 +62,8 @@ import { chapterTitle } from "./navigation.tsx";
 import { PictureInTextDialog, type PictureRequest } from "./picture-in-text.tsx";
 import { RunPieces, type Run, type RunTools } from "./run.tsx";
 import type { Workspace } from "./workspace.ts";
+import { onAndroid } from "../platform.ts";
+import { useSelectionToolbar } from "../selection-toolbar.ts";
 
 interface Props {
   novelId: string;
@@ -339,6 +341,8 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
     useIssuePanel.setState({ numbers: [], editor: undefined });
     useRaise.getState().open(passage, editor);
   };
+  // On a phone, in Android's selection toolbar (#95).
+  useSelectionToolbar(repo ? [{ id: "raise-issue", label: "Raise an issue…", run: raiseFromSelection }] : []);
   // Footnotes (#58), from the palette as by their keys: a new one where the caret is, or between a note and its place.
   useCommands(
     () =>
@@ -504,6 +508,8 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
       <div
         className="mx-auto grid w-full max-w-[calc(var(--ghw-prose-measure)+3rem)] flex-1 content-start gap-3 px-6 py-6"
         onContextMenu={(e) => {
+          // On a phone, a long-press is Android's: its own toolbar, with Raise an issue… added (#95).
+          if (onAndroid) return;
           // On selected text in the editor, unless something there (the spelling menu) took the click.
           if (!repo || !editor || editor.isDestroyed || e.defaultPrevented || !editor.view.dom.contains(e.target as Node)) return;
           if (!selectedPassage(editor, novel)) return;

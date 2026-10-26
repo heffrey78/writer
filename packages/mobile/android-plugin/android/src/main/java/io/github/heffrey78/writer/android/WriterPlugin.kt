@@ -8,7 +8,10 @@ import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
+import android.view.ActionMode
+import android.view.Menu
 import android.view.View
+import android.view.Window
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
@@ -26,6 +29,7 @@ import app.tauri.annotation.TauriPlugin
 import app.tauri.plugin.Invoke
 import app.tauri.plugin.JSObject
 import app.tauri.plugin.Plugin
+import org.json.JSONObject
 import java.security.KeyStore
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
@@ -41,6 +45,17 @@ class UrlArgs {
 class MicrophoneArgs {
     /** Ask for it, with Android's prompt, if it isn't allowed yet. */
     var ask: Boolean = false
+}
+
+@InvokeArg
+class SelectionItem {
+    lateinit var id: String
+    lateinit var label: String
+}
+
+@InvokeArg
+class SelectionArgs {
+    var items: Array<SelectionItem> = arrayOf()
 }
 
 @InvokeArg
@@ -62,6 +77,46 @@ class WriterPlugin(private val activity: Activity) : Plugin(activity) {
         this.webView = webView
         keepClearOfBars(webView)
         serveTheWorker(webView)
+        addToSelectionToolbar(webView)
+    }
+
+    /** The page's actions on selected text, as it last said (#95). */
+    @Volatile private var selectionItems: List<SelectionItem> = emptyList()
+
+    @Command
+    fun selectionActions(invoke: Invoke) {
+        selectionItems = invoke.parseArgs(SelectionArgs::class.java).items.toList()
+        invoke.resolve()
+    }
+
+    /**
+     * Writer's actions on selected text in Android's own selection toolbar, after its Cut, Copy and
+     * Paste (#95). The page leaves a long-press to Android: a menu of its own took the focus, and the
+     * keyboard with it, and showed beside Android's. Once the webview's toolbar has started, Writer's
+     * items are added to it (the webview remakes only its own items as the selection changes); a tap
+     * is a `writer-selection-action` event in the page, with the item's id.
+     */
+    private fun addToSelectionToolbar(webView: WebView) {
+        val window = activity.window
+        val inner = window.callback
+        window.callback = object : Window.Callback by inner {
+            override fun onActionModeStarted(mode: ActionMode) {
+                inner.onActionModeStarted(mode)
+                if (mode.type != ActionMode.TYPE_FLOATING || selectionItems.isEmpty()) return
+                addItems(mode.menu, webView)
+                mode.invalidate()
+            }
+        }
+    }
+
+    private fun addItems(menu: Menu, webView: WebView) {
+        menu.removeGroup(WRITER_ITEMS)
+        selectionItems.forEachIndexed { i, item ->
+            menu.add(WRITER_ITEMS, FIRST_ITEM + i, LAST_ORDER + i, item.label).setOnMenuItemClickListener {
+                webView.evaluateJavascript("dispatchEvent(new CustomEvent('writer-selection-action', { detail: ${JSONObject.quote(item.id)} }))", null)
+                true
+            }
+        }
     }
 
     /**
@@ -180,5 +235,10 @@ class WriterPlugin(private val activity: Activity) : Plugin(activity) {
         private const val ALIAS = "writer-secrets"
         private const val TRANSFORMATION = "AES/GCM/NoPadding"
         private const val NONCE = 12
+
+        /** Writer's items in the selection toolbar: a group of their own, after Android's. */
+        private const val WRITER_ITEMS = 0x77726974
+        private const val FIRST_ITEM = 0x7772
+        private const val LAST_ORDER = 1000
     }
 }

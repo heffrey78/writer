@@ -115,6 +115,12 @@ impl<R: Runtime> secrets::Cipher for Keystore<R> {
     }
 }
 
+/// Writer's actions on selected text in Android's selection toolbar (#95): the page's list, as it changes.
+#[tauri::command]
+fn selection_actions<R: Runtime>(app: AppHandle<R>, items: Vec<writer_android::SelectionAction>) -> Result<(), String> {
+    app.try_state::<writer_android::Android<R>>().map_or(Ok(()), |android| android.selection_actions(items))
+}
+
 /// The page's commands: the engine's ports, and dictation's where the phone can hear.
 fn handlers() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
     #[cfg(target_os = "android")]
@@ -122,6 +128,7 @@ fn handlers() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
         git,
         listen,
         port,
+        selection_actions,
         dictation::dictation_available,
         dictation::dictate_start,
         dictation::dictate_stop,
@@ -134,7 +141,7 @@ fn handlers() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
         dictation::dictation_save_settings
     ];
     #[cfg(not(target_os = "android"))]
-    return tauri::generate_handler![git, listen, port];
+    return tauri::generate_handler![git, listen, port, selection_actions];
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

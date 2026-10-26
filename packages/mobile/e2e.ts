@@ -28,18 +28,63 @@ const inApp = (command: string, input?: string) => execFileSync(ADB, ["shell", `
 // A phone, or the emulator, is slower than this computer.
 const expect = baseExpect.configure({ timeout: 20_000 });
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/** What Android shows now, outside the webview too: each node's text, description, class and bounds. */
+function androidUi() {
+  const ui = execFileSync(ADB, ["exec-out", "uiautomator", "dump", "/dev/tty"], { encoding: "utf8" });
+  return [...ui.matchAll(/<node [^>]*>/g)].map(([n]) => {
+    const [x1, y1, x2, y2] = (/bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/.exec(n) ?? []).slice(1).map(Number) as [number, number, number, number];
+    const attr = (name: string) => new RegExp(` ${name}="([^"]*)"`).exec(n)?.[1] ?? "";
+    return { text: attr("text"), desc: attr("content-desc"), cls: attr("class"), x1, y1, x2, y2 };
+  });
+}
+
+const tapAt = (n: { x1: number; y1: number; x2: number; y2: number }) => adb("shell", "input", "tap", String((n.x1 + n.x2) >> 1), String((n.y1 + n.y2) >> 1));
+
 /** Tap what Android shows with text matching `text` (its own dialogs, outside the webview), once it's there. */
 async function tapAndroid(text: RegExp) {
   for (let i = 0; i < 40; i++, await sleep(500)) {
-    const ui = execFileSync(ADB, ["exec-out", "uiautomator", "dump", "/dev/tty"], { encoding: "utf8" });
-    const node = [...ui.matchAll(/<node [^>]*>/g)].map((m) => m[0]).find((n) => text.test(/ text="([^"]*)"/.exec(n)?.[1] ?? ""));
-    const bounds = node && /bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/.exec(node);
-    if (bounds) {
-      const [x1, y1, x2, y2] = bounds.slice(1).map(Number) as [number, number, number, number];
-      return void adb("shell", "input", "tap", String((x1 + x2) >> 1), String((y1 + y2) >> 1));
-    }
+    const node = androidUi().find((n) => text.test(n.text));
+    if (node) return void tapAt(node);
   }
   throw new Error(`Android showed nothing matching ${text}.`);
+}
+
+/** Long-press the first `word` in `page`'s element `selector`, at its place on the screen. */
+async function longPress(page: Page, selector: string, word: string) {
+  // Measured once it holds still: the page scrolls as the keyboard comes up.
+  let at = await where(page, selector, word);
+  for (let i = 0; i < 20; i++) {
+    await sleep(250);
+    const now = await where(page, selector, word);
+    const still = now.x === at.x && now.y === at.y;
+    at = now;
+    if (still) break;
+  }
+  const view = androidUi().find((n) => n.cls === "android.webkit.WebView")!;
+  const x = Math.round(view.x1 + at.x * at.dpr);
+  const y = Math.round(view.y1 + at.y * at.dpr);
+  adb("shell", "input", "swipe", String(x), String(y), String(x), String(y), "900");
+}
+
+/** Where the first `word` in `selector` is in the page, and the page's pixel ratio. */
+function where(page: Page, selector: string, word: string) {
+  return page.evaluate(
+    ([selector, word]) => {
+      const el = document.querySelector(selector)!;
+      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+      for (let t = walker.nextNode(); t; t = walker.nextNode()) {
+        const i = t.textContent!.indexOf(word);
+        if (i < 0) continue;
+        const range = document.createRange();
+        range.setStart(t, i);
+        range.setEnd(t, i + word.length);
+        const r = range.getBoundingClientRect();
+        return { x: r.left + r.width / 2, y: r.top + r.height / 2, dpr: devicePixelRatio };
+      }
+      throw new Error(`No “${word}” in ${selector}`);
+    },
+    [selector, word] as const,
+  );
 }
 
 const tmp = mkdtempSync(join(tmpdir(), "writer-mobile-"));
@@ -217,6 +262,26 @@ try {
   const author = execFileSync("git", ["--git-dir", days, "log", "-1", "--format=%an <%ae>", "main"], { encoding: "utf8" }).trim();
   if (author !== "Ada Writer <4242+ada@users.noreply.127.0.0.1>") throw new Error(`The commits are by ${author}.`);
   step("put on GitHub: the entry there");
+
+  // A word selected by long-press: Android's own toolbar, with Writer's Raise an issue… in it (#95),
+  // and the keyboard still up.
+  await (await page.getByRole("textbox", { name: /Write today's entry|Entry text/ }).first()).click();
+  await expect.poll(() => /mInputShown=true/.test(adb("shell", "dumpsys", "input_method")), { timeout: 10_000, message: "the keyboard up" }).toBe(true);
+  await longPress(page, ".ghw-prose", "phone");
+  await expect.poll(() => page.evaluate(() => getSelection()?.toString()), { timeout: 10_000, message: "the word selected" }).toBe("phone");
+  // Android's toolbar is a window of its own: Playwright's driver sees it, uiautomator's dump doesn't.
+  await android!.wait({ text: "Copy" }, { timeout: 10_000 });
+  // No menu of Writer's own over it.
+  await expect(page.getByRole("menu", { name: "Selected text" })).toHaveCount(0);
+  if (!/mInputShown=true/.test(adb("shell", "dumpsys", "input_method"))) throw new Error("The keyboard went away as the word was selected.");
+  // Writer's item after Android's, under More options when the toolbar is full.
+  const raise = { text: "Raise an issue…" };
+  if (!(await android!.wait(raise, { timeout: 2_000 }).then(() => true, () => false))) await android!.tap({ desc: "More options" });
+  await android!.tap(raise);
+  const raising = page.getByRole("complementary", { name: "Raise an issue" });
+  await expect(raising).toBeVisible();
+  await raising.getByRole("button", { name: "Back to the text" }).click();
+  step("a word selected by long-press: Android's toolbar, Raise an issue… in it, the keyboard kept");
 
   // A novel cloned from GitHub, opened; a change made elsewhere, taken by a sync.
   await page.goto("http://tauri.localhost/");
