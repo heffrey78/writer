@@ -25,6 +25,10 @@ export function keepSync(queryClient: QueryClient, novelId: string, status: Sync
 export function syncQuery(queryClient: QueryClient, novelId: string) {
   return {
     queryKey: keys.sync(novelId),
-    queryFn: async () => newerSync(queryClient.getQueryData<SyncStatus>(keys.sync(novelId)), await api.sync(novelId)),
+    queryFn: async () => {
+      const next = await api.sync(novelId);
+      // What's kept once the answer is in: the event stream's may have come while it was asked.
+      return newerSync(queryClient.getQueryData<SyncStatus>(keys.sync(novelId)), next);
+    },
   };
 }
