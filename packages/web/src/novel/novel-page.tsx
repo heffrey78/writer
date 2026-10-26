@@ -37,6 +37,7 @@ import { chapterTitle } from "./navigation.tsx";
 import { NoticeBar } from "./notice.tsx";
 import { OutlinePage } from "./outline-page.tsx";
 import { SaveStatus } from "./save-status.tsx";
+import { keepSync, syncQuery } from "./sync-status.ts";
 import { useSpell } from "./spell.ts";
 import { usePublish } from "../github/publish.tsx";
 import { SyncBadge } from "./sync-badge.tsx";
@@ -67,7 +68,7 @@ export function NovelPage() {
   const queryClient = useQueryClient();
   const novel = useQuery({ queryKey: keys.novel(novelId), queryFn: () => api.novel<Book>(novelId) });
   // Asked for once the book is in: they'd slow the request the text is waiting for (a first launch).
-  const sync = useQuery({ queryKey: keys.sync(novelId), queryFn: () => api.sync(novelId), enabled: novel.isSuccess });
+  const sync = useQuery({ ...syncQuery(queryClient, novelId), enabled: novel.isSuccess });
   const library = useQuery({ queryKey: keys.library, queryFn: api.library, staleTime: 30_000 });
   const folder = library.data?.novels.find((n) => n.id === novelId)?.path;
   const [workspace, setWorkspace] = useState<Workspace>();
@@ -145,7 +146,7 @@ export function NovelPage() {
         reload.current = setTimeout(() => void queryClient.invalidateQueries({ queryKey: keys.novel(novelId) }), 300);
       });
     },
-    sync: (status) => queryClient.setQueryData(keys.sync(novelId), status),
+    sync: (status) => keepSync(queryClient, novelId, status),
     issues: () => void queryClient.invalidateQueries({ queryKey: keys.issues(novelId) }),
     module: (module) => void queryClient.invalidateQueries({ queryKey: keys.module(novelId, module) }),
   });
@@ -155,7 +156,7 @@ export function NovelPage() {
       await workspace?.autosave.flush();
       return api.syncNow(novelId);
     },
-    onSuccess: (status: SyncStatus) => queryClient.setQueryData(keys.sync(novelId), status),
+    onSuccess: (status: SyncStatus) => keepSync(queryClient, novelId, status),
   });
 
   const navigate = useNavigate();

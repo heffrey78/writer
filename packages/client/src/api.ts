@@ -149,6 +149,9 @@ export interface SyncStatus {
   commit: CommitStatus;
   /** The GitHub repository the novel syncs with; null (or absent from an older server) when it isn't on GitHub. */
   github?: GitHubRepo | null;
+  /** Changes to the status before it was read, counted from `run`: of two statuses from one run, the higher is newer (#93). Absent from an older server. */
+  revision?: number;
+  run?: string;
 }
 
 /** A repository on GitHub. */

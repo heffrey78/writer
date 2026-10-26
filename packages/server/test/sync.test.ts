@@ -311,7 +311,7 @@ describe("through the server", () => {
     const headers = { cookie: `${sessionCookie(server.port)}=t`, origin: `http://127.0.0.1:${server.port}` };
     try {
       const r = await send(server.port, `/api/novels/${novel.id}/sync`, { method: "POST", headers });
-      expect(JSON.parse(r.body)).toEqual({ state: "off", commit: { state: "off" }, github: null });
+      expect(JSON.parse(r.body)).toEqual({ state: "off", commit: { state: "off" }, github: null, revision: 0, run: expect.any(String) });
     } finally {
       await server.close();
     }

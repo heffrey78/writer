@@ -26,6 +26,13 @@ export type NovelSyncStatus = (SyncStatus | { state: "off" }) & {
   commit: CommitStatus | { state: "off" };
   /** The GitHub repository the novel syncs with, or null when it isn't on GitHub. */
   github: GitHubRepo | null;
+  /**
+   * Changes to the sync and commit status before this one was read, counted from `run` (this
+   * workspace, as opened). A status is read over several git calls, so an older read can answer after
+   * a newer one: the page keeps the status with the higher count (#93).
+   */
+  revision: number;
+  run: string;
 };
 
 export interface WorkspaceOptions {
@@ -76,6 +83,9 @@ export class NovelWorkspace {
   #exclusive?: Promise<unknown>;
 
   #github: GitHub | undefined;
+  /** Changes to the sync or commit status so far, and which opening of the workspace they're counted from. */
+  #syncRevision = 0;
+  readonly #run = crypto.randomUUID();
   /** Pictures the prose stopped naming, their files deleted: kept so a save that names one again (an Undo) brings it back. */
   #dropped = new Map<string, { full: string; bytes: Uint8Array }>();
 
@@ -102,6 +112,9 @@ export class NovelWorkspace {
             exclusive: (fn) => this.exclusive(fn),
             ...(github ? { auth: (url: string) => github.gitAuth(url), onAuthRefused: () => void github.recheck(), signInRefused: (url: string) => github.refused(url) } : {}),
           });
+    // Counted before anyone listening reads the status that changed.
+    this.syncer?.onChange(() => this.#syncRevision++);
+    this.committer?.onChange(() => this.#syncRevision++);
     this.checkpoints = new Checkpoints(root, {
       // Checkpoints commit saved work even when background commits are off.
       committer: this.committer ?? new Committer(root),
@@ -148,8 +161,9 @@ export class NovelWorkspace {
   }
 
   async syncStatus(): Promise<NovelSyncStatus> {
+    const revision = this.#syncRevision;
     const [sync, commit, github] = await Promise.all([this.syncer?.status() ?? { state: "off" as const }, this.committer?.status() ?? { state: "off" as const }, this.githubRepo()]);
-    return { ...sync, commit, github };
+    return { ...sync, commit, github, revision, run: this.#run };
   }
 
   /** The GitHub repository the novel's remote (origin, or the one it syncs with) is, if it's on GitHub. */

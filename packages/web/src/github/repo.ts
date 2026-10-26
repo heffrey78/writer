@@ -1,6 +1,6 @@
 import type { GitHubRepo } from "@writer/client";
-import { useQuery } from "@tanstack/react-query";
-import { api, keys } from "../api.ts";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { syncQuery } from "../novel/sync-status.ts";
 
 /**
  * The GitHub repository the novel is on, or null for a local-only novel. GitHub work tracking (issues,
@@ -9,7 +9,7 @@ import { api, keys } from "../api.ts";
  * in the same session.
  */
 export function useGitHubRepo(novelId: string): GitHubRepo | null | undefined {
-  const sync = useQuery({ queryKey: keys.sync(novelId), queryFn: () => api.sync(novelId) });
+  const sync = useQuery(syncQuery(useQueryClient(), novelId));
   // Undefined until the status is known: a page shouldn't send the author away while it loads.
   return sync.data ? (sync.data.github ?? null) : undefined;
 }

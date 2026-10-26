@@ -8,6 +8,7 @@ import { ErrorAlert } from "../ui/alert.tsx";
 import { Button } from "../ui/button.tsx";
 import { Modal } from "../ui/dialog.tsx";
 import { Field } from "../ui/field.tsx";
+import { keepSync } from "../novel/sync-status.ts";
 import { GitHubMark, githubKey, useConnect, useGitHub } from "./connect.tsx";
 
 /** The Put on GitHub dialog, for one novel, opened from its sync badge or its book on the shelf. */
@@ -38,7 +39,7 @@ function Publish({ novel, onClose }: { novel: { id: string; folder: string }; on
   const publish = useMutation({
     mutationFn: () => api.github.publish(novel.id, { name: name.trim(), private: priv, ...(description.trim() ? { description: description.trim() } : {}) }),
     onSuccess: async ({ status }) => {
-      queryClient.setQueryData(keys.sync(novel.id), status);
+      keepSync(queryClient, novel.id, status);
       await queryClient.invalidateQueries({ queryKey: keys.library });
       onClose();
     },
