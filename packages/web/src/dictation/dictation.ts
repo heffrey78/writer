@@ -15,6 +15,7 @@ import {
   startDictation,
   stopDictation,
   type DictationEvent,
+  type DictationModel,
   type DictationSettings,
 } from "../desktop.ts";
 import { useNotice } from "../novel/notice.tsx";
@@ -45,6 +46,8 @@ interface Dictation {
   downloading: { done: number; total: number } | undefined;
   /** Why the last download stopped, for the settings to say. */
   downloadStopped: string | undefined;
+  /** The first Dictate found no model: the dialog offering it, and the editor to dictate into once it's in. */
+  offer: { editor: Editor | undefined; model: DictationModel } | undefined;
 }
 
 export const useDictation = create<Dictation>(() => ({
@@ -56,6 +59,7 @@ export const useDictation = create<Dictation>(() => ({
   settings: DEFAULT_DICTATION_SETTINGS,
   downloading: undefined,
   downloadStopped: undefined,
+  offer: undefined,
 }));
 
 /** English first (D17); other languages come with #92. */
@@ -131,7 +135,7 @@ function askForMicrophone(editor: Editor | undefined, refused: boolean): void {
       label: "Allow the microphone",
       run: () =>
         void allowMicrophone().then((state) => {
-          if (state === "granted") return live(editor) && void (editor!.commands.focus(null, { scrollIntoView: false }), start(editor!));
+          if (state === "granted") return dictateFrom(editor);
           show({ message: state === "denied" ? REFUSED : "Writer can't dictate without the microphone. Dictate again to be asked again." });
         }),
     },
@@ -139,17 +143,18 @@ function askForMicrophone(editor: Editor | undefined, refused: boolean): void {
   });
 }
 
-/** Say what dictation needs, and offer to download it. */
+/** Say what dictation needs, and offer to download it: a dialog of its own (dictation-settings.tsx), as it's hundreds of megabytes. */
 async function offerModel(editor: Editor | undefined, why?: string): Promise<void> {
   const model = await dictationModel();
-  const show = useNotice.getState().show;
-  if (!model) return show({ message: `Couldn't start dictating: ${why ?? FAILED.model}` });
-  const what = model.state === "damaged" ? `Writer's speech model is damaged on this ${DEVICE} and needs downloading again` : `Dictation hears with Writer's speech model, which isn't on this ${DEVICE} yet`;
-  show({
-    message: `${what}: ${mb(model.downloadBytes)} MB to download, ${mb(model.installedBytes)} MB once it's in. What you say never leaves the ${DEVICE}.`,
-    action: { label: "Download it", run: () => void download(editor) },
-    secondary: { label: "Not now", run: () => {} },
-  });
+  if (!model) return useNotice.getState().show({ message: `Couldn't start dictating: ${why ?? FAILED.model}` });
+  set({ offer: { editor, model }, downloadStopped: undefined });
+}
+
+/** Dictate into `editor`, from somewhere that took the focus (a notice, a dialog): back to the text first. */
+export function dictateFrom(editor: Editor | undefined): void {
+  if (!live(editor)) return;
+  editor!.commands.focus(null, { scrollIntoView: false });
+  void start(editor!);
 }
 
 /**
@@ -182,7 +187,7 @@ export async function download(editor: Editor | undefined, notify = true): Promi
   show({
     message: `The speech model is in: dictation hears on this ${DEVICE} now.`,
     // From the notice back to the text, where the words will go.
-    ...(live(editor) ? { action: { label: "Dictate", run: () => void (editor!.commands.focus(null, { scrollIntoView: false }), start(editor!)) } } : {}),
+    ...(live(editor) ? { action: { label: "Dictate", run: () => dictateFrom(editor) } } : {}),
   });
 }
 

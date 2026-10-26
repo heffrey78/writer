@@ -162,18 +162,27 @@ test("the first Dictate on a computer without the speech model offers it, says h
 
   // From the Edit menu: the shell runs the palette's command in the page.
   await page.evaluate(() => window.writer!.run({ name: "command", arg: "writing.dictate" }));
-  const offer = page.getByRole("status").filter({ hasText: "Writer's speech model, which isn't on this computer yet" });
-  await expect(offer).toContainText("419 MB to download, 208 MB once it's in. What you say never leaves the computer.");
+  // A dialog of its own: hundreds of megabytes to agree to.
+  const offer = page.getByRole("dialog", { name: "Dictation needs its speech model" });
+  await expect(offer).toContainText("Writer hears you with its own speech model, on this computer: what you say never leaves it, and nothing is recorded.");
+  await expect(offer).toContainText("419 MB to download, 208 MB once it's in");
   await expect(listening(page)).toHaveCount(0);
   for (const colorScheme of ["light", "dark"] as const) {
     await page.emulateMedia({ colorScheme });
     await axe(page);
   }
-  await offer.getByRole("button", { name: "Download it" }).click();
-  await expect(page.getByRole("status").filter({ hasText: /Downloading the speech model: \d+% of 419 MB…/ })).toBeVisible();
-  const ready = page.getByRole("status").filter({ hasText: "The speech model is in: dictation hears on this computer now." });
-  await expect(ready).toBeVisible();
+  // At a phone's width, all of it in reach.
+  await page.setViewportSize({ width: 412, height: 915 });
+  await axe(page);
+  await page.evaluate(() => void ((window as unknown as { __holdDownload: () => void }).__holdDownload = () => {}));
+  await offer.getByRole("button", { name: "Download it (419 MB)" }).click();
+  await expect(offer).toContainText("Downloading: 50% of 419 MB…");
+  await expect(offer.getByRole("button", { name: "Cancel download" })).toBeVisible();
+  await page.evaluate(() => (window as unknown as { __holdDownload: () => void }).__holdDownload());
+  const ready = page.getByRole("dialog", { name: "The speech model is in" });
+  await expect(ready).toContainText("Dictation hears on this computer now.");
   await ready.getByRole("button", { name: "Dictate" }).click();
+  await expect(ready).toHaveCount(0);
   await expect(listening(page)).toContainText("Listening…");
   await hear(page, { kind: "settled", text: "the clock was right for once." });
   await expect(text).toContainText("he clock was right for once.");

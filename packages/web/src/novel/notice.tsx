@@ -54,8 +54,10 @@ export function NoticeBar() {
   return (
     <div role="status" aria-live="polite" className="pointer-events-none fixed inset-x-0 bottom-4 z-[70] flex justify-center px-4">
       {notice && (
-        <div className="pointer-events-auto flex items-center gap-3 rounded-lg border border-rule bg-raised py-2 pr-2 pl-4 text-sm shadow-lg">
-          <p>{notice.message}</p>
+        // A long message takes the width, its buttons under it, rather than squeezed into a column beside them (a phone's).
+        <div className="pointer-events-auto flex max-w-2xl flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-rule bg-raised py-2 pr-2 pl-4 text-sm shadow-lg">
+          <p className="min-w-0 flex-[1_1_16rem] py-1">{notice.message}</p>
+          <div className="ml-auto flex items-center gap-1">
           {notice.action && (
             <Button
               size="sm"
@@ -85,6 +87,7 @@ export function NoticeBar() {
           <Button size="sm" variant="ghost" aria-label="Dismiss" onClick={() => show(undefined)}>
             <X className="size-4" aria-hidden />
           </Button>
+          </div>
         </div>
       )}
     </div>

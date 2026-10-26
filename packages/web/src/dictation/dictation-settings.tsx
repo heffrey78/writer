@@ -6,7 +6,7 @@ import { ErrorAlert } from "../ui/alert.tsx";
 import { Button } from "../ui/button.tsx";
 import { Confirm } from "../ui/confirm.tsx";
 import { Modal } from "../ui/dialog.tsx";
-import { DEVICE, download, initDictation, removeModel, saveSettings, useDictation } from "./dictation.ts";
+import { DEVICE, dictateFrom, download, initDictation, removeModel, saveSettings, useDictation } from "./dictation.ts";
 
 /** Whether dictation's settings are open: from the ⋯ menu or the palette, where the shell can hear. */
 export const useDictationSettings = create<{ open: boolean; set: (open: boolean) => void }>((set) => ({ open: false, set: (open) => set({ open }) }));
@@ -34,8 +34,86 @@ export function DictationSettingsDialog() {
   const { open, set } = useDictationSettings();
   // Asked once, app-wide: whether there's anything to set.
   useEffect(() => void initDictation(), []);
-  if (!open) return null;
-  return <DictationSettingsForm onClose={() => set(false)} />;
+  return (
+    <>
+      {open && <DictationSettingsForm onClose={() => set(false)} />}
+      <ModelOffer />
+    </>
+  );
+}
+
+/**
+ * The first Dictate where the speech model isn't there yet: what it is and how big, the download's
+ * progress, then Dictate once it's in. A dialog, not a notice: it's hundreds of megabytes to agree to.
+ */
+function ModelOffer() {
+  const { offer, downloading, downloadStopped } = useDictation();
+  const [model, setModel] = useState<DictationModel>();
+  const [done, setDone] = useState(false);
+  const was = useDictation((s) => !!s.downloading);
+  useEffect(() => {
+    setModel(offer?.model);
+    setDone(false);
+  }, [offer]);
+  // Its state once the download ends: in, or still to finish.
+  useEffect(() => {
+    if (!offer || was) return;
+    void dictationModel().then((m) => {
+      if (!m) return;
+      setModel(m);
+      setDone(m.state === "ready");
+    });
+  }, [was, offer]);
+  if (!offer) return null;
+  const close = () => {
+    if (downloading) cancelDictationDownload();
+    useDictation.setState({ offer: undefined });
+  };
+  const shown = model ?? offer.model;
+  return (
+    <Modal title={done ? "The speech model is in" : "Dictation needs its speech model"} onClose={close}>
+      {done ? (
+        <p className="text-sm">Dictation hears on this {DEVICE} now. What you say never leaves it, and nothing is recorded.</p>
+      ) : (
+        <>
+          <p className="text-sm">
+            Writer hears you with its own speech model, on this {DEVICE}: what you say never leaves it, and nothing is recorded.
+          </p>
+          <div className="rounded-md border border-rule p-3">
+            <ModelState model={shown} downloading={downloading} />
+          </div>
+          {downloadStopped && !downloading && <p className="text-sm text-danger">{downloadStopped}</p>}
+        </>
+      )}
+      <div className="flex flex-wrap justify-end gap-2">
+        {done ? (
+          <>
+            <Button onClick={close}>Close</Button>
+            {offer.editor && !offer.editor.isDestroyed && (
+              <Button
+                variant="primary"
+                onClick={() => {
+                  close();
+                  dictateFrom(offer.editor);
+                }}
+              >
+                Dictate
+              </Button>
+            )}
+          </>
+        ) : downloading ? (
+          <Button onClick={cancelDictationDownload}>Cancel download</Button>
+        ) : (
+          <>
+            <Button onClick={close}>Not now</Button>
+            <Button variant="primary" onClick={() => void download(offer.editor, false)}>
+              {downloadStopped ? "Download again" : `Download it (${mb(shown.downloadBytes)} MB)`}
+            </Button>
+          </>
+        )}
+      </div>
+    </Modal>
+  );
 }
 
 function DictationSettingsForm({ onClose }: { onClose: () => void }) {
@@ -187,7 +265,7 @@ function ModelState({ model, downloading }: { model: DictationModel | undefined;
         <p>
           Downloading: {percent}% of {mb(downloading.total)} MB…
         </p>
-        <progress value={downloading.done} max={Math.max(downloading.total, 1)} aria-label="Speech model downloaded" className="h-2 w-full" />
+        <progress value={downloading.done} max={Math.max(downloading.total, 1)} aria-label="Speech model downloaded" className="h-2 w-full accent-accent" />
       </div>
     );
   }

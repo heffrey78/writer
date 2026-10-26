@@ -89,7 +89,7 @@ beforeEach(() => {
   shell.last = "";
   shell.calls = [];
   notice.useNotice.setState({ notice: undefined });
-  dictation.useDictation.setState({ settings: desktop.DEFAULT_DICTATION_SETTINGS, downloadStopped: undefined });
+  dictation.useDictation.setState({ settings: desktop.DEFAULT_DICTATION_SETTINGS, downloadStopped: undefined, offer: undefined });
 });
 afterEach(async () => {
   await dictation.stop();
@@ -246,38 +246,39 @@ describe("leaving", () => {
 describe("the speech model", () => {
   const shown = () => notice.useNotice.getState().notice;
 
-  it("missing on the first Dictate: offered for download, with its size, then Dictate once it's in", async () => {
+  it("missing on the first Dictate: offered in a dialog of its own, with its size; downloaded, it dictates", async () => {
     shell.model = "missing";
     const editor = open("Fog.\n");
     await dictation.start(editor);
     expect(dictation.useDictation.getState().state).toBe("off");
-    await vi.waitFor(() => expect(shown()?.action?.label).toBe("Download it"));
-    expect(shown()?.message).toBe("Dictation hears with Writer's speech model, which isn't on this computer yet: 419 MB to download, 208 MB once it's in. What you say never leaves the computer.");
-    expect(shown()?.secondary?.label).toBe("Not now");
+    await vi.waitFor(() => expect(dictation.useDictation.getState().offer).toBeDefined());
+    const offer = dictation.useDictation.getState().offer!;
+    expect(offer.editor).toBe(editor);
+    expect(offer.model).toEqual({ state: "missing", installedBytes: 208_048_243, downloadBytes: 419_093_000 });
+    // Not a notice: it's the dialog's to say.
+    expect(shown()).toBeUndefined();
 
-    const messages: string[] = [];
-    const unsubscribe = notice.useNotice.subscribe((s) => s.notice && messages.push(s.notice.message));
-    shown()!.action!.run();
-    await vi.waitFor(() => expect(shown()?.message).toBe("The speech model is in: dictation hears on this computer now."));
+    const seen: (number | undefined)[] = [];
+    const unsubscribe = dictation.useDictation.subscribe((s) => seen.push(s.downloading?.done));
+    await dictation.download(offer.editor, false);
     unsubscribe();
-    expect(messages).toContain("Downloading the speech model: 50% of 419 MB…");
-    expect(messages.filter((m) => m.startsWith("Downloading")).every((m, i, all) => all.indexOf(m) === i)).toBe(true);
-
-    shown()!.action!.run();
+    expect(seen).toContain(209_546_500);
+    expect(shell.model).toBe("ready");
+    dictation.dictateFrom(offer.editor);
     await vi.waitFor(() => expect(dictation.useDictation.getState().state).toBe("listening"));
+    dictation.useDictation.setState({ offer: undefined });
+    await dictation.stop();
   });
 
   it("a download cancelled says what's kept, and goes on from there when asked", async () => {
     shell.model = "missing";
     shell.download = "cancelled";
-    const editor = open("Fog.\n");
-    await dictation.start(editor);
-    await vi.waitFor(() => expect(shown()?.action?.label).toBe("Download it"));
-    shown()!.action!.run();
-    await vi.waitFor(() => expect(shown()?.message).toBe("Download stopped. What's downloaded so far is kept: download again to go on from there."));
+    await dictation.download(undefined, false);
+    expect(dictation.useDictation.getState().downloadStopped).toBe("Download stopped. What's downloaded so far is kept: download again to go on from there.");
     shell.download = "whole";
-    shown()!.action!.run();
-    await vi.waitFor(() => expect(shown()?.message).toBe("The speech model is in: dictation hears on this computer now."));
+    await dictation.download(undefined, false);
+    expect(dictation.useDictation.getState().downloadStopped).toBeUndefined();
+    expect(shell.model).toBe("ready");
   });
 
   it("downloaded from the settings: they say how far it is, and nothing else does", async () => {
