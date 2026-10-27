@@ -14,7 +14,8 @@ import { fakeGitHub } from "../server/test/fake-github.ts";
  * the microphone), puts it on GitHub and syncs; clones a novel, takes a change made elsewhere by
  * syncing, and checks the files on the device and on GitHub.
  *
- * `node packages/mobile/e2e.ts [APK]`, with one device attached (ADB names adb, if not on PATH). The
+ * `node packages/mobile/e2e.ts [APK]`, with one device attached, or the one ANDROID_SERIAL names
+ * (ADB names adb, if not on PATH). The
  * APK is installed and the app's data cleared first. The speech model comes from
  * packages/dictation/models (its fetch-models.sh), pushed once and copied into the app each run.
  */
@@ -125,8 +126,10 @@ const step = (name: string) => {
 };
 
 let android: AndroidDevice | undefined;
+/** The device, as Playwright's driver sees it. */
+const attach = async () => (await _android.devices()).find((d) => !process.env.ANDROID_SERIAL || d.serial() === process.env.ANDROID_SERIAL);
 try {
-  const device = adb("devices").split("\n").slice(1).find((l) => /\tdevice$/.test(l));
+  const device = adb("devices").split("\n").slice(1).find((l) => /\tdevice$/.test(l) && (!process.env.ANDROID_SERIAL || l.startsWith(`${process.env.ANDROID_SERIAL}\t`)));
   if (!device) throw new Error("No Android device: start the emulator, or connect a phone with USB debugging on.");
   // The same port on both sides: the fake's own URLs (a new repository's clone URL) work on the device.
   adb("reverse", `tcp:${port}`, `tcp:${port}`);
@@ -147,7 +150,7 @@ try {
 
   // The app's webview, through Playwright's own adb driver (its CDP connection wants a browser's
   // contexts, which a webview hasn't).
-  [android] = await _android.devices();
+  android = await attach();
   if (!android) throw new Error("Playwright sees no Android device.");
   let page: Page = await (await android.webView({ pkg: PACKAGE }, { timeout: 30_000 })).page();
 
@@ -175,7 +178,7 @@ try {
   // Connected afresh: after the link's cancelled navigation, Playwright's Android driver finds nothing
   // with the old connection's locators, though the page shows it all.
   await android.close();
-  [android] = await _android.devices();
+  android = await attach();
   page = await (await android!.webView({ pkg: PACKAGE }, { timeout: 30_000 })).page();
   const waiting = page.getByRole("dialog", { name: "Connect to GitHub" });
   await expect(waiting.getByLabel("Your code")).toHaveText(fake.userCode);
@@ -203,14 +206,54 @@ try {
   await page.getByRole("dialog", { name: "Command palette" }).getByRole("combobox").fill("today's entry");
   await page.keyboard.press("Enter");
   const text = page.getByRole("textbox", { name: "Write today's entry" });
+  await expect(text).toBeFocused();
+  // The keyboard's voice typing (#85), as Gboard sends it: each phrase one composition, rewritten
+  // whole as more is heard (an earlier word corrected on the way), committed at a sentence's end;
+  // then the last word heard again, composed over where it was. The first words make today's entry,
+  // mid-composition. Replayed with the device's keyboards switched off: a keyboard ends a
+  // composition it didn't start, as its own voice typing's never are.
+  const keyboard = adb("shell", "settings", "get", "secure", "default_input_method").trim();
+  const keyboards = adb("shell", "ime", "list", "-s").trim().split(/\s+/);
+  for (const k of keyboards) adb("shell", "ime", "disable", k);
+  try {
+    const ime = await page.context().newCDPSession(page);
+    const compose = async (text: string) => {
+      await ime.send("Input.imeSetComposition", { text, selectionStart: text.length, selectionEnd: text.length });
+      await sleep(150);
+    };
+    const commit = (text: string) => ime.send("Input.insertText", { text });
+    for (const heard of ["Spoken ", "Spoken to ", "Spoken to a ", "Spoken to the keyboard ", "Spoken to the keyboard every ", "Spoken to the keyboard, every word "]) await compose(heard);
+    // A pause longer than the editor's (300 ms): what's composed so far is reported mid-phrase.
+    await sleep(600);
+    await compose("Spoken to the keyboard, every word.");
+    await commit("Spoken to the keyboard, every word.");
+    for (const heard of [" Kept ", " Kept as ", " Kept as sad"]) await compose(heard);
+    await commit(" Kept as sad");
+    await text.evaluate((el) => {
+      const words = [...el.querySelectorAll("p")].at(-1)!.lastChild!;
+      const at = words.textContent!.lastIndexOf("sad");
+      getSelection()!.setBaseAndExtent(words, at, words, at + 3);
+    });
+    await compose("said");
+    await commit("said.");
+    await ime.detach();
+  } finally {
+    for (const k of keyboards) adb("shell", "ime", "enable", k);
+    adb("shell", "ime", "set", keyboard);
+  }
+  await expect(text).toHaveText("Spoken to the keyboard, every word. Kept as said.");
+  const spoken = () => inApp("grep -rh \"Spoken to\" books/days/entries || true").trim();
+  await expect.poll(spoken).toBe("Spoken to the keyboard, every word. Kept as said.");
+  step("voice typing from the keyboard: today's entry made from the first words, every word kept");
+
   // A tap on today's place, as a person would: the page has put the caret there already, and a click
   // here raises the keyboard only if it moves the focus.
-  await expect(text).toBeFocused();
   await text.evaluate((el) => el.blur());
   await text.click();
   // Typing once Android has the keyboard up.
   await expect.poll(() => /mInputShown=true/.test(adb("shell", "dumpsys", "input_method")), { timeout: 10_000 }).toBe(true);
-  await page.keyboard.type("Written on the phone.");
+  await page.keyboard.press("Control+End");
+  await page.keyboard.type(" Written on the phone.");
   let entry = "";
   for (let i = 0; i < 40 && !entry; i++, await sleep(250)) entry = inApp("grep -rl \"Written on the phone.\" books/days/entries || true").trim();
   if (!entry) throw new Error("The entry wasn't saved in the app's storage.");
