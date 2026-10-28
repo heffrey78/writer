@@ -25,13 +25,18 @@ const listed = (novel: Book, mine?: SidebarFile) => arrangement(true, novel.kind
 const asArranged = ({ groups, hidden }: ReturnType<typeof listed>): Arranged => ({ groups: groups.map((g) => ({ key: g.key, label: g.label, pages: g.places.map((p) => p.key) })), hidden: hidden.map((p) => p.key) });
 const same = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((k, i) => k === b[i]);
 
-/** What's saved: nothing when it's the kind's arrangement; else each group's pages, and those hidden that the kind would show. */
+/**
+ * What's saved: nothing when it's the kind's arrangement; else each group's pages, and those hidden
+ * that the kind would show. A phone's bar, arranged on its own (#100), is kept as it is.
+ */
 function toFile(novel: Book, arranged: Arranged): SidebarFile | null {
   const kinds = asArranged(listed(novel));
-  if (kinds.groups.every((g, i) => same(g.pages, arranged.groups[i]!.pages)) && same([...kinds.hidden].sort(), [...arranged.hidden].sort())) return null;
+  const bar = arrangedBy(novel)?.bar;
+  const kept = bar ? { bar } : {};
+  if (kinds.groups.every((g, i) => same(g.pages, arranged.groups[i]!.pages)) && same([...kinds.hidden].sort(), [...arranged.hidden].sort())) return bar ? kept : null;
   const shownByKind = new Set(kinds.groups.flatMap((g) => g.pages));
   const hidden = arranged.hidden.filter((k) => shownByKind.has(k));
-  return { groups: Object.fromEntries(arranged.groups.map((g) => [g.key, g.pages])), ...(hidden.length ? { hidden } : {}) };
+  return { groups: Object.fromEntries(arranged.groups.map((g) => [g.key, g.pages])), ...(hidden.length ? { hidden } : {}), ...kept };
 }
 
 export function ArrangeSidebar({ novelId, novel, onGitHub, onNewFormat }: { novelId: string; novel: Book; onGitHub: boolean; onNewFormat: (() => void) | undefined }) {

@@ -31,6 +31,10 @@ describe("arranging the sidebar", () => {
     expect(lastCommit(dir)).toBe("Arrange the sidebar");
     expect(gitIn(dir, "status", "--porcelain")).toBe("");
 
+    // A phone's bar beside it (#100).
+    await bible.updateSidebar({ groups: { "look-back": ["issues", "notes"] }, hidden: ["story-map"], bar: ["calendar", "index", "relationships"] });
+    expect(readFileSync(manifest, "utf8")).toBe(`${before}sidebar:\n  groups:\n    look-back:\n      - issues\n      - notes\n  hidden:\n    - story-map\n  bar:\n    - calendar\n    - index\n    - relationships\n`);
+
     await bible.updateSidebar(null);
     expect(readFileSync(manifest, "utf8")).toBe(before);
     expect(lastCommit(dir)).toBe("The sidebar as the book's kind has it");
@@ -47,7 +51,7 @@ describe("arranging the sidebar", () => {
 
   it("refuses what isn't its groups' pages and the pages hidden, by key", async () => {
     const bible = new BibleOperations(bookRepo(fresh("bad"), SAMPLE_JOURNAL), (fn) => fn());
-    for (const sidebar of [{ hidden: "notes" }, { groups: { "look-back": [3] } }, { groups: ["notes"] }, { order: [] }, { hidden: ["Not a key"] }, "notes"]) {
+    for (const sidebar of [{ hidden: "notes" }, { groups: { "look-back": [3] } }, { groups: ["notes"] }, { order: [] }, { hidden: ["Not a key"] }, { bar: "notes" }, "notes"]) {
       await expect(bible.updateSidebar(sidebar as never), JSON.stringify(sidebar)).rejects.toMatchObject({ code: "BAD_REQUEST" });
     }
   });

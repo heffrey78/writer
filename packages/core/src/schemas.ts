@@ -106,7 +106,7 @@ const SIDEBAR_KEY = { type: "string", pattern: "^[a-z][a-z0-9-]*$" };
  */
 function bookSchema(): object {
   const keys = { type: "array", items: SIDEBAR_KEY, uniqueItems: true };
-  const sidebar = { type: "object", properties: { groups: { type: "object", additionalProperties: keys }, hidden: keys }, additionalProperties: false };
+  const sidebar = { type: "object", properties: { groups: { type: "object", additionalProperties: keys }, hidden: keys, bar: keys }, additionalProperties: false };
   return {
     ...novel,
     $id: `${BASE}book.schema.json`,

@@ -200,6 +200,7 @@ export function validateBook(novel: Book): Diagnostic[] {
       list.forEach((p, i) => !pages.has(p) && unknown(p, `/sidebar/groups/${group}/${i}`, "a page"));
     }
     (sidebar.hidden ?? []).forEach((p, i) => !pages.has(p) && unknown(p, `/sidebar/hidden/${i}`, "a page"));
+    (keyList(sidebar.bar) ? sidebar.bar : []).forEach((p, i) => !pages.has(p) && unknown(p, `/sidebar/bar/${i}`, "a page"));
   }
 
   // Diagram layouts: positions for records that no longer exist are harmless, but stale.

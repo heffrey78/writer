@@ -17,6 +17,8 @@ export const novel: BookKind = {
     entity: { label: "Entry", plural: "Entries", article: "an" },
   },
   folders: { content: "manuscript", codex: "bible", notes: "notes" },
+  // On a phone, after the manuscript: its outline, the notes and the story bible.
+  bar: ["outline", "notes", "index"],
   entityTypes: [
     { key: "character", prefix: "char", folder: "characters", label: "Character", color: "1f77b4", builtin: true, is: "person" },
     { key: "location", prefix: "loc", folder: "locations", label: "Location", color: "2ca02c", builtin: true, is: "place" },

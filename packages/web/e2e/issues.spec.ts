@@ -344,7 +344,7 @@ test("open issues sit beside their passages, follow the text, open beside it, an
 });
 
 // The owner's phone (#55): the issue opened at the foot of the chapter, and the sidebar couldn't open.
-test("on a phone, an issue opens over the text; back from it, the sidebar opens from the ⋯ menu", async ({ page, app }) => {
+test("on a phone, an issue opens over the text; back from it, the scene's details open from the bar's More", async ({ page, app }) => {
   await page.setViewportSize({ width: 412, height: 915 });
   const id = await open(page, app);
   await onGitHub(page, app, id);
@@ -368,8 +368,8 @@ test("on a phone, an issue opens over the text; back from it, the sidebar opens 
   await panel.getByRole("button", { name: "Back to the text" }).click();
   await expect(panel).toHaveCount(0);
 
-  await page.getByRole("banner").getByRole("button", { name: /^More/ }).click();
-  await page.getByRole("menuitem", { name: "Show the scene's details" }).click();
+  await page.getByRole("navigation", { name: "Book" }).getByRole("button", { name: "More" }).click();
+  await page.getByRole("dialog", { name: /: more$/ }).getByRole("button", { name: "Details" }).click();
   await expect(page.getByRole("tab", { name: "Scene", selected: true })).toBeVisible();
   await axe(page);
   await page.keyboard.press("Escape");

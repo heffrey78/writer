@@ -1,3 +1,4 @@
+import { useNarrow } from "../narrow.ts";
 import { arrangeSidebar, MANIFEST, vocabulary, type Book, type BookKind, type SidebarFile } from "@writer/core";
 import { BookOpen, CircleDot, Columns2, Goal, ListTree, Map as MapIcon, Network, PanelLeftClose, PanelLeftOpen, PenLine, StickyNote, type LucideIcon } from "lucide-react";
 import { Dialog } from "radix-ui";
@@ -110,18 +111,7 @@ export const arrangedBy = (novel: Book): SidebarFile | undefined => (novel.manif
 
 const SHORTCUT = /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘\\" : "Ctrl+\\";
 
-/** A window too narrow for the sidebar beside the text (a phone, a narrow window): below Tailwind's md. */
-const NARROW = "(max-width: 47.99rem)";
-export function useNarrow(): boolean {
-  const [narrow, setNarrow] = useState(() => window.matchMedia(NARROW).matches);
-  useEffect(() => {
-    const query = window.matchMedia(NARROW);
-    const on = () => setNarrow(query.matches);
-    query.addEventListener("change", on);
-    return () => query.removeEventListener("change", on);
-  }, []);
-  return narrow;
-}
+export { useNarrow } from "../narrow.ts";
 
 /** Collapse or expand with Ctrl+\ (⌘\ on a Mac), anywhere in the novel, and from the palette. */
 function useToggleKey(toggle: () => void, collapsed: boolean) {

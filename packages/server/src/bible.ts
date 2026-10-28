@@ -526,9 +526,9 @@ export class BibleOperations {
       if (sidebar !== null) {
         if (typeof sidebar !== "object" || Array.isArray(sidebar)) throw new OperationError("BAD_REQUEST", "The sidebar is its groups' pages and the pages hidden, by key, or null.");
         const keys = (v: unknown) => Array.isArray(v) && v.every((k) => typeof k === "string" && /^[a-z][a-z0-9-]*$/.test(k));
-        const { groups, hidden, ...rest } = sidebar as Record<string, unknown>;
+        const { groups, hidden, bar, ...rest } = sidebar as Record<string, unknown>;
         const groupsOk = groups === undefined || (typeof groups === "object" && groups !== null && !Array.isArray(groups) && Object.entries(groups).every(([k, v]) => keys([k]) && keys(v)));
-        if (Object.keys(rest).length || !groupsOk || (hidden !== undefined && !keys(hidden))) throw new OperationError("BAD_REQUEST", "The sidebar is its groups' pages and the pages hidden, by key.");
+        if (Object.keys(rest).length || !groupsOk || (hidden !== undefined && !keys(hidden)) || (bar !== undefined && !keys(bar))) throw new OperationError("BAD_REQUEST", "The sidebar is its groups' pages, the pages hidden and a phone's bar, by key.");
       }
       const edit = sidebar === null ? { path: ["sidebar"], remove: true as const } : { path: ["sidebar"], value: sidebar };
       const content = editYaml(await this.#read(novel.manifest), [edit]);

@@ -50,7 +50,7 @@ const keepFocus = (e: MouseEvent) => e.preventDefault();
 /**
  * On a phone, while writing (#96): what's wanted at hand, on top of the keyboard, without leaving the
  * text. Commands (the palette), then `dictate` where the device can hear, Undo, Redo, @ to mention,
- * and the selected text's actions while there's a selection.
+ * and the selected text's actions while there's a selection; and Done, which puts the keyboard away.
  */
 export function WritingBar({ editor, dictate, selection }: { editor: Editor | undefined; dictate?: ReactNode; selection: BarAction[] }) {
   useEditorChanges(editor);
@@ -67,6 +67,10 @@ export function WritingBar({ editor, dictate, selection }: { editor: Editor | un
         selection.map((a) => (
           <BarButton key={a.label} label={a.label} icon={a.icon ?? MessageSquarePlus} onPress={a.run} wide />
         ))}
+      {/* The keyboard put away, and the book's bar back (#100). */}
+      <button type="button" onMouseDown={keepFocus} onClick={() => (document.activeElement as HTMLElement | null)?.blur()} className="ml-auto h-9 shrink-0 rounded-full bg-accent-soft px-3.5 text-sm font-semibold text-accent">
+        Done
+      </button>
     </div>
   );
 }

@@ -66,6 +66,8 @@ import { onAndroid } from "../platform.ts";
 import { useSelectionToolbar } from "../selection-toolbar.ts";
 import { useNarrow } from "./sidebar.tsx";
 import { useTextFocused, WritingBar, type BarAction } from "./writing-bar.tsx";
+import { cn } from "../ui/cn.ts";
+import { useBookBar } from "./bottom-bar.tsx";
 
 interface Props {
   novelId: string;
@@ -214,11 +216,14 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
   };
   useEffect(() => {
     if (wideSidebar) return;
-    usePageMenu.getState().set([
-      { id: "writing.sceneTab", label: `Show the ${w.piece.one}'s details`, run: reveal(() => showTab("scene")) },
-      { id: "writing.notesTab", label: `Show the ${w.piece.one}'s notes`, run: reveal(() => showTab("notes")) },
-      { id: "writing.entryTab", label: `Show the open ${w.entity.one}`, run: reveal(() => showTab("entry")) },
-    ]);
+    usePageMenu.getState().set(
+      [
+        { id: "writing.sceneTab", label: `Show the ${w.piece.one}'s details`, short: "Details", run: reveal(() => showTab("scene")) },
+        { id: "writing.notesTab", label: `Show the ${w.piece.one}'s notes`, short: "Its notes", run: reveal(() => showTab("notes")) },
+        { id: "writing.entryTab", label: `Show the open ${w.entity.one}`, short: `The open ${w.entity.one}`, run: reveal(() => showTab("entry")) },
+      ],
+      `This ${w.piece.one}`,
+    );
     return () => usePageMenu.getState().set([]);
   }, [wideSidebar, showTab, w]);
   useCommands(
@@ -740,15 +745,17 @@ function StatusBar({ novelId, workspace, editor, selection }: { novelId: string;
   const narrow = useNarrow();
   const focused = useTextFocused();
   const writing = narrow && focused;
+  // On a phone, above the book's bar while it's there (#100): it gives way to the keyboard.
+  const above = useBookBar() ? "bottom-[4.75rem]" : "bottom-0";
   if (writing)
     return (
-      <div className="sticky bottom-0 z-10 border-t border-rule bg-paper px-2 py-1 text-[13px] text-muted">
+      <div className={cn("sticky z-10 border-t border-rule bg-paper px-2 py-1 text-[13px] text-muted", above)}>
         <WritingBar editor={editor} dictate={<DictateButton editor={editor} />} selection={selection} />
       </div>
     );
   if (hidden) return null;
   return (
-    <div className="sticky bottom-0 z-10 flex flex-wrap items-baseline justify-end gap-x-4 gap-y-1 border-t border-rule bg-paper px-6 py-1.5 text-[13px] text-muted">
+    <div className={cn("sticky z-10 flex flex-wrap items-baseline justify-end gap-x-4 gap-y-1 border-t border-rule bg-paper px-6 py-1.5 text-[13px] text-muted", above)}>
       <DictateButton editor={editor} />
       <WordCount show={["session"]} label="This session" words={words} />
       <TodayCount novelId={novelId} workspace={workspace} />

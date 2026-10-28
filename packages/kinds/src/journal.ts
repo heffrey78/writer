@@ -63,6 +63,9 @@ export const journal: BookKind = {
     { key: "people-and-places", label: "People and places", pages: ["index", "relationships", "story-map", "progress"] },
   ],
   home: "read",
+  // On a phone, after the journal page: the days, the notes and who and where.
+  bar: ["calendar", "notes", "index"],
+  newestFirst: true,
   fieldOrder: ["when", "people", "places", "events", "entities", "values"],
   issueKinds: [
     { key: "follow-up", label: "Follow up", color: "0075ca", description: "Something to come back to" },

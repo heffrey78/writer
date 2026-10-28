@@ -13,6 +13,7 @@ import { useOverlay } from "./palette.tsx";
 import { useTheme, type ThemeChoice } from "./theme.ts";
 import { cn } from "./ui/cn.ts";
 import { usePageMenu } from "./page-menu.ts";
+import { useNarrow } from "./narrow.ts";
 
 /** The look of an item in the top bar's ⋯ menu, for the items pages add. */
 export const MENU_ITEM = "flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm outline-none data-[highlighted]:bg-accent-soft";
@@ -81,9 +82,13 @@ export function Shell({
   );
 }
 
+const NONE: never[] = [];
+
 /** Everything not needed at every moment: the page's own items, the theme, the account, the shortcuts. */
 function MoreMenu({ items }: { items?: ReactNode }) {
-  const pageItems = usePageMenu((s) => s.items);
+  // On a phone they're on the bottom bar's More sheet instead (#100).
+  const narrow = useNarrow();
+  const pageItems = usePageMenu((s) => (narrow ? NONE : s.items));
   const { theme, setTheme } = useTheme();
   const dictation = useDictation((s) => s.available);
   const { expired, missingScopes } = useGitHubAttention();

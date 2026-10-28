@@ -359,6 +359,24 @@ try {
   await expect(page.getByRole("dialog", { name: "Command palette" })).toHaveCount(0);
   step("writing: the bar on top of the keyboard, Commands from it with the keyboard kept");
 
+  // The book's bar (#100): gone while the keyboard's up, back once Done puts it away; More over the
+  // page, closed by Android's back; a page from the bar.
+  const book = page.getByRole("navigation", { name: "Book" });
+  await expect(book).toHaveCount(0);
+  await bar.getByRole("button", { name: "Done" }).click();
+  await expect.poll(() => /mInputShown=false/.test(adb("shell", "dumpsys", "input_method")), { timeout: 10_000, message: "the keyboard put away" }).toBe(true);
+  await expect(book.getByRole("link")).toHaveText(["Day by day", "Calendar", "Notes", "Index"]);
+  writeFileSync(join(tmp, "..", "book-bar.png"), execFileSync(ADB, ["exec-out", "screencap", "-p"]));
+  await book.getByRole("button", { name: "More" }).click();
+  const more = page.getByRole("dialog", { name: "Days: more" });
+  await expect(more.getByRole("region", { name: "This entry" })).toBeVisible();
+  adb("shell", "input", "keyevent", "KEYCODE_BACK");
+  await expect(more).toHaveCount(0);
+  await book.getByRole("link", { name: "Calendar" }).click();
+  await expect(book.getByRole("link", { name: "Calendar" })).toHaveAttribute("aria-current", "page");
+  await book.getByRole("link", { name: "Day by day" }).click();
+  await expect(page.getByRole("textbox", { name: /Entry text/ }).first()).toBeVisible();
+  step("the book's bar: away for the keyboard, back after Done; More closed by Android's back; a page from it");
 
   // A novel cloned from GitHub, opened; a change made elsewhere, taken by a sync.
   await page.goto("http://tauri.localhost/");
@@ -401,7 +419,8 @@ try {
   if (inApp("grep -rl \"closed the app\" books/days/entries/*/*/*.md || true").trim()) throw new Error("The text was saved before the app was killed: nothing to recover.");
   // Playwright lets go of the killed app's webview before it's asked for the new one's.
   const killed = android;
-  await expect.poll(() => killed.webViews().length).toBe(0);
+  // Writer's: another app's webview (the Google app's search, on the emulator) may be there too.
+  await expect.poll(() => killed.webViews().filter((w) => w.pkg() === PACKAGE).length).toBe(0);
   adb("shell", "monkey", "-p", PACKAGE, "-c", "android.intent.category.LAUNCHER", "1");
   const again: Page = await (await android.webView({ pkg: PACKAGE }, { timeout: 30_000 })).page();
   await expect(await todaysEntry(again)).toContainText("Typed as Android closed the app.");

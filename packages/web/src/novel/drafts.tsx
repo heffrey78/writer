@@ -33,7 +33,8 @@ const dateTime = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeS
 export const useDrafts = create<{ open: boolean; set: (open: boolean) => void }>((set) => ({ open: false, set: (open) => set({ open }) }));
 
 /** The header's button: the version open, which opens Drafts. */
-export function DraftsButton({ novelId, workspace }: { novelId: string; workspace: Workspace }) {
+/** The top bar's Drafts button and its panel; on a phone the panel alone (`button` false), opened from More (#100). */
+export function DraftsButton({ novelId, workspace, button = true }: { novelId: string; workspace: Workspace; button?: boolean }) {
   const w = useWords();
   const { open, set } = useDrafts();
   const versions = useVersions(novelId);
@@ -42,12 +43,14 @@ export function DraftsButton({ novelId, workspace }: { novelId: string; workspac
   useEffect(() => () => set(false), [novelId, set]);
   return (
     <Dialog.Root open={open} onOpenChange={set}>
-      <Dialog.Trigger asChild>
-        <Button variant="ghost" size="sm" aria-label={current ? `Drafts: ${current.name} is open` : "Drafts"}>
-          <Split className="size-4" aria-hidden />
-          <span className="max-w-40 truncate max-sm:sr-only">{current?.name ?? "Drafts"}</span>
-        </Button>
-      </Dialog.Trigger>
+      {button && (
+        <Dialog.Trigger asChild>
+          <Button variant="ghost" size="sm" aria-label={current ? `Drafts: ${current.name} is open` : "Drafts"}>
+            <Split className="size-4" aria-hidden />
+            <span className="max-w-40 truncate max-sm:sr-only">{current?.name ?? "Drafts"}</span>
+          </Button>
+        </Dialog.Trigger>
+      )}
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-40 bg-black/40" />
         <Dialog.Content

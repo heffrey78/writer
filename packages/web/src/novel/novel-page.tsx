@@ -33,6 +33,9 @@ import { AdoptConflicts, useSwitchVersion, useVersions } from "./versions.tsx";
 import { SaveConflicts, SyncConflicts } from "./conflicts.tsx";
 import { useNovelEvents } from "./events.ts";
 import { homeOf, Sidebar, useArrangeSidebar, useSidebar } from "./sidebar.tsx";
+import { ArrangeBar, BottomBar, MoreSheet, useArrangeBar } from "./bottom-bar.tsx";
+import { GoToButton } from "./go-to.tsx";
+import { useNarrow } from "../narrow.ts";
 import { chapterTitle } from "./navigation.tsx";
 import { NoticeBar } from "./notice.tsx";
 import { OutlinePage } from "./outline-page.tsx";
@@ -81,6 +84,8 @@ export function NovelPage() {
   // out, since only the editor turns it off. Back in a chapter or scene, it's on again.
   const focus = useWritingModes((m) => m.focus) && current !== undefined;
   const collapsed = useSidebar((s) => s.collapsed);
+  // A phone (#100): no sidebar, a bar at the bottom, and the page's name a way to go elsewhere.
+  const narrow = useNarrow();
   const spell = useSpell(api, novelId, novel.data?.novel);
 
   // What the entries made in place report with: the latest model and navigation.
@@ -203,6 +208,7 @@ export function NovelPage() {
       // Compiling runs on Node (@writer/export reads its fonts from disk): not where the engine runs in the page.
       ...(engineInPage ? [] : [{ id: "novel.compile", title: `Compile the ${w?.content.one ?? "manuscript"}…`, group: w?.book.One ?? "Novel", keywords: ["export", "docx", "word", "epub", "pdf", "e-book", w?.content.one ?? "manuscript"], run: () => setCompiling(true) }]),
       { id: "novel.arrangeSidebar", title: "Arrange the sidebar…", group: "App", keywords: ["order", "hide", "show", "pages", "views", "menu"], run: () => useArrangeSidebar.getState().set(true) },
+      { id: "novel.arrangeBar", title: "Arrange the bar…", group: "App", keywords: ["phone", "bottom", "order", "pages", "tabs"], run: () => useArrangeBar.getState().set(true) },
       { id: "novel.bible", title: w?.codex.One ?? "Story bible", group: "Go to", run: () => void navigate(`/novels/${novelId}/bible`) },
       { id: "novel.outline", title: "Outline", group: "Go to", keywords: ["table"], run: () => void navigate(`/novels/${novelId}/outline/table`) },
       { id: "novel.outlineCards", title: "Outline: cards", group: "Go to", keywords: ["corkboard", "index cards"], run: () => void navigate(`/novels/${novelId}/outline/cards`) },
@@ -239,12 +245,20 @@ export function NovelPage() {
     [model, conflict, novelId, navigate, repo, versions.data, switchVersion.mutate, newFormat.commands.length, conversions.commands.length],
   );
 
-  const heading = workspace && novel.data && (
-    <>
-      <span className="truncate px-1 font-semibold">{novel.data.novel.config?.title ?? "Untitled"}</span>
-      <DraftsButton novelId={novelId} workspace={workspace} />
-    </>
-  );
+  const heading =
+    workspace &&
+    novel.data &&
+    (narrow && !unreadable(novel.data.novel) ? (
+      <>
+        <GoToButton novelId={novelId} novel={novel.data.novel} onGitHub={!!repo} />
+        <DraftsButton novelId={novelId} workspace={workspace} button={false} />
+      </>
+    ) : (
+      <>
+        <span className="truncate px-1 font-semibold">{novel.data.novel.config?.title ?? "Untitled"}</span>
+        <DraftsButton novelId={novelId} workspace={workspace} />
+      </>
+    ));
   const menu = workspace && (
     <>
       <DropdownMenu.Item className={MENU_ITEM} onSelect={() => useDrafts.getState().set(true)}>
@@ -318,8 +332,8 @@ export function NovelPage() {
             Writer isn't answering. Your unsaved text is kept in this tab; start Writer again and it will be saved.
           </p>
         )}
-        <div className={focus ? "h-full" : cn("grid h-full", collapsed ? "grid-cols-[3.25rem_minmax(0,1fr)]" : "grid-cols-[3.25rem_minmax(0,1fr)] md:grid-cols-[16rem_minmax(0,1fr)]")}>
-          {!focus && (
+        <div className={focus ? "h-full" : narrow ? "h-full pb-24" : cn("grid h-full", collapsed ? "grid-cols-[3.25rem_minmax(0,1fr)]" : "grid-cols-[3.25rem_minmax(0,1fr)] md:grid-cols-[16rem_minmax(0,1fr)]")}>
+          {!focus && !narrow && (
             <Sidebar novelId={novelId} novel={book} workspace={workspace} current={current} onGitHub={!!repo} />
           )}
           <div className="md:overflow-y-auto">
@@ -363,6 +377,9 @@ export function NovelPage() {
         {compiling && <CompileDialog novelId={novelId} novel={book} workspace={workspace} onClose={() => setCompiling(false)} />}
         <SaveConflicts novel={book} workspace={workspace} />
         <ArrangeSidebar novelId={novelId} novel={book} onGitHub={!!repo} onNewFormat={newFormat.commands[0]?.run} />
+        {!focus && <BottomBar novelId={novelId} novel={book} onGitHub={!!repo} />}
+        <MoreSheet novelId={novelId} novel={book} onGitHub={!!repo} />
+        <ArrangeBar novelId={novelId} novel={book} onGitHub={!!repo} />
         <ModuleCommands novelId={novelId} novel={book} workspace={workspace} />
         <NoticeBar />
         <DictationControls />

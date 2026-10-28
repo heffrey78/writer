@@ -10,6 +10,8 @@ export const BASE_PAGES = ["outline", "story-map", "relationships", "notes", "pr
 export interface SidebarFile {
   groups?: Record<string, string[]>;
   hidden?: string[];
+  /** On a phone, the bottom bar's pages after where the book opens (#100), in order. */
+  bar?: string[];
 }
 
 /** A list of keys as book.yaml has it: a book opens with schema errors in it, so anything else is none. */
@@ -35,4 +37,14 @@ export function arrangeSidebar(kind: BookKind, mine?: SidebarFile): { groups: Si
   const groups = layout.map((g, i) => ({ ...g, pages: [...own[i]!, ...g.pages.filter((p) => !placed.has(p) && !hidden.has(p))] }));
   const shown = new Set(groups.flatMap((g) => g.pages));
   return { groups, hidden: [...new Set([...sidebarPages(kind), ...hidden])].filter((p) => !shown.has(p)) };
+}
+
+/**
+ * The pages for a phone's bottom bar after where the book opens (#100), in order of preference: the
+ * writer's (book.yaml's `sidebar.bar`), then the kind's `bar`, then its sidebar's pages as arranged.
+ * The app takes the first three that are there (Issues only on GitHub), leaving out `home`.
+ */
+export function barPages(kind: BookKind, mine?: SidebarFile, home?: string): string[] {
+  const arranged = arrangeSidebar(kind, mine).groups.flatMap((g) => g.pages);
+  return [...new Set([...keys(mine?.bar), ...(kind.bar ?? []), ...arranged])].filter((p) => p !== home);
 }

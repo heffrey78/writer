@@ -206,6 +206,13 @@ export interface BookKind extends Noun {
    * it, or where the page isn't there, a book opens on its first section.
    */
   home?: string;
+  /**
+   * On a phone, the bottom bar's pages after where the book opens (#100), by keys as in `sidebar`:
+   * three, with More after them. Without it, the first pages of its sidebar.
+   */
+  bar?: readonly string[];
+  /** Its pieces are read newest first (a journal's entries): lists of them, to go to one, show them so. */
+  newestFirst?: boolean;
 }
 
 /** The kind of every book in format v2, which has no `kind`. */

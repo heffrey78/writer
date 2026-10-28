@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { arrangeSidebar, kindByKey, memorySource, validate } from "../src/index.ts";
+import { arrangeSidebar, barPages, kindByKey, memorySource, validate } from "../src/index.ts";
 
 /** A writer's arrangement of the sidebar over the kind's (#63), and what the validator says of one. */
 
@@ -64,6 +64,19 @@ const files = (dir: string): Record<string, string> =>
       }),
   );
 
+describe("a phone's bar (#100)", () => {
+  it("is the kind's after where the book opens, then the sidebar's pages in their order", () => {
+    expect(barPages(journal(), undefined, "read").slice(0, 3)).toEqual(["calendar", "notes", "index"]);
+    expect(barPages(kindByKey("novel")).slice(0, 3)).toEqual(["outline", "notes", "index"]);
+    // A kind that names none: its sidebar's first pages.
+    expect(barPages(kindByKey("campaign")).slice(0, 3)).toEqual(["index", "notes", "outline"]);
+  });
+
+  it("is the writer's first, and never where the book opens", () => {
+    expect(barPages(journal(), { bar: ["relationships", "read", "calendar"] }, "read").slice(0, 3)).toEqual(["relationships", "calendar", "notes"]);
+  });
+});
+
 describe("validating the sidebar's arrangement", () => {
   const withSidebar = async (yaml: string) => {
     const book = files(SAMPLE);
@@ -81,6 +94,11 @@ describe("validating the sidebar's arrangement", () => {
       ["W_SIDEBAR_UNKNOWN", "/sidebar/groups/plan/1", "The sidebar names a page “swimlanes”, which a journal doesn't have"],
       ["W_SIDEBAR_UNKNOWN", "/sidebar/hidden/0", "The sidebar names a page “board”, which a journal doesn't have"],
     ]);
+  });
+
+  it("warns of a page in the bar the kind doesn't have, and takes one it has", async () => {
+    expect(await withSidebar("sidebar:\n  bar: [calendar, index, relationships]\n")).toEqual([]);
+    expect((await withSidebar("sidebar:\n  bar: [board]\n")).map((d) => [d.code, d.pointer])).toEqual([["W_SIDEBAR_UNKNOWN", "/sidebar/bar/0"]]);
   });
 
   it("is a schema error when it isn't lists of keys", async () => {

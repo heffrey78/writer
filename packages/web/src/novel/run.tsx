@@ -3,9 +3,12 @@ import { getMarkdown } from "@writer/editor";
 import { SceneEditor, type SceneEditorProps } from "@writer/editor/react";
 import type { Editor } from "@tiptap/core";
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { ArrowDown } from "lucide-react";
 import { useStore } from "zustand";
 import { useCommands } from "../commands.ts";
+import { useNarrow } from "../narrow.ts";
 import { Button } from "../ui/button.tsx";
+import { cn } from "../ui/cn.ts";
 import { useNotice } from "./notice.tsx";
 import type { Workspace } from "./workspace.ts";
 
@@ -94,6 +97,8 @@ interface Props {
 /** The run's pieces, a batch at a time; each piece's editor is made as it comes near the screen. */
 export function RunPieces({ run, workspace, label, tools, onFocus, piece: noun }: Props) {
   const [shown, setShown] = useState(BATCH);
+  const list = useRef<HTMLOListElement>(null);
+  const narrow = useNarrow();
   const [want, setWant] = useState<{ key: string; at: "start" | "end" }>();
   // The piece made in the place to begin one: it keeps the place's key, so React keeps its editor
   // and what's typed in it. Known from make()'s answer, or from the run (`begun`) once the place
@@ -168,13 +173,15 @@ export function RunPieces({ run, workspace, label, tools, onFocus, piece: noun }
   );
 
   if (items.length === 0) return <>{run.empty}</>;
+  // On a phone (#100), the place to begin a piece takes the screen to write in, with the way on to the rest at its foot.
+  const fill = narrow && items[0]?.key === BEGIN;
   return (
     <>
-      <ol aria-label={run.heading} className="grid gap-10">
-        {items.slice(0, shown).map(({ key, piece }) => (
+      <ol ref={list} aria-label={run.heading} className="grid gap-10">
+        {items.slice(0, shown).map(({ key, piece }, i) => (
           // Each day's place its own: React would give the next day's the component, and the state,
           // of the piece the last one made.
-          <li key={key === BEGIN ? `${BEGIN}:${placeKeep ?? ""}` : key}>
+          <li key={key === BEGIN ? `${BEGIN}:${placeKeep ?? ""}` : key} className={cn(fill && i === 0 && "flex min-h-[calc(100dvh-14rem)] flex-col [&>article]:flex-1 [&_.ghw-prose]:min-h-[calc(100dvh-20rem)]")}>
             <RunPiece
               piece={piece}
               began={key === BEGIN}
@@ -197,6 +204,11 @@ export function RunPieces({ run, workspace, label, tools, onFocus, piece: noun }
                 notify({ message: `Couldn't start the ${noun}: ${e instanceof Error ? e.message : String(e)}. Your words are kept here: type on to try again.` });
               }}
             />
+            {fill && i === 0 && items.length > 1 && (
+              <button type="button" onClick={() => list.current?.children[1]?.scrollIntoView({ block: "start" })} className="mt-3 flex min-h-11 items-center gap-2 border-t border-rule text-sm text-muted">
+                <ArrowDown className="size-4" aria-hidden /> {run.more}
+              </button>
+            )}
           </li>
         ))}
       </ol>

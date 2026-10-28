@@ -27,7 +27,7 @@ async function audit(page: Page) {
   }
 }
 
-test("on a phone, by touch: the shelf, a book, its sidebar, writing, the palette and a sync", async ({ page, app }) => {
+test("on a phone, by touch: the shelf, a book, its bar and its pages, writing, the palette and a sync", async ({ page, app }) => {
   test.setTimeout(90_000);
   const remote = app.bareRepo("varn.git");
   app.git(app.home, "clone", "-q", remote, join(app.home, "varn"));
@@ -40,16 +40,33 @@ test("on a phone, by touch: the shelf, a book, its sidebar, writing, the palette
   await fits(page);
   await audit(page);
 
-  // A book, opened by tapping it; its sidebar a strip, opened over the text.
+  // A book, opened by tapping it: no sidebar beside the text, and its bar at the bottom (#100),
+  // the novel's pages in it, each a thumb's width.
   await page.getByRole("list", { name: "Books" }).getByRole("link", { name: /The Bridge at Varn/ }).tap();
   const text = page.getByRole("textbox", { name: "Chapter text" });
   await expect(text).toBeVisible();
+  await expect(page.getByRole("complementary", { name: "Sidebar" })).toHaveCount(0);
+  const bar = page.getByRole("navigation", { name: "Book" });
+  await expect(bar.getByRole("link")).toHaveText(["Manuscript", "Outline", "Notes", "Bible"]);
+  for (const target of await bar.locator("a, button").all()) expect((await target.boundingBox())!.height).toBeGreaterThanOrEqual(48);
   await fits(page);
   await audit(page);
-  await page.getByRole("button", { name: "Expand the sidebar" }).tap();
-  const drawer = page.getByRole("dialog", { name: "The sidebar" });
-  await drawer.getByRole("tree", { name: "Manuscript" }).getByRole("treeitem", { name: /The Station/ }).tap();
-  await expect(drawer).toHaveCount(0);
+  // A page from the bar, and back.
+  await bar.getByRole("link", { name: "Outline" }).tap();
+  await expect(page.getByRole("heading", { level: 1, name: "Outline" })).toBeVisible();
+  await expect(bar.getByRole("link", { name: "Outline" })).toHaveAttribute("aria-current", "page");
+  await bar.getByRole("link", { name: "Manuscript" }).tap();
+  await expect(text).toBeVisible();
+
+  // A scene, from the page's name in the top bar: the chapters folded, the one being read open.
+  await page.getByRole("banner").getByRole("button", { name: /^Arrival, in The Bridge at Varn/ }).tap();
+  const goTo = page.getByRole("dialog", { name: "Go to a scene" });
+  await expect(goTo.getByRole("button", { name: /^Arrival/ })).toHaveAttribute("aria-expanded", "true");
+  await expect(goTo.getByRole("button", { name: /^Old Debts/ })).toHaveAttribute("aria-expanded", "false");
+  await fits(page);
+  await audit(page);
+  await goTo.getByRole("link", { name: "The Station" }).tap();
+  await expect(goTo).toHaveCount(0);
 
   // Written in, by tapping into the scene's text.
   const scene = page.getByRole("textbox", { name: "Scene text" });
@@ -58,9 +75,15 @@ test("on a phone, by touch: the shelf, a book, its sidebar, writing, the palette
   await page.keyboard.type(" Written on the phone.");
   await expect.poll(() => readFileSync(join(app.home, "varn", STATION), "utf8"), { timeout: 10_000 }).toContain("Written on the phone.");
 
-  // The scene's details, from the ⋯ menu: no strip of buttons for the right sidebar on a phone.
-  await page.getByRole("banner").getByRole("button", { name: /^More/ }).tap();
-  await page.getByRole("menuitem", { name: "Show the scene's details" }).tap();
+  // The scene's details, from the bar's More (#100): the right sidebar's, for the piece written in.
+  // Done with the keyboard first: the bar gives way to it while writing.
+  await page.getByRole("toolbar", { name: "Writing" }).getByRole("button", { name: "Done" }).tap();
+  await bar.getByRole("button", { name: "More" }).tap();
+  const more = page.getByRole("dialog", { name: "The Bridge at Varn: more" });
+  await expect(more.getByRole("region", { name: "This scene" })).toBeVisible();
+  await fits(page);
+  await audit(page);
+  await more.getByRole("button", { name: "Details" }).tap();
   await expect(page.getByRole("tab", { name: "Scene", selected: true })).toBeVisible();
   await fits(page);
   await audit(page);
@@ -94,10 +117,14 @@ test("on a phone, Drafts closes by its button, and a book left with Drafts open 
   await app.restart(app.novelRepo("varn"));
   await launch(page, app);
   const drafts = page.getByRole("dialog", { name: "Drafts" });
-  const open = page.getByRole("button", { name: "Drafts: Main version is open" });
+  // On a phone, from the bar's More (#100).
+  const open = async () => {
+    await page.getByRole("navigation", { name: "Book" }).getByRole("button", { name: "More" }).tap();
+    await page.getByRole("dialog", { name: /: more$/ }).getByRole("button", { name: "Drafts and checkpoints…" }).tap();
+  };
 
   // It fills the screen, with nothing beside it to tap: its own button closes it.
-  await open.tap();
+  await open();
   await expect(drafts).toBeVisible();
   await fits(page);
   await audit(page);
@@ -107,13 +134,39 @@ test("on a phone, Drafts closes by its button, and a book left with Drafts open 
   // Left for the shelf while open, as Android's back did: the book opens on its text again.
   await page.getByRole("link", { name: "Writer: your books" }).tap();
   await page.getByRole("list", { name: "Books" }).getByRole("link", { name: /The Bridge at Varn/ }).tap();
-  await open.tap();
+  await open();
   await expect(drafts).toBeVisible();
   await page.goBack();
   await expect(page.getByRole("heading", { level: 1, name: "Your books" })).toBeVisible();
   await page.getByRole("list", { name: "Books" }).getByRole("link", { name: /The Bridge at Varn/ }).tap();
   await expect(page.getByRole("textbox", { name: "Chapter text" })).toBeVisible();
   await expect(drafts).toHaveCount(0);
+});
+
+test("on a phone, a journal opens on today's entry with the screen to write in, and its bar is arranged from More (#100)", async ({ page, app }) => {
+  const dir = app.bookRepo(fileURLToPath(new URL("../../../examples/sample-journal", import.meta.url)), "journal");
+  await app.restart(dir);
+  await launch(page, app);
+  const today = page.getByRole("textbox", { name: "Write today's entry" });
+  await expect(today).toBeVisible();
+  // The place to write takes most of the screen; the earlier entries are a tap away.
+  expect((await page.getByRole("list", { name: "Day by day" }).getByRole("listitem").first().boundingBox())!.height).toBeGreaterThan(viewport.height * 0.6);
+  const bar = page.getByRole("navigation", { name: "Book" });
+  await expect(bar.getByRole("link")).toHaveText(["Day by day", "Calendar", "Notes", "Index"]);
+  await page.getByRole("button", { name: "Earlier entries" }).first().tap();
+  await expect(page.getByRole("list", { name: "Day by day" }).getByRole("article").nth(1)).toBeInViewport();
+
+  // Arranged: Relationships in place of Notes, kept in book.yaml.
+  await bar.getByRole("button", { name: "More" }).tap();
+  await page.getByRole("dialog", { name: /: more$/ }).getByRole("button", { name: "Arrange the bar…" }).tap();
+  const arrange = page.getByRole("dialog", { name: "Arrange the bar" });
+  await fits(page);
+  await audit(page);
+  await arrange.getByRole("button", { name: "Take “Notes” out of the bar" }).tap();
+  await arrange.getByRole("button", { name: "Put “Relationships” in the bar" }).tap();
+  await arrange.getByRole("button", { name: "Save" }).tap();
+  await expect(bar.getByRole("link")).toHaveText(["Day by day", "Calendar", "Index", "Relationships"]);
+  await expect.poll(() => readFileSync(join(dir, "book.yaml"), "utf8")).toMatch(/bar:\s*\n?\s*- calendar\s+- index\s+- relationships|bar: \[calendar, index, relationships\]/);
 });
 
 test("on a phone, Arrange the sidebar fits, from the ⋯ menu, and closes by its button", async ({ page, app }) => {
@@ -152,10 +205,19 @@ test("on a phone, writing: the bar on top of the keyboard, every tap leaving the
   await page.reload();
 
   const bar = page.getByRole("toolbar", { name: "Writing" });
-  // Only while writing.
+  const book = page.getByRole("navigation", { name: "Book" });
+  // Only while writing, above the book's bar; with the keyboard up (the window made shorter for it,
+  // as Android does), in place of it (#100).
   await expect(bar).toHaveCount(0);
+  await expect(book).toBeVisible();
   await text.tap();
   await expect(bar).toBeVisible();
+  expect((await bar.boundingBox())!.y + (await bar.boundingBox())!.height).toBeLessThanOrEqual((await book.boundingBox())!.y + 1);
+  await page.setViewportSize({ width: viewport.width, height: Math.round(viewport.height * 0.6) });
+  await expect(book).toHaveCount(0);
+  await expect(bar).toBeInViewport();
+  await page.setViewportSize(viewport);
+  await expect(book).toBeVisible();
   await fits(page);
   await audit(page);
   await page.keyboard.press("Control+End");
@@ -180,6 +242,13 @@ test("on a phone, writing: the bar on top of the keyboard, every tap leaving the
   await expect(text).toBeFocused();
   await page.keyboard.type(" Wind.");
   await expect(text).toContainText("Wind.");
+
+  // Done puts the keyboard away: the text lets go of the focus, and the writing bar goes.
+  await bar.getByRole("button", { name: "Done" }).tap();
+  await expect(text).not.toBeFocused();
+  await expect(bar).toHaveCount(0);
+  await text.tap();
+  await page.keyboard.press("Control+End");
 
   // A selection's actions while there's one.
   await expect(bar.getByRole("button", { name: "Raise an issue…" })).toHaveCount(0);

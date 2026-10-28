@@ -4,6 +4,8 @@ import { create } from "zustand";
 export interface PageMenuItem {
   id: string;
   label: string;
+  /** Its name on a phone's More sheet, under the heading the page gives (#100): "Details". */
+  short?: string;
   run: () => void;
 }
 
@@ -12,7 +14,7 @@ export interface PageMenuItem {
  * view's right sidebar, say, on a screen too narrow for its strip of buttons, where a touch has no
  * other way in.
  */
-export const usePageMenu = create<{ items: PageMenuItem[]; set: (items: PageMenuItem[]) => void }>((set) => ({
+export const usePageMenu = create<{ items: PageMenuItem[]; heading?: string; set: (items: PageMenuItem[], heading?: string) => void }>((set) => ({
   items: [],
-  set: (items) => set({ items }),
+  set: (items, heading) => set({ items, heading }),
 }));

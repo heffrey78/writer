@@ -53,34 +53,34 @@ test("the sidebar groups the views, collapses to a strip of icons with Ctrl+\\, 
   await expect(sidebar.getByRole("button", { name: "Collapse the sidebar" })).toBeVisible();
 });
 
-test("too narrow for it beside the text, the sidebar is a strip that opens over the text, and the top bar fits", async ({ page, app }) => {
+test("too narrow for it beside the text, there's no sidebar: the book's bar at the bottom, and the top bar fits (#100)", async ({ page, app }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await app.restart(app.novelRepo("varn"));
   await page.goto(app.launchUrl);
-  await expect(page.getByRole("textbox", { name: "Chapter text" })).toBeVisible();
-  const views = page.getByRole("navigation", { name: "Views" });
-  // The strip, beside the text: nothing drawn over it.
+  const text = page.getByRole("textbox", { name: "Chapter text" });
+  await expect(text).toBeVisible();
+  // Nothing beside the text: it has the width.
+  await expect(page.getByRole("complementary", { name: "Sidebar" })).toHaveCount(0);
   await expect(page.getByRole("tree", { name: "Manuscript" })).toHaveCount(0);
-  const text = await page.getByRole("textbox", { name: "Chapter text" }).boundingBox();
-  const strip = await views.boundingBox();
-  expect(strip!.x + strip!.width).toBeLessThanOrEqual(text!.x);
-  // The top bar's labels give way; their names stay.
-  await expect(page.getByRole("button", { name: "Drafts: Main version is open" })).toBeVisible();
+  expect((await text.boundingBox())!.x).toBeLessThan(40);
+  // The top bar fits: the page's name, the sync badge and ⋯.
+  await expect(page.getByRole("banner").getByRole("button", { name: /^Arrival, in The Bridge at Varn/ })).toBeVisible();
   await expect(page.getByRole("button", { name: /^Sync: / })).toBeVisible();
-  const bar = await page.getByRole("banner").boundingBox();
-  expect(bar!.height).toBeLessThan(60);
+  expect((await page.getByRole("banner").boundingBox())!.height).toBeLessThan(64);
   await axe(page);
 
-  // Opened, over the text with the focus in it; Escape closes it, and so does going somewhere.
-  await page.getByRole("button", { name: "Expand the sidebar" }).click();
-  const drawer = page.getByRole("dialog", { name: "The sidebar" });
-  await expect(drawer.getByRole("tree", { name: "Manuscript" })).toBeVisible();
-  await expect(drawer.locator(":focus")).toHaveCount(1);
+  // The bar's pages, and More with the rest; going somewhere closes it.
+  const bar = page.getByRole("navigation", { name: "Book" });
+  await bar.getByRole("link", { name: "Bible" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Story bible" })).toBeVisible();
+  await bar.getByRole("button", { name: "More" }).click();
+  const more = page.getByRole("dialog", { name: "The Bridge at Varn: more" });
+  await expect(more.locator(":focus")).toHaveCount(1);
   await axe(page);
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("tree", { name: "Manuscript" })).toHaveCount(0);
-  await page.getByRole("button", { name: "Expand the sidebar" }).click();
-  await drawer.getByRole("navigation", { name: "Views" }).getByRole("link", { name: "Story bible" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Story bible" })).toBeVisible();
-  await expect(page.getByRole("tree", { name: "Manuscript" })).toHaveCount(0);
+  await expect(more).toHaveCount(0);
+  await bar.getByRole("button", { name: "More" }).click();
+  await more.getByRole("link", { name: "Relationships" }).click();
+  await expect(more).toHaveCount(0);
+  await expect(page).toHaveURL(/\/relationships$/);
 });
