@@ -20,11 +20,13 @@ await server.close();
 | `GET /api/app/licenses` | yes | `{ licenses: [{ name, text }] }`: the licence texts in `WRITER_LICENSES`, which the desktop app sets; none otherwise |
 | `GET /api/identity` | yes | `{ identity, suggestion }`: the name and email git signs with on this computer (`git config --global`), or null; and, signed in, the GitHub account's name (or login) and noreply address (`<id>+<login>@users.noreply.github.com`), or null |
 | `PUT /api/identity` | yes | `{ name, email }`: set as git's global `user.name` and `user.email`, then any commit blocked for want of them (`IDENTITY`) is made; `400 BAD_IDENTITY` without a name or a valid address |
-| `GET /api/library` | yes | `{ novels, notices, folder }`: `folder` is where new novels and clones go, with `~` for home; a novel with a cover has its version as `coverVersion` |
+| `GET /api/library` | yes | `{ novels, notices, folder, ghWriter, kinds, strays }`: `folder` is where new novels and clones go, with `~` for home; a novel with a cover has its version as `coverVersion`; `strays` are the books in that folder that aren't on the shelf (`{ path, title }`), to add back or delete (#98) |
 | `GET /api/library/:id/cover` | yes | the novel's cover image, for the shelf: read from its folder without opening the novel (which would start syncing it) |
 | `POST /api/library` | yes | `{ path }` → `201 { novel }`, or `400 { code, error }` |
 | `POST /api/library/new` | yes | `{ title, author?, path?, identity?: { name, email } }` → `201 { novel }`, or `400 { code, error }` |
 | `DELETE /api/library/:id` | yes | `204`: forgets the novel; its folder is left alone |
+| `GET /api/library/unsynced?path=` | yes | `{ onGitHub, changes, versions }`: what deleting the book would lose (changes not committed or not pushed, and branches GitHub hasn't got); `404` for a folder that isn't a book on the shelf or in the books folder |
+| `POST /api/library/delete` | yes | `{ path }` → `204`: deletes a book on the shelf, or one in the books folder that isn't on it, folder and all, closing it first; never its GitHub repository; `404` for any other folder |
 | `POST /api/library/clone` | yes | `{ repo, path? }` → an event stream (below) |
 | `GET /api/novels/:id` | yes | `{ novel, files, images }`: the story model (core `loadBook`), the hash of each file it was read from, and a version of each picture it shows from `images/` (see [Pictures](#pictures)) |
 | `GET /api/novels/:id/files/<path>` | yes | `{ path, content, hash }` |

@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { createServer as createHttpServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { join } from "node:path";
@@ -185,6 +185,61 @@ test("removes a novel from the library after confirming, keeping its folder", as
   await dialog.getByRole("button", { name: "Remove" }).click();
   await expect(page.getByText("No books yet")).toBeVisible();
   expect(app.git(dir, "rev-parse", "--is-inside-work-tree").trim()).toBe("true");
+});
+
+test("deletes a book once it has said what isn't on GitHub, and offers one taken off the shelf to add back or delete (#98)", async ({ page, app }) => {
+  await launch(page, app);
+  // A book that isn't on GitHub, in the books folder.
+  await page.getByRole("list", { name: "Books" }).getByRole("button", { name: "New book" }).click();
+  await page.getByRole("dialog", { name: "New book" }).getByRole("textbox", { name: "Title" }).fill("The Salt Road");
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(/\/novels\//);
+  const road = join(app.home, "writer", "the-salt-road");
+  await page.goto(app.url);
+
+  // Taken off the shelf, it's offered below it, and comes back.
+  await (await bookMenu(page, "The Salt Road")).getByRole("menuitem", { name: "Remove from library…" }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Remove" }).click();
+  const strays = page.getByRole("list", { name: "Not on the shelf" });
+  await expect(strays.getByRole("listitem")).toContainText("The Salt Road");
+  await axe(page);
+  await strays.getByRole("button", { name: "Add “The Salt Road” back to the shelf" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "“The Salt Road” is back on the shelf." })).toBeVisible();
+  await expect(strays).toHaveCount(0);
+
+  // Deleted: it says the book isn't on GitHub, and that it'll be gone for good.
+  await (await bookMenu(page, "The Salt Road")).getByRole("menuitem", { name: "Delete the book…" }).click();
+  const confirm = page.getByRole("alertdialog", { name: "Delete “The Salt Road”?" });
+  await expect(confirm).toContainText("“The Salt Road” isn't on GitHub: deleting it deletes every word of it, and its history, for good.");
+  for (const colorScheme of ["light", "dark"] as const) {
+    await page.emulateMedia({ colorScheme });
+    await axe(page);
+  }
+  await page.keyboard.press("Escape");
+  await expect(confirm).toHaveCount(0);
+  expect(existsSync(road)).toBe(true);
+  await (await bookMenu(page, "The Salt Road")).getByRole("menuitem", { name: "Delete the book…" }).click();
+  await confirm.getByRole("button", { name: "Delete the book" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Deleted “The Salt Road” from this computer." })).toBeVisible();
+  expect(existsSync(road)).toBe(false);
+  await expect(page.getByText("No books yet")).toBeVisible();
+
+  // A clone with a change not synced, deleted from the palette: it says what isn't on GitHub, and that GitHub's copy stays.
+  const bare = app.bareRepo("varn.git");
+  await cloneFrom(page, `file://${bare}`);
+  await expect(page).toHaveTitle("The Bridge at Varn · Writer");
+  // GitHub out of reach, so the open book's sync can't take the change there first.
+  rmSync(bare, { recursive: true });
+  const [clone] = readdirSync(join(app.home, "writer"));
+  writeFileSync(join(app.home, "writer", clone!, "README.md"), "Changed here.\n");
+  await page.goto(app.url);
+  await page.keyboard.press("ControlOrMeta+k");
+  await page.getByRole("dialog", { name: "Command palette" }).getByRole("combobox").fill("delete the book: the bridge");
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("alertdialog", { name: "Delete “The Bridge at Varn”?" })).toContainText("1 change isn't on GitHub yet, and will be gone. Sync first to keep it. The copy on GitHub stays.");
+  await page.getByRole("alertdialog").getByRole("button", { name: "Delete the book" }).click();
+  await expect(page.getByText("No books yet")).toBeVisible();
+  expect(readdirSync(join(app.home, "writer"))).toEqual([]);
 });
 
 test("follows the OS theme, and remembers a chosen one", async ({ page, app }) => {

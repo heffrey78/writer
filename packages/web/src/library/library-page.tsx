@@ -19,6 +19,7 @@ import { SHAPES } from "../bible/pictures.ts";
 import { CloneDialog, NewNovelDialog, OpenFolderDialog } from "./add-dialogs.tsx";
 import { onAndroid } from "../platform.ts";
 import { Cover } from "./cover.tsx";
+import { DeleteBook } from "./delete-book.tsx";
 
 export type AddMode = "new" | "open" | "clone";
 const MODES: AddMode[] = ["new", "open", "clone"];
@@ -31,6 +32,10 @@ export function LibraryPage() {
   const library = useQuery({ queryKey: keys.library, queryFn: api.library });
   const [dismissed, setDismissed] = useState<string[]>([]);
   const notices = library.data?.notices.filter((n) => !dismissed.includes(n.path)) ?? [];
+  // What a book's deletion, or adding one back, did: said where a screen reader hears it.
+  const [said, setSaid] = useState<string>();
+  // A book to delete, chosen from the palette.
+  const [deleting, setDeleting] = useState<{ path: string; title: string }>();
   const [params, setParams] = useSearchParams();
   const adding = MODES.find((m) => m === params.get("add"));
   const add = (mode: AddMode | undefined) => setParams(mode ? { add: mode } : {}, { replace: !mode });
@@ -49,6 +54,7 @@ export function LibraryPage() {
       return [
         ...offered.map(({ n, a }) => ({ id: `${a.command}.${n.id}`, title: `${a.label}: ${n.title}`, group: "Your books", run: () => openNovel(n.id, a.path) })),
         ...[...latest.values()].map(({ n, a }) => ({ id: a.command, title: `${a.label} (${n.title})`, group: "Your books", run: () => openNovel(n.id, a.path) })),
+        ...[...(library.data?.novels ?? []), ...(library.data?.strays ?? [])].map((b) => ({ id: `library.delete:${b.path}`, title: `Delete the book: ${b.title}…`, group: "Your books", run: () => setDeleting(b) })),
       ];
     },
     [library.data, openNovel],
@@ -86,6 +92,10 @@ export function LibraryPage() {
         </ul>
       )}
 
+      <p role="status" className="mt-2 text-sm empty:hidden">
+        {said}
+      </p>
+
       <FromGhWriter books={library.data?.ghWriter ?? []} />
 
       <section ref={setMenus} aria-labelledby="shelf-heading" className="mt-8">
@@ -107,7 +117,7 @@ export function LibraryPage() {
             )}
             <Shelf>
               {library.data.novels.map((novel) => (
-                <Book key={novel.id} novel={novel} menus={menus} />
+                <Book key={novel.id} novel={novel} menus={menus} onSaid={setSaid} />
               ))}
               <li>
                 <button
@@ -124,6 +134,9 @@ export function LibraryPage() {
           </>
         )}
       </section>
+
+      <NotOnTheShelf books={library.data?.strays ?? []} folder={library.data?.folder} onSaid={setSaid} />
+      {deleting && <DeleteBook path={deleting.path} title={deleting.title} open onOpenChange={(o) => !o && setDeleting(undefined)} onDone={setSaid} />}
 
       {adding === "new" && <NewNovelDialog folder={library.data?.folder} authors={library.data?.novels.flatMap((n) => (n.author ? [n.author] : [])) ?? []} kinds={library.data?.kinds ?? []} onClose={close} />}
       {adding === "open" && <OpenFolderDialog onClose={close} initial={params.get("path") ?? undefined} />}
@@ -156,6 +169,8 @@ function Shelf({ children }: { children: ReactNode }) {
 function FromGhWriter({ books }: { books: { path: string; title: string }[] }) {
   const queryClient = useQueryClient();
   const [said, setSaid] = useState<string>();
+  // A book to delete, chosen from the palette.
+  const [deleting, setDeleting] = useState<{ path: string; title: string }>();
   const bring = useMutation({
     mutationFn: api.importGhWriter,
     onSuccess: async ({ added, failed }) => {
@@ -187,10 +202,54 @@ function FromGhWriter({ books }: { books: { path: string; title: string }[] }) {
   );
 }
 
-function Book({ novel, menus }: { novel: LibraryEntry; menus: HTMLElement | null }) {
+/**
+ * The books in the books folder that aren't on the shelf (#98): on a phone, the app's own folder,
+ * which nothing else can reach. Each can be added back, or deleted.
+ */
+function NotOnTheShelf({ books, folder, onSaid }: { books: { path: string; title: string }[]; folder: string | undefined; onSaid: (said: string) => void }) {
+  const queryClient = useQueryClient();
+  const [deleting, setDeleting] = useState<{ path: string; title: string }>();
+  const addBack = useMutation({
+    mutationFn: (book: { path: string; title: string }) => api.addNovel(book.path),
+    onSuccess: async (novel) => {
+      await queryClient.invalidateQueries({ queryKey: keys.library });
+      onSaid(`“${novel.title}” is back on the shelf.`);
+    },
+    onError: (e) => onSaid(`Couldn't add it back: ${e instanceof Error ? e.message : String(e)}`),
+  });
+  if (!books.length) return null;
+  return (
+    <section aria-labelledby="strays-heading" className="mt-8">
+      <h2 id="strays-heading" className="mb-1 text-sm font-medium tracking-[0.14em] text-muted uppercase">
+        {onAndroid ? "On this phone" : "Not on the shelf"}
+      </h2>
+      <p className="mb-3 text-sm text-muted">{onAndroid ? "Books on this phone that aren't on the shelf." : `Books in ${folder ?? "the books folder"} that aren't on the shelf.`}</p>
+      <ul aria-label={onAndroid ? "On this phone" : "Not on the shelf"} className="grid max-w-xl divide-y divide-rule rounded-md border border-rule bg-raised">
+        {books.map((book) => (
+          <li key={book.path} className="flex flex-wrap items-center gap-2 px-3 py-2">
+            <span className="min-w-0 flex-1">
+              <span className="block truncate font-medium">{book.title}</span>
+              <span className="block truncate font-mono text-xs text-muted">{book.path}</span>
+            </span>
+            <Button size="sm" aria-label={`Add “${book.title}” back to the shelf`} disabled={addBack.isPending} onClick={() => addBack.mutate(book)}>
+              Add back
+            </Button>
+            <Button size="sm" variant="ghost" aria-label={`Delete “${book.title}”…`} onClick={() => setDeleting(book)}>
+              Delete…
+            </Button>
+          </li>
+        ))}
+      </ul>
+      {deleting && <DeleteBook path={deleting.path} title={deleting.title} open onOpenChange={(o) => !o && setDeleting(undefined)} onDone={onSaid} />}
+    </section>
+  );
+}
+
+function Book({ novel, menus, onSaid }: { novel: LibraryEntry; menus: HTMLElement | null; onSaid: (said: string) => void }) {
   const openNovel = useOpenNovel();
   const queryClient = useQueryClient();
   const [removing, setRemoving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const remove = useMutation({
     mutationFn: () => api.removeNovel(novel.id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: keys.library }),
@@ -270,6 +329,9 @@ function Book({ novel, menus }: { novel: LibraryEntry; menus: HTMLElement | null
               <DropdownMenu.Item className={item} onSelect={() => setRemoving(true)}>
                 Remove from library…
               </DropdownMenu.Item>
+              <DropdownMenu.Item className={`${item} text-danger`} onSelect={() => setDeleting(true)}>
+                Delete the book…
+              </DropdownMenu.Item>
             </DropdownMenu.Content>
           </DropdownMenu.Portal>
         </DropdownMenu.Root>
@@ -293,10 +355,11 @@ function Book({ novel, menus }: { novel: LibraryEntry; menus: HTMLElement | null
         open={removing}
         onOpenChange={setRemoving}
         title={`Remove “${novel.title}” from your library?`}
-        description="Its folder and files stay where they are; you can add it again at any time."
+        description={onAndroid ? "It stays on this phone, under On this phone below the shelf, to add back or delete." : "Its folder and files stay where they are; you can add it again at any time."}
         action="Remove"
         onConfirm={() => remove.mutate()}
       />
+      <DeleteBook path={novel.path} title={novel.title} open={deleting} onOpenChange={setDeleting} onDone={onSaid} />
     </li>
   );
 }

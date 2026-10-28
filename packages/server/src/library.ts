@@ -162,6 +162,59 @@ export class Library {
     return entry;
   }
 
+  /**
+   * The books in the books folder that aren't on the shelf: taken off it, or left by an older Writer.
+   * On a phone that folder is the app's own, out of the writer's reach, so the shelf offers them to
+   * add back or delete (#98).
+   */
+  async strays(): Promise<{ path: string; title: string }[]> {
+    const files = filesPort();
+    const mine = new Set((await this.list()).map((n) => n.path));
+    const out: { path: string; title: string }[] = [];
+    for (const entry of await files.list(this.cloneDir).catch(() => [])) {
+      if (entry.kind !== "dir" || entry.path.includes("/")) continue;
+      const path = await files.real(files.join(this.cloneDir, entry.path));
+      if (!path || mine.has(path)) continue;
+      const cover = await coverOf(path).catch(() => undefined);
+      if (cover && (await gitPort().isRepo(path))) out.push({ path, title: cover.title });
+    }
+    return out.sort((a, b) => a.title.localeCompare(b.title));
+  }
+
+  /**
+   * What deleting the book at `path` would lose, for the writer to be told first: whether it's on
+   * GitHub at all, its changes not there yet (files not committed, and commits not pushed), and its
+   * versions (branches) GitHub hasn't got.
+   */
+  async unsynced(path: string): Promise<{ onGitHub: boolean; changes: number; versions: number }> {
+    const dir = await this.#deletable(path);
+    const git = gitPort();
+    const onGitHub = (await git.remoteUrl(dir, "origin")) !== null;
+    let changes = (await git.status(dir)).length;
+    let versions = 0;
+    for (const ref of await git.refs(dir, ["refs/heads/"])) {
+      const theirs = onGitHub ? await git.resolve(dir, `refs/remotes/origin/${ref.name.slice("refs/heads/".length)}`) : null;
+      if (!theirs) versions++;
+      else if (ref.oid) changes += (await git.aheadBehind(dir, ref.oid, theirs)).ahead;
+    }
+    return { onGitHub, changes, versions };
+  }
+
+  /** Delete a book: its folder, and its place on the shelf. Only a book on the shelf, or one of the strays. */
+  async deleteBook(path: string): Promise<void> {
+    const dir = await this.#deletable(path);
+    await filesPort().removeTree(dir);
+    const entry = this.#novels.find((n) => n.path === dir);
+    if (entry) await this.remove(entry.id);
+  }
+
+  /** `path` as a book Writer may delete, or a LibraryError: never a folder that isn't a book it knows of. */
+  async #deletable(path: string): Promise<string> {
+    const dir = (await filesPort().real(path).catch(() => undefined)) ?? path;
+    if (this.#novels.some((n) => n.path === dir) || (await this.strays()).some((s) => s.path === dir)) return dir;
+    throw new LibraryError("UNKNOWN_NOVEL", `${path} isn't a book on the shelf or in ${host().shown(this.cloneDir)}.`);
+  }
+
   /** Forget a novel. Its folder is left alone. */
   async remove(id: string): Promise<boolean> {
     const before = this.#novels.length;

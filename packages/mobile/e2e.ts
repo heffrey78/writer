@@ -248,7 +248,7 @@ try {
     adb("shell", "ime", "set", keyboard);
   }
   await expect(text).toHaveText("Spoken to the keyboard, every word. Kept as said.");
-  const spoken = () => inApp("grep -rh \"Spoken to\" books/days/entries || true").trim();
+  const spoken = () => inApp("grep -rh \"Spoken to\" books/days/entries/*/*/*.md || true").trim();
   await expect.poll(spoken).toBe("Spoken to the keyboard, every word. Kept as said.");
   step("voice typing from the keyboard: today's entry made from the first words, every word kept");
 
@@ -261,7 +261,7 @@ try {
   await page.keyboard.press("Control+End");
   await page.keyboard.type(" Written on the phone.");
   let entry = "";
-  for (let i = 0; i < 40 && !entry; i++, await sleep(250)) entry = inApp("grep -rl \"Written on the phone.\" books/days/entries || true").trim();
+  for (let i = 0; i < 40 && !entry; i++, await sleep(250)) entry = inApp("grep -rl \"Written on the phone.\" books/days/entries/*/*/*.md || true").trim();
   if (!entry) throw new Error("The entry wasn't saved in the app's storage.");
   // The keyboard takes room from the page rather than covering it.
   await expect.poll(() => page.evaluate(() => innerHeight)).toBeLessThan(tall);
@@ -282,7 +282,7 @@ try {
   await dictating.getByRole("button", { name: "Stop dictating" }).click();
   await expect(dictating).toHaveCount(0);
   let dictated = "";
-  for (let i = 0; i < 40 && !dictated; i++, await sleep(250)) dictated = inApp("grep -rli \"kinder to her than ever\" books/days/entries || true").trim();
+  for (let i = 0; i < 40 && !dictated; i++, await sleep(250)) dictated = inApp("grep -rli \"kinder to her than ever\" books/days/entries/*/*/*.md || true").trim();
   if (!dictated) throw new Error("The dictated words weren't saved.");
   console.log(`     heard: ${inApp(`cat ${dictated}`).split("Written on the phone.")[1]?.trim()}`);
   step("dictated: the microphone allowed when asked, the words heard on the device and saved");
@@ -291,7 +291,8 @@ try {
   // stops; the phrase the speech model settles as it stops takes their place, with its capitals and
   // punctuation (#97), not the greyed words' lower case.
   const said = () => Number(inApp(`grep -oi "dear" ${dictated} | wc -l`).trim());
-  const settled = () => Number(inApp(`grep -o "Then, dear" ${dictated} | wc -l`).trim());
+  // Settled, it's punctuated ("…dear, said Mrs Whitney"); the greyed words never are.
+  const settled = () => Number(inApp(`grep -o "dear, said" ${dictated} | wc -l`).trim());
   await page.getByRole("button", { name: "Dictate", exact: true }).click();
   await expect(dictating).toContainText("Listening…", { timeout: 30_000 });
   await expect(page.locator(".ghw-heard")).toContainText(/dear/i, { timeout: 30_000 });
@@ -309,8 +310,8 @@ try {
   await expect(page.getByRole("group", { name: "Dictation" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Dictate", exact: true })).toBeVisible();
   await expect.poll(settled, { timeout: 20_000, message: "the settled phrase in place of the greyed words" }).toBe(2);
-  if (/then dear/.test(inApp(`cat ${dictated}`))) throw new Error("The greyed words are still in the entry.");
-  console.log(`     after the background: ${inApp(`cat ${dictated}`).split("Then, dear").at(-1)?.trim().slice(0, 60)}`);
+  if (/dear said/.test(inApp(`cat ${dictated}`))) throw new Error("The greyed words are still in the entry.");
+  console.log(`     after the background: ${inApp(`cat ${dictated}`).split("Think what it would").at(-1)?.trim().slice(0, 60)}`);
   step("to the background mid-phrase: the screen kept on till then; what was heard saved, settled in place, and listening stopped");
 
   // Put on GitHub, then synced.
@@ -358,6 +359,7 @@ try {
   await expect(page.getByRole("dialog", { name: "Command palette" })).toHaveCount(0);
   step("writing: the bar on top of the keyboard, Commands from it with the keyboard kept");
 
+
   // A novel cloned from GitHub, opened; a change made elsewhere, taken by a sync.
   await page.goto("http://tauri.localhost/");
   await page.getByRole("button", { name: "Clone from GitHub" }).click();
@@ -396,7 +398,7 @@ try {
   // app that Android kills has had its page hidden first, which hands the editor's text on at once.
   await sleep(1000);
   adb("shell", "am", "force-stop", PACKAGE);
-  if (inApp("grep -rl \"closed the app\" books/days/entries || true").trim()) throw new Error("The text was saved before the app was killed: nothing to recover.");
+  if (inApp("grep -rl \"closed the app\" books/days/entries/*/*/*.md || true").trim()) throw new Error("The text was saved before the app was killed: nothing to recover.");
   // Playwright lets go of the killed app's webview before it's asked for the new one's.
   const killed = android;
   await expect.poll(() => killed.webViews().length).toBe(0);
@@ -404,9 +406,31 @@ try {
   const again: Page = await (await android.webView({ pkg: PACKAGE }, { timeout: 30_000 })).page();
   await expect(await todaysEntry(again)).toContainText("Typed as Android closed the app.");
   let recovered = "";
-  for (let i = 0; i < 40 && !recovered; i++, await sleep(250)) recovered = inApp("grep -rl \"Typed as Android closed the app.\" books/days/entries || true").trim();
+  for (let i = 0; i < 40 && !recovered; i++, await sleep(250)) recovered = inApp("grep -rl \"Typed as Android closed the app.\" books/days/entries/*/*/*.md || true").trim();
   if (!recovered) throw new Error("The recovered text wasn't saved.");
   step("killed mid-sentence: reopened, the text was there and saved");
+
+  // Books on the phone (#98): taken off the shelf, a book is offered under On this phone, to add
+  // back or delete; deleted, its folder is gone from the app's storage.
+  await again.goto("http://tauri.localhost/");
+  const bookMenu = (title: string) => again.getByRole("button", { name: `More for “${title}”` }).click();
+  await bookMenu("The Bridge at Varn");
+  await again.getByRole("menuitem", { name: "Remove from library…" }).click();
+  await expect(again.getByRole("alertdialog")).toContainText("It stays on this phone, under On this phone below the shelf");
+  await again.getByRole("alertdialog").getByRole("button", { name: "Remove" }).click();
+  const onPhone = again.getByRole("list", { name: "On this phone" });
+  await expect(onPhone).toContainText("The Bridge at Varn");
+  await onPhone.getByRole("button", { name: "Add “The Bridge at Varn” back to the shelf" }).click();
+  await expect(again.getByRole("list", { name: "Books" }).getByRole("link", { name: /The Bridge at Varn/ })).toBeVisible();
+  const varnHere = () => inApp("ls books").split(/\s+/).includes("varn");
+  if (!varnHere()) throw new Error("The novel's folder isn't in the app's storage.");
+  await bookMenu("The Bridge at Varn");
+  await again.getByRole("menuitem", { name: "Delete the book…" }).click();
+  await expect(again.getByRole("alertdialog")).toContainText("The copy on GitHub stays");
+  await again.getByRole("alertdialog").getByRole("button", { name: "Delete the book" }).click();
+  await expect(again.getByRole("status").filter({ hasText: "Deleted “The Bridge at Varn” from this phone." })).toBeVisible();
+  if (varnHere()) throw new Error("The deleted novel's folder is still in the app's storage.");
+  step("books on the phone: one taken off the shelf offered to add back, and one deleted, folder and all");
 
   console.log(`\nAll ${steps.length} steps passed on ${device.split("\t")[0]}.`);
 } catch (e) {

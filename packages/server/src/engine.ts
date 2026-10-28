@@ -60,7 +60,7 @@ export function createEngine({ library, workspaces, github, novelRoutes: extra }
     await workspaces.retryIdentity();
     return c.json({ identity: { name, email } });
   });
-  app.route("/api/library", libraryRoutes(library, github));
+  app.route("/api/library", libraryRoutes(library, github, workspaces));
   app.route("/api/novels", novelRoutes(library, workspaces, github, extra));
   app.route("/api/github", githubRoutes(github));
   return app;

@@ -435,6 +435,13 @@ export class Workspaces {
     return ws;
   }
 
+  /** Close the book's workspace, if it's open: before its folder is deleted. */
+  async closeBook(id: string): Promise<void> {
+    const ws = this.#open.get(id);
+    this.#open.delete(id);
+    await ws?.close();
+  }
+
   /** Commit now wherever a commit was blocked for want of a git identity: one has just been given. */
   async retryIdentity(): Promise<void> {
     await Promise.all(

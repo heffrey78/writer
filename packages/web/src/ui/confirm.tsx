@@ -15,6 +15,7 @@ export function Confirm({
   action,
   onConfirm,
   danger,
+  busy,
 }: {
   trigger?: ReactNode;
   open?: boolean;
@@ -24,6 +25,8 @@ export function Confirm({
   action: string;
   onConfirm: () => void;
   danger?: boolean;
+  /** The action waits: what it would do is still being found out. */
+  busy?: boolean;
 }) {
   return (
     <AlertDialog.Root {...(open !== undefined ? { open } : {})} {...(onOpenChange ? { onOpenChange } : {})}>
@@ -38,7 +41,7 @@ export function Confirm({
               <Button>Cancel</Button>
             </AlertDialog.Cancel>
             <AlertDialog.Action asChild>
-              <Button variant={danger ? "danger" : "primary"} onClick={onConfirm}>
+              <Button variant={danger ? "danger" : "primary"} disabled={busy} onClick={onConfirm}>
                 {action}
               </Button>
             </AlertDialog.Action>

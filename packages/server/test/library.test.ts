@@ -242,6 +242,51 @@ describe("Library.clone", () => {
   });
 });
 
+describe("deleting a book (#98)", () => {
+  it("finds the books in the books folder that aren't on the shelf, and nothing else there", async () => {
+    const clones = join(tmp, "strays");
+    const library = await Library.open({ configDir: fresh("config"), cloneDir: clones });
+    const shelved = novelRepoIn(join(clones, "shelved"));
+    const stray = novelRepoIn(join(clones, "stray"));
+    mkdirSync(join(clones, "not-a-book"));
+    await library.add(shelved);
+    expect(await library.strays()).toEqual([{ path: stray, title: "The Bridge at Varn" }]);
+    await library.add(stray);
+    expect(await library.strays()).toEqual([]);
+  });
+
+  it("says what isn't on GitHub: everything for a book not there, else changes and versions not pushed", async () => {
+    const library = await openLibrary();
+    const local = await library.add(novelRepo());
+    expect(await library.unsynced(local.path)).toMatchObject({ onGitHub: false });
+
+    const synced = await library.clone(bareRemote(novelRepo()));
+    expect(await library.unsynced(synced.path)).toEqual({ onGitHub: true, changes: 0, versions: 0 });
+    writeFileSync(join(synced.path, "README.md"), "Changed.\n");
+    expect(await library.unsynced(synced.path)).toEqual({ onGitHub: true, changes: 1, versions: 0 });
+    gitIn(synced.path, "commit", "-qam", "Changed");
+    gitIn(synced.path, "branch", "draft-two");
+    expect(await library.unsynced(synced.path)).toEqual({ onGitHub: true, changes: 1, versions: 1 });
+  });
+
+  it("deletes a book's folder and takes it off the shelf, a stray's too, and nothing that isn't a book it knows", async () => {
+    const clones = join(tmp, "deleting");
+    const library = await Library.open({ configDir: fresh("config"), cloneDir: clones });
+    const book = await library.add(novelRepoIn(join(clones, "on-the-shelf")));
+    const stray = novelRepoIn(join(clones, "stray"));
+    await library.deleteBook(book.path);
+    expect(existsSync(book.path)).toBe(false);
+    expect(await library.list()).toEqual([]);
+    await library.deleteBook(stray);
+    expect(existsSync(stray)).toBe(false);
+
+    const elsewhere = novelRepo();
+    await expect(library.deleteBook(elsewhere)).rejects.toMatchObject({ code: "UNKNOWN_NOVEL" });
+    await expect(library.unsynced(elsewhere)).rejects.toMatchObject({ code: "UNKNOWN_NOVEL" });
+    expect(existsSync(elsewhere)).toBe(true);
+  });
+});
+
 describe("expandHome", () => {
   it("reads a leading ~ as the home folder, as a shell does, and leaves other paths alone", () => {
     expect(expandHome("~")).toBe(homedir());

@@ -5,22 +5,26 @@ import { FileError, imageVersion, servableImage } from "./files.ts";
 import { GitFailure, gitFailure } from "./git-port/port.ts";
 import type { GitHub } from "./github.ts";
 import { LibraryError, type Library } from "./library.ts";
+import type { Workspaces } from "./workspace.ts";
 import { bookSource, filesPort, host } from "./ports.ts";
 
 /**
- * GET    /api/library        { novels, notices, folder, ghWriter, kinds }: folder is where new novels and clones go, ~ for home;
+ * GET    /api/library        { novels, notices, folder, ghWriter, kinds, strays }: folder is where new novels and clones go, ~ for home;
  *                             kinds are the kinds of book New can start ({ key, label }, the Novel first);
  *                             each novel with its cover's version, when it has one, and its kind and the kind's
  *                             modules (kind, modules) where it's of one this Writer ships; ghWriter, the books in
- *                             gh-writer's library that aren't here, to offer to bring in
+ *                             gh-writer's library that aren't here, to offer to bring in; strays, the books in the books
+ *                             folder that aren't on the shelf ({ path, title }), to add back or delete (#98)
  * GET    /api/library/:id/cover  the novel's cover image, for the shelf (without opening the novel)
  * POST   /api/library        { path } → 201 { novel }
  * POST   /api/library/new    { kind?, title, author?, path?, identity?: { name, email } } → 201 { novel }: a book of the kind (a novel by default), from its template
  * DELETE /api/library/:id    forget a novel (its folder stays) → 204
+ * GET    /api/library/unsynced?path=  what deleting the book would lose → { onGitHub, changes, versions }
+ * POST   /api/library/delete { path } delete a book on the shelf, or a stray: its folder and its place on the shelf → 204
  * POST   /api/library/gh-writer  add the books in gh-writer's library that aren't here (#2) → { added, failed }
  * POST   /api/library/clone  { repo, path? } → an event stream: "progress"…, then "done" { novel } or "error"
  */
-export function libraryRoutes(library: Library, github?: GitHub): Hono {
+export function libraryRoutes(library: Library, github?: GitHub, workspaces?: Workspaces): Hono {
   const routes = new Hono();
 
   // Each cover with its version, so the shelf shows a replaced one anew.
@@ -33,7 +37,7 @@ export function libraryRoutes(library: Library, github?: GitHub): Hono {
         return { ...n, ...(coverVersion ? { coverVersion } : {}), ...(kind ? { kind: kind.key, modules: [...(kind.modules ?? [])] } : {}) };
       }),
     );
-    return c.json({ novels, notices: library.notices, folder: host().shown(library.cloneDir), ghWriter: await library.ghWriterBooks(), kinds: await library.kinds() });
+    return c.json({ novels, notices: library.notices, folder: host().shown(library.cloneDir), ghWriter: await library.ghWriterBooks(), kinds: await library.kinds(), strays: await library.strays() });
   });
 
   // Read straight from the folder: opening the novel for this would start syncing every book on the shelf.
@@ -93,6 +97,30 @@ export function libraryRoutes(library: Library, github?: GitHub): Hono {
   });
 
   routes.delete("/:id", async (c) => (await library.remove(c.req.param("id")) ? c.body(null, 204) : c.json({ code: "UNKNOWN_NOVEL", error: "No such book." }, 404)));
+
+  routes.get("/unsynced", async (c) => {
+    const path = c.req.query("path");
+    if (!path) return c.json({ code: "BAD_REQUEST", error: "Send ?path: the book's folder." }, 400);
+    try {
+      return c.json(await library.unsynced(path));
+    } catch (e) {
+      return failure(c, e);
+    }
+  });
+
+  routes.post("/delete", async (c) => {
+    const body = await jsonBody(c);
+    if (typeof body?.path !== "string" || !body.path) return c.json({ code: "BAD_REQUEST", error: "Send { path }: the book's folder." }, 400);
+    try {
+      // Closed first: its watcher, sync and committer would work on a folder that's going.
+      const entry = (await library.list()).find((n) => n.path === body.path);
+      if (entry) await workspaces?.closeBook(entry.id);
+      await library.deleteBook(body.path);
+      return c.body(null, 204);
+    } catch (e) {
+      return failure(c, e);
+    }
+  });
 
   routes.post("/gh-writer", async (c) => c.json(await library.importGhWriter()));
 

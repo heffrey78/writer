@@ -416,7 +416,7 @@ export function createApi({ baseUrl = "", headers = {}, fetch = globalThis.fetch
     licenses: async () => (await request<{ licenses: License[] }>("GET", "/api/app/licenses")).data.licenses,
     /** The library, its notices, and the folder new novels and clones go in (~ for home). */
     library: async () =>
-      (await request<{ novels: LibraryEntry[]; notices: LibraryNotice[]; folder: string; ghWriter: { path: string; title: string }[]; kinds: { key: string; label: string }[] }>("GET", "/api/library")).data,
+      (await request<{ novels: LibraryEntry[]; notices: LibraryNotice[]; folder: string; ghWriter: { path: string; title: string }[]; kinds: { key: string; label: string }[]; strays: { path: string; title: string }[] }>("GET", "/api/library")).data,
     /** Bring the books in gh-writer's library into this one (#2): their folders, not copies. */
     importGhWriter: async () => (await request<{ added: LibraryEntry[]; failed: { path: string; error: string }[] }>("POST", "/api/library/gh-writer")).data,
     /** Start a novel from the template. Rejects with NEEDS_IDENTITY when git doesn't know the author: send `identity` then. */
@@ -467,6 +467,10 @@ export function createApi({ baseUrl = "", headers = {}, fetch = globalThis.fetch
         (await request<{ remote: string; status: SyncStatus }>("POST", `/api/novels/${encodeURIComponent(novelId)}/publish`, repo)).data,
     },
     removeNovel: async (id: string) => void (await request("DELETE", `/api/library/${encodeURIComponent(id)}`)),
+    /** What deleting the book in `path` would lose (#98): whether it's on GitHub, and its changes and versions not there. */
+    unsynced: async (path: string) => (await request<{ onGitHub: boolean; changes: number; versions: number }>("GET", `/api/library/unsynced?path=${encodeURIComponent(path)}`)).data,
+    /** Delete a book on the shelf, or one in the books folder that isn't on it: its folder too. */
+    deleteBook: async (path: string) => void (await request("POST", "/api/library/delete", { path })),
     /** The story model (core's Novel), the hash of each file it was read from, and a version of each picture it shows. */
     novel: async <Novel = unknown>(id: string) => (await request<{ novel: Novel; files: Record<string, string>; images: Record<string, string> }>("GET", `/api/novels/${encodeURIComponent(id)}`)).data,
     /** Give the book a cover (JPEG or PNG bytes, already resized): images/cover.jpg and `cover:` in novel.yaml, one commit. */
