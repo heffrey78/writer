@@ -54,6 +54,9 @@ jobs:
         with:
           workspaces: packages/desktop/src-tauri
       - run: npm ci
+      # sherpa-onnx's build keeps its download in target/, which the cache brings back emptied.
+      - run: rm -rf packages/desktop/src-tauri/target/sherpa-onnx-prebuilt
+        shell: bash
       - uses: actions/cache@v4
         with:
           path: node_modules/.cache/writer-runtime
@@ -167,6 +170,9 @@ jobs:
         with:
           workspaces: packages/desktop/src-tauri
       - run: npm ci
+      # sherpa-onnx's build keeps its download in target/, which the cache brings back emptied.
+      - run: rm -rf packages/desktop/src-tauri/target/sherpa-onnx-prebuilt
+        shell: bash
       - uses: actions/cache@v4
         with:
           path: node_modules/.cache/writer-runtime
@@ -215,6 +221,9 @@ jobs:
         with:
           workspaces: packages/desktop/src-tauri
       - run: npm ci
+      # sherpa-onnx's build keeps its download in target/, which the cache brings back emptied.
+      - run: rm -rf packages/desktop/src-tauri/target/sherpa-onnx-prebuilt
+        shell: bash
       - uses: actions/cache@v4
         with:
           path: node_modules/.cache/writer-runtime

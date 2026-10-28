@@ -183,6 +183,9 @@ jobs:
           [ -n "$KEYSTORE" ] || { echo "::warning::No ANDROID_DEBUG_KEYSTORE: the APK is signed with a new key, and won't install over the phone's app."; exit 0; }
           mkdir -p ~/.android
           echo "$KEYSTORE" | base64 -d > ~/.android/debug.keystore
+      # sherpa-onnx's build keeps its download in target/, which the cache brings back emptied (as in
+      # the dictation job): a build script that runs again would take it as there.
+      - run: rm -rf packages/mobile/src-tauri/target/sherpa-onnx-prebuilt
       - run: packages/mobile/build.sh aarch64
       - name: Signed with the owner's key, or it isn't published
         id: signer

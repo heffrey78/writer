@@ -65,7 +65,7 @@ const serverEnv: Record<string, string> = {
   PATH: process.env.PATH!.split(delimiter).filter((d) => !d.startsWith(root) && !hasGit(d)).join(delimiter),
   HOME: home,
   USERPROFILE: home,
-  ...(windows ? { SystemRoot: process.env.SystemRoot ?? "C:\\Windows", TEMP: process.env.TEMP ?? tmpdir(), LOCALAPPDATA: join(home, "AppData") } : {}),
+  ...(windows ? { SystemRoot: process.env.SystemRoot ?? "C:\\Windows", TEMP: process.env.TEMP ?? tmpdir() } : {}),
   WRITER_CONFIG_DIR: join(scratch, "config"),
   WRITER_GIT: bundledGit,
   WRITER_ASKPASS: app,
@@ -152,13 +152,26 @@ try {
     step(windows ? "Starting the app itself, then ending it: its server stops with it" : "Starting the app itself, then quitting it as the system does (SIGTERM)");
     // The display and session the app needs, from this process (xvfb-run and dbus-run-session in CI).
     const session = ["DISPLAY", "XAUTHORITY", "WAYLAND_DISPLAY", "XDG_RUNTIME_DIR", "DBUS_SESSION_BUS_ADDRESS"].flatMap((k) => (process.env[k] ? [[k, process.env[k]!]] : []));
-    const appEnv = { ...serverEnv, ...Object.fromEntries(session) };
+    // On Windows, the whole environment a window and its webview need (the user's folders, WebView2's).
+    const appEnv = windows ? { ...process.env, ...serverEnv } : { ...serverEnv, ...Object.fromEntries(session) };
     const window = spawn(app, [], { env: appEnv, stdio: ["ignore", "inherit", "pipe"] });
     let said = "";
     window.stderr!.setEncoding("utf8").on("data", (d: string) => (said += d));
-    for (let i = 0; !said.includes("server listening"); i++) {
-      if (i > 300 || window.exitCode !== null) fail(`the app didn't start its server:\n${said}`);
-      await new Promise((r) => setTimeout(r, 100));
+    // A Windows app (no console) may say nothing on stderr: its server running is the sign.
+    const started = () => said.includes("server listening") || (windows && leftovers() !== "");
+    // Its own log of the server, where it keeps one (the app's log folder), for when it says nothing here.
+    const appLog = () => {
+      const dir = windows ? join(process.env.LOCALAPPDATA ?? "", "io.github.heffrey78.writer", "logs") : process.platform === "darwin" ? join(process.env.HOME ?? "", "Library/Logs/io.github.heffrey78.writer") : "";
+      try {
+        return readFileSync(join(dir, "server.log"), "utf8");
+      } catch {
+        return `(no server.log in ${dir})`;
+      }
+    };
+    const until = Date.now() + 60_000;
+    while (!started()) {
+      if (Date.now() > until || window.exitCode !== null) fail(`the app didn't start its server (${window.exitCode === null ? "still running" : `exited with ${window.exitCode}`}):\n${said}\n${appLog()}`);
+      await new Promise((r) => setTimeout(r, 200));
     }
     if (!leftovers()) fail("the app says its server is listening, but it isn't running");
     window.kill("SIGTERM");
