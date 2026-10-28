@@ -290,7 +290,8 @@ img.ProseMirror-separator {
   padding: 0.05em 0.25em;
 }
 
-.ghw-prose p.is-editor-empty:first-child::before {
+.ghw-prose p.is-editor-empty:first-child::before,
+.ghw-prose p.ghw-empty-scene::before {
   content: attr(data-placeholder);
   float: left;
   height: 0;

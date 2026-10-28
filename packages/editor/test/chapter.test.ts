@@ -208,3 +208,16 @@ test("getMarkdown is for single scenes; a chapter splits with serializeChapter",
   open(three);
   expect(() => getMarkdown(editor)).not.toThrow();
 });
+
+test("an empty scene shows what to do there, greyed, and never as its text (#99)", () => {
+  open([
+    { id: "sc_1", title: "Opening", markdown: "" },
+    { id: "sc_2", title: "Two", markdown: "Second scene.\n" },
+  ]);
+  const hints = () => [...editor.view.dom.querySelectorAll("p.ghw-empty-scene")].map((p) => p.getAttribute("data-placeholder"));
+  expect(hints()).toEqual(["Write the first line here…"]);
+  expect(bodies()).toEqual({ sc_1: "", sc_2: "Second scene.\n" });
+  editor.view.dispatch(editor.state.tr.insertText("The road ran white.", 2));
+  expect(hints()).toEqual([]);
+  expect(bodies().sc_1).toBe("The road ran white.\n");
+});

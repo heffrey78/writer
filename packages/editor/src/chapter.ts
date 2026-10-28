@@ -1,6 +1,7 @@
 import { Node, type Editor } from "@tiptap/core";
 import type { Node as PMNode, Schema } from "@tiptap/pm/model";
 import { EditorState, Plugin, PluginKey, TextSelection, type Transaction } from "@tiptap/pm/state";
+import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import { Doc, hidden, proseContent } from "./extensions.ts";
 import { parseProse, serializeProse } from "./markdown.ts";
 
@@ -34,10 +35,13 @@ export const ChapterDoc = Node.create({
 
 const sceneGuardKey = new PluginKey("ghwSceneGuard");
 
-export const Scene = Node.create<{ label: string }>({
+export const Scene = Node.create<{ label: string; placeholder: string }>({
   name: "scene",
-  /** What a scene is called at its boundary, for screen readers: the kind's word ("Scene"). */
-  addOptions: () => ({ label: "" }),
+  /**
+   * What a scene is called at its boundary, for screen readers: the kind's word ("Scene"); and
+   * what an empty one shows, greyed, until its first word (#99).
+   */
+  addOptions: () => ({ label: "", placeholder: "Write the first line here…" }),
   // Ahead of the core keymap, so a Backspace over several scenes is handled here first.
   priority: 1100,
   content: "block+",
@@ -82,6 +86,16 @@ export const Scene = Node.create<{ label: string }>({
             if (!spansScenes(editor.state.doc, from, to) || !deleteAcrossScenes(editor)) return false;
             editor.view.dispatch(editor.state.tr.insertText(text));
             return true;
+          },
+          // An empty scene's one paragraph shows what to do there, greyed: never text in its file.
+          decorations: (state) => {
+            const empty: Decoration[] = [];
+            state.doc.forEach((scene, offset) => {
+              const first = scene.firstChild;
+              if (scene.childCount === 1 && first?.type.name === "paragraph" && first.content.size === 0)
+                empty.push(Decoration.node(offset + 1, offset + 1 + first.nodeSize, { class: "ghw-empty-scene", "data-placeholder": this.options.placeholder }));
+            });
+            return empty.length ? DecorationSet.create(state.doc, empty) : null;
           },
         },
       }),

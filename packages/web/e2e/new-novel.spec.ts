@@ -21,11 +21,13 @@ test("starts a novel from the shelf's + and opens it, ready to write", async ({ 
   const dir = join(app.home, "writer", "the-salt-road");
   expect(app.git(dir, "log", "--format=%s").trim()).toBe("Start The Salt Road");
 
-  // Typing goes into the opening scene, which is saved and committed.
-  await page.keyboard.press("ControlOrMeta+a");
+  // The opening scene is empty, with what to do there greyed (#99): typing goes straight in, and
+  // it's the scene's only text, saved and committed.
+  await expect(text.locator("p.ghw-empty-scene")).toHaveAttribute("data-placeholder", "Write the first line here…");
   await page.keyboard.type("The road ran white with salt.");
+  await expect(text.locator("p.ghw-empty-scene")).toHaveCount(0);
   const scene = join(dir, "manuscript/01-chapter-one/01-opening.md");
-  await expect.poll(() => readFileSync(scene, "utf8"), { timeout: 10_000 }).toContain("The road ran white with salt.");
+  await expect.poll(() => readFileSync(scene, "utf8").split("---\n")[2], { timeout: 10_000 }).toBe("The road ran white with salt.\n");
 
   await page.getByRole("link", { name: "writer" }).click();
   await expect(page.getByRole("link", { name: "The Salt Road, by Ada Writer" })).toBeVisible();
