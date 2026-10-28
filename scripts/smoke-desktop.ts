@@ -51,7 +51,8 @@ cpSync(sample, join(scratch, "seed"), { recursive: true });
 // http-backend: the machine's own git where it has one (the Windows and macOS runners: MinGit has no
 // http-backend), else the app's, which this process alone puts on its PATH. The app uses only its own.
 const gitEnv = { GIT_EXEC_PATH: join(gitPrefix, "libexec/git-core"), GIT_TEMPLATE_DIR: join(gitPrefix, "share/git-core/templates") };
-Object.assign(process.env, { HOME: scratch, USERPROFILE: scratch });
+// HOME alone: git reads it, and Windows works out the user's folders from USERPROFILE, which stays.
+Object.assign(process.env, { HOME: scratch });
 if (!onPath) Object.assign(process.env, gitEnv, { PATH: [gitBin, process.env.PATH].join(delimiter) });
 const git = (cwd: string, ...args: string[]) => execFileSync(join(gitBin, windows ? "git.exe" : "git"), args, { cwd, encoding: "utf8", env: { ...process.env, ...gitEnv } });
 const fake = await fakeGitHub({ gitRoot: join(scratch, "github") });
@@ -64,7 +65,6 @@ git(scratch, "clone", "-q", "--bare", join(scratch, "seed"), fake.repoPath("ada"
 const serverEnv: Record<string, string> = {
   PATH: process.env.PATH!.split(delimiter).filter((d) => !d.startsWith(root) && !hasGit(d)).join(delimiter),
   HOME: home,
-  USERPROFILE: home,
   ...(windows ? { SystemRoot: process.env.SystemRoot ?? "C:\\Windows", TEMP: process.env.TEMP ?? tmpdir() } : {}),
   WRITER_CONFIG_DIR: join(scratch, "config"),
   WRITER_GIT: bundledGit,
@@ -152,9 +152,9 @@ try {
     step(windows ? "Starting the app itself, then ending it: its server stops with it" : "Starting the app itself, then quitting it as the system does (SIGTERM)");
     // The display and session the app needs, from this process (xvfb-run and dbus-run-session in CI).
     const session = ["DISPLAY", "XAUTHORITY", "WAYLAND_DISPLAY", "XDG_RUNTIME_DIR", "DBUS_SESSION_BUS_ADDRESS"].flatMap((k) => (process.env[k] ? [[k, process.env[k]!]] : []));
-    // On Windows, the whole environment a window and its webview need: the user's own folders too
-    // (USERPROFILE), where WebView2 keeps its profile.
-    const appEnv = windows ? { ...process.env, ...serverEnv, USERPROFILE: process.env.USERPROFILE ?? home } : { ...serverEnv, ...Object.fromEntries(session) };
+    // On Windows, the whole environment a window and its webview need (the user's folders, from
+    // USERPROFILE), with the server's PATH in place of Path: names there don't mind their case.
+    const appEnv = windows ? { ...Object.fromEntries(Object.entries(process.env).filter(([k]) => k.toUpperCase() !== "PATH")), ...serverEnv } : { ...serverEnv, ...Object.fromEntries(session) };
     const window = spawn(app, [], { env: appEnv, stdio: ["ignore", "inherit", "pipe"] });
     let said = "";
     window.stderr!.setEncoding("utf8").on("data", (d: string) => (said += d));
