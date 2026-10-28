@@ -47,11 +47,13 @@ const home = join(scratch, "home");
 mkdirSync(home);
 cpSync(sample, join(scratch, "seed"), { recursive: true });
 
-// The fake GitHub (test infrastructure, standing in for github.com) serves git over HTTP with the
-// app's own git, which this process alone puts on its PATH.
+// The fake GitHub (test infrastructure, standing in for github.com) serves git over HTTP with git
+// http-backend: the machine's own git where it has one (the Windows and macOS runners: MinGit has no
+// http-backend), else the app's, which this process alone puts on its PATH. The app uses only its own.
 const gitEnv = { GIT_EXEC_PATH: join(gitPrefix, "libexec/git-core"), GIT_TEMPLATE_DIR: join(gitPrefix, "share/git-core/templates") };
-Object.assign(process.env, gitEnv, { PATH: [gitBin, process.env.PATH].join(delimiter), HOME: scratch, USERPROFILE: scratch });
-const git = (cwd: string, ...args: string[]) => execFileSync(join(gitBin, windows ? "git.exe" : "git"), args, { cwd, encoding: "utf8" });
+Object.assign(process.env, { HOME: scratch, USERPROFILE: scratch });
+if (!onPath) Object.assign(process.env, gitEnv, { PATH: [gitBin, process.env.PATH].join(delimiter) });
+const git = (cwd: string, ...args: string[]) => execFileSync(join(gitBin, windows ? "git.exe" : "git"), args, { cwd, encoding: "utf8", env: { ...process.env, ...gitEnv } });
 const fake = await fakeGitHub({ gitRoot: join(scratch, "github") });
 git(join(scratch, "seed"), "init", "-q", "--initial-branch=main");
 git(join(scratch, "seed"), "add", "-A");
