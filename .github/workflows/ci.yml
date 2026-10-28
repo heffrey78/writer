@@ -143,3 +143,99 @@ jobs:
             packages/editor/test-results/
             packages/web/test-results/
           retention-days: 7
+
+  # Writer for Android (#105): the phone's APK, built as packages/mobile/build.sh builds it here, on
+  # the runner's Android SDK and NDK. Signed with the owner's debug key (the ANDROID_DEBUG_KEYSTORE
+  # secret, base64), so it installs over the app on the phone and keeps its books.
+  android:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      WRITER_ANDROID_ENV: given
+      # The NDK the build is made with here (Unity's).
+      NDK_VERSION: 27.2.12479018
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: packages/mobile/src-tauri
+      - name: The NDK
+        run: |
+          ndk="$ANDROID_HOME/ndk/$NDK_VERSION"
+          [ -d "$ndk" ] || yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;$NDK_VERSION" > /dev/null
+          echo "NDK_HOME=$ndk" >> "$GITHUB_ENV"
+      - run: npm ci
+      - name: The owner's debug key, where Gradle signs a debug build with it
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_DEBUG_KEYSTORE }}
+        run: |
+          [ -n "$KEYSTORE" ] || { echo "::warning::No ANDROID_DEBUG_KEYSTORE: the APK is signed with a new key, and won't install over the phone's app."; exit 0; }
+          mkdir -p ~/.android
+          echo "$KEYSTORE" | base64 -d > ~/.android/debug.keystore
+      - run: packages/mobile/build.sh aarch64
+      - name: Signed with the owner's key, or it isn't published
+        id: signer
+        run: |
+          apk=$(find packages/mobile/src-tauri/gen/android/app/build/outputs/apk -name '*.apk' | head -n 1)
+          cp "$apk" writer-android.apk
+          apksigner=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -n 1)/apksigner
+          digest=$("$apksigner" verify --print-certs writer-android.apk | sed -n 's/.*certificate SHA-256 digest: //p' | head -n 1)
+          echo "Signed by $digest"
+          [ "$digest" = b51ee4d85ea649d5907f59743726c6a3365369c6e28319ca737f4eae37616fb2 ] && echo "owner=true" >> "$GITHUB_OUTPUT" || echo "owner=false" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: writer-android.apk
+          if-no-files-found: error
+          retention-days: 14
+    outputs:
+      owner: ${{ steps.signer.outputs.owner }}
+
+  # Once everything else on main has passed: the APK at a fixed address, in the "Android (latest)"
+  # pre-release, for the phone's browser to download. A pre-release, so the desktop app's update
+  # check doesn't offer it.
+  android-latest:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [check, git2-port, dictation, e2e, android]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Signed with the owner's key
+        if: needs.android.outputs.owner != 'true'
+        run: |
+          echo "::error::The APK isn't signed with the owner's debug key (ANDROID_DEBUG_KEYSTORE): it wouldn't install over the phone's app."
+          exit 1
+      - uses: actions/download-artifact@v4
+        with:
+          name: android-apk
+      - name: The pre-release, at this commit, with the APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          # Through the environment, never into the script: it's the commit's own text.
+          MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          gh api -X PATCH "repos/$GH_REPO/git/refs/tags/android-latest" -f sha="$GITHUB_SHA" -F force=true > /dev/null 2>&1 \
+            || gh api "repos/$GH_REPO/git/refs" -f ref=refs/tags/android-latest -f sha="$GITHUB_SHA" > /dev/null
+          notes=$(printf '%s\n\n%s\n\n%s' \
+            "Writer for Android, built from ${GITHUB_SHA::7} on $(date -u +'%-d %B %Y, %H:%M UTC'): ${MESSAGE%%$'\n'*}" \
+            "Open writer-android.apk on the phone to install it over Writer: your books are kept. The first time, Android asks to allow installing from the browser." \
+            "Updated by every push to main that passes CI. It's a pre-release, so the desktop app doesn't offer it as an update.")
+          if gh release view android-latest > /dev/null 2>&1; then
+            gh release edit android-latest --prerelease --title "Android (latest)" --notes "$notes"
+          else
+            gh release create android-latest --prerelease --verify-tag --title "Android (latest)" --notes "$notes"
+          fi
+          gh release upload android-latest writer-android.apk --clobber
