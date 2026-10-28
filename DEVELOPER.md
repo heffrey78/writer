@@ -209,6 +209,8 @@ Cutting a release:
 
 The workflow also runs on pull requests that touch the desktop app or its scripts, without the release, and by hand (*Run workflow*). To run the smoke test on this machine against an installed package: `node scripts/build-smoke.ts`, then `/usr/lib/writer/runtime/node/node dist/smoke/smoke-desktop.mjs --sample dist/smoke/sample-novel`. Set `WRITER_SMOKE_ALLOW_GIT=1` if this machine has git.
 
+Windows and Apple-silicon Mac test builds (#106): the same workflow builds an unsigned NSIS installer on `windows-latest` (`tauri.windows.conf.json`) and a .dmg on `macos-15` (`tauri.macos.conf.json`, signed ad hoc, which Apple silicon needs, and not notarized; `Info.plist` says why the app wants the microphone). Each installs as a writer would (the installer silently, for the user; the app copied out of the .dmg) and runs the smoke test on its runner. The runners have git of their own, so the smoke test runs with `WRITER_SMOKE_ALLOW_GIT=1` and gives the server a PATH with no folder holding a git. On Windows, which has no signals, it ends the app and checks that the server stops with it. Run by hand on main, the workflow replaces the assets of the **Desktop (test builds)** pre-release (tag `desktop-test-builds`), with how to open an unsigned build on each. Signing and clean-machine checks are #88 and #89.
+
 The server's messages go to `server.log` in the app's log folder (`~/.local/share/io.github.heffrey78.writer/logs` on Linux). The previous run's are in `server.previous.log`. `cargo test` in `src-tauri` runs the shell's unit tests.
 
 ## The Android app

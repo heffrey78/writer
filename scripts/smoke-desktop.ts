@@ -4,13 +4,16 @@
 //   1. Sign in to GitHub; clone a novel; take the name and email the account offers.
 //   2. Edit a scene; sync: committed by the app's git, pushed through the app's own askpass.
 //   3. Quit (stdin closed): the server exits 0 and nothing of the app is left running.
-//   With --gui, also start the app itself (a display is needed: xvfb-run) and quit it with SIGTERM.
+//   With --gui, also start the app itself (a display is needed: xvfb-run) and quit it with SIGTERM;
+//   on Windows, which has none, end it, and its server stops with it (its stdin closed, D9).
 //
 // Usage: <packaged node> smoke-desktop.mjs --root /usr/lib/writer --app /usr/bin/writer --sample <sample novel> [--gui]
+// On Windows and macOS (#106), --root is where the installer put the app's resources, and the runner
+// has a git of its own: WRITER_SMOKE_ALLOW_GIT=1, and the server's PATH leaves out every folder with one.
 // CI bundles it (scripts/build-smoke.ts), since a clean machine has no node_modules.
 import { execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { parseArgs } from "node:util";
@@ -20,8 +23,12 @@ const { values } = parseArgs({ options: { root: { type: "string" }, app: { type:
 const root = values.root ?? "/usr/lib/writer";
 const app = values.app ?? "/usr/bin/writer";
 const sample = values.sample ?? new URL("../examples/sample-novel", import.meta.url).pathname;
-const node = join(root, "runtime/node/node");
+const windows = process.platform === "win32";
+const node = join(root, "runtime/node", windows ? "node.exe" : "node");
 const bundledGit = join(root, "runtime/git");
+// MinGit keeps its git in cmd/ and its parts under mingw64/ (as the server's gitInstall knows).
+const gitBin = join(bundledGit, windows ? "cmd" : "bin");
+const gitPrefix = windows ? join(bundledGit, "mingw64") : bundledGit;
 const SCENE = "manuscript/01-return/01-arrival/01-the-station.md";
 const LINE = "Smoke test: written in the installed app.";
 
@@ -31,14 +38,8 @@ function fail(message: string): never {
 }
 
 // No git of the machine's own: the app must bring everything it needs.
-const onPath = (process.env.PATH ?? "").split(delimiter).some((dir) => {
-  try {
-    execFileSync(join(dir, "git"), ["--version"], { stdio: "ignore" });
-    return true;
-  } catch {
-    return false;
-  }
-});
+const hasGit = (dir: string) => existsSync(join(dir, "git")) || existsSync(join(dir, "git.exe"));
+const onPath = (process.env.PATH ?? "").split(delimiter).some(hasGit);
 if (onPath && !process.env.WRITER_SMOKE_ALLOW_GIT) fail("git is installed on this machine: the smoke test proves the app needs none (WRITER_SMOKE_ALLOW_GIT=1 to run anyway).");
 
 const scratch = mkdtempSync(join(tmpdir(), "writer-smoke-"));
@@ -48,19 +49,21 @@ cpSync(sample, join(scratch, "seed"), { recursive: true });
 
 // The fake GitHub (test infrastructure, standing in for github.com) serves git over HTTP with the
 // app's own git, which this process alone puts on its PATH.
-const gitEnv = { GIT_EXEC_PATH: join(bundledGit, "libexec/git-core"), GIT_TEMPLATE_DIR: join(bundledGit, "share/git-core/templates") };
-Object.assign(process.env, gitEnv, { PATH: [join(bundledGit, "bin"), process.env.PATH].join(delimiter), HOME: scratch });
-const git = (cwd: string, ...args: string[]) => execFileSync(join(bundledGit, "bin/git"), args, { cwd, encoding: "utf8" });
+const gitEnv = { GIT_EXEC_PATH: join(gitPrefix, "libexec/git-core"), GIT_TEMPLATE_DIR: join(gitPrefix, "share/git-core/templates") };
+Object.assign(process.env, gitEnv, { PATH: [gitBin, process.env.PATH].join(delimiter), HOME: scratch, USERPROFILE: scratch });
+const git = (cwd: string, ...args: string[]) => execFileSync(join(gitBin, windows ? "git.exe" : "git"), args, { cwd, encoding: "utf8" });
 const fake = await fakeGitHub({ gitRoot: join(scratch, "github") });
 git(join(scratch, "seed"), "init", "-q", "--initial-branch=main");
 git(join(scratch, "seed"), "add", "-A");
 git(join(scratch, "seed"), "-c", "user.name=Seed", "-c", "user.email=seed@example.com", "commit", "-qm", "Start");
 git(scratch, "clone", "-q", "--bare", join(scratch, "seed"), fake.repoPath("ada", "varn"));
 
-// The server as the app starts it, in an environment without the bundled git on PATH.
+// The server as the app starts it, in an environment without the bundled git on PATH, nor any other.
 const serverEnv: Record<string, string> = {
-  PATH: process.env.PATH!.split(delimiter).filter((d) => !d.startsWith(root)).join(delimiter),
+  PATH: process.env.PATH!.split(delimiter).filter((d) => !d.startsWith(root) && !hasGit(d)).join(delimiter),
   HOME: home,
+  USERPROFILE: home,
+  ...(windows ? { SystemRoot: process.env.SystemRoot ?? "C:\\Windows", TEMP: process.env.TEMP ?? tmpdir(), LOCALAPPDATA: join(home, "AppData") } : {}),
   WRITER_CONFIG_DIR: join(scratch, "config"),
   WRITER_GIT: bundledGit,
   WRITER_ASKPASS: app,
@@ -72,9 +75,12 @@ const serverEnv: Record<string, string> = {
   WRITER_TOKEN_STORE: "memory",
 };
 
+const serverScript = join(root, "server", "writer.mjs");
 const leftovers = () => {
   try {
-    return execFileSync("pgrep", ["-f", join(root, "server/writer.mjs")], { encoding: "utf8" }).trim();
+    if (!windows) return execFileSync("pgrep", ["-f", serverScript], { encoding: "utf8" }).trim();
+    const find = `Get-CimInstance Win32_Process -Filter "Name='node.exe'" | Where-Object { $_.CommandLine -and $_.CommandLine.Contains('${serverScript}') } | ForEach-Object { $_.ProcessId }`;
+    return execFileSync("powershell", ["-NoProfile", "-Command", find], { encoding: "utf8" }).trim();
   } catch {
     return "";
   }
@@ -87,7 +93,7 @@ const exited = (child: ChildProcess, ms: number) =>
 
 try {
   step("Starting the packaged server");
-  const server = spawn(node, [join(root, "server/writer.mjs"), "serve", "--sidecar"], { env: serverEnv, stdio: ["pipe", "pipe", "inherit"] });
+  const server = spawn(node, [serverScript, "serve", "--sidecar"], { env: serverEnv, stdio: ["pipe", "pipe", "inherit"] });
   const line = await new Promise<string>((resolve, reject) => {
     let out = "";
     server.stdout!.setEncoding("utf8").on("data", (d: string) => (out += d).includes("\n") && resolve(out.slice(0, out.indexOf("\n"))));
@@ -141,7 +147,7 @@ try {
   if (leftovers()) fail(`still running: ${leftovers()}`);
 
   if (values.gui) {
-    step("Starting the app itself, then quitting it as the system does (SIGTERM)");
+    step(windows ? "Starting the app itself, then ending it: its server stops with it" : "Starting the app itself, then quitting it as the system does (SIGTERM)");
     // The display and session the app needs, from this process (xvfb-run and dbus-run-session in CI).
     const session = ["DISPLAY", "XAUTHORITY", "WAYLAND_DISPLAY", "XDG_RUNTIME_DIR", "DBUS_SESSION_BUS_ADDRESS"].flatMap((k) => (process.env[k] ? [[k, process.env[k]!]] : []));
     const appEnv = { ...serverEnv, ...Object.fromEntries(session) };
@@ -155,8 +161,12 @@ try {
     if (!leftovers()) fail("the app says its server is listening, but it isn't running");
     window.kill("SIGTERM");
     const quit = await exited(window, 30_000);
-    if (quit !== 0) fail(`the app exited with ${quit}:\n${said}`);
-    if (leftovers()) fail(`still running after the app quit: ${leftovers()}`);
+    // Windows has no signals: the app is ended, not asked, so its exit code says nothing.
+    if (!windows && quit !== 0) fail(`the app exited with ${quit}:\n${said}`);
+    for (let i = 0; leftovers(); i++) {
+      if (i > 200) fail(`still running after the app quit: ${leftovers()}`);
+      await new Promise((r) => setTimeout(r, 100));
+    }
   }
   console.log("✔ The installed app works with nothing else installed.");
 } finally {
