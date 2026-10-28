@@ -1,0 +1,20 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "bundle": {
+    "targets": [
+      "dmg"
+    ],
+    "resources": {
+      "../../../dist/server/": "server/",
+      "../../../LICENSE.md": "licenses/writer-LICENSE.md",
+      "../../dictation/licenses/": "licenses/",
+      "../../../dist/runtime/darwin-arm64/": "runtime/",
+      "../../../dist/runtime/darwin-arm64/licenses/": "licenses/"
+    },
+    "macOS": {
+      "minimumSystemVersion": "11.0",
+      "signingIdentity": "-",
+      "hardenedRuntime": false
+    }
+  }
+}

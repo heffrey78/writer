@@ -400,8 +400,9 @@ fn start_server(app: &AppHandle) {
     let starting = Instant::now();
     let system_git = app.state::<Shell>().settings.lock().unwrap().system_git;
     let started = (|| {
-        let resources = Resources::in_dir(&app.path().resource_dir().map_err(|e| e.to_string())?, system_git);
-        let logs = app.path().app_log_dir().map_err(|e| e.to_string())?;
+        // Which folder couldn't be found is said: "unknown path" alone told a Windows run nothing (#106).
+        let resources = Resources::in_dir(&app.path().resource_dir().map_err(|e| format!("Couldn't find the app's own files: {e}"))?, system_git);
+        let logs = app.path().app_log_dir().map_err(|e| format!("Couldn't find where the app keeps its logs: {e}"))?;
         fs::create_dir_all(&logs).map_err(|e| format!("Couldn't make the log folder ({}): {e}", logs.display()))?;
         // The app's own executable answers git's prompts for the GitHub token (askpass mode, in main).
         let askpass = std::env::current_exe().map_err(|e| e.to_string())?;

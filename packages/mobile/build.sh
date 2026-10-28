@@ -7,6 +7,11 @@ set -euo pipefail
 target="${1:-aarch64}"
 cd "$(dirname "${BASH_SOURCE[0]}")"
 source env.sh
+# OpenSSL's build (git2-port's vendored-openssl) asks the cc crate for a ranlib, which finds none
+# named for Android, and falls back to an llvm-ranlib on the PATH: there here, not on CI (#105).
+# The NDK's own, for both targets.
+ndk_bin="$NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin"
+export RANLIB_aarch64_linux_android="$ndk_bin/llvm-ranlib" RANLIB_x86_64_linux_android="$ndk_bin/llvm-ranlib"
 (cd ../.. && npm run build)
 tauri=(node "$(realpath ../../node_modules/@tauri-apps/cli/tauri.js)")
 cd src-tauri

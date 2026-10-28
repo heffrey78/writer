@@ -4,6 +4,10 @@ name: Desktop
 # it; each installed on a clean machine with no git and smoke-tested (scripts/smoke-desktop.ts). A
 # release tag (v1.2.3, or v1.2.3-rc.1 for a pre-release) also drafts a GitHub Release with them and
 # git's source. Publishing the draft is the owner's: the app offers the latest published release.
+#
+# Windows and Apple-silicon Mac test builds (#106): unsigned (signing is #88 and #89), built and
+# smoke-tested on GitHub's runners, on the same triggers. Run by hand on main, they replace the assets
+# of the "Desktop (test builds)" pre-release.
 
 on:
   push:
@@ -16,6 +20,7 @@ on:
       - scripts/build-smoke.ts
       - scripts/smoke-desktop.ts
       - scripts/check-version.ts
+      - packages/dictation/**
       - .github/workflows/desktop.yml
   workflow_dispatch:
 
@@ -49,6 +54,9 @@ jobs:
         with:
           workspaces: packages/desktop/src-tauri
       - run: npm ci
+      # sherpa-onnx's build keeps its download in target/, which the cache brings back emptied.
+      - run: rm -rf packages/desktop/src-tauri/target/sherpa-onnx-prebuilt
+        shell: bash
       - uses: actions/cache@v4
         with:
           path: node_modules/.cache/writer-runtime
@@ -146,6 +154,150 @@ jobs:
         env:
           WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS: "1"
         run: xvfb-run -a dbus-run-session -- /usr/lib/writer/runtime/node/node smoke/smoke-desktop.mjs --sample smoke/sample-novel --gui
+
+  windows:
+    name: Windows test build (unsigned), smoke-tested
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: packages/desktop/src-tauri
+      - run: npm ci
+      # sherpa-onnx's build keeps its download in target/, which the cache brings back emptied.
+      - run: rm -rf packages/desktop/src-tauri/target/sherpa-onnx-prebuilt
+        shell: bash
+      - uses: actions/cache@v4
+        with:
+          path: node_modules/.cache/writer-runtime
+          key: runtime-win32-${{ hashFiles('scripts/fetch-runtime.ts') }}
+      - name: The server bundle and the runtime (Node, MinGit)
+        run: |
+          npm run build:server
+          npm run fetch:runtime
+      - name: The installer (NSIS)
+        run: npx tauri build --bundles nsis
+        working-directory: packages/desktop
+      - run: node scripts/build-smoke.ts dist/smoke
+      - name: Installed for this user, as a writer would
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem packages/desktop/src-tauri/target/release/bundle/nsis/*-setup.exe | Select-Object -First 1
+          Start-Process -Wait -FilePath $installer.FullName -ArgumentList '/S'
+          $exe = Get-ChildItem "$env:LOCALAPPDATA" -Recurse -Depth 2 -Filter writer.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $exe) { throw "The installer put no writer.exe in $env:LOCALAPPDATA" }
+          "WRITER_ROOT=$($exe.DirectoryName)" >> $env:GITHUB_ENV
+          "WRITER_EXE=$($exe.FullName)" >> $env:GITHUB_ENV
+          Get-ChildItem $exe.DirectoryName
+      - name: Sign in, clone, write, sync, quit; and start and end the app
+        shell: pwsh
+        env:
+          WRITER_SMOKE_ALLOW_GIT: "1"
+          # The test shows the screen there if the app doesn't start: a Windows app says nothing on a console.
+          WRITER_SMOKE_SCREEN: ${{ runner.temp }}\screen.png
+        run: '& "$env:WRITER_ROOT\runtime\node\node.exe" dist/smoke/smoke-desktop.mjs --root "$env:WRITER_ROOT" --app "$env:WRITER_EXE" --sample dist/smoke/sample-novel --gui'
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: windows-screen
+          path: ${{ runner.temp }}/screen.png
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: packages/desktop/src-tauri/target/release/bundle/nsis/*-setup.exe
+          if-no-files-found: error
+
+  macos:
+    name: Apple-silicon Mac test build (unsigned), smoke-tested
+    runs-on: macos-15
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: packages/desktop/src-tauri
+      - run: npm ci
+      # sherpa-onnx's build keeps its download in target/, which the cache brings back emptied.
+      - run: rm -rf packages/desktop/src-tauri/target/sherpa-onnx-prebuilt
+        shell: bash
+      - uses: actions/cache@v4
+        with:
+          path: node_modules/.cache/writer-runtime
+          key: runtime-darwin-${{ hashFiles('scripts/fetch-runtime.ts') }}
+      - name: The server bundle and the runtime (Node, git)
+        run: |
+          npm run build:server
+          npm run fetch:runtime
+      - name: The .dmg (signed ad hoc, as Apple silicon needs; not notarized)
+        run: npx tauri build --bundles dmg
+        working-directory: packages/desktop
+      - run: node scripts/build-smoke.ts dist/smoke
+      - name: The app copied out of the .dmg, as a writer would
+        run: |
+          dmg=$(ls packages/desktop/src-tauri/target/release/bundle/dmg/*.dmg | head -n 1)
+          hdiutil attach -nobrowse -mountpoint "$RUNNER_TEMP/dmg" "$dmg"
+          cp -R "$RUNNER_TEMP"/dmg/*.app "$RUNNER_TEMP/"
+          hdiutil detach "$RUNNER_TEMP/dmg"
+          app=$(ls -d "$RUNNER_TEMP"/*.app | head -n 1)
+          echo "WRITER_ROOT=$app/Contents/Resources" >> "$GITHUB_ENV"
+          echo "WRITER_EXE=$app/Contents/MacOS/$(ls "$app/Contents/MacOS" | head -n 1)" >> "$GITHUB_ENV"
+          codesign -dv "$app" 2>&1 | head -n 5
+      - name: Sign in, clone, write, sync, quit; and start and quit the app
+        env:
+          WRITER_SMOKE_ALLOW_GIT: "1"
+        run: '"$WRITER_ROOT/runtime/node/node" dist/smoke/smoke-desktop.mjs --root "$WRITER_ROOT" --app "$WRITER_EXE" --sample dist/smoke/sample-novel --gui'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: packages/desktop/src-tauri/target/release/bundle/dmg/*.dmg
+          if-no-files-found: error
+
+  test-builds:
+    name: The "Desktop (test builds)" pre-release
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    needs: [windows, macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: At this commit, with the installers under names that stay the same
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          cp artifacts/windows/*-setup.exe writer-windows-setup.exe
+          cp artifacts/macos/*.dmg writer-macos-apple-silicon.dmg
+          gh api -X PATCH "repos/$GH_REPO/git/refs/tags/desktop-test-builds" -f sha="$GITHUB_SHA" -F force=true > /dev/null 2>&1 \
+            || gh api "repos/$GH_REPO/git/refs" -f ref=refs/tags/desktop-test-builds -f sha="$GITHUB_SHA" > /dev/null
+          cat > notes.md <<NOTES
+          Unsigned test builds of Writer's desktop app, from ${GITHUB_SHA::7}, built and smoke-tested on GitHub's Windows and Apple-silicon Mac runners. Not for everyone yet: signing comes with #88 and #89.
+
+          **Windows** (writer-windows-setup.exe): SmartScreen warns about an unknown publisher. Choose More info, then Run anyway. It installs for you alone, with nothing else needed.
+
+          **Mac with Apple silicon** (writer-macos-apple-silicon.dmg): drag Writer to Applications. macOS won't open it at first, as it isn't notarized: open System Settings › Privacy & Security and choose Open Anyway beside Writer (or run \`xattr -dr com.apple.quarantine /Applications/writer.app\`).
+
+          Updated each time the Desktop workflow is run by hand on main. A pre-release, so the app's update check doesn't offer it.
+          NOTES
+          if gh release view desktop-test-builds > /dev/null 2>&1; then
+            gh release edit desktop-test-builds --prerelease --title "Desktop (test builds)" --notes-file notes.md
+          else
+            gh release create desktop-test-builds --prerelease --verify-tag --title "Desktop (test builds)" --notes-file notes.md
+          fi
+          gh release upload desktop-test-builds writer-windows-setup.exe writer-macos-apple-silicon.dmg --clobber
 
   release:
     name: Draft the release
