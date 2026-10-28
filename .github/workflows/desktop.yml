@@ -200,6 +200,23 @@ jobs:
         env:
           WRITER_SMOKE_ALLOW_GIT: "1"
         run: '& "$env:WRITER_ROOT\runtime\node\node.exe" dist/smoke/smoke-desktop.mjs --root "$env:WRITER_ROOT" --app "$env:WRITER_EXE" --sample dist/smoke/sample-novel --gui'
+      # A Windows app says nothing on a console: what was running, and the screen (a dialog, say).
+      - name: What was on the screen, if the smoke test failed
+        if: failure()
+        shell: pwsh
+        run: |
+          Get-CimInstance Win32_Process | Where-Object { $_.Name -in 'writer.exe','node.exe','WerFault.exe' } | Format-List Name,ProcessId,ParentProcessId,CommandLine
+          Get-Process | Where-Object { $_.MainWindowTitle } | Format-Table Id,ProcessName,MainWindowTitle -AutoSize
+          Add-Type -AssemblyName System.Windows.Forms,System.Drawing
+          $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+          $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+          [System.Drawing.Graphics]::FromImage($bmp).CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
+          $bmp.Save("$env:RUNNER_TEMP\screen.png")
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: windows-screen
+          path: ${{ runner.temp }}/screen.png
       - uses: actions/upload-artifact@v4
         with:
           name: windows
