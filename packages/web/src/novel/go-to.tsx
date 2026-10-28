@@ -5,6 +5,7 @@ import { useEffect, useId, useState } from "react";
 import { Link, useLocation } from "react-router";
 import { webModulesByIds } from "../modules.tsx";
 import { cn } from "../ui/cn.ts";
+import { SheetHandle } from "../ui/sheet-handle.tsx";
 import { chapterTitle } from "./navigation.tsx";
 import { arrangedBy, arrangement } from "./sidebar.tsx";
 
@@ -56,8 +57,9 @@ export function GoToButton({ novelId, novel, onGitHub }: { novelId: string; nove
       </Dialog.Trigger>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-40 bg-black/40" />
-        <Dialog.Content aria-describedby={undefined} className="fixed inset-x-0 top-0 z-50 grid max-h-[85dvh] gap-2 overflow-y-auto rounded-b-2xl border-b border-rule bg-raised px-4 pt-3 pb-4 text-ink shadow-xl">
+        <Dialog.Content aria-describedby={undefined} className="fixed inset-x-0 top-0 z-50 grid max-h-[85dvh] gap-2 overflow-y-auto rounded-b-2xl border-b border-rule bg-raised px-4 pt-3 pb-1 text-ink shadow-xl">
           <GoTo novelId={novelId} novel={novel} onGitHub={onGitHub} current={page} />
+          <SheetHandle edge="top" onClose={() => setOpen(false)} />
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

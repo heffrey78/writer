@@ -1,5 +1,5 @@
 import type { Editor } from "@tiptap/core";
-import { AtSign, Command, MessageSquarePlus, Redo2, Undo2, type LucideIcon } from "lucide-react";
+import { AtSign, ChevronDown, Command, Keyboard, MessageSquarePlus, Redo2, Undo2, type LucideIcon } from "lucide-react";
 import { useEffect, useReducer, useState, type MouseEvent, type ReactNode } from "react";
 import { openOverlay } from "../palette.tsx";
 import { cn } from "../ui/cn.ts";
@@ -50,7 +50,7 @@ const keepFocus = (e: MouseEvent) => e.preventDefault();
 /**
  * On a phone, while writing (#96): what's wanted at hand, on top of the keyboard, without leaving the
  * text. Commands (the palette), then `dictate` where the device can hear, Undo, Redo, @ to mention,
- * and the selected text's actions while there's a selection; and Done, which puts the keyboard away.
+ * and the selected text's actions while there's a selection; last, Hide the keyboard.
  */
 export function WritingBar({ editor, dictate, selection }: { editor: Editor | undefined; dictate?: ReactNode; selection: BarAction[] }) {
   useEditorChanges(editor);
@@ -67,9 +67,17 @@ export function WritingBar({ editor, dictate, selection }: { editor: Editor | un
         selection.map((a) => (
           <BarButton key={a.label} label={a.label} icon={a.icon ?? MessageSquarePlus} onPress={a.run} wide />
         ))}
-      {/* The keyboard put away, and the book's bar back (#100). */}
-      <button type="button" onMouseDown={keepFocus} onClick={() => (document.activeElement as HTMLElement | null)?.blur()} className="ml-auto h-9 shrink-0 rounded-full bg-accent-soft px-3.5 text-sm font-semibold text-accent">
-        Done
+      {/* The keyboard put away, and the book's bar back (#100): the sign phones' keyboards use for it. */}
+      <button
+        type="button"
+        aria-label="Hide the keyboard"
+        title="Hide the keyboard"
+        onMouseDown={keepFocus}
+        onClick={() => (document.activeElement as HTMLElement | null)?.blur()}
+        className="ml-auto grid h-10 w-10 shrink-0 place-items-center content-center rounded-md text-ink hover:bg-panel"
+      >
+        <Keyboard className="size-5" aria-hidden />
+        <ChevronDown className="-mt-1 size-3.5" aria-hidden />
       </button>
     </div>
   );

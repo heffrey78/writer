@@ -363,7 +363,7 @@ try {
   // page, closed by Android's back; a page from the bar.
   const book = page.getByRole("navigation", { name: "Book" });
   await expect(book).toHaveCount(0);
-  await bar.getByRole("button", { name: "Done" }).click();
+  await bar.getByRole("button", { name: "Hide the keyboard" }).click();
   await expect.poll(() => /mInputShown=false/.test(adb("shell", "dumpsys", "input_method")), { timeout: 10_000, message: "the keyboard put away" }).toBe(true);
   await expect(book.getByRole("link")).toHaveText(["Day by day", "Calendar", "Notes", "Index"]);
   writeFileSync(join(tmp, "..", "book-bar.png"), execFileSync(ADB, ["exec-out", "screencap", "-p"]));
@@ -376,7 +376,7 @@ try {
   await expect(book.getByRole("link", { name: "Calendar" })).toHaveAttribute("aria-current", "page");
   await book.getByRole("link", { name: "Day by day" }).click();
   await expect(page.getByRole("textbox", { name: /Entry text/ }).first()).toBeVisible();
-  step("the book's bar: away for the keyboard, back after Done; More closed by Android's back; a page from it");
+  step("the book's bar: away for the keyboard, back once it's hidden; More closed by Android's back; a page from it");
 
   // A novel cloned from GitHub, opened; a change made elsewhere, taken by a sync.
   await page.goto("http://tauri.localhost/");

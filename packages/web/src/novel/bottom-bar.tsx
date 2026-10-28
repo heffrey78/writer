@@ -13,6 +13,7 @@ import { ErrorAlert } from "../ui/alert.tsx";
 import { Button } from "../ui/button.tsx";
 import { cn } from "../ui/cn.ts";
 import { Modal } from "../ui/dialog.tsx";
+import { SheetHandle } from "../ui/sheet-handle.tsx";
 import { useDrafts } from "./drafts.tsx";
 import { useNotice } from "./notice.tsx";
 import { arrangedBy, arrangement, type Place } from "./sidebar.tsx";
@@ -111,8 +112,8 @@ export function MoreSheet({ novelId, novel, onGitHub }: { novelId: string; novel
     <Dialog.Root open={open} onOpenChange={set}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-40 bg-black/40" />
-        <Dialog.Content aria-describedby={undefined} className="fixed inset-x-0 bottom-0 z-50 grid max-h-[85dvh] gap-4 overflow-y-auto rounded-t-2xl border-t border-rule bg-raised px-4 pt-2 pb-6 text-ink shadow-xl">
-          <span aria-hidden className="h-1 w-9 justify-self-center rounded-full bg-rule" />
+        <Dialog.Content aria-describedby={undefined} className="fixed inset-x-0 bottom-0 z-50 grid max-h-[85dvh] gap-4 overflow-y-auto rounded-t-2xl border-t border-rule bg-raised px-4 pt-0 pb-6 text-ink shadow-xl">
+          <SheetHandle edge="bottom" onClose={close} />
           <Dialog.Title className="sr-only">{novel.config?.title ?? "Untitled"}: more</Dialog.Title>
           {items.length > 0 && (
             <section aria-label={heading} className="grid gap-2">

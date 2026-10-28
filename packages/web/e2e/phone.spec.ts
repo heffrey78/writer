@@ -65,6 +65,10 @@ test("on a phone, by touch: the shelf, a book, its bar and its pages, writing, t
   await expect(goTo.getByRole("button", { name: /^Old Debts/ })).toHaveAttribute("aria-expanded", "false");
   await fits(page);
   await audit(page);
+  // Its handle tapped closes it; it opens again from the page's name.
+  await goTo.getByRole("button", { name: "Close" }).tap();
+  await expect(goTo).toHaveCount(0);
+  await page.getByRole("banner").getByRole("button", { name: /^Arrival, in The Bridge at Varn/ }).tap();
   await goTo.getByRole("link", { name: "The Station" }).tap();
   await expect(goTo).toHaveCount(0);
 
@@ -76,11 +80,25 @@ test("on a phone, by touch: the shelf, a book, its bar and its pages, writing, t
   await expect.poll(() => readFileSync(join(app.home, "varn", STATION), "utf8"), { timeout: 10_000 }).toContain("Written on the phone.");
 
   // The scene's details, from the bar's More (#100): the right sidebar's, for the piece written in.
-  // Done with the keyboard first: the bar gives way to it while writing.
-  await page.getByRole("toolbar", { name: "Writing" }).getByRole("button", { name: "Done" }).tap();
+  // The keyboard hidden first: the bar gives way to it while writing.
+  await page.getByRole("toolbar", { name: "Writing" }).getByRole("button", { name: "Hide the keyboard" }).tap();
   await bar.getByRole("button", { name: "More" }).tap();
   const more = page.getByRole("dialog", { name: "The Bridge at Varn: more" });
   await expect(more.getByRole("region", { name: "This scene" })).toBeVisible();
+  // Its handle: dragged down, it closes (#100); dragged a little, it goes back.
+  const handle = more.getByRole("button", { name: "Close" });
+  const grip = (await handle.boundingBox())!;
+  const drag = async (by: number) => {
+    await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2 + by, { steps: 6 });
+    await page.mouse.up();
+  };
+  await drag(30);
+  await expect(more).toBeVisible();
+  await drag(200);
+  await expect(more).toHaveCount(0);
+  await bar.getByRole("button", { name: "More" }).tap();
   await fits(page);
   await audit(page);
   await more.getByRole("button", { name: "Details" }).tap();
@@ -243,8 +261,8 @@ test("on a phone, writing: the bar on top of the keyboard, every tap leaving the
   await page.keyboard.type(" Wind.");
   await expect(text).toContainText("Wind.");
 
-  // Done puts the keyboard away: the text lets go of the focus, and the writing bar goes.
-  await bar.getByRole("button", { name: "Done" }).tap();
+  // Hide the keyboard puts it away: the text lets go of the focus, and the writing bar goes.
+  await bar.getByRole("button", { name: "Hide the keyboard" }).tap();
   await expect(text).not.toBeFocused();
   await expect(bar).toHaveCount(0);
   await text.tap();
