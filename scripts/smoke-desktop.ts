@@ -152,8 +152,9 @@ try {
     step(windows ? "Starting the app itself, then ending it: its server stops with it" : "Starting the app itself, then quitting it as the system does (SIGTERM)");
     // The display and session the app needs, from this process (xvfb-run and dbus-run-session in CI).
     const session = ["DISPLAY", "XAUTHORITY", "WAYLAND_DISPLAY", "XDG_RUNTIME_DIR", "DBUS_SESSION_BUS_ADDRESS"].flatMap((k) => (process.env[k] ? [[k, process.env[k]!]] : []));
-    // On Windows, the whole environment a window and its webview need (the user's folders, WebView2's).
-    const appEnv = windows ? { ...process.env, ...serverEnv } : { ...serverEnv, ...Object.fromEntries(session) };
+    // On Windows, the whole environment a window and its webview need: the user's own folders too
+    // (USERPROFILE), where WebView2 keeps its profile.
+    const appEnv = windows ? { ...process.env, ...serverEnv, USERPROFILE: process.env.USERPROFILE ?? home } : { ...serverEnv, ...Object.fromEntries(session) };
     const window = spawn(app, [], { env: appEnv, stdio: ["ignore", "inherit", "pipe"] });
     let said = "";
     window.stderr!.setEncoding("utf8").on("data", (d: string) => (said += d));
@@ -168,9 +169,28 @@ try {
         return `(no server.log in ${dir})`;
       }
     };
+    // On Windows, what can be seen while the app is still up: its processes and windows, and the
+    // screen (WRITER_SMOKE_SCREEN), as a dialog of the app's would show there.
+    const evidence = () => {
+      if (!windows) return "";
+      const screen = process.env.WRITER_SMOKE_SCREEN ?? join(scratch, "screen.png");
+      const script = [
+        "Get-CimInstance Win32_Process | Where-Object { $_.Name -in 'writer.exe','node.exe','msedgewebview2.exe','WerFault.exe' } | Format-Table ProcessId,ParentProcessId,Name,CommandLine -AutoSize -Wrap | Out-String -Width 400",
+        "Get-Process | Where-Object { $_.MainWindowTitle } | Format-Table Id,ProcessName,MainWindowTitle -AutoSize | Out-String -Width 400",
+        "Add-Type -AssemblyName System.Windows.Forms,System.Drawing",
+        "$b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds; $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height",
+        "[System.Drawing.Graphics]::FromImage($bmp).CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)",
+        `$bmp.Save('${screen}'); "Screen saved to ${screen}"`,
+      ].join("; ");
+      try {
+        return execFileSync("powershell", ["-NoProfile", "-Command", script], { encoding: "utf8" });
+      } catch (e) {
+        return `(couldn't look: ${e instanceof Error ? e.message : String(e)})`;
+      }
+    };
     const until = Date.now() + 60_000;
     while (!started()) {
-      if (Date.now() > until || window.exitCode !== null) fail(`the app didn't start its server (${window.exitCode === null ? "still running" : `exited with ${window.exitCode}`}):\n${said}\n${appLog()}`);
+      if (Date.now() > until || window.exitCode !== null) fail(`${evidence()}\n` + `the app didn't start its server (${window.exitCode === null ? "still running" : `exited with ${window.exitCode}`}):\n${said}\n${appLog()}`);
       await new Promise((r) => setTimeout(r, 200));
     }
     if (!leftovers()) fail("the app says its server is listening, but it isn't running");
