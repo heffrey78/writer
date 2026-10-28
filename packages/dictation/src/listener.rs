@@ -24,6 +24,25 @@ const PHRASE_SILENCE_S: f32 = 0.5;
 /// dozen seconds or so. At 20 s, forty seconds of speech without a pause was greyed for 25 (#97).
 const LONGEST_PHRASE_S: f32 = 10.0;
 const WINDOW: usize = 512;
+/// Heard before the voice detection says a phrase starts, and after it says it ends, decoded with it:
+/// after a short pause, or a phrase cut short of one (LONGEST_PHRASE_S), the detection hears the next
+/// one start a little late, and its first word was lost to the settled phrase though the streaming
+/// model had shown it ("Think what…" became "what…", #97). It costs the phrase its capital, which the
+/// editor gives back at a sentence's start, and more of it would take in the last word's end.
+const BEFORE_S: f32 = 0.2;
+const AFTER_S: f32 = 0.1;
+/// The last of what's been heard, to take that from: a phrase is never longer than this.
+const KEPT_S: f32 = LONGEST_PHRASE_S + 5.0;
+
+/// The level quiet speech is raised to, as a peak, before the voice detection and the models hear it:
+/// a clear voice's own (the test clip peaks at 0.32), so that's left as it is. A phone held at arm's
+/// length gives a twentieth of it, and at that the voice detection missed a phrase's first words (#97).
+const LEVEL: f32 = 0.3;
+/// The quietest a peak is taken to be: twenty times louder at most is made of it, so the room's own
+/// noise isn't made into speech.
+const QUIETEST: f32 = LEVEL / 20.0;
+/// How fast the level falls back after something loud: by half in this long.
+const LEVEL_HALF_LIFE_S: f32 = 3.0;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Event {
@@ -82,6 +101,11 @@ pub struct Listener {
     /// Samples not yet a whole window for the voice detection.
     pending: Vec<f32>,
     heard: String,
+    /// The last KEPT_S of what the voice detection has been given, and where in its count it starts.
+    kept: Vec<f32>,
+    kept_from: i64,
+    /// The recent peak, falling slowly: what's heard is brought from it to LEVEL.
+    peak: f32,
 }
 
 fn s(dir: &Path, file: &str) -> Option<String> {
@@ -147,12 +171,14 @@ impl Listener {
             ..Default::default()
         })
         .ok_or(Error::Engine("model"))?;
-        Ok(Listener { hearer, stream, vad, settler, pending: Vec::new(), heard: String::new() })
+        Ok(Listener { hearer, stream, vad, settler, pending: Vec::new(), heard: String::new(), kept: Vec::new(), kept_from: 0, peak: QUIETEST })
     }
 
     /// Samples heard, 16 kHz mono, in any number at a time; what's heard and settled because of them.
     pub fn feed(&mut self, samples: &[f32]) -> Vec<Event> {
         let mut out = Vec::new();
+        let levelled = self.level(samples);
+        let samples = levelled.as_slice();
         self.stream.accept_waveform(RATE as i32, samples);
         while self.hearer.is_ready(&self.stream) {
             self.hearer.decode(&self.stream);
@@ -163,7 +189,8 @@ impl Listener {
         let windows = self.pending.len() / WINDOW;
         let mut settled = false;
         for i in 0..windows {
-            self.vad.accept_waveform(&self.pending[i * WINDOW..(i + 1) * WINDOW]);
+            let window = self.pending[i * WINDOW..(i + 1) * WINDOW].to_vec();
+            self.detect(&window);
             settled |= self.settle(&mut out);
         }
         self.pending.drain(..windows * WINDOW);
@@ -185,22 +212,65 @@ impl Listener {
         if !self.pending.is_empty() {
             let mut last = std::mem::take(&mut self.pending);
             last.resize(WINDOW, 0.0);
-            self.vad.accept_waveform(&last);
+            self.detect(&last);
         }
         self.vad.flush();
         self.settle(&mut out);
         self.vad.reset();
+        // The detection counts afresh after a reset.
+        self.kept.clear();
+        self.kept_from = 0;
         self.afresh(&mut out);
         out
     }
 
-    /// Each phrase the voice detection has ended, decoded whole.
+    /// `samples` brought up to LEVEL, sample by sample (so however they come, it's the same): up at
+    /// once for something louder (it's never clipped), and down slowly after, so a phrase's quiet
+    /// words are raised as much as its loud ones. Louder than LEVEL is left alone.
+    fn level(&mut self, samples: &[f32]) -> Vec<f32> {
+        let fall = 0.5_f32.powf(1.0 / RATE as f32 / LEVEL_HALF_LIFE_S);
+        samples
+            .iter()
+            .map(|x| {
+                self.peak = (self.peak * fall).max(x.abs()).max(QUIETEST);
+                x * (LEVEL / self.peak).max(1.0)
+            })
+            .collect()
+    }
+
+    /// A window to the voice detection, kept for the phrase it may start.
+    fn detect(&mut self, window: &[f32]) {
+        self.vad.accept_waveform(window);
+        self.kept.extend_from_slice(window);
+        let over = self.kept.len().saturating_sub((KEPT_S * RATE as f32) as usize);
+        if over > 0 {
+            self.kept.drain(..over);
+            self.kept_from += over as i64;
+        }
+    }
+
+    /// A phrase's samples with what was heard just before and after it, where they're kept; else its own.
+    fn padded(&self, start: i64, samples: &[f32]) -> Vec<f32> {
+        let end = start + samples.len() as i64;
+        let kept_to = self.kept_from + self.kept.len() as i64;
+        // Its own samples must be where the count says: else the counts have drifted, and it's decoded as given.
+        let at = (start - self.kept_from) as usize;
+        if start < self.kept_from || end > kept_to || samples.first() != self.kept.get(at) || samples.last() != self.kept.get(at + samples.len() - 1) {
+            return samples.to_vec();
+        }
+        let from = (start - (BEFORE_S * RATE as f32) as i64).max(self.kept_from);
+        let to = (end + (AFTER_S * RATE as f32) as i64).min(kept_to);
+        self.kept[(from - self.kept_from) as usize..(to - self.kept_from) as usize].to_vec()
+    }
+
+    /// Each phrase the voice detection has ended, decoded whole, with a moment either side.
     fn settle(&mut self, out: &mut Vec<Event>) -> bool {
         let mut any = false;
         while !self.vad.is_empty() {
             if let Some(phrase) = self.vad.front() {
+                let samples = if phrase.samples().is_empty() { Vec::new() } else { self.padded(phrase.start(), phrase.samples()) };
                 let stream = self.settler.create_stream();
-                stream.accept_waveform(RATE as i32, phrase.samples());
+                stream.accept_waveform(RATE as i32, &samples);
                 self.settler.decode(&stream);
                 let text = stream.get_result().map(|r| r.text.trim().to_string()).unwrap_or_default();
                 if !text.is_empty() {

@@ -86,10 +86,11 @@ fn hears_the_clip_and_settles_each_phrase_at_its_pause() {
         assert!(events.iter().any(|(at, e)| *at > *start && *at <= *end && matches!(e, Event::Heard(t) if !t.is_empty())), "nothing of utterance {i} heard while spoken");
     }
 
-    // Written as prose: a capital to start and punctuation to end.
-    for phrase in settled(&events) {
-        assert!(phrase.chars().next().unwrap().is_uppercase(), "{phrase}");
-    }
+    // Written as prose: the clip's first phrase starts with a capital. A later one may not, as it's
+    // decoded with a moment of what came before it; the editor capitalises a phrase that starts a
+    // sentence (joinPhrase).
+    let first = settled(&events)[0].clone();
+    assert!(first.chars().next().unwrap().is_uppercase(), "{first}");
     // What's heard is cleared once its phrase is settled.
     let last_settled = events.iter().rposition(|(_, e)| matches!(e, Event::Settled(_))).unwrap();
     let after: Vec<&Event> = events[last_settled..].iter().map(|(_, e)| e).filter(|e| matches!(e, Event::Heard(t) if !t.is_empty())).collect();
@@ -203,5 +204,25 @@ fn speech_without_a_pause_is_settled_in_pieces() {
     for at in events.iter().filter(|(_, e)| matches!(e, Event::Settled(_))).map(|(at, _)| *at).chain([speech.len()]) {
         assert!(at - last <= RATE * 15, "{:.1} s heard without a phrase settled", (at - last) as f64 / RATE as f64);
         last = at;
+    }
+}
+
+
+#[test]
+fn quiet_speech_is_settled_whole() {
+    // The clip at a phone's level held at arm's length, a fiftieth of its own: its words all settle,
+    // the first of each phrase too (#97). Unlevelled, the voice detection heard it start late.
+    let clip = clip();
+    let quiet: Vec<f32> = clip.samples.iter().map(|x| x * 0.02).collect();
+    let mut listener = Listener::open(&models(), &Options::default()).unwrap();
+    let mut events = hear(&mut listener, &quiet, RATE / 10);
+    events.extend(listener.stop().into_iter().map(|e| (quiet.len(), e)));
+    let reference = clip.utterances.iter().map(|u| u.2.as_str()).collect::<Vec<_>>().join(" ");
+    let got = settled(&events).join(" ");
+    let wer = word_error_rate(&reference, &got);
+    assert!(wer <= 0.10, "{:.1}% of words wrong: {got:?}", wer * 100.0);
+    for (_, _, said) in &clip.utterances {
+        let first = words(said)[0].clone();
+        assert!(words(&got).contains(&first), "“{first}” lost: {got:?}");
     }
 }
