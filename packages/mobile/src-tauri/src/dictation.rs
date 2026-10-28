@@ -42,6 +42,13 @@ fn models<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
 }
 
 /// Whether the microphone may be used, or (`ask`) Android's prompt for it first.
+/// The screen kept on while listening (#97): set down, the phone would time out and stop it.
+fn keep_screen_on<R: Runtime>(app: &AppHandle<R>, on: bool) {
+    if let Some(android) = app.try_state::<writer_android::Android<R>>() {
+        let _ = android.keep_screen_on(on);
+    }
+}
+
 fn microphone<R: Runtime>(app: &AppHandle<R>, ask: bool) -> Result<String, String> {
     app.try_state::<writer_android::Android<R>>().ok_or("No microphone to ask for here: it's Android's.")?.microphone(ask)
 }
@@ -93,7 +100,10 @@ fn start<R: Runtime>(app: &AppHandle<R>, language: String, events: Channel<Value
         None => Dictation::start(listener, None, on),
     };
     match started {
-        Ok(dictation) => *state.running.lock().unwrap() = Some(Running { dictation, events }),
+        Ok(dictation) => {
+            *state.running.lock().unwrap() = Some(Running { dictation, events });
+            keep_screen_on(app, true);
+        }
         Err((failure, listener)) => {
             *state.listener.lock().unwrap() = Some(listener);
             let _ = events.send(failure_event(&failure));
@@ -127,6 +137,7 @@ fn stop_running<R: Runtime>(app: &AppHandle<R>) {
     let state = app.state::<Dictating>();
     let running = state.running.lock().unwrap().take();
     if let Some(running) = running {
+        keep_screen_on(app, false);
         *state.listener.lock().unwrap() = Some(running.dictation.stop());
         let _ = running.events.send(json!({ "kind": "stopped" }));
     }

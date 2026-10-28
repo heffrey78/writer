@@ -1,7 +1,7 @@
 import { Extension, type Editor } from "@tiptap/core";
 import { closeHistory } from "@tiptap/pm/history";
 import type { ResolvedPos } from "@tiptap/pm/model";
-import { Plugin, PluginKey, type EditorState } from "@tiptap/pm/state";
+import { Plugin, PluginKey, type EditorState, type Transaction } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import { appContextMenu, contributeMenuItems } from "./context-menu.ts";
 import { spokenPhrase, type SpokenName } from "./spoken.ts";
@@ -23,7 +23,7 @@ export interface DictationOffer {
   toggle(editor: Editor): void;
   /** `editor` took the caret: a phrase being heard follows it there. */
   focused(editor: Editor): void;
-  /** `editor` is going (its page left, the app hidden): it has written the words heard so far. */
+  /** `editor` is going (its page left, the app hidden): the words heard so far are to be written now. */
   left(editor: Editor): void;
 }
 
@@ -82,12 +82,62 @@ function bookNames(editor: Editor): readonly SpokenName[] {
   return (suggest?.options as { entities?: () => readonly SpokenName[] } | undefined)?.entities?.() ?? [];
 }
 
-/** Write the words heard so far and say the editor is going, before it's flushed for the last time. */
+/** Say the editor is going, before it's flushed for the last time: the words heard so far are written. */
 export function leaveDictation(editor: Editor): void {
   if (editor.isDestroyed) return;
+  if (offer?.listening(editor)) return offer.left(editor);
   const heard = heardText(editor.state);
   if (heard) settleHeard(editor, heard);
-  if (offer?.listening(editor)) offer.left(editor);
+}
+
+/** Words written before they were settled, which the settled phrase takes the place of. */
+export interface HeldPhrase {
+  /** Put `text`, as the recognizer settled it, in place of the words held, if they're still as written. */
+  settle(text: string): void;
+}
+
+/**
+ * Write the words heard so far at the caret now, as they were shown, so they're saved however the
+ * page goes (the app to the background, Android killing it), and keep track of them: the phrase the
+ * recognizer settles for them, a moment later, takes their place (#97). The greyed words are
+ * lower-cased and unpunctuated, and less often right.
+ */
+export function holdHeard(editor: Editor): HeldPhrase | undefined {
+  if (editor.isDestroyed) return undefined;
+  const heard = heardText(editor.state);
+  if (!heard) return undefined;
+  const at = editor.state.selection.from;
+  settleHeard(editor, heard);
+  // "New paragraph" heard is one made already: nothing for the settled phrase to put right.
+  if (spokenPhrase(heard, bookNames(editor)).kind !== "text") return undefined;
+  const { from: end } = editor.state.selection;
+  let held = { from: at, to: end, text: editor.state.doc.textBetween(at, end) };
+  // Followed through every change until it's settled. Typing against either end is taken as a
+  // change to the words ("sun" made "sunny"), which then stay as the writer left them.
+  const follow = ({ transaction }: { transaction: Transaction }) => {
+    held = { ...held, from: transaction.mapping.map(held.from, -1), to: transaction.mapping.map(held.to, 1) };
+  };
+  editor.on("transaction", follow);
+  return {
+    settle(text) {
+      if (editor.isDestroyed) return;
+      const { doc } = editor.state;
+      if (held.to > doc.content.size || doc.textBetween(held.from, held.to) !== held.text) return void editor.off("transaction", follow);
+      const spoken = spokenPhrase(text, bookNames(editor));
+      if (spoken.kind !== "text") {
+        // "New paragraph" said alone, heard as words: what it says, in their place.
+        const tr = editor.state.tr.delete(held.from, held.to);
+        editor.view.dispatch(spoken.kind === "paragraph" ? tr.split(held.from) : tr.insert(held.from, editor.schema.nodes.hard_break!.create()));
+        return void editor.off("transaction", follow);
+      }
+      const $from = doc.resolve(held.from);
+      const $to = doc.resolve(held.to);
+      const words = joinPhrase(textBefore($from), spoken.text, $to.parent.textBetween($to.parentOffset, $to.parent.content.size, undefined, "￼"));
+      editor.view.dispatch(editor.state.tr.insertText(words, held.from, held.to));
+      // Settled again (the host's last phrases come one by one): the words now there are the ones held.
+      held = { from: held.from, to: held.from + words.length, text: words };
+    },
+  };
 }
 
 /** The paragraph's text before `$pos`; a mention or a picture as one character that's no word's. */

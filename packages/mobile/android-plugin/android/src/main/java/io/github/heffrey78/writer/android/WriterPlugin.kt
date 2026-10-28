@@ -12,6 +12,7 @@ import android.view.ActionMode
 import android.view.Menu
 import android.view.View
 import android.view.Window
+import android.view.WindowManager
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
@@ -45,6 +46,11 @@ class UrlArgs {
 class MicrophoneArgs {
     /** Ask for it, with Android's prompt, if it isn't allowed yet. */
     var ask: Boolean = false
+}
+
+@InvokeArg
+class ScreenArgs {
+    var on: Boolean = false
 }
 
 @InvokeArg
@@ -189,6 +195,20 @@ class WriterPlugin(private val activity: Activity) : Plugin(activity) {
             else -> "prompt"
         }
         invoke.resolve(JSObject().put("state", state))
+    }
+
+    /**
+     * The screen kept on while dictation listens (#97): the writer may set the phone down and talk,
+     * and a screen that times out sends the app to the background, which stops dictating.
+     */
+    @Command
+    fun keepScreenOn(invoke: Invoke) {
+        val on = invoke.parseArgs(ScreenArgs::class.java).on
+        activity.runOnUiThread {
+            if (on) activity.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            else activity.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            invoke.resolve()
+        }
     }
 
     @Command

@@ -39,6 +39,12 @@ function androidUi() {
   });
 }
 
+/** Whether Writer's window keeps the screen on (with Playwright let go of the webview: its connection keeps it on too). */
+function screenOn() {
+  const windows = execFileSync(ADB, ["shell", "dumpsys", "window", "windows"], { encoding: "utf8" }).split(/\n(?=  Window #)/);
+  return windows.some((w) => w.includes(`${PACKAGE}/`) && /\bKEEP_SCREEN_ON\b/.test(w));
+}
+
 const tapAt = (n: { x1: number; y1: number; x2: number; y2: number }) => adb("shell", "input", "tap", String((n.x1 + n.x2) >> 1), String((n.y1 + n.y2) >> 1));
 
 /** Tap what Android shows with text matching `text` (its own dialogs, outside the webview), once it's there. */
@@ -281,17 +287,31 @@ try {
   console.log(`     heard: ${inApp(`cat ${dictated}`).split("Written on the phone.")[1]?.trim()}`);
   step("dictated: the microphone allowed when asked, the words heard on the device and saved");
 
-  // To the background mid-phrase: the words heard so far are written and saved, and it stops.
+  // To the background mid-phrase: the words heard so far are written and saved at once, and it
+  // stops; the phrase the speech model settles as it stops takes their place, with its capitals and
+  // punctuation (#97), not the greyed words' lower case.
   const said = () => Number(inApp(`grep -oi "dear" ${dictated} | wc -l`).trim());
+  const settled = () => Number(inApp(`grep -o "Then, dear" ${dictated} | wc -l`).trim());
   await page.getByRole("button", { name: "Dictate", exact: true }).click();
   await expect(dictating).toContainText("Listening…", { timeout: 30_000 });
   await expect(page.locator(".ghw-heard")).toContainText(/dear/i, { timeout: 30_000 });
+  // The screen kept on while listening (#97): set down, the phone would time out, and that stops
+  // it. Read with Playwright let go of the webview, whose connection keeps the screen on too.
+  await android!.close();
+  if (!screenOn()) throw new Error("The screen isn't kept on while listening.");
   adb("shell", "input", "keyevent", "KEYCODE_HOME");
   await expect.poll(said, { timeout: 20_000 }).toBe(2);
   adb("shell", "monkey", "-p", PACKAGE, "-c", "android.intent.category.LAUNCHER", "1");
-  await expect(dictating).toHaveCount(0);
+  for (let i = 0; i < 40 && top() !== PACKAGE; i++) await sleep(250);
+  if (screenOn()) throw new Error("The screen is still kept on once listening stopped.");
+  android = await attach();
+  page = await (await android!.webView({ pkg: PACKAGE }, { timeout: 30_000 })).page();
+  await expect(page.getByRole("group", { name: "Dictation" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Dictate", exact: true })).toBeVisible();
-  step("to the background mid-phrase: what was heard saved, and listening stopped");
+  await expect.poll(settled, { timeout: 20_000, message: "the settled phrase in place of the greyed words" }).toBe(2);
+  if (/then dear/.test(inApp(`cat ${dictated}`))) throw new Error("The greyed words are still in the entry.");
+  console.log(`     after the background: ${inApp(`cat ${dictated}`).split("Then, dear").at(-1)?.trim().slice(0, 60)}`);
+  step("to the background mid-phrase: the screen kept on till then; what was heard saved, settled in place, and listening stopped");
 
   // Put on GitHub, then synced.
   const badge = page.getByRole("button", { name: /^Sync: / });

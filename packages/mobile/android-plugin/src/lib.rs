@@ -1,6 +1,7 @@
 //! Writer's Android plugin (#52). Its Kotlin (android/) seals and opens bytes with an AES key that
 //! lives in Android's keystore and can't leave it, for the GitHub token; opens other sites in the
-//! phone's browser; asks for the microphone, for dictation (#86); adds Writer's actions on selected
+//! phone's browser; asks for the microphone, for dictation (#86), and keeps the screen on while it
+//! listens (#97); adds Writer's actions on selected
 //! text to Android's selection toolbar (#95); and, when the webview loads, keeps the page clear of the system's bars and gives
 //! the page's service worker (packages/web/public/engine-sw.js) the same answers as the page, which
 //! Android's webview otherwise asks the network for.
@@ -28,6 +29,12 @@ struct Address {
 #[cfg_attr(not(target_os = "android"), allow(dead_code))]
 struct Ask {
     ask: bool,
+}
+
+#[derive(Serialize)]
+#[cfg_attr(not(target_os = "android"), allow(dead_code))]
+struct Screen {
+    on: bool,
 }
 
 #[derive(Deserialize)]
@@ -79,6 +86,17 @@ impl<R: Runtime> Android<R> {
         return self.0.run_mobile_plugin::<Allowed>("microphone", Ask { ask }).map(|a| a.state).map_err(|e| e.to_string());
         #[cfg(not(target_os = "android"))]
         return Err(format!("No microphone to ask for here (ask: {ask}): it's Android's."));
+    }
+
+    /// The screen kept on, or let time out again: while dictation listens (#97).
+    pub fn keep_screen_on(&self, on: bool) -> Result<(), String> {
+        #[cfg(target_os = "android")]
+        return self.0.run_mobile_plugin::<()>("keepScreenOn", Screen { on }).map_err(|e| e.to_string());
+        #[cfg(not(target_os = "android"))]
+        return {
+            let _ = on;
+            Ok(())
+        };
     }
 
     /// The page's actions on selected text (#95), added to Android's own selection toolbar from now

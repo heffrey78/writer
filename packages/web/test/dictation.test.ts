@@ -209,17 +209,40 @@ describe("its settings", () => {
 });
 
 describe("leaving", () => {
-  it("the page hidden: the words heard so far are written, and what comes after is dropped", async () => {
+  it("the page hidden: the words heard so far are written at once, and the phrase the host settles as it stops takes their place (#97)", async () => {
     const editor = open("Fog.\n");
     await dictation.start(editor);
-    say({ kind: "heard", text: "then sun" });
+    say({ kind: "heard", text: "then sun at" });
+    // The host settles the phrase a moment after it's asked to stop.
+    shell.last = undefined;
     Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true });
     document.dispatchEvent(new Event("visibilitychange"));
     Object.defineProperty(document, "visibilityState", { value: "visible", configurable: true });
-    expect(ed.getMarkdown(editor)).toBe("Fog. Then sun\n");
+    expect(ed.getMarkdown(editor)).toBe("Fog. Then sun at\n");
     expect(dictation.useDictation.getState().state).toBe("off");
-    say({ kind: "settled", text: "then sun at last" });
+    await vi.waitFor(() => expect(shell.calls).toContain("dictate_stop"));
+    // Its last phrases, one by one, settle the words written for them.
+    say({ kind: "settled", text: "Then, sun" });
+    say({ kind: "settled", text: "at last." });
+    say({ kind: "stopped" });
+    expect(ed.getMarkdown(editor)).toBe("Fog. Then, sun at last.\n");
+    // Nothing more from that dictation.
+    say({ kind: "settled", text: "And wind." });
+    say({ kind: "heard", text: "and" });
+    expect(ed.getMarkdown(editor)).toBe("Fog. Then, sun at last.\n");
+    expect(shown(editor)).toBeUndefined();
+  });
+
+  it("Android's app to the background: the same, and words changed meanwhile stay as they are", async () => {
+    const editor = open("Fog.\n");
+    await dictation.start(editor);
+    say({ kind: "heard", text: "then sun" });
+    shell.last = undefined;
+    window.dispatchEvent(new Event("writer-background"));
     expect(ed.getMarkdown(editor)).toBe("Fog. Then sun\n");
+    editor.commands.insertContent("ny");
+    say({ kind: "settled", text: "Then, sun." });
+    expect(ed.getMarkdown(editor)).toBe("Fog. Then sunny\n");
   });
 
   it("the editor going writes what was heard first, and stops listening into it", async () => {

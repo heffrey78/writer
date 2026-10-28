@@ -12,6 +12,7 @@ import {
   documentCounts,
   getMarkdown,
   heardText,
+  holdHeard,
   joinPhrase,
   leaveDictation,
   loadChapter,
@@ -125,15 +126,23 @@ describe("a settled phrase", () => {
 });
 
 describe("leaving", () => {
-  test("writes the words heard so far, and tells the app the editor is going", () => {
+  test("tells the app the editor is going, which writes the words heard so far", () => {
     open("Fog.\n");
     after("Fog.");
-    const left = vi.fn();
+    const left = vi.fn((e: Editor) => void holdHeard(e));
     offerDictation({ listening: () => true, toggle: () => {}, focused: () => {}, left });
     showHeard(editor, "then sun");
     leaveDictation(editor);
     expect(getMarkdown(editor)).toBe("Fog. Then sun\n");
     expect(left).toHaveBeenCalledWith(editor);
+  });
+
+  test("with nothing listening, writes words still shown", () => {
+    open("Fog.\n");
+    after("Fog.");
+    showHeard(editor, "then sun");
+    leaveDictation(editor);
+    expect(getMarkdown(editor)).toBe("Fog. Then sun\n");
   });
 
   test("with nothing heard and nothing listening, changes nothing", () => {
@@ -143,6 +152,69 @@ describe("leaving", () => {
     leaveDictation(editor);
     expect(getMarkdown(editor)).toBe("Fog.\n");
     expect(left).not.toHaveBeenCalled();
+  });
+});
+
+describe("words held when the page goes (#97)", () => {
+  test("are written at once, as heard, and the phrase settled for them takes their place", () => {
+    open("Fog.\n");
+    after("Fog.");
+    showHeard(editor, "then sun at");
+    const held = holdHeard(editor)!;
+    expect(getMarkdown(editor)).toBe("Fog. Then sun at\n");
+    expect(heardText(editor.state)).toBe("");
+    held.settle("Then, sun at last.");
+    expect(getMarkdown(editor)).toBe("Fog. Then, sun at last.\n");
+    // The host's last phrases come one by one: each settles the words held, all of them.
+    held.settle("Then, sun at last. And wind.");
+    expect(getMarkdown(editor)).toBe("Fog. Then, sun at last. And wind.\n");
+  });
+
+  test("follow what's typed around them, and between words keep their spacing", () => {
+    open("Fog. Rain.\n");
+    after("Fog.");
+    showHeard(editor, "then sun");
+    const held = holdHeard(editor)!;
+    expect(getMarkdown(editor)).toBe("Fog. Then sun Rain.\n");
+    after("Fog");
+    editor.commands.insertContent(" thick");
+    held.settle("then sun.");
+    expect(getMarkdown(editor)).toBe("Fog thick. Then sun. Rain.\n");
+  });
+
+  test("changed since they were written, are left as they are", () => {
+    open("Fog.\n");
+    after("Fog.");
+    showHeard(editor, "then sun");
+    const held = holdHeard(editor)!;
+    after("Then sun");
+    editor.commands.insertContent("ny");
+    held.settle("Then, sun.");
+    expect(getMarkdown(editor)).toBe("Fog. Then sunny\n");
+  });
+
+  test("settled as \"new paragraph\" said alone, they become one", () => {
+    open("Fog.\n");
+    after("Fog.");
+    showHeard(editor, "new pair of graph");
+    const held = holdHeard(editor)!;
+    held.settle("New paragraph.");
+    expect(editor.state.doc.childCount).toBe(2);
+    expect(getMarkdown(editor)).toBe("Fog.\n");
+  });
+
+  test("heard as \"new paragraph\", it's made at once, and nothing is held", () => {
+    open("Fog.\n");
+    after("Fog.");
+    showHeard(editor, "new paragraph");
+    expect(holdHeard(editor)).toBeUndefined();
+    expect(editor.state.doc.childCount).toBe(2);
+  });
+
+  test("nothing heard, nothing held", () => {
+    open("Fog.\n");
+    expect(holdHeard(editor)).toBeUndefined();
+    expect(getMarkdown(editor)).toBe("Fog.\n");
   });
 });
 

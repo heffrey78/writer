@@ -188,3 +188,20 @@ proptest! {
         prop_assert_eq!(settled(&events), settled(&expected));
     }
 }
+
+#[test]
+fn speech_without_a_pause_is_settled_in_pieces() {
+    // The clip's speech with every quiet 20 ms taken out, three times over: forty seconds without a
+    // pause, as a writer may talk on. It's settled every quarter of a minute or so, not only at the end.
+    let clip = clip();
+    let frame = RATE / 50;
+    let once: Vec<f32> = clip.utterances.iter().flat_map(|(s, e, _)| clip.samples[*s..*e].chunks(frame)).filter(|c| (c.iter().map(|x| x * x).sum::<f32>() / c.len() as f32).sqrt() > 0.02).flatten().copied().collect();
+    let speech: Vec<f32> = once.iter().chain(&once).chain(&once).copied().collect();
+    let mut listener = Listener::open(&models(), &Options::default()).unwrap();
+    let events = hear(&mut listener, &speech, RATE / 10);
+    let mut last = 0;
+    for at in events.iter().filter(|(_, e)| matches!(e, Event::Settled(_))).map(|(at, _)| *at).chain([speech.len()]) {
+        assert!(at - last <= RATE * 15, "{:.1} s heard without a phrase settled", (at - last) as f64 / RATE as f64);
+        last = at;
+    }
+}

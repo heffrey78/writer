@@ -6,7 +6,7 @@ export { insertTable, setHeading, structureCommands } from "./structure.ts";
 export { insertPicture, pictureAt, PicturesExtension, setPicture, type PictureAttrs, type PictureCallbacks } from "./pictures.ts";
 export { getMarkdown, loadMarkdown, setInitialMarkdown } from "./editor.ts";
 export { sound, spellNames, spokenPhrase, type Spoken, type SpokenName } from "./spoken.ts";
-export { DICTATE_KEYS, DictationExtension, heardText, joinPhrase, leaveDictation, offerDictation, settleHeard, showHeard, type DictationOffer } from "./dictation.ts";
+export { DICTATE_KEYS, DictationExtension, heardText, holdHeard, joinPhrase, leaveDictation, offerDictation, settleHeard, showHeard, type DictationOffer, type HeldPhrase } from "./dictation.ts";
 export {
   chapterContent,
   deleteAcrossScenes,

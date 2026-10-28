@@ -1,5 +1,5 @@
 import type { Editor } from "@tiptap/core";
-import { heardText, offerDictation, settleHeard, showHeard, type DictationOffer } from "@writer/editor";
+import { heardText, holdHeard, offerDictation, settleHeard, showHeard, type DictationOffer, type HeldPhrase } from "@writer/editor";
 import { create } from "zustand";
 import {
   allowMicrophone,
@@ -73,6 +73,8 @@ const STOP_MS = 10_000;
 let session = 0;
 let silence: ReturnType<typeof setTimeout> | undefined;
 let stopping: ReturnType<typeof setTimeout> | undefined;
+/** The words written as they were heard when the page went, and the session the host settles them in. */
+let held: { session: number; phrase: HeldPhrase; settled: string[] } | undefined;
 
 const set = useDictation.setState;
 const get = useDictation.getState;
@@ -93,13 +95,37 @@ function end(announcement = "Dictation stopped"): void {
   set({ state: "off", editor: undefined, announcement });
 }
 
-/** The words heard so far into the text, then stopped at once: when the page is going, or the host failed. */
+/** The words heard so far into the text, then stopped at once: the host failed, or won't answer. */
 function settleNow(): void {
   if (get().state === "off") return;
   const editor = live(get().editor);
   if (editor) settleHeard(editor, heardText(editor.state));
   end();
   void stopDictation();
+}
+
+/**
+ * The page is going (hidden, the app to the background, the editor's page left, quitting): the words
+ * heard so far are written at once, and stopped. The host settles them as it stops, a moment later,
+ * and if the editor's still there the settled phrase takes their place (#97).
+ */
+function leave(): void {
+  if (get().state === "off") return;
+  const editor = live(get().editor);
+  const phrase = editor && holdHeard(editor);
+  const of = session;
+  end();
+  held = phrase ? { session: of, phrase, settled: [] } : undefined;
+  void stopDictation();
+}
+
+/** An event from a session that's ended: the phrases settled for the words written when the page went. */
+function late(of: number, event: DictationEvent): void {
+  if (held?.session !== of) return;
+  if (event.kind === "stopped" || event.kind === "failed") return void (held = undefined);
+  if (event.kind !== "settled") return;
+  held.settled.push(event.text);
+  held.phrase.settle(held.settled.join(" "));
 }
 
 const FAILED: Record<Extract<DictationEvent, { kind: "failed" }>["reason"], string> = {
@@ -212,7 +238,7 @@ export async function start(editor: Editor): Promise<void> {
   const mine = ++session;
   set({ state: "starting", editor, last: editor, announcement: "" });
   try {
-    await startDictation(LANGUAGE, [], (event) => mine === session && onEvent(event));
+    await startDictation(LANGUAGE, [], (event) => (mine === session ? onEvent(event) : late(mine, event)));
   } catch (e) {
     if (mine !== session) return;
     end("");
@@ -256,7 +282,7 @@ const offer: DictationOffer = {
     showHeard(editor, heard);
   },
   left(editor) {
-    if (get().editor === editor) settleNow();
+    if (get().editor === editor) leave();
   },
 };
 
@@ -282,10 +308,10 @@ export function initDictation(): Promise<void> {
     if (!available) return;
     void dictationSettings().then((setup) => setup && set({ settings: { ...DEFAULT_DICTATION_SETTINGS, ...setup.settings } }));
     offerDictation(offer);
-    settleOnQuit(settleNow);
-    document.addEventListener("visibilitychange", () => document.visibilityState === "hidden" && settleNow());
+    settleOnQuit(leave);
+    document.addEventListener("visibilitychange", () => document.visibilityState === "hidden" && leave());
     // Android's app goes to the background without hiding its page: its plugin says so instead.
-    window.addEventListener("writer-background", settleNow);
+    window.addEventListener("writer-background", leave);
   });
   return started;
 }

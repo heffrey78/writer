@@ -19,8 +19,10 @@ pub const RATE: usize = 16_000;
 
 /// A pause this long ends a phrase.
 const PHRASE_SILENCE_S: f32 = 0.5;
-/// A phrase is cut after this long without a pause, as no writer dictates longer in one breath.
-const LONGEST_PHRASE_S: f32 = 20.0;
+/// Past this long without a pause, the voice detection ends the phrase at the next slight dip in the
+/// voice (a softer pause than PHRASE_SILENCE_S), so a writer who talks on still sees it settle every
+/// dozen seconds or so. At 20 s, forty seconds of speech without a pause was greyed for 25 (#97).
+const LONGEST_PHRASE_S: f32 = 10.0;
 const WINDOW: usize = 512;
 
 #[derive(Clone, Debug, PartialEq)]
