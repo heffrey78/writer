@@ -183,6 +183,8 @@ jobs:
           [ -n "$KEYSTORE" ] || { echo "::warning::No ANDROID_DEBUG_KEYSTORE: the APK is signed with a new key, and won't install over the phone's app."; exit 0; }
           mkdir -p ~/.android
           echo "$KEYSTORE" | base64 -d > ~/.android/debug.keystore
+          # Named to Gradle (build.sh): on the runner its default place for the key isn't ~/.android.
+          echo "WRITER_ANDROID_DEBUG_KEYSTORE=$HOME/.android/debug.keystore" >> "$GITHUB_ENV"
       # sherpa-onnx's build keeps its download in target/, which the cache brings back emptied (as in
       # the dictation job), and the cache says its build script has run: it's made to run again, to
       # download it afresh.

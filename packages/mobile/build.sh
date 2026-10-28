@@ -26,6 +26,13 @@ grep -q 'libsherpa-onnx-jni.so' gen/android/app/build.gradle.kts || cat >> gen/a
 
 android { packaging { jniLibs { excludes += listOf("**/libsherpa-onnx-jni.so", "**/libsherpa-onnx-cxx-api.so") } } }
 GRADLE
+# The debug key from WRITER_ANDROID_DEBUG_KEYSTORE where it's set (CI, #105), so the APK installs over
+# the phone's app: Gradle's default place for it isn't ~/.android on every machine (on GitHub's
+# runners it signed with a key of its own). Unset, Gradle's own debug key, as here.
+grep -q 'WRITER_ANDROID_DEBUG_KEYSTORE' gen/android/app/build.gradle.kts || cat >> gen/android/app/build.gradle.kts <<'GRADLE'
+
+android { signingConfigs { getByName("debug") { System.getenv("WRITER_ANDROID_DEBUG_KEYSTORE")?.let { storeFile = file(it) } } } }
+GRADLE
 # An APK of the last build would be taken for this one's.
 rm -rf gen/android/app/build/outputs/apk
 "${tauri[@]}" android build --debug --apk --target "$target"
