@@ -4,6 +4,7 @@ import { Dialog } from "radix-ui";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { create } from "zustand";
 import { allCommands, keyCaps, useCommandRegistry, type Command } from "./commands.ts";
+import { markFocus, returnFocus, type FocusMark } from "./ui/focus.ts";
 
 /** Which of the two overlays is open. */
 export const useOverlay = create<{ open: "palette" | "shortcuts" | undefined; set: (open: "palette" | "shortcuts" | undefined) => void }>((set) => ({
@@ -81,10 +82,8 @@ function Keys({ keys }: { keys: string }) {
  * Mod+K: every registered command, searchable, recent ones first. Mod+/: the keyboard shortcuts.
  * Choosing a command closes the palette, returns focus to where it was, then runs the command.
  */
-/** Where the focus was when the palette or the shortcuts opened, to go back to. */
-const returnTo: { current: HTMLElement | null } = { current: null };
-/** The text selection when the palette opened: focusing a contenteditable again would put the caret at its start. */
-const returnRange: { current: Range | null } = { current: null };
+/** Where the focus and the caret were when the palette or the shortcuts opened, to go back to. */
+let returnTo: FocusMark = { element: null, range: null };
 
 /**
  * Open the palette or the shortcuts, to come back to the focus and the caret as they are now: from
@@ -92,11 +91,7 @@ const returnRange: { current: Range | null } = { current: null };
  */
 export function openOverlay(which: "palette" | "shortcuts"): void {
   const state = useOverlay.getState();
-  if (!state.open) {
-    returnTo.current = document.activeElement as HTMLElement | null;
-    const sel = window.getSelection();
-    returnRange.current = returnTo.current?.isContentEditable && sel?.rangeCount ? sel.getRangeAt(0).cloneRange() : null;
-  }
+  if (!state.open) returnTo = markFocus();
   state.set(which);
 }
 
@@ -144,19 +139,7 @@ export function CommandPalette() {
   };
 
   /** Focus back where it was; if that's gone (the view changed) or was nowhere, the text, else the page's main area. */
-  const restoreFocus = () => {
-    const before = returnTo.current;
-    const back = before?.isConnected && before !== document.body;
-    const target = back ? before : (document.querySelector<HTMLElement>(".ghw-prose") ?? document.getElementById("main"));
-    target?.focus({ preventScroll: true });
-    // Put the caret back where it was, in the same frame, before the editor reads the selection.
-    const range = returnRange.current;
-    if (back && range && target?.contains(range.startContainer)) {
-      const sel = window.getSelection();
-      sel?.removeAllRanges();
-      sel?.addRange(range);
-    }
-  };
+  const restoreFocus = () => returnFocus(returnTo, () => document.querySelector<HTMLElement>(".ghw-prose") ?? document.getElementById("main"));
 
   /** After closing: focus back where it was, then the command (which may move focus itself). */
   const onCloseAutoFocus = (e: Event) => {

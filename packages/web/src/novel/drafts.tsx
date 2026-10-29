@@ -2,7 +2,7 @@ import { ApiError, type Checkpoint, type Version } from "@writer/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronRight, Split, X } from "lucide-react";
 import { Dialog } from "radix-ui";
-import { useEffect, useId, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { create } from "zustand";
 import { api, keys } from "../api.ts";
@@ -12,6 +12,7 @@ import { Button } from "../ui/button.tsx";
 import { cn } from "../ui/cn.ts";
 import { Confirm } from "../ui/confirm.tsx";
 import { Field } from "../ui/field.tsx";
+import { markFocus, returnFocus, type FocusMark } from "../ui/focus.ts";
 import { useCurrentScene } from "./current.ts";
 import { useNotice } from "./notice.tsx";
 import { reload, stayIfThere, undoAdoption, useAdoption, useSwitchVersion, useVersions } from "./versions.tsx";
@@ -29,8 +30,15 @@ const number = new Intl.NumberFormat();
 const signed = (n: number) => (n > 0 ? `+${number.format(n)}` : n < 0 ? `−${number.format(-n)}` : "±0");
 const dateTime = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
 
-/** The Drafts panel, opened from the header, the ⋯ menu or the palette. */
-export const useDrafts = create<{ open: boolean; set: (open: boolean) => void }>((set) => ({ open: false, set: (open) => set({ open }) }));
+/**
+ * The Drafts panel, opened from the header, the ⋯ menu or the palette. Opening marks where the focus
+ * was, to go back to: the field Drafts focuses takes it before the panel's own open hook could look.
+ */
+export const useDrafts = create<{ open: boolean; opener: FocusMark; set: (open: boolean) => void }>((set, get) => ({
+  open: false,
+  opener: { element: null, range: null },
+  set: (open) => set(open && !get().open ? { open, opener: markFocus() } : { open }),
+}));
 
 /** The header's button: the version open, which opens Drafts. */
 /** The top bar's Drafts button and its panel; on a phone the panel alone (`button` false), opened from More (#100). */
@@ -39,13 +47,14 @@ export function DraftsButton({ novelId, workspace, button = true }: { novelId: s
   const { open, set } = useDrafts();
   const versions = useVersions(novelId);
   const current = versions.data?.find((v) => v.current);
+  const trigger = useRef<HTMLButtonElement>(null);
   // Open or closed is the app's, not the book's: leaving the book closes it, so the next doesn't open on it.
   useEffect(() => () => set(false), [novelId, set]);
   return (
     <Dialog.Root open={open} onOpenChange={set}>
       {button && (
         <Dialog.Trigger asChild>
-          <Button variant="ghost" size="sm" aria-label={current ? `Drafts: ${current.name} is open` : "Drafts"}>
+          <Button ref={trigger} variant="ghost" size="sm" aria-label={current ? `Drafts: ${current.name} is open` : "Drafts"}>
             <Split className="size-4" aria-hidden />
             <span className="max-w-40 truncate max-sm:sr-only">{current?.name ?? "Drafts"}</span>
           </Button>
@@ -55,8 +64,12 @@ export function DraftsButton({ novelId, workspace, button = true }: { novelId: s
         <Dialog.Overlay className="fixed inset-0 z-40 bg-black/40" />
         <Dialog.Content
           className="fixed top-0 right-0 z-50 flex h-dvh w-[min(32rem,100vw)] flex-col gap-4 overflow-y-auto border-l border-rule bg-raised p-5 text-ink shadow-xl"
-          // An adoption with passages to settle opens the resolver, which keeps the focus.
-          onCloseAutoFocus={(e) => void (useAdoption.getState().conflicts && e.preventDefault())}
+          // Back where it was when Drafts opened (the text, when opened from the palette), not always the
+          // header's button. An adoption with passages to settle opens the resolver, which keeps the focus.
+          onCloseAutoFocus={(e) => {
+            e.preventDefault();
+            if (!useAdoption.getState().conflicts) returnFocus(useDrafts.getState().opener, () => trigger.current);
+          }}
         >
           <div className="flex items-start justify-between gap-3">
             <Dialog.Title className="text-lg font-semibold">Drafts</Dialog.Title>

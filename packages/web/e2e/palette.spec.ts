@@ -70,6 +70,20 @@ test("reaches sync, checkpoints, the library and the theme", async ({ page, app 
   await expect(page.getByRole("textbox", { name: "Chapter text" })).toBeVisible();
 });
 
+test("Drafts opened from the palette closes back to the text, with the caret where it was", async ({ page, app }) => {
+  await open(page, app);
+  const text = page.getByRole("textbox", { name: "Chapter text" });
+  await page.keyboard.press("Control+End");
+  await page.keyboard.type(" Before.");
+  await run(page, "checkpoints");
+  await expect(page.getByRole("dialog", { name: "Drafts" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  // Not the header's Drafts button, as Radix would have it.
+  await expect(text).toBeFocused();
+  await page.keyboard.type(" After.");
+  await expect(text).toContainText("Before. After.");
+});
+
 test("says when nothing matches", async ({ page, app }) => {
   await open(page, app);
   await page.keyboard.press("ControlOrMeta+k");
