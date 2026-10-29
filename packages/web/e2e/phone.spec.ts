@@ -96,6 +96,8 @@ test("on a phone, by touch: the shelf, a book, its bar and its pages, writing, t
   };
   await drag(30);
   await expect(more).toBeVisible();
+  // Settled back before it's taken again: sliding, the grip isn't under the place it was.
+  await expect(more).toHaveCSS("transform", "none");
   await drag(200);
   await expect(more).toHaveCount(0);
   await bar.getByRole("button", { name: "More" }).tap();
