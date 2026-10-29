@@ -2,12 +2,14 @@ import { BookOpen, FileText, PanelRightClose, PanelRightOpen, StickyNote } from 
 import { useEffect, useRef, useSyncExternalStore, type KeyboardEvent, type ReactNode } from "react";
 import { create } from "zustand";
 import { cn } from "../ui/cn.ts";
+import { useSwipeClose } from "../ui/sheet-swipe.ts";
 
 /*
  * The right sidebar (heffrey78/gh-writer#149): the scene the caret is in, and a story bible entry, as two tabs beside
  * the text. Ctrl+Shift+\ (⌘⇧\ on a Mac) opens and closes it; closed, it's a strip of icons at the
  * right edge, as the left sidebar is. Open or closed, its tab and its width are remembered in this
- * browser. On a narrow window it's a sheet over the text, shown only when asked for.
+ * browser. On a narrow window it's a sheet over the text, shown only when asked for, that swipes
+ * closed (#109).
  */
 
 export type SidebarTab = "scene" | "notes" | "entry";
@@ -106,6 +108,9 @@ export function RightSidebar({ content, toText, labels = {} }: { content: Record
   const isWide = useWideSidebar();
   const open = isWide ? opened : sheet;
   const aside = useRef<HTMLElement>(null);
+  const backdrop = useRef<HTMLButtonElement>(null);
+  // On a narrow window, swiped back toward the right edge, the sheet closes as its button closes it (#109).
+  const swipe = useSwipeClose({ sheet: aside, backdrop, onClose: () => useRightSidebar.setState({ sheet: false }) });
   const tabs = useRef<Record<SidebarTab, HTMLButtonElement | null>>({ scene: null, notes: null, entry: null });
 
   // Ctrl+Shift+\ anywhere in the novel (the key by its place: Shift+\ types "|" on most keyboards);
@@ -170,9 +175,10 @@ export function RightSidebar({ content, toText, labels = {} }: { content: Record
   return (
     <>
       {/* On a narrow window, a sheet over the text: the backdrop closes it. */}
-      {!isWide && <button type="button" aria-hidden tabIndex={-1} onClick={toggle} className="fixed inset-0 z-30 bg-black/30" />}
+      {!isWide && <button ref={backdrop} type="button" aria-hidden tabIndex={-1} onClick={toggle} className="fixed inset-0 z-30 bg-black/30" />}
       <aside
         ref={aside}
+        {...(!isWide && swipe)}
         aria-label="Right sidebar"
         style={{ width }}
         onKeyDown={(e) => {
@@ -182,7 +188,7 @@ export function RightSidebar({ content, toText, labels = {} }: { content: Record
             toText();
           }
         }}
-        className="fixed inset-y-0 right-0 z-40 flex max-w-[90vw] shrink-0 flex-col border-l border-rule bg-raised shadow-xl lg:relative lg:z-auto lg:max-w-none lg:shadow-none"
+        className="fixed inset-y-0 right-0 z-40 flex max-w-[90vw] shrink-0 touch-pan-y flex-col border-l border-rule bg-raised shadow-xl lg:relative lg:touch-auto lg:z-auto lg:max-w-none lg:shadow-none"
       >
         <div
           role="separator"

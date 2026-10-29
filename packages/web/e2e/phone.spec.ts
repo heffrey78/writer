@@ -131,6 +131,81 @@ test("on a phone, by touch: the shelf, a book, its bar and its pages, writing, t
   await expect.poll(() => app.git(remote, "show", `main:${STATION}`), { timeout: 15_000 }).toContain("Written on the phone.");
 });
 
+test("on a phone, the right sidebar swipes closed: drawn far enough or flicked, not a little, not up and down, not in a field (#109)", async ({ page, app }) => {
+  await app.restart(app.novelRepo("varn"));
+  await launch(page, app);
+  const sheet = page.getByRole("complementary", { name: "Right sidebar" });
+  const tab = page.getByRole("tab", { name: "Scene" });
+  const open = async () => {
+    await page.getByRole("navigation", { name: "Book" }).getByRole("button", { name: "More" }).tap();
+    await page.getByRole("dialog", { name: /: more$/ }).getByRole("button", { name: "Details" }).tap();
+    await expect(tab).toBeVisible();
+  };
+  // Real touches, as the phone's, so the browser's own panning (touch-action) has its say too.
+  const cdp = await page.context().newCDPSession(page);
+  // Each with its own time, so a flick is one however busy the machine is.
+  const touch = (type: "touchStart" | "touchMove" | "touchEnd", timestamp: number, at?: { x: number; y: number }) =>
+    cdp.send("Input.dispatchTouchEvent", { type, timestamp, touchPoints: at ? [at] : [] });
+  /** A finger down on `on`, drawn by (dx, dy) in `steps` moves `ms` apart, held `hold` ms, and lifted. */
+  const swipe = async (on: { x: number; y: number; width: number; height: number }, dx: number, dy: number, { steps = 10, ms = 30, hold = 150 } = {}) => {
+    const x = on.x + on.width / 2;
+    const y = on.y + on.height / 2;
+    let at = Date.now() / 1000;
+    await touch("touchStart", at, { x, y });
+    for (let i = 1; i <= steps; i++) await touch("touchMove", (at += ms / 1000), { x: x + (dx * i) / steps, y: y + (dy * i) / steps });
+    await touch("touchEnd", (at += hold / 1000));
+  };
+
+  // Drawn a little and held: it slides back.
+  await open();
+  await swipe((await tab.boundingBox())!, 60, 0);
+  await expect(sheet).toBeVisible();
+  await expect(sheet).toHaveCSS("transform", "none");
+  // Up and down, and mostly so: the browser's, to scroll; the sheet stays where it is.
+  await swipe((await tab.boundingBox())!, 0, 200);
+  await swipe((await tab.boundingBox())!, 40, 200);
+  await expect(sheet).toBeVisible();
+  await expect(sheet).toHaveCSS("transform", "none");
+  // In a field it edits, never closes.
+  await sheet.getByRole("button", { name: "Edit synopsis" }).tap();
+  await swipe((await sheet.getByRole("textbox", { name: "Synopsis" }).boundingBox())!, 250, 0);
+  await expect(sheet).toBeVisible();
+  // A mouse selects, as it would anywhere.
+  const box = (await tab.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 250, box.y + box.height / 2, { steps: 6 });
+  await page.mouse.up();
+  await expect(sheet).toBeVisible();
+
+  // Past a third of its width: it goes, with the dimmed text behind it.
+  await swipe((await tab.boundingBox())!, 200, 10);
+  await expect(sheet).toHaveCount(0);
+  await expect(page.locator(".bg-black\\/30")).toHaveCount(0);
+  // Flicked, however short (90 px of its 370, at about 2 px/ms).
+  await open();
+  await swipe((await tab.boundingBox())!, 90, 0, { steps: 3, ms: 16, hold: 0 });
+  await expect(sheet).toHaveCount(0);
+  // Without the slide, for whoever asks for less motion. Opened again at once: the first tap after a
+  // flick once only stopped the browser's fling of it.
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await open();
+  await swipe((await tab.boundingBox())!, 200, 0);
+  await expect(sheet).toHaveCount(0);
+  // Its button still closes it, and it opens again on the same tab.
+  await open();
+  await expect(tab).toHaveAttribute("aria-selected", "true");
+  await sheet.getByRole("button", { name: "Hide the right sidebar" }).tap();
+  await expect(sheet).toHaveCount(0);
+
+  // On a wide screen the sidebar beside the text doesn't swipe.
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await expect(sheet).toBeVisible();
+  await swipe((await sheet.getByRole("tab", { name: "Scene" }).boundingBox())!, 200, 0);
+  await expect(sheet).toBeVisible();
+  await expect(sheet).toHaveCSS("transform", "none");
+});
+
 test("on a phone, Drafts closes by its button, and a book left with Drafts open doesn't open on it", async ({ page, app }) => {
   await app.restart(app.novelRepo("varn"));
   await launch(page, app);
