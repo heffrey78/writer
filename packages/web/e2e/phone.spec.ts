@@ -27,6 +27,25 @@ async function audit(page: Page) {
   }
 }
 
+/**
+ * Real touches, as the phone's, so the browser's own panning (touch-action) has its say too, each
+ * with its own time, so a flick is one however busy the machine is. The swipe: a finger down on the
+ * middle of `on`, drawn by (dx, dy) in `steps` moves `ms` apart, held `hold` ms, and lifted.
+ */
+async function finger(page: Page) {
+  const cdp = await page.context().newCDPSession(page);
+  const touch = (type: "touchStart" | "touchMove" | "touchEnd", timestamp: number, at?: { x: number; y: number }) =>
+    cdp.send("Input.dispatchTouchEvent", { type, timestamp, touchPoints: at ? [at] : [] });
+  return async (on: { x: number; y: number; width: number; height: number }, dx: number, dy: number, { steps = 10, ms = 30, hold = 150 } = {}) => {
+    const x = on.x + on.width / 2;
+    const y = on.y + on.height / 2;
+    let at = Date.now() / 1000;
+    await touch("touchStart", at, { x, y });
+    for (let i = 1; i <= steps; i++) await touch("touchMove", (at += ms / 1000), { x: x + (dx * i) / steps, y: y + (dy * i) / steps });
+    await touch("touchEnd", (at += hold / 1000));
+  };
+}
+
 test("on a phone, by touch: the shelf, a book, its bar and its pages, writing, the palette and a sync", async ({ page, app }) => {
   test.setTimeout(90_000);
   const remote = app.bareRepo("varn.git");
@@ -143,20 +162,7 @@ test("on a phone, the right sidebar swipes closed: drawn far enough or flicked, 
     await page.getByRole("dialog", { name: /: more$/ }).getByRole("button", { name: "Details" }).tap();
     await expect(tab).toBeVisible();
   };
-  // Real touches, as the phone's, so the browser's own panning (touch-action) has its say too.
-  const cdp = await page.context().newCDPSession(page);
-  // Each with its own time, so a flick is one however busy the machine is.
-  const touch = (type: "touchStart" | "touchMove" | "touchEnd", timestamp: number, at?: { x: number; y: number }) =>
-    cdp.send("Input.dispatchTouchEvent", { type, timestamp, touchPoints: at ? [at] : [] });
-  /** A finger down on `on`, drawn by (dx, dy) in `steps` moves `ms` apart, held `hold` ms, and lifted. */
-  const swipe = async (on: { x: number; y: number; width: number; height: number }, dx: number, dy: number, { steps = 10, ms = 30, hold = 150 } = {}) => {
-    const x = on.x + on.width / 2;
-    const y = on.y + on.height / 2;
-    let at = Date.now() / 1000;
-    await touch("touchStart", at, { x, y });
-    for (let i = 1; i <= steps; i++) await touch("touchMove", (at += ms / 1000), { x: x + (dx * i) / steps, y: y + (dy * i) / steps });
-    await touch("touchEnd", (at += hold / 1000));
-  };
+  const swipe = await finger(page);
 
   // Drawn a little and held: it slides back.
   await open();
@@ -206,6 +212,41 @@ test("on a phone, the right sidebar swipes closed: drawn far enough or flicked, 
   await swipe((await sheet.getByRole("tab", { name: "Scene" }).boundingBox())!, 200, 0);
   await expect(sheet).toBeVisible();
   await expect(sheet).toHaveCSS("transform", "none");
+});
+
+test("on a phone, a journal's right sidebar keeps its scrolling to itself, and swipes closed (#109)", async ({ page, app }) => {
+  await app.restart(app.bookRepo(fileURLToPath(new URL("../../../examples/sample-journal", import.meta.url)), "journal"));
+  await launch(page, app);
+  await expect(page.getByRole("textbox", { name: "Write today's entry" })).toBeVisible();
+  const swipe = await finger(page);
+  await page.getByRole("navigation", { name: "Book" }).getByRole("button", { name: "More" }).tap();
+  await page.getByRole("dialog", { name: /: more$/ }).getByRole("button", { name: "Details" }).tap();
+  const sheet = page.getByRole("complementary", { name: "Right sidebar" });
+  const panel = sheet.getByRole("tabpanel");
+  await expect(panel).toBeVisible();
+  const pageScrolled = () => page.evaluate(() => document.scrollingElement!.scrollTop);
+
+  // Drawn up, with nothing in it to scroll, from its middle and its foot: the entries beneath stay
+  // where they are (they scrolled, on the owner's phone).
+  expect(await panel.evaluate((e) => e.scrollHeight <= e.clientHeight)).toBe(true);
+  const box = (await panel.boundingBox())!;
+  for (const from of [0.5, 0.85]) {
+    await swipe({ x: box.x, y: box.y + box.height * from, width: box.width, height: 0 }, 0, -300);
+    await page.waitForTimeout(300);
+    expect(await pageScrolled()).toBe(0);
+  }
+  // Longer than the screen, it scrolls in itself, and still not the entries.
+  const details = await panel.evaluate((e) => (e.firstElementChild as HTMLElement).offsetHeight);
+  await page.setViewportSize({ width: viewport.width, height: Math.round(details * 0.75) });
+  await expect.poll(() => panel.evaluate((e) => e.scrollHeight > e.clientHeight)).toBe(true);
+  const short = (await panel.boundingBox())!;
+  await swipe({ ...short, height: short.height / 2, y: short.y + short.height / 2 }, 0, -150);
+  await expect.poll(() => panel.evaluate((e) => e.scrollTop)).toBeGreaterThan(0);
+  expect(await pageScrolled()).toBe(0);
+
+  // Drawn to the right, from its tabs: it goes.
+  await swipe((await sheet.getByRole("tab").first().boundingBox())!, 200, 0);
+  await expect(sheet).toHaveCount(0);
 });
 
 test("on a phone, Drafts closes by its button, and a book left with Drafts open doesn't open on it", async ({ page, app }) => {

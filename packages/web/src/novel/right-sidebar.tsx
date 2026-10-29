@@ -174,7 +174,8 @@ export function RightSidebar({ content, toText, labels = {} }: { content: Record
 
   return (
     <>
-      {/* On a narrow window, a sheet over the text: the backdrop closes it. */}
+      {/* On a narrow window, a sheet over the text: the backdrop closes it. Its scrolling stays its own:
+          with nothing in it to scroll, a drag up or down scrolled the text beneath (#109). */}
       {!isWide && <button ref={backdrop} type="button" aria-hidden tabIndex={-1} onClick={toggle} className="fixed inset-0 z-30 bg-black/30" />}
       <aside
         ref={aside}
@@ -188,7 +189,7 @@ export function RightSidebar({ content, toText, labels = {} }: { content: Record
             toText();
           }
         }}
-        className="fixed inset-y-0 right-0 z-40 flex max-w-[90vw] shrink-0 touch-pan-y flex-col border-l border-rule bg-raised shadow-xl lg:relative lg:touch-auto lg:z-auto lg:max-w-none lg:shadow-none"
+        className="fixed inset-y-0 right-0 z-40 flex max-w-[90vw] shrink-0 touch-pan-y flex-col overflow-hidden overscroll-contain border-l border-rule bg-raised shadow-xl lg:relative lg:touch-auto lg:overflow-visible lg:overscroll-auto lg:z-auto lg:max-w-none lg:shadow-none"
       >
         <div
           role="separator"
@@ -242,7 +243,7 @@ export function RightSidebar({ content, toText, labels = {} }: { content: Record
             <PanelRightClose className="size-4" aria-hidden />
           </button>
         </div>
-        <div role="tabpanel" id="right-tabpanel" aria-labelledby={`right-tab-${tab}`} className="min-h-0 flex-1 overflow-y-auto">
+        <div role="tabpanel" id="right-tabpanel" aria-labelledby={`right-tab-${tab}`} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
           {content[tab]}
         </div>
       </aside>
