@@ -392,3 +392,34 @@ test("on a phone, writing: the bar on top of the keyboard, every tap leaving the
   await bar.getByRole("button", { name: "Raise an issue…" }).tap();
   await expect(page.getByRole("complementary", { name: "Raise an issue" })).toBeVisible();
 });
+
+// The palette has what it has on a wide screen, though the tree that's beside the text there isn't here.
+for (const [sample, name, section, piece] of [
+  ["sample-novel", "novel", "chapter", "scene"],
+  ["sample-campaign", "campaign", "arc", "session"],
+  ["sample-nonfiction", "nonfiction", "chapter", "section"],
+] as const) {
+  test(`on a phone, the palette adds its sections and pieces to a ${name}, with the notice leaving the bar free`, async ({ page, app }) => {
+    const dir = app.bookRepo(fileURLToPath(new URL(`../../../examples/${sample}`, import.meta.url)), name);
+    await app.restart(dir);
+    await launch(page, app);
+    await expect(page.getByRole("navigation", { name: "Book" })).toBeVisible();
+    const command = async (title: string) => {
+      await page.getByRole("navigation", { name: "Book" }).getByRole("button", { name: "More" }).tap();
+      await page.getByRole("dialog", { name: /: more$/ }).getByRole("button", { name: "Commands…" }).tap();
+      const palette = page.getByRole("dialog", { name: "Command palette" });
+      await palette.getByRole("combobox").fill(title);
+      await palette.getByRole("option", { name: new RegExp(`^${title}`) }).first().tap();
+    };
+    await command(`New ${section}`);
+    await page.getByRole("dialog", { name: `New ${section}` }).getByRole("textbox").fill("Added on the phone");
+    await fits(page);
+    await page.getByRole("dialog", { name: `New ${section}` }).getByRole("button", { name: new RegExp(`^Add ${section}`, "i") }).tap();
+    await expect(page.getByRole("heading", { level: 1, name: "Added on the phone" })).toBeVisible();
+
+    await command(`New ${piece}`);
+    await page.getByRole("dialog", { name: `New ${piece}` }).getByRole("textbox").fill("Its first");
+    await page.getByRole("dialog", { name: `New ${piece}` }).getByRole("button", { name: new RegExp(`^Add ${piece}`, "i") }).tap();
+    await expect(page.getByRole("heading", { level: 1, name: "Its first" })).toBeVisible();
+  });
+}

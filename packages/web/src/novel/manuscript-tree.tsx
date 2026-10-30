@@ -3,13 +3,12 @@ import { ChevronDown, ChevronRight, Ellipsis, FilePlus, FolderPlus, History, Lay
 import { ContextMenu, DropdownMenu } from "radix-ui";
 import { memo, useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
 import { useNavigate } from "react-router";
-import { useCommands, type Command } from "../commands.ts";
 import { Button } from "../ui/button.tsx";
 import { cn } from "../ui/cn.ts";
 import { chapterTitle } from "./navigation.tsx";
-import { dropMove, itemOf, stepMove, useStructure, type ItemKind, type Structure } from "./structure.ts";
+import { dropMove, newSectionPlace, openSection, stepMove, usableLevels, useStructure, type ItemKind, type Structure } from "./structure.ts";
 import type { Workspace } from "./workspace.ts";
-import { MoveToDialog, RecentlyDeletedDialog, TitleDialog } from "./structure-dialogs.tsx";
+import { StructureDialogs, type StructureDialog } from "./structure-dialogs.tsx";
 
 const number = new Intl.NumberFormat();
 
@@ -29,12 +28,7 @@ interface TreeNode {
   hasChildren: boolean;
 }
 
-type Dialog =
-  | { kind: "rename"; id: string; title: string }
-  | { kind: "new-scene"; chapter: string; after?: string | null }
-  | { kind: "new-section"; level: LevelDef; parent: string | null; after: string | null }
-  | { kind: "move"; id: string }
-  | { kind: "deleted" };
+type Dialog = StructureDialog;
 
 /**
  * The manuscript as a tree: its sections at each level of its kind (a novel's parts and chapters) and
@@ -57,11 +51,6 @@ export function ManuscriptTree({ novelId, novel, structure, current }: { novelId
   const { levels, piece } = novel.kind;
   const inner = pieceLevel(novel);
   const w = vocabulary(novel.kind);
-  /** What an item is, in the kind's words: "scene", "part"; "it" for one that's gone. */
-  const what = (id: string) => {
-    const kind = itemOf(novel, id)?.kind;
-    return kind ? w.of(kind).one : "it";
-  };
   const levelOf = (key: string) => levels.find((l) => l.key === key);
   /** The level a section's children are at; none for one that holds pieces. */
   const childLevel = (key: string) => levels[levels.findIndex((l) => l.key === key) + 1];
@@ -278,53 +267,12 @@ export function ManuscriptTree({ novelId, novel, structure, current }: { novelId
     </ContextMenu.Portal>
   );
 
-  const currentChapter = novel.allPieces.find((s) => s.id === current)?.sectionId ?? (novel.allSections.some((c) => c.id === current && c.level === inner) ? current : novel.sections.find((c) => c.level === inner)?.id);
+  const currentChapter = openSection(novel, current);
   const currentNode = all.find((n) => n.id === current);
-  /** The open chapter's section at a level: itself, or what it's in (its part). */
-  const currentAt = (level: string): string | undefined => {
-    let s = sectionById(novel, currentChapter);
-    while (s && s.level !== level) s = sectionById(novel, s.parentId);
-    return s?.id;
-  };
-  /** Where "New <level>" puts a section: in the open chapter's section of the level above (or the first), after its own. */
-  const newSection = (level: LevelDef): Dialog => {
-    const above = parentLevel(level.key);
-    const parent = level.key === novel.levels[0] || !above ? null : (currentAt(above.key) ?? novel.sections.find((s) => s.level === above.key)?.id ?? null);
-    const after = currentAt(level.key) ?? (level.key === inner ? null : (novel.sections.filter((s) => s.level === level.key).at(-1)?.id ?? null));
-    return { kind: "new-section", level, parent, after };
-  };
-  /** Levels the book uses, innermost first, as the New menu lists them; one that needs a section above it that isn't there yet can't be added. */
-  const usable = [...novel.levels].reverse().map((key) => {
-    const level = levelOf(key)!;
-    const above = parentLevel(key);
-    return { level, disabled: key !== novel.levels[0] && !!above && !novel.sections.some((s) => s.level === above.key) };
-  });
+  const newSection = (level: LevelDef): Dialog => ({ kind: "new-section", level, ...newSectionPlace(novel, level, current) });
+  const usable = usableLevels(novel);
   // The toolbar's ⋯ acts on the item last focused in the tree, or the open one.
   const target = all.find((n) => n.id === focused) ?? currentNode;
-  useCommands((): Command[] => {
-    const here = currentNode;
-    return [
-      ...(currentChapter ? [{ id: "tree.newScene", title: `New ${w.piece.one}`, group: w.content.One, run: () => setDialog({ kind: "new-scene", chapter: currentChapter, ...(here?.role === "piece" ? { after: here.id } : {}) }) }] : []),
-      ...usable.map(({ level }) => ({ id: level.key === inner ? "tree.newChapter" : `tree.new.${level.key}`, title: `New ${w.level(level.key).one}`, group: w.content.One, run: () => setDialog(newSection(level)) })),
-      ...novel.sections
-        .filter((s) => s.level !== inner)
-        .flatMap((s): Command[] => [
-          { id: `tree.rename.${s.id}`, title: `Rename ${w.level(s.level).one} “${s.title ?? ""}”…`, group: w.content.One, run: () => setDialog({ kind: "rename", id: s.id, title: s.title ?? "" }) },
-          { id: `tree.delete.${s.id}`, title: `Delete ${w.level(s.level).one} “${s.title ?? ""}”`, group: w.content.One, run: () => void structure.remove(s.id) },
-        ]),
-      { id: "tree.deleted", title: "Recently deleted", group: w.content.One, run: () => setDialog({ kind: "deleted" }) },
-      ...(here
-        ? [
-            { id: "tree.rename", title: `Rename ${w.of(here.kind).one}…`, group: w.content.One, keys: "F2", run: () => setDialog({ kind: "rename", id: here.id, title: titleOf(here) }) },
-            { id: "tree.up", title: `Move ${w.of(here.kind).one} up`, group: w.content.One, keys: "Alt-ArrowUp", run: () => void structure.step(here.id, -1) },
-            { id: "tree.down", title: `Move ${w.of(here.kind).one} down`, group: w.content.One, keys: "Alt-ArrowDown", run: () => void structure.step(here.id, 1) },
-            ...(here.role === "piece" ? [{ id: "tree.moveTo", title: `Move ${w.piece.one} to ${w.level(inner).one}…`, group: w.content.One, run: () => setDialog({ kind: "move", id: here.id }) }] : []),
-            ...(here.role === "piece" && here.pos < here.size ? [{ id: "tree.merge", title: `Merge ${w.piece.one} with the next`, group: w.content.One, run: () => void structure.merge(here.id) }] : []),
-            { id: "tree.delete", title: `Delete ${w.of(here.kind).one}`, group: w.content.One, keys: "Delete", run: () => void structure.remove(here.id) },
-          ]
-        : []),
-    ];
-  }, [currentNode, currentChapter, novel, structure]);
 
   return (
     <div className="grid gap-2">
@@ -451,41 +399,23 @@ export function ManuscriptTree({ novelId, novel, structure, current }: { novelId
         ))}
       </div>
 
-      {dialog?.kind === "rename" && (
-        <TitleDialog
-          title={`Rename ${what(dialog.id)}`}
-          initial={dialog.title}
-          required={titleRequired(novel, dialog.id)}
-          action="Rename"
-          submit={(title) => structure.rename(dialog.id, title)}
+      {dialog && (
+        <StructureDialogs
+          novelId={novelId}
+          novel={novel}
+          structure={structure}
+          dialog={dialog}
           onClose={() => {
             setDialog(undefined);
-            focusNode(dialog.id);
+            if (dialog.kind === "rename") focusNode(dialog.id);
           }}
         />
       )}
-      {dialog?.kind === "new-scene" && <TitleDialog title={`New ${w.piece.one}`} action={`Add ${w.piece.one}`} submit={(title) => structure.createScene(dialog.chapter, title, dialog.after)} onClose={() => setDialog(undefined)} />}
-      {dialog?.kind === "new-section" && (
-        <TitleDialog
-          title={`New ${w.level(dialog.level.key).one}`}
-          {...(dialog.level.titled ? {} : { label: "Title (optional)", required: false })}
-          action={`Add ${w.level(dialog.level.key).one}`}
-          submit={(title) => structure.createSection(dialog.level.key, dialog.parent, title || undefined, dialog.after)}
-          onClose={() => setDialog(undefined)}
-        />
-      )}
-      {dialog?.kind === "move" && <MoveToDialog novel={novel} id={dialog.id} structure={structure} onClose={() => setDialog(undefined)} />}
-      {dialog?.kind === "deleted" && <RecentlyDeletedDialog novelId={novelId} structure={structure} onClose={() => setDialog(undefined)} />}
     </div>
   );
 }
 
 /** Whether renaming an item needs a title: a piece's, and a section's whose level is `titled` (a part's, not a chapter's). */
-function titleRequired(novel: Book, id: string): boolean {
-  const section = sectionById(novel, id);
-  return !section || !!novel.kind.levels.find((l) => l.key === section.level)?.titled;
-}
-
 /**
  * The tree with its structural actions, for the workspace's sidebar. `current` is the open chapter
  * or scene. Memoised, and given that rather than reading the address itself, so a change to a

@@ -1,4 +1,4 @@
-import { axe, caretAtEnd, expect, test } from "./fixtures.ts";
+import { axe, caretAtEnd, expect, palette, test } from "./fixtures.ts";
 
 /** What surrounds the text, kept quiet: the counts where they belong, the card's buttons until pointed at. */
 
@@ -60,4 +60,17 @@ test("the count by a title is of what's open, and says Words: a chapter's, or a 
   await page.getByRole("tree").getByRole("treeitem", { name: /The Station/ }).click();
   await expect(page.getByRole("textbox", { name: "Scene text" })).toBeVisible();
   await expect(header).toHaveText("Words 113");
+});
+
+test("in focus mode, the palette still adds a scene", async ({ page, app }) => {
+  await app.restart(app.novelRepo("varn"));
+  await page.goto(app.launchUrl);
+  await expect(page.getByRole("textbox", { name: "Chapter text" })).toBeFocused();
+  await palette(page, "focus mode");
+  await expect(page.getByRole("navigation", { name: "Views" })).toHaveCount(0);
+  await page.keyboard.press("ControlOrMeta+k");
+  const commands = page.getByRole("dialog", { name: "Command palette" });
+  await commands.getByRole("combobox").fill("new scene");
+  await commands.getByRole("option", { name: /^New scene/ }).click();
+  await expect(page.getByRole("dialog", { name: "New scene" })).toBeVisible();
 });

@@ -35,6 +35,7 @@ import { useNovelEvents } from "./events.ts";
 import { homeOf, Sidebar, useArrangeSidebar, useSidebar } from "./sidebar.tsx";
 import { ArrangeBar, BottomBar, MoreSheet, useArrangeBar } from "./bottom-bar.tsx";
 import { GoToButton } from "./go-to.tsx";
+import { StructureCommands } from "./structure-commands.tsx";
 import { useNarrow } from "../narrow.ts";
 import { chapterTitle } from "./navigation.tsx";
 import { NoticeBar } from "./notice.tsx";
@@ -336,6 +337,7 @@ export function NovelPage() {
           {!focus && !narrow && (
             <Sidebar novelId={novelId} novel={book} workspace={workspace} current={current} onGitHub={!!repo} />
           )}
+          <StructureCommands novelId={novelId} novel={book} workspace={workspace} current={current} />
           <div className="md:overflow-y-auto">
             <ErrorBoundary what="this view" remount={sameView}>
               <Routes>

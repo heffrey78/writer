@@ -1,4 +1,4 @@
-import { pieceLevel, sectionById, vocabulary, type Book } from "@writer/core";
+import { pieceLevel, sectionById, vocabulary, type Book, type LevelDef } from "@writer/core";
 import { useQuery } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { api } from "../api.ts";
@@ -10,7 +10,7 @@ import { Field } from "../ui/field.tsx";
 import { Picker } from "../ui/picker.tsx";
 import { useWords } from "./kind.ts";
 import { chapterTitle } from "./navigation.tsx";
-import type { Structure } from "./structure.ts";
+import { itemOf, type Structure } from "./structure.ts";
 
 const Frame = Modal;
 
@@ -107,4 +107,45 @@ export function RecentlyDeletedDialog({ novelId, structure, onClose }: { novelId
       </div>
     </Frame>
   );
+}
+
+/** What's being asked about the book's structure, from the tree or the palette. */
+export type StructureDialog =
+  | { kind: "rename"; id: string; title: string }
+  | { kind: "new-scene"; chapter: string; after?: string | null }
+  | { kind: "new-section"; level: LevelDef; parent: string | null; after: string | null }
+  | { kind: "move"; id: string }
+  | { kind: "deleted" };
+
+/** A section of a level that must have a title, or a piece, can't be renamed to nothing. */
+function titleRequired(novel: Book, id: string): boolean {
+  const section = sectionById(novel, id);
+  return !section || !!novel.kind.levels.find((l) => l.key === section.level)?.titled;
+}
+
+/** The dialog for what's being asked. */
+export function StructureDialogs({ novelId, novel, structure, dialog, onClose }: { novelId: string; novel: Book; structure: Structure; dialog: StructureDialog; onClose: () => void }) {
+  const w = vocabulary(novel.kind);
+  switch (dialog.kind) {
+    case "rename": {
+      const kind = itemOf(novel, dialog.id)?.kind;
+      return <TitleDialog title={`Rename ${kind ? w.of(kind).one : "it"}`} initial={dialog.title} required={titleRequired(novel, dialog.id)} action="Rename" submit={(title) => structure.rename(dialog.id, title)} onClose={onClose} />;
+    }
+    case "new-scene":
+      return <TitleDialog title={`New ${w.piece.one}`} action={`Add ${w.piece.one}`} submit={(title) => structure.createScene(dialog.chapter, title, dialog.after)} onClose={onClose} />;
+    case "new-section":
+      return (
+        <TitleDialog
+          title={`New ${w.level(dialog.level.key).one}`}
+          {...(dialog.level.titled ? {} : { label: "Title (optional)", required: false })}
+          action={`Add ${w.level(dialog.level.key).one}`}
+          submit={(title) => structure.createSection(dialog.level.key, dialog.parent, title || undefined, dialog.after)}
+          onClose={onClose}
+        />
+      );
+    case "move":
+      return <MoveToDialog novel={novel} id={dialog.id} structure={structure} onClose={onClose} />;
+    case "deleted":
+      return <RecentlyDeletedDialog novelId={novelId} structure={structure} onClose={onClose} />;
+  }
 }

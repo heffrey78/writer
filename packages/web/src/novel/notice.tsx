@@ -52,7 +52,8 @@ export function NoticeBar() {
     [notice],
   );
   return (
-    <div role="status" aria-live="polite" className="pointer-events-none fixed inset-x-0 bottom-4 z-[70] flex justify-center px-4">
+    // On a phone, above the bottom bar and the writing bar: it stays until dismissed, and mustn't cover them.
+    <div role="status" aria-live="polite" className="pointer-events-none fixed inset-x-0 bottom-4 z-[70] flex justify-center px-4 max-md:bottom-36">
       {notice && (
         // A long message takes the width, its buttons under it, rather than squeezed into a column beside them (a phone's).
         <div className="pointer-events-auto flex max-w-2xl flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-rule bg-raised py-2 pr-2 pl-4 text-sm shadow-lg">

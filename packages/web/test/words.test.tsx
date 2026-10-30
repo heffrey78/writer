@@ -14,6 +14,7 @@ import { CompileDialog } from "../src/novel/compile.tsx";
 import { OutlineCards } from "../src/novel/corkboard.tsx";
 import { ManuscriptTree } from "../src/novel/manuscript-tree.tsx";
 import { OutlineTable } from "../src/novel/outline.tsx";
+import { StructureCommands } from "../src/novel/structure-commands.tsx";
 import type { Workspace } from "../src/novel/workspace.ts";
 import { groups } from "../src/novel/sidebar.tsx";
 import type { Structure } from "../src/novel/structure.ts";
@@ -53,7 +54,10 @@ describe("a kind's words on screen", () => {
     const b = await book(diary);
     render(
       <MemoryRouter>
-        <ManuscriptTree novelId="lib_1" novel={b} structure={{} as Structure} current="day_000001" />
+        <QueryClientProvider client={new QueryClient()}>
+          <ManuscriptTree novelId="lib_1" novel={b} structure={{} as Structure} current="day_000001" />
+          <StructureCommands novelId="lib_1" novel={b} workspace={{} as Workspace} current="day_000001" />
+        </QueryClientProvider>
       </MemoryRouter>,
     );
     expect(screen.getByRole("tree", { name: "Pages" })).toBeTruthy();
@@ -61,6 +65,19 @@ describe("a kind's words on screen", () => {
     const said = titles();
     expect(said).toEqual(expect.arrayContaining(["Pages: New day", "Pages: New month", "Pages: Rename day…", "Pages: Move day to month…", "Pages: Delete day"]));
     expect(said.join("\n")).not.toMatch(/scene|chapter|Manuscript/i);
+  });
+
+  it("are the book's, not the tree's: the palette has them with no tree on the page", async () => {
+    const b = await book(diary);
+    render(
+      <MemoryRouter>
+        <QueryClientProvider client={new QueryClient()}>
+          <StructureCommands novelId="lib_1" novel={b} workspace={{} as Workspace} current="day_000001" />
+        </QueryClientProvider>
+      </MemoryRouter>,
+    );
+    expect(screen.queryByRole("tree")).toBeNull();
+    expect(titles()).toEqual(expect.arrayContaining(["Pages: New day", "Pages: New month", "Pages: Rename day…", "Pages: Delete day"]));
   });
 
   it("name the codex in the sidebar", () => {

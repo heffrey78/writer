@@ -1,4 +1,4 @@
-import { pieceLevel, pieceSections, sectionById, vocabulary, type Book, type Section } from "@writer/core";
+import { pieceLevel, pieceSections, sectionById, vocabulary, type Book, type LevelDef, type Section } from "@writer/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router";
 import { api, keys } from "../api.ts";
@@ -16,6 +16,40 @@ export function itemOf(novel: Book, id: string): { kind: ItemKind; title: string
   if (piece) return { kind: novel.kind.piece.key, title: piece.title };
   const section = sectionById(novel, id);
   return section ? { kind: section.level, title: chapterTitle(novel, section) } : undefined;
+}
+
+/** The section holding pieces that's open: the one given, or the one holding the piece given. */
+export function openSection(novel: Book, current: string | undefined): string | undefined {
+  const inner = pieceLevel(novel);
+  return novel.allPieces.find((s) => s.id === current)?.sectionId ?? (novel.allSections.some((c) => c.id === current && c.level === inner) ? current : undefined);
+}
+
+/** The levels the book uses, innermost first, as New lists them; one that needs a section above it that isn't there yet can't be added. */
+export function usableLevels(novel: Book): { level: LevelDef; disabled: boolean }[] {
+  const { levels } = novel.kind;
+  return [...novel.levels].reverse().flatMap((key) => {
+    const at = levels.findIndex((l) => l.key === key);
+    const level = levels[at];
+    if (!level) return [];
+    const above = levels[at - 1];
+    return [{ level, disabled: key !== novel.levels[0] && !!above && !novel.sections.some((s) => s.level === above.key) }];
+  });
+}
+
+/** Where a new section of a level goes: in the open chapter's section of the level above (or the first), after its own. */
+export function newSectionPlace(novel: Book, level: LevelDef, current: string | undefined): { parent: string | null; after: string | null } {
+  const inner = pieceLevel(novel);
+  const open = openSection(novel, current);
+  const at = (key: string): string | undefined => {
+    let s = sectionById(novel, open);
+    while (s && s.level !== key) s = sectionById(novel, s.parentId);
+    return s?.id;
+  };
+  const { levels } = novel.kind;
+  const above = levels[levels.findIndex((l) => l.key === level.key) - 1];
+  const parent = level.key === novel.levels[0] || !above ? null : (at(above.key) ?? novel.sections.find((s) => s.level === above.key)?.id ?? null);
+  const after = at(level.key) ?? (level.key === inner ? null : (novel.sections.filter((s) => s.level === level.key).at(-1)?.id ?? null));
+  return { parent, after };
 }
 
 /** The ordered list an item sits in, and the container it belongs to (null: the top level). */
