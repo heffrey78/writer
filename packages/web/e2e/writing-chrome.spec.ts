@@ -2,14 +2,14 @@ import { axe, caretAtEnd, expect, test } from "./fixtures.ts";
 
 /** What surrounds the text, kept quiet: the counts where they belong, the card's buttons until pointed at. */
 
-test("the chapter's length by its title, the scene's on its card, the session's and today's in the bar under the text", async ({ page, app }) => {
+test("the length of what's open by its title, a scene's on its card, the session's and today's in the bar under the text", async ({ page, app }) => {
   await app.restart(app.novelRepo("varn"));
   await page.goto(app.launchUrl);
   const text = page.getByRole("textbox", { name: "Chapter text" });
   await expect(text).toBeFocused();
 
   const header = page.getByRole("group", { name: "Word count" });
-  await expect(header).toHaveText("Chapter 231");
+  await expect(header).toHaveText("Words 231");
   const card = page.getByRole("region", { name: "Details of “The Station”" });
   await expect(card).toContainText("Arrival · scene 1 of 2 · 113 words");
   const bar = page.getByRole("group", { name: "This session" });
@@ -22,7 +22,7 @@ test("the chapter's length by its title, the scene's on its card, the session's 
   await expect(bar).toContainText("Session +4");
   const span = page.getByRole("region", { name: "Details of “Walking the Span”" });
   await expect(span).toContainText("scene 2 of 2 · 122 words");
-  await expect(header).toHaveText("Chapter 235");
+  await expect(header).toHaveText("Words 235");
 
   // The card's pencils and pins: out of the way until their row is pointed at.
   const pencil = span.getByRole("button", { name: "Edit where" });
@@ -50,4 +50,14 @@ test("Compile… is in the ⋯ menu and the palette, except with the engine in t
   const palette = page.getByRole("dialog", { name: "Command palette" });
   await palette.getByRole("combobox").fill("compile");
   await expect(palette.getByRole("option", { name: /^Compile the manuscript/ })).toHaveCount(offered);
+});
+
+test("the count by a title is of what's open, and says Words: a chapter's, or a scene's alone", async ({ page, app }) => {
+  await app.restart(app.novelRepo("varn"));
+  await page.goto(app.launchUrl);
+  const header = page.getByRole("group", { name: "Word count" });
+  await expect(header).toHaveText("Words 231");
+  await page.getByRole("tree").getByRole("treeitem", { name: /The Station/ }).click();
+  await expect(page.getByRole("textbox", { name: "Scene text" })).toBeVisible();
+  await expect(header).toHaveText("Words 113");
 });

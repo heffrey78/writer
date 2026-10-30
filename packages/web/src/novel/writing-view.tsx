@@ -440,13 +440,6 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
   }, [editor, words]);
 
   // For the single-scene view, the chapter's count is the other scenes' plus this one's live count.
-  // Only there: following it re-renders the view, and in a run all its editors, at every keystroke.
-  const liveScene = useStore(liveCounts, (c) => ("scene" in view && view.chapter ? c.scene : 0));
-  const chapterWords =
-    "scene" in view && view.chapter
-      ? view.chapter.childIds.filter((id) => id !== view.scene.id).reduce((n, id) => n + countWords(byId.get(id)?.body ?? ""), liveScene)
-      : undefined;
-
   // Find and replace searches every scene; open ones live in the editor. Scene IDs here are file paths.
   const manuscript: Manuscript = useMemo(
     () =>
@@ -528,8 +521,8 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
       >
         <div className="flex flex-wrap items-baseline justify-between gap-3">
           <h1 className="text-xl font-semibold">{heading}</h1>
-          {/* The chapter's length by its title; the scene's is on its card, the session's and today's below. A run's pieces say their own. */}
-          {"run" in view ? view.run.controls : <WordCount chapterWords={chapterWords} show={["chapter"]} words={words} />}
+          {/* The length of what's open, by its title; in a chapter, a scene's is on its card, and the session's and today's are below. A run's pieces say their own. */}
+          {"run" in view ? view.run.controls : <WordCount show={"scene" in view ? ["scene"] : ["chapter"]} words={words} />}
         </div>
         {"scene" in view && pinned[view.scene.file] && <p className="ghw-pinned -mt-2 text-[13px] text-muted">{pinned[view.scene.file]}</p>}
         {splitting && (

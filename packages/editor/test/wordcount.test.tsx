@@ -183,6 +183,17 @@ describe("WordCount", () => {
     expect(bar.textContent).toContain("Session +2");
   });
 
+  test("a count shown alone says Words, not the name of what it counts", async () => {
+    render(
+      <>
+        <ChapterEditor label="Chapter text" words={words} scenes={[{ id: "a", markdown: "One two three.\n" }]} />
+        <WordCount show={["chapter"]} words={words} />
+      </>,
+    );
+    await act(() => new Promise<void>((done) => requestAnimationFrame(() => done())));
+    expect(screen.getByRole("group", { name: "Word count" }).textContent).toBe("Words 3");
+  });
+
   test("a single-scene editor shows the chapter count the app gives it", async () => {
     render(
       <>

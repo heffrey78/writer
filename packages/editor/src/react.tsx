@@ -482,7 +482,8 @@ const signed = (n: number) => (n > 0 ? `+${format.format(n)}` : n < 0 ? `−${fo
 
 /**
  * Scene, chapter and session word counts. It follows the editor the writer last used, and hides in
- * focus mode unless the count is pinned.
+ * focus mode unless the count is pinned. A scene's or a chapter's count shown alone says "Words":
+ * "Chapter 231" reads as the chapter's number.
  */
 export function WordCount({ chapterWords, show = ["scene", "chapter", "session"], label = "Word count", words: names, className }: WordCountProps) {
   const counts = useStore(liveCounts);
@@ -490,17 +491,18 @@ export function WordCount({ chapterWords, show = ["scene", "chapter", "session"]
   const hidden = useWritingModes((m) => m.focus && !m.pinCount);
   const words = sessionWords(session);
   const chapter = counts.view === "chapter" ? counts.chapter : chapterWords;
+  const alone = !(show.includes("scene") && show.includes("chapter"));
 
   return (
     <div className={["ghw-wordcount", className].filter(Boolean).join(" ")} role="group" aria-label={label} hidden={hidden}>
       {show.includes("scene") && (
         <span>
-          {names.piece.One} <strong>{format.format(counts.scene)}</strong>
+          {alone ? "Words" : names.piece.One} <strong>{format.format(counts.scene)}</strong>
         </span>
       )}
       {show.includes("chapter") && chapter !== undefined && (
         <span>
-          {names.section.One} <strong>{format.format(chapter)}</strong>
+          {alone ? "Words" : names.section.One} <strong>{format.format(chapter)}</strong>
         </span>
       )}
       {show.includes("session") && (
