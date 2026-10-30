@@ -30,7 +30,7 @@ test("a journal's sidebar arranged by keyboard: kept in book.yaml in one commit,
   const dialog = arrange(page);
   await expect(dialog).toBeVisible();
   // Issues too, where it will be once the journal is on GitHub.
-  await expect(dialog.getByRole("region", { name: "Look back" }).getByRole("listitem")).toHaveText(["Day by day", "Calendar", "Notes", "Issues (once the book is on GitHub)"]);
+  await expect(dialog.getByRole("region", { name: "Look back" }).getByRole("listitem")).toHaveText(["Journal", "Calendar", "Notes", "Issues (once the book is on GitHub)"]);
   for (const colorScheme of ["light", "dark"] as const) {
     await page.emulateMedia({ colorScheme });
     await axe(page);
@@ -57,7 +57,7 @@ test("a journal's sidebar arranged by keyboard: kept in book.yaml in one commit,
 
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(dialog).toHaveCount(0);
-  await expect(links(page, "Look back")).toHaveText(["Notes", "Day by day", "Calendar", "Index", "Outline"]);
+  await expect(links(page, "Look back")).toHaveText(["Notes", "Journal", "Calendar", "Index", "Outline"]);
   await expect(links(page, "People and places")).toHaveText(["Relationships", "Progress"]);
   // In book.yaml, after what was there, as one commit.
   expect(readFileSync(join(dir, "book.yaml"), "utf8")).toBe(
@@ -68,14 +68,14 @@ test("a journal's sidebar arranged by keyboard: kept in book.yaml in one commit,
   // Kept: the same after the app starts again.
   await app.restart(dir);
   await page.goto(app.launchUrl);
-  await expect(links(page, "Look back")).toHaveText(["Notes", "Day by day", "Calendar", "Index", "Outline"]);
+  await expect(links(page, "Look back")).toHaveText(["Notes", "Journal", "Calendar", "Index", "Outline"]);
 
   // Back to the journal's, from the sidebar's own button: book.yaml as it was.
   await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Arrange the sidebar…" }).click();
   await arrange(page).getByRole("button", { name: "Back to the journal's" }).click();
   await arrange(page).getByRole("button", { name: "Save" }).click();
   await expect(arrange(page)).toHaveCount(0);
-  await expect(links(page, "Look back")).toHaveText(["Day by day", "Calendar", "Notes"]);
+  await expect(links(page, "Look back")).toHaveText(["Journal", "Calendar", "Notes"]);
   await expect.poll(() => readFileSync(join(dir, "book.yaml"), "utf8")).toBe(before);
 });
 

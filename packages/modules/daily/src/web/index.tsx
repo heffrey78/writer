@@ -1,7 +1,7 @@
 import { BookOpenText, CalendarDays, CalendarPlus } from "lucide-react";
 import type { WebModule } from "@writer/web/modules.tsx";
 import { CalendarPage } from "./calendar-page.tsx";
-import { DAY_BY_DAY, ReadPage } from "./read-page.tsx";
+import { JOURNAL_PAGE, ReadPage } from "./read-page.tsx";
 import { TodayPage } from "./today.tsx";
 
 /**
@@ -15,7 +15,7 @@ export const dailyWeb: WebModule = {
   views: [
     { path: "today", label: "Today's entry", icon: CalendarPlus, render: ({ novelId }) => <TodayPage novelId={novelId} /> },
     { path: "calendar", label: "Calendar", icon: CalendarDays, group: "Plan", render: ({ novelId, novel }) => <CalendarPage novelId={novelId} novel={novel} /> },
-    { path: "read", label: DAY_BY_DAY, icon: BookOpenText, group: "Plan", render: (view) => <ReadPage {...view} /> },
+    { path: "read", label: JOURNAL_PAGE, icon: BookOpenText, group: "Plan", render: (view) => <ReadPage {...view} /> },
   ],
   shelfActions: [{ label: "Today's entry", path: "today", command: "daily.today" }],
   // Straight to the journal page, not by /today: on the page already, a redirect would make it

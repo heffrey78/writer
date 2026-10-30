@@ -207,7 +207,7 @@ try {
   await making.getByRole("textbox", { name: "Title" }).fill("Days");
   await making.getByRole("button", { name: "Create" }).click();
   // A journal opens on its journal page (#64), today's place at the top.
-  await expect(page.getByRole("heading", { level: 1, name: "Day by day" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Journal" })).toBeVisible();
   await page.keyboard.press("Control+k");
   await page.getByRole("dialog", { name: "Command palette" }).getByRole("combobox").fill("today's entry");
   await page.keyboard.press("Enter");
@@ -365,7 +365,7 @@ try {
   await expect(book).toHaveCount(0);
   await bar.getByRole("button", { name: "Hide the keyboard" }).click();
   await expect.poll(() => /mInputShown=false/.test(adb("shell", "dumpsys", "input_method")), { timeout: 10_000, message: "the keyboard put away" }).toBe(true);
-  await expect(book.getByRole("link")).toHaveText(["Day by day", "Calendar", "Notes", "Index"]);
+  await expect(book.getByRole("link")).toHaveText(["Journal", "Calendar", "Notes", "Index"]);
   writeFileSync(join(tmp, "..", "book-bar.png"), execFileSync(ADB, ["exec-out", "screencap", "-p"]));
   await book.getByRole("button", { name: "More" }).click();
   const more = page.getByRole("dialog", { name: "Days: more" });
@@ -374,7 +374,7 @@ try {
   await expect(more).toHaveCount(0);
   await book.getByRole("link", { name: "Calendar" }).click();
   await expect(book.getByRole("link", { name: "Calendar" })).toHaveAttribute("aria-current", "page");
-  await book.getByRole("link", { name: "Day by day" }).click();
+  await book.getByRole("link", { name: "Journal" }).click();
   await expect(page.getByRole("textbox", { name: /Entry text/ }).first()).toBeVisible();
   step("the book's bar: away for the keyboard, back once it's hidden; More closed by Android's back; a page from it");
 

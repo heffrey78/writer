@@ -18,7 +18,7 @@ test("Make this book a journal…: asked, done in one commit, and the book opens
   await dialog.getByRole("button", { name: "Do it" }).click();
 
   // On its journal page (#64), as a journal opens.
-  await expect(page.getByRole("heading", { level: 1, name: "Day by day" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Journal" })).toBeVisible();
   await expect(page.getByText("It's a journal now. “Tuesday, 10/20/2026” dated 2026-10-20 from its title.")).toBeVisible();
   await expect(page.getByRole("tree").getByRole("treeitem", { name: /October 2026/ }).first()).toBeVisible();
   expect(app.git(dir, "log", "-1", "--format=%s").trim()).toBe("Make this book a journal");

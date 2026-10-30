@@ -90,7 +90,7 @@ test("starts a journal from the shelf's +, of the kind chosen, in its own folder
 
   await expect(page).toHaveTitle("Days · Writer");
   // On its journal page (#64), today's place ready to type in: nothing written, nothing made.
-  await expect(page.getByRole("heading", { level: 1, name: "Day by day" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Journal" })).toBeVisible();
   await expect(page.getByRole("textbox", { name: "Write today's entry" })).toBeFocused();
   const dir = join(app.home, "writer", "days");
   expect(readFileSync(join(dir, "book.yaml"), "utf8")).toMatch(/^kind: journal\n/m);

@@ -286,11 +286,11 @@ test("on a phone, a journal opens on today's entry with the screen to write in, 
   const today = page.getByRole("textbox", { name: "Write today's entry" });
   await expect(today).toBeVisible();
   // The place to write takes most of the screen; the earlier entries are a tap away.
-  expect((await page.getByRole("list", { name: "Day by day" }).getByRole("listitem").first().boundingBox())!.height).toBeGreaterThan(viewport.height * 0.6);
+  expect((await page.getByRole("list", { name: "Journal" }).getByRole("listitem").first().boundingBox())!.height).toBeGreaterThan(viewport.height * 0.6);
   const bar = page.getByRole("navigation", { name: "Book" });
-  await expect(bar.getByRole("link")).toHaveText(["Day by day", "Calendar", "Notes", "Index"]);
+  await expect(bar.getByRole("link")).toHaveText(["Journal", "Calendar", "Notes", "Index"]);
   await page.getByRole("button", { name: "Earlier entries" }).first().tap();
-  await expect(page.getByRole("list", { name: "Day by day" }).getByRole("article").nth(1)).toBeInViewport();
+  await expect(page.getByRole("list", { name: "Journal" }).getByRole("article").nth(1)).toBeInViewport();
 
   // Arranged: Relationships in place of Notes, kept in book.yaml.
   await bar.getByRole("button", { name: "More" }).tap();
@@ -301,7 +301,7 @@ test("on a phone, a journal opens on today's entry with the screen to write in, 
   await arrange.getByRole("button", { name: "Take “Notes” out of the bar" }).tap();
   await arrange.getByRole("button", { name: "Put “Relationships” in the bar" }).tap();
   await arrange.getByRole("button", { name: "Save" }).tap();
-  await expect(bar.getByRole("link")).toHaveText(["Day by day", "Calendar", "Index", "Relationships"]);
+  await expect(bar.getByRole("link")).toHaveText(["Journal", "Calendar", "Index", "Relationships"]);
   await expect.poll(() => readFileSync(join(dir, "book.yaml"), "utf8")).toMatch(/bar:\s*\n?\s*- calendar\s+- index\s+- relationships|bar: \[calendar, index, relationships\]/);
 });
 
@@ -310,7 +310,7 @@ test("on a phone, Arrange the sidebar fits, from the ⋯ menu, and closes by its
   await launch(page, app);
   // The book open first, on its journal page (#64), which fits: until then the ⋯ menu has only the app's items.
   await expect(page.getByRole("textbox", { name: "Write today's entry" })).toBeVisible();
-  await expect(page.getByRole("list", { name: "Day by day" }).getByRole("article").nth(1)).toBeVisible();
+  await expect(page.getByRole("list", { name: "Journal" }).getByRole("article").nth(1)).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
   await page.getByRole("banner").getByRole("button", { name: /^More/ }).tap();
   await page.getByRole("menuitem", { name: "Arrange the sidebar…" }).tap();

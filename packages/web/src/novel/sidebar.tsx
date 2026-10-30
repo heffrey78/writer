@@ -246,12 +246,15 @@ function Strip({ novelId, novel, onGitHub, toggle }: { novelId: string; novel: B
       <Icon className="size-4" aria-hidden />
     </NavLink>
   );
+  const pages = groups(onGitHub, kind, arrangedBy(novel));
+  // The book's own address opens its home page, so where that's in the strip it needs no second icon.
+  const homeShown = pages.some((g) => g.places.some((p) => p.key === kind.home));
   return (
     <aside aria-label="Sidebar" className="flex flex-col items-center gap-1 border-rule bg-panel py-2 md:border-r">
       <ToggleButton collapsed toggle={toggle} />
       <nav aria-label="Views" className="flex flex-col items-center gap-1">
-        {icon(`/novels/${novelId}`, vocabulary(kind).content.One, PenLine, true)}
-        {groups(onGitHub, kind, arrangedBy(novel)).map((g) => (
+        {!homeShown && icon(`/novels/${novelId}`, vocabulary(kind).content.One, PenLine, true)}
+        {pages.map((g) => (
           <div key={g.key} role="group" aria-label={g.label} className="flex flex-col items-center gap-1 border-t border-rule pt-1">
             {g.places.map((p) => icon(`/novels/${novelId}/${p.path}`, p.label, p.icon))}
           </div>

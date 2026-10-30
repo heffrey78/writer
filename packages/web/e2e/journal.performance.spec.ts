@@ -64,7 +64,7 @@ test("a year's journal opens on its journal page, the caret in today's place, in
   await page.goto(app.launchUrl.replace(/\?token=.*/, ""), { waitUntil: "commit" });
   await page.waitForFunction(() => document.activeElement?.getAttribute("aria-label") === "Write today's entry", undefined, { polling: "raf", timeout: 10_000 });
   const elapsed = Date.now() - start;
-  await expect(page.getByRole("list", { name: "Day by day" }).getByRole("article").nth(1)).toHaveAccessibleName("Thursday, 31 December");
+  await expect(page.getByRole("list", { name: "Journal" }).getByRole("article").nth(1)).toHaveAccessibleName("Thursday, 31 December");
   const result = `journal page ${elapsed} ms`;
   console.log(result);
   test.info().annotations.push({ type: "performance", description: result });
@@ -78,7 +78,7 @@ test("typing in an entry on the journal page of a year's journal stays under 50 
   const text = page.getByRole("textbox", { name: "Entry text: Thursday, 31 December" });
   await text.click();
   // Today's place and the entries near the screen in their editors too.
-  await expect.poll(() => page.getByRole("list", { name: "Day by day" }).getByRole("textbox").count()).toBeGreaterThanOrEqual(2);
+  await expect.poll(() => page.getByRole("list", { name: "Journal" }).getByRole("textbox").count()).toBeGreaterThanOrEqual(2);
   await page.evaluate(() => {
     const w = window as unknown as { latencies: number[] };
     w.latencies = [];

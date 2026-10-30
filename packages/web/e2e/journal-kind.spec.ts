@@ -29,7 +29,7 @@ async function open(page: Page, app: App) {
 
 test("opens on its journal page, in its months and entries, in a journal's words", async ({ page, app }) => {
   await open(page, app);
-  await expect(page.getByRole("heading", { level: 1, name: "Day by day" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Journal" })).toBeVisible();
   const tree = page.getByRole("tree");
   for (const name of ["2026", "September", "October", "Monday, 28 September", "Thursday, 1 October"]) await expect(tree.getByRole("treeitem", { name, exact: false }).first()).toBeVisible();
   await expect(page.locator("body")).not.toContainText(novelWords);
@@ -44,12 +44,12 @@ test("its sidebar looks back first, then at its people and places, with no outli
   const views = page.getByRole("navigation", { name: "Views" });
   await expect(views.getByRole("heading")).toHaveText(["Look back", "People and places"]);
   // Issues only for a journal on GitHub, which the sample isn't.
-  await expect(views.getByRole("group", { name: "Look back" }).getByRole("link")).toHaveText(["Day by day", "Calendar", "Notes"]);
+  await expect(views.getByRole("group", { name: "Look back" }).getByRole("link")).toHaveText(["Journal", "Calendar", "Notes"]);
   await expect(views.getByRole("group", { name: "People and places" }).getByRole("link")).toHaveText(["Index", "Relationships", "Story map", "Progress"]);
   // Collapsed to its strip, in the same order.
   await page.getByRole("button", { name: "Collapse the sidebar" }).click();
   const strip = page.getByRole("navigation", { name: "Views" }).getByRole("link");
-  await expect.poll(() => strip.evaluateAll((links) => links.map((l) => l.getAttribute("aria-label")))).toEqual(["Journal", "Day by day", "Calendar", "Notes", "Index", "Relationships", "Story map", "Progress"]);
+  await expect.poll(() => strip.evaluateAll((links) => links.map((l) => l.getAttribute("aria-label")))).toEqual(["Journal", "Calendar", "Notes", "Index", "Relationships", "Story map", "Progress"]);
 });
 
 test("its index, outline and story map say its words too", async ({ page, app }) => {
@@ -74,7 +74,7 @@ test("its index, outline and story map say its words too", async ({ page, app })
 test("written where it's read: today on top, made with its first words, and earlier entries newest first, written in place", async ({ page, app }) => {
   const dir = await open(page, app);
   const commits = Number(app.git(dir, "rev-list", "--count", "HEAD"));
-  const entries = page.getByRole("list", { name: "Day by day" }).getByRole("article");
+  const entries = page.getByRole("list", { name: "Journal" }).getByRole("article");
   await expect(entries).toHaveCount(6);
   await expect(entries.first().getByRole("heading", { level: 2 })).toHaveText("Friday, 23 October");
   await expect(entries.nth(1).getByRole("heading", { level: 2 })).toHaveText("Sunday, 4 October");
@@ -129,7 +129,7 @@ test("written where it's read: today on top, made with its first words, and earl
   // Reading: the text only. A name opens its index entry, within the app.
   await page.getByRole("button", { name: "Reading" }).click();
   await expect(page.getByRole("button", { name: "Reading" })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByRole("list", { name: "Day by day" }).getByRole("textbox")).toHaveCount(0);
+  await expect(page.getByRole("list", { name: "Journal" }).getByRole("textbox")).toHaveCount(0);
   await expect(entries.first()).toContainText("Fog on the water till noon. Then sun.");
   await entries.nth(2).getByRole("link", { name: "the sluice" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "The Old Sluice" })).toBeVisible();
@@ -170,7 +170,7 @@ test("an issue is raised about a passage in today's entry, written in its place,
   await selectionSettled(page);
   await page.keyboard.type("Fog on the water till noon.");
   // Made: its title is a link to it (today's place has the date before there's an entry to raise an issue about).
-  await expect(page.getByRole("list", { name: "Day by day" }).getByRole("article").first().getByRole("link", { name: "Friday, 23 October" })).toBeVisible();
+  await expect(page.getByRole("list", { name: "Journal" }).getByRole("article").first().getByRole("link", { name: "Friday, 23 October" })).toBeVisible();
   const today = begin(page);
   const passage = today.getByText("Fog on the water till noon.");
   await passage.click({ clickCount: 3 });

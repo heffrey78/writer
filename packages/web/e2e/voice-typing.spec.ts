@@ -20,7 +20,7 @@ test("voice typing into today's place keeps every word, the entry made mid-compo
   await dialog.getByRole("radio", { name: "Journal" }).check();
   await dialog.getByRole("textbox", { name: "Title" }).fill("Days");
   await dialog.getByRole("button", { name: "Create" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Day by day" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Journal" })).toBeVisible();
   await page.clock.setFixedTime(new Date("2026-10-19T08:00:00"));
   await palette(page, "today's entry");
   const text = page.getByRole("textbox", { name: "Write today's entry" });

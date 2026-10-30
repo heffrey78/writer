@@ -14,8 +14,8 @@ const number = new Intl.NumberFormat();
 /** Reading (text only) or writing, remembered on the device. */
 const READING = "writer:journal-reading";
 
-/** The page's name: the Write section's is the journal's, "Journal". */
-export const DAY_BY_DAY = "Day by day";
+/** The page's name. */
+export const JOURNAL_PAGE = "Journal";
 
 /**
  * The journal page (#64), as Logseq's Journals page is: today at the top, ready to type in (the entry
@@ -53,7 +53,7 @@ export function ReadPage({ novelId, novel, workspace, spell, entries }: BookView
 
   const view: Run = {
     key: "journal",
-    heading: DAY_BY_DAY,
+    heading: JOURNAL_PAGE,
     controls: (
       <button
         type="button"

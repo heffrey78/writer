@@ -25,7 +25,7 @@ test("from the journal's tile: the caret where today's begins; typed in, it's ma
   const commits = app.git(dir, "rev-list", "--count", "HEAD");
   await page.getByRole("button", { name: "Today's entry" }).click();
   await expect(page).toHaveURL(/\/read$/);
-  await expect(page.getByRole("heading", { level: 1, name: "Day by day" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Journal" })).toBeVisible();
   const begin = page.getByRole("textbox", { name: "Write today's entry" });
   await expect(begin).toBeFocused();
   // Nothing made until there's something in it.
@@ -63,7 +63,7 @@ test("the calendar shows the month's entries, today marked, and a way to write t
   await expect(page.getByRole("textbox", { name: "Write today's entry" })).toBeFocused();
   await selectionSettled(page);
   await page.keyboard.type("Hello there.");
-  await expect(page.getByRole("list", { name: "Day by day" }).getByRole("article", { name: entryTitle(today()) })).toBeVisible();
+  await expect(page.getByRole("list", { name: "Journal" }).getByRole("article", { name: entryTitle(today()) })).toBeVisible();
   await page.getByRole("navigation", { name: "Views" }).getByRole("link", { name: "Calendar" }).click();
   await expect(page.getByRole("table").getByRole("link", { name: entryTitle(today()) })).toBeVisible();
   await expect(page.getByRole("main").getByRole("status").filter({ hasText: /entr/ })).toHaveText("1 entry, 2 words");

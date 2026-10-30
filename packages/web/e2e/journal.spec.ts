@@ -52,7 +52,7 @@ test("a new journal, written in on three days, its people and places from mentio
   await dialog.getByRole("radio", { name: "Journal" }).check();
   await dialog.getByRole("textbox", { name: "Title" }).fill("Days");
   await dialog.getByRole("button", { name: "Create" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Day by day" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Journal" })).toBeVisible();
   const dir = join(app.home, "writer", "days");
 
   await write(page, "2026-10-19", async () => {
@@ -108,7 +108,7 @@ test("words begun just before the day turns reach that day's entry, though its f
   await dialog.getByRole("radio", { name: "Journal" }).check();
   await dialog.getByRole("textbox", { name: "Title" }).fill("Days");
   await dialog.getByRole("button", { name: "Create" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Day by day" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Journal" })).toBeVisible();
   const entries = join(app.home, "writer", "days", "entries");
   const fileOn = (day: string) =>
     readdirSync(entries, { recursive: true, encoding: "utf8" })
