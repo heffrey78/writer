@@ -1,6 +1,6 @@
 # @writer/editor
 
-The scene prose editor: a TipTap (ProseMirror) schema for scene prose, a lossless round-trip between it and the Markdown in a novel repository ([format spec](../../docs/format/v3.md)), and a React editor component.
+The prose editor: a TipTap (ProseMirror) schema for a piece's prose (a novel's scene, a journal's entry), a lossless round-trip between it and the Markdown in a book's repository ([format spec](../../docs/format/v3.md)), and a React editor component.
 
 ## React component
 
@@ -32,6 +32,10 @@ Mentions are atoms: the caret steps over them, typing can't split them, and Back
 **Mention cards.** `onMention` (`{ show, leave }`) tells the app when a mention is hovered (after a short pause) or Alt+Enter is pressed with the caret beside one: `show` gets the entity ID, the mention's element to place a card by, the scene holding it in a chapter, and whether it came by pointer or keyboard; `leave` says the pointer left it. The editor draws nothing itself. `mentionAtCaret(editor)` finds the mention beside the caret.
 
 **Link suggestions.** With the "linkSuggestions" writing mode on ("Suggest links for names written without a mention", off by default, kept with the other modes), names and aliases of the `entities` written as plain text are underlined: whole words, with their case, longest first, never inside a mention or a link. Nothing changes until the author acts: Alt+Enter (or "Link the name at the caret") turns the name at the caret into a mention showing the words as written. Results are cached per paragraph, like spell check.
+
+**Footnotes.** Mod+Alt+F adds a footnote where the caret is (`addFootnote`), its next number in the file and its note at the end of the file's text, with the caret in it; in a note, the same keys go back to where it's referred to (`followFootnote`). A reference clicked opens its note, and a note's label clicked goes back. A note whose last reference is deleted goes with it. A file's footnotes are its own: in a chapter, each scene's. They're written as Markdown's `[^1]`.
+
+**Dictation** (`DictationExtension`, D17). While a phrase is being heard its words show at the caret, greyed, as a decoration: not in the document, so they're never saved, counted, found or undone. When it's settled, the phrase is inserted at the caret as one change, spaced and capitalised for where it lands, with the book's names spelled as its index has them; "new paragraph" or "new line" said alone makes one. The editor only shows and writes: the app hears, through its host, and gives the editors its `DictationOffer`, which puts Dictate on the key (`DICTATE_KEYS`) and in the right-click menu.
 
 The typography uses CSS custom properties (`--ghw-prose-font`, `--ghw-prose-measure`, `--ghw-ink`…) and follows the OS light or dark setting, or `data-theme` on the root element.
 

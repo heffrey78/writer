@@ -21,7 +21,7 @@ const { frontMatter, body } = splitSceneFile(content); // from @writer/editor
 const { status, error, conflicts } = useStore(autosave.store); // "saved" | "saving" | "unsaved" | "error"
 ```
 
-The API also covers sync (`sync`, `syncNow`), checkpoints (`checkpoints`, `createCheckpoint`, `restoreCheckpoint`) and sync conflicts (`conflicts`, `resolveConflicts`). Failures throw `ApiError` with the server's code. Two 409s come back as results instead: a write refused because the file changed (`{ ok: false, current }`), and a resolution refused because the conflicts changed (`{ ok: false, conflicts }`, the fresh ones to show).
+The API also covers sync (`sync`, `syncNow`), checkpoints (`checkpoints`, `createCheckpoint`, `restoreCheckpoint`), sync conflicts (`conflicts`, `resolveConflicts`), and a module's routes under a book (`module(id, module, method, path, body)`). Failures throw `ApiError` with the server's code. Two 409s come back as results instead: a write refused because the file changed (`{ ok: false, current }`), and a resolution refused because the conflicts changed (`{ ok: false, conflicts }`, the fresh ones to show).
 
 ## Autosave
 

@@ -1,5 +1,7 @@
 # Inventory: where the novel is built in
 
+*A record of the starting point, kept as written. The work it led to is done (#3, #4). For how kinds and modules are now, see [DEVELOPER.md](../../DEVELOPER.md#kinds-and-modules).*
+
 What [#3](https://github.com/heffrey78/writer/issues/3) (kinds) and [#4](https://github.com/heffrey78/writer/issues/4) (modules) start from: every feature of the app as imported from gh-writer, sorted into the **base**, the **Novel kind** or a **module** ([D14](https://github.com/heffrey78/writer/issues/10)), and every novel concept that's hard-coded, with where it's read. Written for [#17](https://github.com/heffrey78/writer/issues/17), at commit c22a411. It's a proposal for the owner to review: the classification and the glossary decide what the next tasks are.
 
 - **Base:** every kind of book wants it. It works in neutral terms and shows each kind's words.

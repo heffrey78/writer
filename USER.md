@@ -2,19 +2,29 @@
 
 This guide is for the person writing the book. It assumes Writer is installed and running (see [Getting started](README.md#getting-started)). You don't need to know git or GitHub: Writer uses them for you, and this guide says what happens in plain terms.
 
-**Contents:** [Your library](#your-library) · [Finding your way](#finding-your-way) · [Writing](#writing) · [Structure](#structure-parts-chapters-and-scenes) · [The story bible](#the-story-bible) · [Story map and relationships](#story-map-and-relationships) · [Progress](#progress) · [Saving and sync](#saving-and-sync) · [Drafts: versions and checkpoints](#drafts-versions-and-checkpoints) · [GitHub](#github) · [Issues](#issues) · [Compiling](#compiling) · [Keyboard](#keyboard) · [Your files](#your-files) · [The command line](#the-command-line)
+Most of it uses a novel's words: scene, chapter, story bible. [Kinds of book](#kinds-of-book) says what they're called in yours, and what each kind has of its own. The app always shows your book's own words.
+
+**Contents:** [Your library](#your-library) · [Kinds of book](#kinds-of-book) · [Finding your way](#finding-your-way) · [Writing](#writing) · [Dictation](#dictation) · [On a phone](#on-a-phone) · [Structure](#structure-parts-chapters-and-scenes) · [The story bible](#the-story-bible) · [Story map and relationships](#story-map-and-relationships) · [Progress](#progress) · [Saving and sync](#saving-and-sync) · [Drafts: versions and checkpoints](#drafts-versions-and-checkpoints) · [GitHub](#github) · [Issues](#issues) · [Compiling](#compiling) · [Keyboard](#keyboard) · [Your files](#your-files) · [The command line](#the-command-line)
 
 ## Your library
 
-`npx writer serve` opens your library in the browser: the books on this computer, most recently opened first. From there:
+Your library is your shelf: the books on this computer or phone, most recently opened first. The apps open on it, and `npx writer serve` opens it in the browser. From there:
 
-- **New book** starts a novel from the novel template, in `~/writer/<title>` unless you choose another folder. The first time, Writer may ask who's writing: the name and email that sign your saved work.
-- **Open a folder** adds a book already on this computer.
+- **New book** asks what kind of book it is (a novel, a journal, a campaign or a non-fiction book), then starts one from that kind's template, in `~/writer/<title>` unless you choose another folder. The first time, Writer may ask who's writing: the name and email that sign your saved work.
+- **Open a folder** adds a book already on this computer. (A phone doesn't have this: see below.)
 - **Clone from GitHub** copies a book from GitHub, after you've connected (see [GitHub](#github)), listing your repositories to choose from.
+- **Books in gh-writer.** If you've used gh-writer on this computer, the shelf offers to bring its books in. They open as they are, in the same folders, not copies.
 
 Each book stands on the shelf in a cover of its own design, or with your cover: its **⋯** menu has *Set a cover…* (and *Change the cover…*, *Remove the cover…*), as does the Compile dialog. A cover is framed like a [picture](#the-story-bible), at 5:8, and saved as `images/cover.jpg`, 1600 × 2560 px.
 
-`npx writer serve path/to/novel` opens one novel directly. Taking a novel out of the library leaves its folder alone.
+`npx writer serve path/to/novel` opens one book directly.
+
+### Taking a book off the shelf, or deleting it
+
+A book's **⋯** menu on the shelf has two ways to see the last of it. Both are in the command palette too.
+
+- **Remove from library…** takes it off the shelf and leaves its files alone. You can add it again at any time. A book in Writer's own folder (`~/writer` on a computer, the app's storage on a phone) is listed under **Not on the shelf**, or **On this phone**, to add back or delete.
+- **Delete the book…** deletes its folder too. It asks first, and says what would be lost: the changes not yet on GitHub, or the whole book if it isn't on GitHub. There's no undoing it. The copy on GitHub, if there is one, isn't touched, so you can clone it again.
 
 ### The desktop app
 
@@ -27,11 +37,58 @@ In the desktop app, the library has a window of its own, and each novel opens in
 - **File › Use This Computer's git** switches from the git that comes with Writer to the one installed on your computer, if you'd rather use your own setup. Your open windows come back where they were.
 - Quitting, or closing a window, saves what you've typed first.
 
+## Kinds of book
+
+A book's kind gives it its structure, its words and some features of its own. The rest of this guide applies to every kind, in its words:
+
+| | Novel | Journal | Campaign | Non-fiction book |
+|---|---|---|---|---|
+| **Sections** | Part (optional), chapter | Year (optional), month | Arc | Part (optional), chapter |
+| **What you write in** | Scene | Entry | Session | Section |
+| **The index** | Story bible | Index | Codex | Index |
+| **Its entries** | Characters, locations, plotlines, themes | People, places, events, values | NPCs, player characters, locations, factions, items, quests | Sources, people, concepts, claims |
+| **Statuses** | Idea, outlined, drafted, revised, final | Draft, kept | Planned, prepped, played | Outline, draft, revised, checked |
+| **Kinds of issue** | Plot hole, continuity, research, idea, revision | Follow up, fact | Loose end, ruling, idea | Fact check, citation needed, research, idea |
+| **Sidebar groups** | Plan, Revise | Look back, People and places | Prep, The world, Look back | Plan, Revise |
+| **Story map** | Plotlines, presence, timeline | Presence, timeline | Presence, timeline | Presence |
+| **Only this kind** | Point of view, off-page events, the drafting board, standard manuscript format | The Journal page, Today's entry, the calendar | A session's prep sheet, *Note from the table* | Citations and a bibliography |
+
+Any kind can add entry types of its own, and every kind has notes, relationships, progress, drafts, compare, issues and compile. A page a kind's sidebar leaves out, such as a journal's Outline and Compare, is still in the command palette under *Go to*.
+
+### A journal
+
+A journal opens on its **Journal** page: today at the top, then every earlier entry, newest first.
+
+- **Today.** Today's place is ready to type in. Your first words make the entry, in its month, with the date as its title. If you leave without typing, nothing is made. **Today's entry** takes you there from the palette, from the book's tile on the shelf and from the desktop app's menu.
+- **Earlier entries** are written in where they are, with everything the writing view has: `@` mentions, find, pictures, footnotes, and the right sidebar following the entry the caret is in. **Alt+PageDown** and **Alt+PageUp** go to the next and previous entry, and more come as you scroll. An entry's title opens it alone.
+- **Reading**, at the top of the page, shows the same entries as text only, with names linking to their index entries. Writer remembers your choice on this device.
+- **Calendar** shows a month's entries as a calendar.
+
+An entry's date is its *when*, so the Timeline shows your days and who was where. A person or place you mention is added to the entry's details.
+
+**A journal kept as a novel.** If you kept your journal in gh-writer (a chapter a month, a scene a day), *Make this book a journal…* in the palette makes it a Journal in one commit, or `writer convert` from the [command line](#the-command-line). Every ID, mention, relationship and note is kept, and an entry with no date is dated from its title ("Tuesday, 10/20/2026"). It refuses a book that uses what a journal has no place for (a point of view, plotlines, off-page events, untitled chapters) and says why, rather than drop anything.
+
+### A campaign
+
+A new session starts as a prep sheet, with headings for a strong start, scenes, secrets and clues, NPCs, locations and treasure, then **At the table** for what happened. Its card says who's in the party, which NPCs, locations, factions and items are in play, and which quests it advances. Move it from planned to prepped to played.
+
+- **Note from the table** in the palette makes a note on the session you're in, with the caret in it, so you can write something down without leaving your prep.
+- **Relationships** change at a session, and the graph shows NPCs, player characters and factions: step through the campaign and see who stands with whom.
+- **Quests** run through the sessions like threads, on the Timeline's lanes and on Presence.
+
+Writer plans and remembers. It has no dice, combat trackers or character sheets. The Campaign is still being refined with the game master who'll use it, so it may change.
+
+### A non-fiction book
+
+A section's title is its heading in the compiled book. Keep your research in notes, and the sources, people, concepts and claims in the index.
+
+**Citing a source.** Add a footnote (Ctrl+Alt+F), and in its text type `@` and the source's name. Give a source its details as fields on its entry: `author`, `year`, `publisher`, `place` and `url`. Compiled, a mention that reads as the source's name or another name reads as its short form ("Darwin, Vegetable Mould"), and the book ends with a bibliography of the sources it draws on, by author. A source's page shows both forms, and which details are missing. There's one plain style, not APA or Chicago.
+
 ## Finding your way
 
 **The top bar** names the book and the version open (choose it to open [Drafts](#drafts-versions-and-checkpoints)), says whether your work is saved and synced, and keeps everything else in its **⋯** menu: Checkpoints, Compile, the theme (light, dark, or like your system), your GitHub account, and the keyboard shortcuts.
 
-**The sidebar** groups everything by what you're doing:
+**The sidebar** groups everything by what you're doing, in groups your book's kind names. A novel's are:
 
 - **Write**: the manuscript, as a tree of parts, chapters and scenes.
 - **Plan**: the **Outline**, as a table, as cards or as a drafting board; the **Story map** (plotlines, presence and the timeline); the **Relationships** between entries; your **Notes**; your **Progress**; and the **Story bible**, with its entries and off-page events.
@@ -39,12 +96,15 @@ In the desktop app, the library has a window of its own, and each novel opens in
 
 Collapse it to a strip of icons with the button at its top, or Ctrl+\\ (⌘\\ on a Mac); it stays that way until you open it again. **Focus mode** hides it, and the top bar, altogether.
 
+**Arrange the sidebar…**, at its foot and in the palette, moves pages up, down and between groups, or hides them. It's kept in the book's `book.yaml`, so it's the same on every device the book syncs to, and a page you hide stays in the palette. *Back to the journal's* (in your kind's word) undoes it. A novel still in the older format is asked to move to the new one first.
+
 ## Writing
 
-Choose a chapter or scene in the tree on the left. A chapter opens as one continuous text with each scene's title at its boundary; you can move between scenes freely, though typing can't merge or delete them by accident. The chapter's word count is beside its title, and the scene's is on its card in the right sidebar. The bar under the text has this session's words and **Today**: the words you've added today, against your daily goal if you've set one (it opens [Progress](#progress)).
+Choose a chapter or scene in the tree on the left. A chapter opens as one continuous text with each scene's title at its boundary; you can move between scenes freely, though typing can't merge or delete them by accident. **Words**, beside the title, is the length of what's open, the chapter or the scene; in a chapter, each scene's is on its card in the right sidebar. The bar under the text has this session's words and **Today**: the words you've added today, against your daily goal if you've set one (it opens [Progress](#progress)).
 
 - **Formatting:** Ctrl+I italic, Ctrl+B bold, Ctrl+Shift+B block quote, Ctrl+Enter section break, Shift+Enter line break. Typing Markdown works too: `*word*` for italic, `> ` for a quote, `***` for a break. (On a Mac, ⌘ for Ctrl throughout.)
-- **Headings, lists and tables:** type `## ` at the start of a line for a heading (`#` to `###`), `- ` for a bulleted list, `1. ` for a numbered one; or Ctrl+Alt+1 to 3 for a heading (Ctrl+Alt+0 back to text), Ctrl+Shift+8 and Ctrl+Shift+7 for lists. In a list, Tab nests an item and Shift+Tab lifts it; Enter on an empty item leaves the list. *Insert table* in the command palette adds a table: Tab and Shift+Tab move between its cells, Tab in the last cell adds a row, and the palette's *Table:* commands add and delete rows and columns. A scene's headings sit beneath its chapter's title, so `#` is the largest a scene has. Anything else Markdown can do (code, footnotes, HTML) is kept as you wrote it, shown as Markdown.
+- **Headings, lists and tables:** type `## ` at the start of a line for a heading (`#` to `###`), `- ` for a bulleted list, `1. ` for a numbered one; or Ctrl+Alt+1 to 3 for a heading (Ctrl+Alt+0 back to text), Ctrl+Shift+8 and Ctrl+Shift+7 for lists. In a list, Tab nests an item and Shift+Tab lifts it; Enter on an empty item leaves the list. *Insert table* in the command palette adds a table: Tab and Shift+Tab move between its cells, Tab in the last cell adds a row, and the palette's *Table:* commands add and delete rows and columns. A scene's headings sit beneath its chapter's title, so `#` is the largest a scene has. Anything else Markdown can do (code, HTML) is kept as you wrote it, shown as Markdown.
+- **Footnotes:** Ctrl+Alt+F (or *Add a footnote* in the palette) adds one where the caret is, numbered for you, with the caret in its text beneath the prose. The same keys go back to where it's referred to, or a click on its number does. Delete the reference and the note goes with it. They compile as real footnotes or notes in Word, EPUB and PDF.
 - **Pictures:** drop or paste an image into the text, or choose *Insert a picture…* in the command palette, for a map, a letter's scan or a sketch between paragraphs. Give it a description (read aloud by screen readers in its place) and, if you like, a caption to show under it. It's resized to at most 1600 px on its longest edge and saved in the novel's `images/` folder, named from its description. To change the description or caption, select the picture (↑ or ↓ onto it, or click it) and press Enter, or double-click it; Drag it to move it: a line shows where it will land. Delete or Backspace removes it, and its file goes too unless something else shows it. Undo brings both back.
 - **Focus mode** (Ctrl+Shift+F) hides everything but the text. **Typewriter scrolling** (Ctrl+Shift+L) keeps the line you're on steady on the screen.
 - **Mentions:** type `@` and a few letters to mention someone or something from the story bible; ↑ ↓ and Enter to choose. A mention keeps its words in the text and stays linked if the entry is renamed. Hover over one, or press Alt+Enter beside it, for its card: who or what it is (with its picture, if it has one), and its relationships at this point in the story.
@@ -56,10 +116,35 @@ Choose a chapter or scene in the tree on the left. A chapter opens as one contin
 
 Beside the text, the right sidebar has three tabs: **Scene**, **Notes** and **Entry**. **Ctrl+Shift+\\** (⌘⇧\\ on a Mac) hides and shows it; hidden, it's a strip of icons at the right edge. Drag its left edge to widen it (or focus that edge and use ← →). **F6** moves between the text and the sidebar, and **Escape** returns to the text with the caret where it was. Its tab, width and whether it's showing are remembered. On a narrow window it opens as a sheet over the text when you ask for it.
 
-- **Scene** is a card for the scene the caret is in: its title and place in the chapter, the synopsis, the status (idea, outlined, drafted, revised, final) as five steps, and a row for each detail it has: point of view, where, characters, when (and for how long) in story time, plotlines with their weight and beat, entries of your own types, themes and tags. Details it hasn't got yet are under **Add…**. Each row's pencil edits it in place, with the people and places pickers (and *New character “…”* to make one as you go); Enter saves a single field and Escape or **Done** returns to the row. ◀ ▶ step through the chapter's scenes without moving the caret. **From the story** lists what the rest of the book says about the scene: the first or last scene, how long after the scene before it comes (or how far back a flashback goes), first appearances, someone back after a long absence, plotlines beginning or ending, relationships starting or ending.
+- **Scene** is a card for the scene the caret is in: its title and place in the chapter, the synopsis, the status (idea, outlined, drafted, revised, final) as five steps, and a row for each detail it has: point of view, where, characters, when (and for how long) in story time, plotlines with their weight and beat, entries of your own types, themes and tags. Details it hasn't got yet are under **Add…**. Each row's pencil edits it in place, with the people and places pickers (and *New character “…”* to make one as you go); Enter saves a single field and Escape or **Done** returns to the row. ◀ ▶ step through the chapter's scenes without moving the caret. **From the manuscript** (*From the journal*, and so on) lists what the rest of the book says about the scene: the first or last scene, how long after the scene before it comes (or how far back a flashback goes), first appearances, someone back after a long absence, plotlines beginning or ending, relationships starting or ending.
 - **Pins:** the pin on a row puts that detail under every scene's title in the text, as a quiet line (*Ada Varn · Day 1, 09:10 · 20 min*), sidebar showing or not. It's only shown, never written into your scene files.
 - **Notes** are the notes on the scene the caret is in, as sticky-note cards: the one pinned here on top, then newest first, each a few lines until you open it. Open one (click, or Enter on its title) to write in it, change its title and tags, **Pin to the top** (the scene's other pinned note is unpinned), **Take off this scene**, or **Open the note** over the Notes gallery. **+ Note** (or *New note on this scene* in the palette) asks for a title, then puts the caret in the new note. A note can be on several scenes; it lists them, under a pencil, and **Add a note already written** on the tab puts one you've written on this scene too. Deleting a scene takes it off its notes, and asks whether notes on no other scene are kept or deleted.
 - **Entry** shows a story bible entry: choose a name on the Scene card, or *Open entry* on a mention's card. It's the entry's profile at the sidebar's size, with its picture beside the name, read first and edited in place just as on its page, with its strip of scenes and its relationships read at the caret's scene, and *Open the full entry*. **Back** and **Forward** walk the entries you've opened, and whatever you open next shows there. The tab is called *Event* while it shows an off-page event. After a quick entry, the notice's **Add details** opens it with the name ready to edit.
+
+## Dictation
+
+**Dictate** (Ctrl+Shift+D, ⌘⇧D on a Mac; the palette, the right-click menu, the desktop app's Edit menu, or the microphone in the bar above a phone's keyboard) and speak. The words show greyed at the caret as they're heard. When you pause, the phrase settles into the text, with its spacing and capitals, and saves like typing. One Undo takes back one phrase. Say "new paragraph" or "new line" on their own to start one. Names are spelled as your index spells them.
+
+You can type and move the caret while dictating: the phrase goes where the caret is when it settles. **Escape**, **Stop dictating**, or Dictate again stops it, and so does opening another page, hiding the app, or a stretch of silence. Whatever was heard so far is written first, and if something goes wrong, a message says what to do next.
+
+**It stays on your device.** Dictation hears with a speech model on your computer or phone, and works offline once it's there. The first time, Writer offers to download it (about 208 MB). Audio is never saved or sent anywhere, and what you say isn't logged. **Dictation…** in the ⋯ menu shows the model and lets you remove it, chooses the microphone on a computer (a Bluetooth headset's can stall some computers, and it says so), sets how long a silence stops listening, and says whether a screen reader reads out each phrase.
+
+It hears English for now, in the Linux desktop app and the Android app. It isn't offered in a browser tab on `writer serve`, and it isn't checked yet on the Windows and Mac test builds. The system's own voice typing, like the microphone on Android's keyboard, works in the text anywhere, but that's your system's: it may send audio away, depending on its settings.
+
+## On a phone
+
+The Android app opens, edits and syncs the same books as your computer, through GitHub, and doesn't need anything else installed. Writing offline is fine: it syncs later, and shows conflicts rather than overwriting. Unsaved typing survives the app being closed or killed, apart from the last moment's if it's killed while on screen.
+
+- **The bottom bar** holds four of the book's pages and **More**. A journal has Journal, Calendar, Notes and Index; a novel has its manuscript, Outline, Notes and Bible. *Arrange the bar…* in More chooses the other three, and the choice is kept with the book.
+- **More** is a sheet with what's beside the text on a wide screen (this piece's details, its notes, and the entry at the caret), every page as a large tile, Drafts and checkpoints, *Arrange the bar…* and *Commands…*, the palette.
+- **The page's name** in the top bar opens *Go to an entry* or *Go to a scene*: a search, then the book's sections folded, a journal's newest first.
+- **While you're writing**, a bar above the keyboard holds Commands, Dictate, Undo, Redo, `@` and the actions for selected text. Its last button hides the keyboard, and the bottom bar comes back.
+- **Selected text** keeps Android's own toolbar and the keyboard, with *Raise an issue…* added.
+- **Sheets** close when you drag their handle away or tap it. Swipe the right sidebar back toward the edge to close it, or use its button, a tap beside it, or Android's back. Back closes what's open first, then goes back a page.
+
+**Where the books are.** A phone keeps books in the app's own storage, out of reach of a file manager, so a phone has no *Open a folder*. To bring a book to the phone, put it on GitHub from your computer and clone it. A book you remove from the shelf waits under **On this phone**, to add back or delete. Uninstalling the app or clearing its data removes these books, so sync first.
+
+**What's not on the phone.** Compile isn't offered: use a computer or the book's GitHub workflow. The Android app comes from the [Android (latest)](https://github.com/heffrey78/writer/releases/tag/android-latest) pre-release. There's nothing for iPhones or iPads yet.
 
 ## Structure: parts, chapters and scenes
 
@@ -69,13 +154,13 @@ The tree on the left holds the book. **New** adds a scene, a chapter or a part a
 
 - **Table**: each scene's synopsis, status, point of view, characters, plotlines and word count; edit the synopsis and status in place, and drag to reorder.
 - **Cards**: scenes as index cards by chapter, filtered by point of view, character, plotline or status; drag cards to reorder.
-- **Board**: your drafting progress, a column for each status (Idea, Outlined, Drafted, Revised, Final) with its scenes and words. Drag a card to another column, or press Alt+← / Alt+→ on its handle, to change a scene's status. Filter by point of view, part or chapter. For a novel on GitHub, the board can be on GitHub too (see [The board on GitHub](#the-board-on-github)).
+- **Board** (a novel's): your drafting progress, a column for each status (Idea, Outlined, Drafted, Revised, Final) with its scenes and words. Drag a card to another column, or press Alt+← / Alt+→ on its handle, to change a scene's status. Filter by point of view, part or chapter. For a novel on GitHub, the board can be on GitHub too (see [The board on GitHub](#the-board-on-github)).
 
 ![The outline as cards](docs/screenshots/outline-cards.png)
 
 ## The story bible
 
-**Story bible** in the left panel opens a gallery of every entry, grouped by type: characters, locations, plotlines, themes and any types of your own (an "Artifacts" type in the sample novel, say). Each card shows its picture (a portrait beside the name, or the initials while there's none; a place's picture across the top, or *No picture yet*), the summary, a fact or two, a small strip of the scenes the entry is in and how many; an entry no scene uses yet says *Not in the story yet*. Search by name or other name, and sort by first appearance, name or most scenes.
+**Story bible** in the left panel opens a gallery of every entry, grouped by type: characters, locations, plotlines, themes and any types of your own (an "Artifacts" type in the sample novel, say). Each card shows its picture (a portrait beside the name, or the initials while there's none; a place's picture across the top, or *No picture yet*), the summary, a fact or two, a small strip of the scenes the entry is in and how many; an entry no scene uses yet says *Not in the manuscript yet*. Search by name or other name, and sort by first appearance, name or most scenes.
 
 An entry opens over the gallery, like a card picked up off the table, as a profile to read first. Each part has a pencil (or *+ Add…* while it's empty) and edits in place: the name, other names (recognised when you type `@`), tags, the summary, fields of your choice (*+ Add a field*; rename or remove one from its pencil) and the notes, which you write in straight away. Enter saves, and so does moving on: clicking or tabbing elsewhere, opening another part, or closing the entry. Escape leaves a part as it was. Close the entry with ✕, Escape or a click outside it, back to the gallery as you left it; everything is already saved. Wherever you open an entry from (the palette, a mention's card, a link), it opens over the gallery, and **Back** closes it.
 
@@ -85,7 +170,7 @@ An entry opens over the gallery, like a card picked up off the table, as a profi
 
 Below them:
 
-- **In the story**: every scene in reading order, under its part and chapter names, marked where the entry carries the scene (a character's point of view, a plotline's major beat, a theme at its strongest), is in it, or is only mentioned. Each mark opens its scene. Beneath it: first and last appearance, how many scenes, the longest absence, and the off-page events it's part of.
+- **In the manuscript** (*In the journal*, and so on): every scene in reading order, under its part and chapter names, marked where the entry carries the scene (a character's point of view, a plotline's major beat, a theme at its strongest), is in it, or is only mentioned. Each mark opens its scene. Beneath it: first and last appearance, how many scenes, the longest absence, and the off-page events it's part of.
 - **By type**: a location's visitors and the story time its scenes span; a plotline's beats in reading order, with *+ Write the beat* where a scene hasn't said what happens (written into that scene), the scenes it skips, who's in it and where; a theme's strength scene by scene.
 - **Relationships** as arcs over the same scenes: each from the scene it starts to the scene it ends, in its kind's colour and line, with its name on the bar. The marker under them (arrow keys, or a click) reads what holds at one scene. A bar opens *Change at…*, *End at…* and *Remove…*; *+ Add a relationship* makes a new one.
 
@@ -115,7 +200,7 @@ Each event is a file of its own, `bible/events/<title>.md`. A novel made before 
 
 Notes are your own thinking, kept with the book: ideas, what-ifs, questions to answer later. **New note** (in the palette or on the Notes page) makes one, and *Note:* in the palette opens one. A note opens over the Notes gallery, and a new one starts as just its title: press Enter or move on and the caret goes into its text, ready to write. Close it with ✕, Escape or a click outside it; everything is already saved, and a new note closed without a title isn't made. A note has a title, tags and prose, each edited in place, and the prose takes @ mentions like a scene's. **Notes**, under Plan, shows every note as a card, with its tags and scenes, filtered by a tag or words and sorted newest or by title. The Story bible shows off-page events the same way, as their own group of cards after the entries. An entry or an event lists the notes that mention it, under *In your notes*. Notes are never part of the manuscript, the compile or the Story map. When one earns its place in the story, **Make it an event or a scene** turns it into an off-page event (the note as its note) or a new scene at the end of a chapter (the note as its synopsis), and keeps the note, saying what it became, or removes it. Each note is a file of its own, `notes/<title>.md`.
 
-**Relationships**, under Plan, draws the story bible's relationships as a graph. Drag the *Story position* slider, or press **Play**, to see relationships begin and end as the story goes. Arrange entries by dragging; the layout is saved.
+**Relationships**, under Plan, draws the story bible's relationships as a graph. Drag the *Position in the manuscript* slider, or press **Play**, to see relationships begin and end as the story goes. Arrange entries by dragging; the layout is saved.
 
 Each has an **Export** button for SVG; the relationships and the timeline also export Mermaid.
 
@@ -145,6 +230,7 @@ Set the **target length**, the **date** to reach it by and your **words a day** 
 ### Your name and email
 
 git signs every change it saves to your book's history with a name and an email, and needs both before it can save anything. If you're signed in to GitHub, Writer offers your account's name and its private noreply address. GitHub knows that address is you, and your own email stays out of the history. You can change them any time under *Your name and email…* in the **⋯** menu. They're set for every novel on this computer, as git's own settings (`git config --global`). If saved work is waiting because git doesn't know you yet, the sync button says so and offers to fix it.
+
 ## Drafts: versions and checkpoints
 
 **Drafts** (the version's name in the top bar, or *Checkpoints* in the ⋯ menu) holds the book's history:
@@ -210,7 +296,9 @@ Issues are for the work around the book: plot holes, continuity errors, research
 - **E-book (EPUB)** for readers and e-readers.
 - **PDF**, laid out like the Word file.
 
-A scene's headings, lists, tables and pictures come out as themselves in all three, set beneath the chapter's heading. Compile the whole book or a range of chapters. Anything you've just typed is saved first. The **Cover** row shows the book's cover, if it has one, with *Change…* and *Remove* (or *Add a cover…*): it's the e-book's cover and the PDF's first page, and Word manuscripts go out without one, as agents expect. Presets in a `compile.yaml` file in the novel set the title page details, chapter headings ("Chapter Four: The Flood", or just the number or title), the scene break marker, and front and back matter such as a dedication; see the [format spec](docs/format/v3.md#compileyaml).
+That layout is a novel's. Other kinds compile in a plain one, in their own words, and a section of a non-fiction book is headed by its title.
+
+A scene's headings, lists, tables, pictures and footnotes come out as themselves in all three, set beneath the chapter's heading. Compile the whole book or a range of chapters. Anything you've just typed is saved first. The **Cover** row shows the book's cover, if it has one, with *Change…* and *Remove* (or *Add a cover…*): it's the e-book's cover and the PDF's first page, and Word manuscripts go out without one, as agents expect. Presets in a `compile.yaml` file in the novel set the title page details, chapter headings ("Chapter Four: The Flood", or just the number or title), the scene break marker, and front and back matter such as a dedication; see the [format spec](docs/format/v3.md#compileyaml).
 
 **On GitHub**, every named checkpoint you make becomes a Release of the novel's repository with the three files attached, and *Actions → Compile → Run workflow* compiles on demand. The files are identical to the app's for the same saved version.
 
@@ -220,13 +308,13 @@ A scene's headings, lists, tables and pictures come out as themselves in all thr
 
 ## Keyboard
 
-Everything is reachable from the keyboard. **Ctrl+K** opens the command palette, which can do anything in the app: go to a chapter or scene, open a view, make a checkpoint, sync, change the theme. **Back** and **Forward** in the top bar, or **Alt+←** and **Alt+→** (outside text, where those keys move the caret), go back and forward through the pages you've visited, as do the mouse's back and forward buttons. **Ctrl+/** lists the keyboard shortcuts, **Ctrl+\\** collapses or expands the sidebar, and **Ctrl+Shift+\\** hides or shows the right sidebar; **F6** moves between it and the text.
+Everything is reachable from the keyboard. **Ctrl+K** opens the command palette, which can do anything in the app: go to a chapter or scene, open a view, make a checkpoint, sync, change the theme. **Back** and **Forward** in the top bar, or **Alt+←** and **Alt+→** (outside text, where those keys move the caret), go back and forward through the pages you've visited, as do the mouse's back and forward buttons. **Ctrl+Shift+D** dictates, **Ctrl+Alt+F** adds a footnote, **Ctrl+/** lists the keyboard shortcuts, **Ctrl+\\** collapses or expands the sidebar, and **Ctrl+Shift+\\** hides or shows the right sidebar; **F6** moves between it and the text.
 
 ![The command palette](docs/screenshots/palette.png)
 
 ## Your files
 
-A novel is a folder of plain files you can read and edit anywhere: on github.com, in a text editor, or by hand.
+A book is a folder of plain files you can read and edit anywhere: on github.com, in a text editor, or by hand. A novel's look like this:
 
 ```
 novel.yaml           title, author, word target, kinds of relationship (book.yaml in format 3)
@@ -240,7 +328,9 @@ notes/               your notes, one file each (not part of the story)
 diagrams/            generated diagram snapshots
 ```
 
-Write each paragraph on one line, and don't change the IDs (`char_7f3k2q`). The novel's own README explains more, and the [format spec](docs/format/v3.md) says everything.
+Other kinds have the same shape under their own folder names: a journal has `entries/` and `index/`, a campaign `sessions/` and `codex/`, a non-fiction book `text/` and `index/`, each with `book.yaml`.
+
+Write each paragraph on one line, and don't change the IDs (`char_7f3k2q`). The book's own README explains more, and the [format spec](docs/format/v3.md) says everything.
 
 The format has a version, `schema_version` in `novel.yaml` (or, from format 3, `book.yaml`, which also says what kind of book this is). Writer moves a novel to a newer format only once you agree: from format 1 the first time you change an off-page event, and to format 3 when you choose *Move this book to the new format…* in the command palette. An older copy, on another computer say, or gh-writer, then won't open the book: it says to update Writer rather than show it wrongly or save over it. Syncing still works.
 
@@ -250,11 +340,12 @@ From the Writer folder:
 
 | Command | Does |
 |---|---|
-| `npx writer serve [dir]` | Start the app; with a folder, open that novel. `--port`, `--no-open`, `--sync-every <minutes>` |
-| `npx writer validate [dir]` | Check a novel's files for broken references and other problems |
+| `npx writer serve [dir]` | Start the app; with a folder, open that book. `--port`, `--no-open`, `--sync-every <minutes>` |
+| `npx writer validate [dir]` | Check a book's files for broken references and other problems |
 | `npx writer snapshots [dir]` | Redraw the diagram snapshots in `diagrams/` |
-| `npx writer compile [dir]` | Compile to `compiled/` in the novel. `--format docx,epub,pdf`, `--preset`, `--from`/`--to` (chapter IDs), `--out` |
-| `npx writer migrate [dir]` | Move a novel to the newest format as one commit, and update its tools in `.github/gh-writer/` ([format spec](docs/format/v3.md#versioning)) |
+| `npx writer compile [dir]` | Compile to `compiled/` in the book. `--format docx,epub,pdf`, `--preset`, `--from`/`--to` (chapter IDs), `--out` |
+| `npx writer migrate [dir]` | Move a book to the newest format as one commit, and update its tools in `.github/gh-writer/` ([format spec](docs/format/v3.md#versioning)) |
+| `npx writer convert [dir] --to journal` | Make a journal kept as a novel a Journal, as one commit (see [A journal](#a-journal)) |
 | `npx writer new-id <prefix>` | A new ID, for editing files by hand |
 
-In a novel's own folder, without Writer installed, the same tools run as `node .github/gh-writer/validate.mjs`, `snapshots.mjs` and `compile.mjs`.
+In a book's own folder, without Writer installed, the same tools run as `node .github/gh-writer/validate.mjs`, `snapshots.mjs` and `compile.mjs`.

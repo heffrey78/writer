@@ -188,3 +188,36 @@ test("progress, with three weeks of writing", async ({ page, app }) => {
   await page.waitForTimeout(500);
   await page.screenshot({ path: out("progress") });
 });
+
+test("the shelf, and a book of each other kind", async ({ page, app }) => {
+  const sample = (name: string) => fileURLToPath(new URL(`../../../examples/${name}`, import.meta.url));
+  await app.restart(app.novelRepo("varn"));
+  for (const [book, name] of [
+    ["sample-nonfiction", "nonfiction"],
+    ["sample-campaign", "campaign"],
+    ["sample-journal", "journal"],
+  ] as const) {
+    await app.restart(app.bookRepo(sample(book), name));
+    await page.goto(app.launchUrl);
+    await expect(page.getByRole("navigation", { name: "Views" })).toBeVisible();
+    await page.waitForTimeout(1200);
+    await shoot(page, name);
+  }
+  await page.goto(new URL("/", app.url).href);
+  await expect(page.getByText("A Year at the Estuary").first()).toBeVisible();
+  await page.waitForTimeout(500);
+  await shoot(page, "shelf");
+});
+
+test("on a phone: a journal's day, and More", async ({ page, app }) => {
+  await page.setViewportSize({ width: 412, height: 915 });
+  await app.restart(app.bookRepo(fileURLToPath(new URL("../../../examples/sample-journal", import.meta.url)), "journal"));
+  await page.goto(app.launchUrl);
+  const bar = page.getByRole("navigation", { name: "Book" });
+  await expect(bar).toBeVisible();
+  await page.waitForTimeout(1200);
+  await shoot(page, "phone-journal");
+  await bar.getByRole("button", { name: "More" }).click();
+  await page.waitForTimeout(600);
+  await shoot(page, "phone-more");
+});

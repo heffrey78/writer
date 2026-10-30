@@ -1,6 +1,6 @@
 # @writer/server
 
-The local writer server: a [Hono](https://hono.dev) API on Node that reads and writes a novel repository on the author's machine. `writer serve` starts it.
+The local writer server: a [Hono](https://hono.dev) API on Node that reads and writes a book's repository on the author's machine. `writer serve` starts it. Its logic is the engine (`@writer/server/engine`, D16), which reaches git, the disk and the host only through ports, so it also runs in the page on Android; see [DEVELOPER.md](../../DEVELOPER.md#the-engine-and-its-hosts). This README says "novel" where the routes do, and a book of any kind answers to them.
 
 ```ts
 import { createServer, Library } from "@writer/server";
@@ -20,10 +20,11 @@ await server.close();
 | `GET /api/app/licenses` | yes | `{ licenses: [{ name, text }] }`: the licence texts in `WRITER_LICENSES`, which the desktop app sets; none otherwise |
 | `GET /api/identity` | yes | `{ identity, suggestion }`: the name and email git signs with on this computer (`git config --global`), or null; and, signed in, the GitHub account's name (or login) and noreply address (`<id>+<login>@users.noreply.github.com`), or null |
 | `PUT /api/identity` | yes | `{ name, email }`: set as git's global `user.name` and `user.email`, then any commit blocked for want of them (`IDENTITY`) is made; `400 BAD_IDENTITY` without a name or a valid address |
-| `GET /api/library` | yes | `{ novels, notices, folder, ghWriter, kinds, strays }`: `folder` is where new novels and clones go, with `~` for home; a novel with a cover has its version as `coverVersion`; `strays` are the books in that folder that aren't on the shelf (`{ path, title }`), to add back or delete (#98) |
+| `GET /api/library` | yes | `{ novels, notices, folder, ghWriter, kinds, strays }`: `folder` is where new novels and clones go, with `~` for home; a novel with a cover has its version as `coverVersion`, and each has its kind and the kind's modules (`kind`, `modules`) where it's of one this Writer ships; `ghWriter` lists the books in gh-writer's library that aren't here; `kinds` the kinds New can start (`{ key, label }`); `strays` are the books in that folder that aren't on the shelf (`{ path, title }`), to add back or delete (#98) |
 | `GET /api/library/:id/cover` | yes | the novel's cover image, for the shelf: read from its folder without opening the novel (which would start syncing it) |
 | `POST /api/library` | yes | `{ path }` → `201 { novel }`, or `400 { code, error }` |
-| `POST /api/library/new` | yes | `{ title, author?, path?, identity?: { name, email } }` → `201 { novel }`, or `400 { code, error }` |
+| `POST /api/library/new` | yes | `{ kind?, title, author?, path?, identity?: { name, email } }` → `201 { novel }`: a book of the kind (a novel by default), from its template; or `400 { code, error }` |
+| `POST /api/library/gh-writer` | yes | `{ added, failed }`: adds the books in gh-writer's library that aren't here, their folders, not copies (#2) |
 | `DELETE /api/library/:id` | yes | `204`: forgets the novel; its folder is left alone |
 | `GET /api/library/unsynced?path=` | yes | `{ onGitHub, changes, versions }`: what deleting the book would lose (changes not committed or not pushed, and branches GitHub hasn't got); `404` for a folder that isn't a book on the shelf or in the books folder |
 | `POST /api/library/delete` | yes | `{ path }` → `204`: deletes a book on the shelf, or one in the books folder that isn't on it, folder and all, closing it first; never its GitHub repository; `404` for any other folder |
@@ -58,11 +59,11 @@ Routes added to `server.app` (before its first request) or in `createApp` sit be
 
 The library is the author's list of novels: `library.json` in the user config directory. That's `$XDG_CONFIG_HOME/writer` (or `~/.config/writer`) on Linux, `~/Library/Application Support/writer` on macOS and `%APPDATA%\Writer` on Windows. `WRITER_CONFIG_DIR` overrides it. Each entry has an `id` (`lib_…`), its `path`, the `title`, `author` and `cover` from novel.yaml (read again whenever the novel is opened, and when its cover changes), the `remote` (origin, with any credentials stripped out of the URL) and `lastOpened`. `list()` returns the most recently opened first. The file is replaced atomically on every change.
 
-- **Adding** a folder checks that it's a folder (`NOT_A_DIRECTORY`), inside a git work tree (`NOT_A_REPO`) and holds novel.yaml (`NOT_A_NOVEL`). Adding a folder that's already there refreshes its entry.
+- **Adding** a folder checks that it's a folder (`NOT_A_DIRECTORY`), inside a git work tree (`NOT_A_REPO`) and holds book.yaml or novel.yaml (`NOT_A_NOVEL`). Adding a folder that's already there refreshes its entry.
 - **Missing folders** are dropped whenever the library is read, at startup or later. Each drop leaves a `MISSING` notice in `notices` for the server's lifetime. An unreadable library.json is set aside (`UNREADABLE` notice, with the backup's path) and the library starts empty.
 - **Cloning** takes `owner/name` (GitHub over https), an `https://`, `ssh://`, `git://` or `file://` URL, or `git@host:path`. Anything else, including anything git could read as an option, is `BAD_REPO`. The clone goes to `path`, or by default to `~/writer/<name>`. A destination with files in it is refused (`DESTINATION_EXISTS`) and never touched. A failed clone, or a clone that turns out not to be a novel, leaves no folder behind.
 
-- **Starting** a novel copies the novel template (`templates/novel` in this repository, `DEFAULT_TEMPLATE`; `Library.open({ templateDir })` overrides it) into `path`, by default `~/writer/<slug of the title>`. The folder must be new or empty (`NOT_EMPTY`). The template's placeholder IDs get fresh ones, as its `init.mjs` does on GitHub. novel.yaml gets the title and author, the README its heading, and `diagrams/` is drawn for the new title. Then `git init` on `main` and one commit, "Start <title>". If git has no name and email (config or `GIT_AUTHOR_*`), it fails with `NEEDS_IDENTITY`; given `identity`, they are set in the new repository's config only. Any failure leaves nothing behind.
+- **Starting** a book copies its kind's template (`templates/<kind>` in this repository; `Library.open({ templatesDir })` overrides the folder, `UNKNOWN_KIND` if there's none) into `path`, by default `~/writer/<slug of the title>`. The folder must be new or empty (`NOT_EMPTY`). The template's placeholder IDs get fresh ones, as its `init.mjs` does on GitHub. The manifest gets the title and author, the README its heading, and `diagrams/` is drawn for the new title. Then `git init` on `main` and one commit, "Start <title>". If git has no name and email (config or `GIT_AUTHOR_*`), it fails with `NEEDS_IDENTITY`; given `identity`, they are set in the new repository's config only. Any failure leaves nothing behind.
 
 The clone endpoint answers with `text/event-stream`. It sends `progress` events (`{ stage, progress, processed, total }`, from git's own progress), then either `done` with `{ novel }`, or `error` with `{ code, error, detail? }`. Closing the request aborts the clone.
 
@@ -254,7 +255,7 @@ Only files in `images/` that nothing else shows are deleted: a picture the autho
 
 ### Events
 
-Each off-page event is a file of its own, `bible/events/<slug>.md`: its fields as front matter and its note as the prose ([D11](https://github.com/heffrey78/gh-writer/issues/206)). Its note can also be edited as the file's text, like an entry's notes.
+Each off-page event is a file of its own, `bible/events/<slug>.md`: its fields as front matter and its note as the prose ([D11](https://github.com/heffrey78/gh-writer/issues/206)). Its note can also be edited as the file's text, like an entry's notes. These routes are the off-page-events module's (`packages/modules/off-page-events`), so they sit under `/api/novels/:id/off-page-events` (`/events`, for the `/bible/events` below) and answer only for a book whose kind lists the module.
 
 | Endpoint | Does | Commit |
 |---|---|---|
@@ -309,14 +310,14 @@ Unlike the operations above, a layout is saved like typing: through the workspac
 
 ## Drafting board
 
-The novel's scenes on a GitHub Project (heffrey78/gh-writer#11, decision [D8](https://github.com/heffrey78/gh-writer/issues/177)), for GitHub's board, table and roadmap views of drafting progress. `BoardStore` (in `board.ts`) keeps it; the scene files stay authoritative.
+The novel's scenes on a GitHub Project (heffrey78/gh-writer#11, decision [D8](https://github.com/heffrey78/gh-writer/issues/177)), for GitHub's board, table and roadmap views of drafting progress. It's the drafting-board module's: `BoardStore` (`packages/modules/drafting-board/src/server/board.ts`) keeps it, and the scene files stay authoritative.
 
 | Endpoint | Returns |
 |---|---|
-| `GET /api/novels/:id/board` | the status: `{ repo, project: { number, title, url } \| null, syncedAt, last, conflicts, error?, gone? }` |
-| `POST /api/novels/:id/board` | makes the novel's project, or adopts the one it has, and syncs: the status |
-| `POST /api/novels/:id/board/sync` | syncs now: the status, with why it couldn't in `error` |
-| `POST /api/novels/:id/board/conflicts/:scene` | `{ keep: "file" \| "board" }` → settles a status conflict and syncs: the status |
+| `GET /api/novels/:id/drafting-board` | the status: `{ repo, project: { number, title, url } \| null, syncedAt, last, conflicts, error?, gone? }` |
+| `POST /api/novels/:id/drafting-board` | makes the novel's project, or adopts the one it has, and syncs: the status |
+| `POST /api/novels/:id/drafting-board/sync` | syncs now: the status, with why it couldn't in `error` |
+| `POST /api/novels/:id/drafting-board/conflicts/:scene` | `{ keep: "file" \| "board" }` → settles a status conflict and syncs: the status |
 
 Refusals: `400 BAD_REQUEST`, `403 NO_SIGN_IN` / `NEEDS_SCOPE` (the sign-in lacks `project`), `404 NOT_ON_GITHUB` / `NOT_SET_UP` / `NOT_FOUND`, `409 NOT_MAIN`, `410 GONE`, `429 RATE_LIMITED { resetAt }`, `503 OFFLINE`, `502 GITHUB`.
 

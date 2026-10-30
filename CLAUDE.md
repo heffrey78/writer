@@ -1,18 +1,18 @@
 # Writer
 
-Writer is a local-first writing app for desktop (Tauri) and later Android. It grows out of [gh-writer](https://github.com/heffrey78/gh-writer), a novel-writing app, into a general base where each kind of book gets its own words, structure and features. The kinds are Novel and Journal first, then Campaign (tabletop RPG) and Non-fiction. A book is a git repository of plain Markdown and YAML, synced through GitHub. Books sit on a shelf: a journal is one book, and so is a novel or a campaign.
+Writer is a local-first writing app for desktop (Tauri) and Android. It grows out of [gh-writer](https://github.com/heffrey78/gh-writer), a novel-writing app, into a general base where each kind of book gets its own words, structure and features. The kinds are Novel, Journal, Campaign (tabletop RPG) and Non-fiction. A book is a git repository of plain Markdown and YAML, synced through GitHub. Books sit on a shelf: a journal is one book, and so is a novel or a campaign.
 
 **Writer should not try to be everything to everyone.** A feature belongs in the base only if every kind wants it. Anything else goes in a module that some kinds use.
 
 ## Status
 
-The plan lives in this repository's issues (see *Project tracking*). Its order:
+The plan lives in this repository's issues (see *Project tracking*); `get_status` says where it stands. Its order:
 
-1. Import gh-writer as a snapshot, rename it to Writer, and get every check green (#1, D13 #9).
-2. Keep gh-writer v2 novels opening unchanged (#2).
-3. Generalize: kinds (#3, D15 #11) and modules (#4, D14 #10), starting from the inventory (#17).
-4. The Journal kind, the first proof of the base (#5).
-5. Roadmap: Campaign (#6), Non-fiction (#7), Android (#8, D16 #12), dictation (#71–#76, D17 #77), other languages (#92).
+1. Import gh-writer as a snapshot, rename it to Writer, and get every check green (#1, D13 #9). Done.
+2. Keep gh-writer v2 novels opening unchanged (#2). Done.
+3. Generalize: kinds (#3, D15 #11) and modules (#4, D14 #10), starting from the inventory (#17). Done.
+4. The Journal kind, the first proof of the base (#5). Done.
+5. Roadmap: Non-fiction (#7) and Android (#8, D16 #12) are done. Campaign (#6) is built and waits on its game master. Dictation (#71–#76, D17 #77) works on Linux and Android; Windows and macOS wait on signed apps (#74). Other languages (#92) are a draft.
 
 D13–D15 are accepted (2026-10-18), D16 (2026-10-21, amended from its spike: docs/architecture/d16-spike.md), and D17 (2026-10-24; its spike, #78, amends it with the engine and model). Don't build on a proposed decision as if it were settled, and point it out when work depends on one.
 
@@ -48,7 +48,7 @@ cli (serve, validate, snapshots, compile, migrate)    desktop (Tauri 2 shell run
 - `core` runs in the browser and in Node, so keep `node:` imports out of it. Its Node-only parts are behind `@…/core/node`.
 - Books vendor their tools (validate, snapshots, compile) as esbuild bundles under `.github/<app>/`. After changing core, export or the CLI entry points, rebuild the template (`npm run build:template`). A test fails if the bundles are stale.
 
-Extensibility (D14, proposed): three layers, all shipped in the app.
+Extensibility (D14): three layers, all shipped in the app.
 
 - **Base:** shelf, outline, writing view, index, notes, events, sync, issues and compile.
 - **Kinds:** data-first definitions of structure, vocabulary, types, statuses and templates.
