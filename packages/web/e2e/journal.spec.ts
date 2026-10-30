@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Page } from "@playwright/test";
 import { expect, launch, palette, selectionSettled, test, type App } from "./fixtures.ts";
@@ -99,4 +99,42 @@ test("a new journal, written in on three days, its people and places from mentio
   for (const entry of entries) expect(app.git(remote, "show", `main:${entry}`), entry).toContain("---\nid: ent_");
   expect(app.git(remote, "show", `main:${entries[1]}`)).toContain("came by anyway.");
   expect(app.git(remote, "show", "main:book.yaml")).toMatch(/^kind: journal$/m);
+});
+
+test("words begun just before the day turns reach that day's entry, though its file comes before the answer that made it (#112)", async ({ page, app }) => {
+  await launch(page, app);
+  await page.getByRole("list", { name: "Books" }).getByRole("button", { name: "New book" }).click();
+  const dialog = page.getByRole("dialog", { name: "New book" });
+  await dialog.getByRole("radio", { name: "Journal" }).check();
+  await dialog.getByRole("textbox", { name: "Title" }).fill("Days");
+  await dialog.getByRole("button", { name: "Create" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Day by day" })).toBeVisible();
+  const entries = join(app.home, "writer", "days", "entries");
+  const fileOn = (day: string) =>
+    readdirSync(entries, { recursive: true, encoding: "utf8" })
+      .filter((f) => f.endsWith(".md"))
+      .map((f) => readFileSync(join(entries, f), "utf8"))
+      .find((text) => text.includes(`at: ${day}\n`));
+
+  // The entry's file is made, and the book reloads with it, but the answer to "make today's" is
+  // late (as under load): meanwhile the day turns, and the page goes on to the next day's place.
+  let answer!: () => void;
+  const late = new Promise<void>((resolve) => (answer = resolve));
+  await page.route("**/api/novels/*/daily/today", async (route) => {
+    const made = await route.fetch();
+    await late;
+    await route.fulfill({ response: made });
+  });
+  await write(page, "2026-10-20", async () => {
+    await page.keyboard.type("Rain on the Spit.");
+  });
+  await expect.poll(() => fileOn("2026-10-20")).toBeTruthy();
+  await write(page, "2026-10-21", async () => {});
+  const yesterday = page.getByRole("article", { name: "Tuesday, 20 October" });
+  await expect(yesterday).toBeVisible();
+  answer();
+
+  // Every word in the 20th's entry: in its file, and on the page.
+  await expect.poll(() => fileOn("2026-10-20"), { timeout: 10_000 }).toContain("Rain on the Spit.");
+  await expect(yesterday).toContainText("Rain on the Spit.");
 });

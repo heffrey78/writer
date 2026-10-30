@@ -44,6 +44,12 @@ export interface Run {
    */
   begun?: { id: string; keep: string };
   /**
+   * Where a piece's words were kept if a place to begin one made it (today's entry: its day's), for
+   * a piece shown after its place went: the day turned, or the book reloaded with its file before
+   * make() answered. Words still kept there go into its file, if it has none yet.
+   */
+  keepOf?(piece: Piece): string | undefined;
+  /**
    * Where the caret goes, at the end: a piece's ID, or BEGIN for the place to begin one. Once for each
    * `asked`: the navigation that asked for it (Today's entry, again).
    */
@@ -114,7 +120,7 @@ export function RunPieces({ run, workspace, label, tools, onFocus, piece: noun }
   const making = placeKeep !== undefined && made.has(placeKeep);
   const begun = making ? (made.get(placeKeep!) ?? (run.begun?.keep === placeKeep ? run.begun.id : undefined)) : undefined;
   /** Where the words were kept for a piece made in a place that went before they reached its file. */
-  const keptFor = (piece: Piece) => [...made].find(([, id]) => id === piece.id)?.[0] ?? (run.begun?.id === piece.id ? run.begun.keep : undefined);
+  const keptFor = (piece: Piece) => [...made].find(([, id]) => id === piece.id)?.[0] ?? (run.begun?.id === piece.id ? run.begun.keep : run.keepOf?.(piece));
   const remember = (keep: string, id: string | undefined, gone = false) =>
     setMade((m) => {
       const next = new Map(m);
@@ -353,6 +359,14 @@ function RunPiece({ piece, began, adopt, run, workspace, label, tools, want, onW
     if (keep.current) store(keep.current, md);
     make();
   };
+  // Kept as they're typed, not as they're reported (after a pause): a place that goes at once (the
+  // day turned) leaves every word for its piece to take.
+  useEffect(() => {
+    if (!editor || bound) return;
+    const keepNow = () => void (keep.current && !boundNow.current && store(keep.current, getMarkdown(editor)));
+    editor.on("update", keepNow);
+    return () => void editor.off("update", keepNow);
+  }, [editor, bound]);
   // Made at the first keystroke, not the first pause: the place is the piece's as soon as it can be.
   useEffect(() => {
     if (!editor || path) return;

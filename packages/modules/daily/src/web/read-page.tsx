@@ -33,8 +33,9 @@ export function ReadPage({ novelId, novel, workspace, spell, entries }: BookView
   const [reading, setReading] = useState(() => remembered());
   const now = today();
   const todays = entryOn(novel, now);
-  // Where today's place keeps its words until its entry's file has them.
-  const todayKeep = `writer:today:${novelId}:${now}`;
+  // Where a day's place keeps its words until its entry's file has them.
+  const keepOn = (day: Day) => `writer:today:${novelId}:${day}`;
+  const todayKeep = keepOn(now);
 
   const toggle = () => {
     setReading(!reading);
@@ -95,6 +96,11 @@ export function ReadPage({ novelId, novel, workspace, spell, entries }: BookView
           },
         }),
     ...(todays ? { begun: { id: todays.id, keep: todayKeep } } : {}),
+    // Any day's: its entry may come after the day turned, without its place to hand over its words.
+    keepOf: (piece) => {
+      const day = days.get(piece.id) ?? dayOf(piece);
+      return day ? keepOn(day) : undefined;
+    },
     caret: { to: todays?.id ?? BEGIN, asked: location.key },
   };
 
