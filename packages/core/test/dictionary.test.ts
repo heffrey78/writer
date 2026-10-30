@@ -22,6 +22,7 @@ describe("dictionary.txt", () => {
   test("a new file gets a header explaining it", () => {
     const text = addToDictionary("", "Varn");
     expect(text).toMatch(/^# Words the spell checker accepts/);
+    expect(text).not.toMatch(/novel|story bible/);
     expect(parseDictionary(text)).toEqual(["Varn"]);
   });
 

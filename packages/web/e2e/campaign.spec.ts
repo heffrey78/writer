@@ -121,7 +121,7 @@ test("a new campaign: two sessions prepped and played, an NPC turning on a facti
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog", { name: "Marta Hollin" })).toHaveCount(0);
   await openView(page, "Relationships");
-  const slider = page.getByRole("slider", { name: "Story position" });
+  const slider = page.getByRole("slider", { name: "Position in the campaign" });
   await expect(slider).toHaveAttribute("aria-valuetext", "Session 1 of 2: Session 1, in The First Arc");
   await expect(edge(page, "Marta Hollin, Allied with, The Tide Choir")).toHaveCount(1);
   await slider.focus();

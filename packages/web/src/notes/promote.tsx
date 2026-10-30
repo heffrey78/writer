@@ -51,7 +51,7 @@ export function PromoteNoteDialog({ novelId, novel, workspace, note, flush, open
           aria-describedby={undefined}
           className="fixed top-1/2 left-1/2 z-50 grid w-[min(30rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-lg border border-rule bg-raised p-5 text-ink shadow-xl"
         >
-          <Dialog.Title className="text-lg font-semibold">Make “{note.title}” part of the story</Dialog.Title>
+          <Dialog.Title className="text-lg font-semibold">Make “{note.title}” part of the {w.content.one}</Dialog.Title>
           <form onSubmit={submit} className="grid gap-3 text-sm">
             <fieldset className="grid gap-1.5">
               <legend className="mb-1 font-medium">It becomes</legend>
@@ -90,7 +90,7 @@ export function PromoteNoteDialog({ novelId, novel, workspace, note, flush, open
               </label>
             </fieldset>
             {target?.hint?.(view)}
-            {promote.isError && <ErrorAlert title="Couldn't make it part of the story">{promote.error.message}</ErrorAlert>}
+            {promote.isError && <ErrorAlert title={`Couldn't make it part of the ${w.content.one}`}>{promote.error.message}</ErrorAlert>}
             <div className="flex justify-end gap-2">
               <Dialog.Close asChild>
                 <Button>Cancel</Button>

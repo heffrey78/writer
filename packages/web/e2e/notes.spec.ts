@@ -62,7 +62,7 @@ test("notes are made from the palette, made into an event or a scene, and delete
   // An event, the note kept and pointing at it.
   await palette(page, "note: what if ben");
   await page.getByRole("button", { name: "Make it an event or a scene" }).click();
-  const dialog = page.getByRole("dialog", { name: "Make “What if Ben never sold the plans?” part of the story" });
+  const dialog = page.getByRole("dialog", { name: "Make “What if Ben never sold the plans?” part of the manuscript" });
   await axe(page);
   await dialog.getByRole("button", { name: "Make the event" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "What if Ben never sold the plans?" })).toBeVisible();

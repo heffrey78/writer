@@ -61,7 +61,7 @@ export function DayOne({ novelId, novel }: { novelId: string; novel: Book }) {
       )}
       {!start && apart.length > 0 && (
         <p className="rounded-md border border-warn/40 bg-warn-soft px-3 py-2">
-          {apart.length === 1 ? `1 ${things(novel).one} is on a day of the story` : `${apart.length} ${things(novel).many} are on days of the story`}, not a date: until Day 1 has one, {apart.length === 1 ? "it can't" : "they can't"} be placed among the dated ones, and {apart.length === 1 ? "comes" : "come"} after them.
+          {apart.length === 1 ? `1 ${things(novel).one} is on a numbered day` : `${apart.length} ${things(novel).many} are on numbered days`}, not a date: until Day 1 has one, {apart.length === 1 ? "it can't" : "they can't"} be placed among the dated ones, and {apart.length === 1 ? "comes" : "come"} after them.
         </p>
       )}
     </section>

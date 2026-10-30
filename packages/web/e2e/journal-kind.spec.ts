@@ -52,6 +52,24 @@ test("its sidebar looks back first, then at its people and places, with no outli
   await expect.poll(() => strip.evaluateAll((links) => links.map((l) => l.getAttribute("aria-label")))).toEqual(["Journal", "Calendar", "Notes", "Index", "Relationships", "Story map", "Progress"]);
 });
 
+test("an entry's card says what the rest of the journal says about it, in a journal's words", async ({ page, app }) => {
+  await open(page, app);
+  await page.getByRole("tree").getByRole("treeitem", { name: "Monday, 28 September" }).click();
+  const facts = page.getByRole("region", { name: /^Details of/ }).getByRole("region", { name: "From the journal" });
+  await expect(facts.getByRole("listitem").first()).toBeVisible();
+});
+
+test("an entry in the index and the relationship graph say a journal's words", async ({ page, app }) => {
+  await open(page, app);
+  const views = page.getByRole("navigation", { name: "Views" });
+  await views.getByRole("link", { name: "Index" }).click();
+  await page.getByRole("main").getByRole("link", { name: /^Mira/ }).first().click();
+  await expect(page.getByRole("region", { name: "In the journal" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await views.getByRole("link", { name: "Relationships" }).click();
+  await expect(page.getByRole("slider", { name: "Position in the journal" })).toBeVisible();
+});
+
 test("its index, outline and story map say its words too", async ({ page, app }) => {
   await open(page, app);
   await palette(page, "index");

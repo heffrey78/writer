@@ -300,6 +300,7 @@ function ChapterBlock({ novelId, chapter: ch, from, to, onlyChanges, bring }: { 
 }
 
 function SceneItem({ novelId, scene: s, from, to, bring }: { novelId: string; scene: SceneComparison; from: string; to: string; bring: Bring | undefined }) {
+  const piece = useWords().piece;
   const [open, setOpen] = useState(false);
   const bodyId = useId();
   const delta = s.words.after - s.words.before;
@@ -325,7 +326,7 @@ function SceneItem({ novelId, scene: s, from, to, bring }: { novelId: string; sc
         <div id={bodyId} className="grid gap-3 pl-7">
           {bring && s.status !== "unchanged" && s.status !== (bring.side === "from" ? "added" : "removed") && (
             <Button size="sm" className="justify-self-start" disabled={bring.busy} onClick={() => bring.run(s)}>
-              Use this scene from “{bring.version.name}”
+              Use this {piece.one} from “{bring.version.name}”
             </Button>
           )}
           <Fields fields={s.fields} />

@@ -5,14 +5,14 @@ import type { QuickEntriesState } from "../bible/quick-entries.ts";
 
 const LABELS = { saved: "Saved", saving: "Saving…", unsaved: "Unsaved changes", error: "Not saved" } as const;
 
-/** Whether the author's text is on disk, and the entries made from it in the story bible. */
+/** Whether the author's text is on disk, and the entries made from it in the index. */
 export function SaveStatus({ autosave, entries }: { autosave: Autosave; entries?: StoreApi<QuickEntriesState> | undefined }) {
   const { status: text, error } = useStore(autosave.store);
   const pending = useStore(entries ?? EMPTY, (s) => s.pending);
   const refused = pending.find((e) => e.refused);
   const status = text === "error" || refused ? "error" : text === "saved" && pending.length ? "saving" : text;
   return (
-    <p role="status" className={status === "error" ? "text-sm text-danger max-sm:sr-only" : "text-sm text-muted max-sm:sr-only"} title={error ?? (refused && `“${refused.name}” isn't in the story bible yet: ${refused.refused}`)}>
+    <p role="status" className={status === "error" ? "text-sm text-danger max-sm:sr-only" : "text-sm text-muted max-sm:sr-only"} title={error ?? (refused && `“${refused.name}” couldn't be added yet: ${refused.refused}`)}>
       {LABELS[status]}
     </p>
   );

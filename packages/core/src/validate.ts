@@ -106,7 +106,7 @@ export function validateBook(novel: Book): Diagnostic[] {
     const what = describe(target);
     const custom = target.kind === "entity" && !builtinTypes.has(what);
     if (!allowed.includes(what) && !(allowed.includes("*entity") && target.kind === "entity") && !(allowed.includes("*custom") && custom)) {
-      const wanted = allowed.map((a) => (a === "*entity" ? "a bible entity" : a === "*custom" ? "an entry of a custom type" : `a ${a}`)).join(" or ");
+      const wanted = allowed.map((a) => (a === "*entity" ? `an entry of the ${vocabulary(kind).codex.one}` : a === "*custom" ? "an entry of a custom type" : `a ${a}`)).join(" or ");
       push("error", "E_REF_TYPE", file, `${field} must be ${wanted}, but ${id} is ${article(describe(target))}`, where);
     }
   }
@@ -114,7 +114,7 @@ export function validateBook(novel: Book): Diagnostic[] {
   /** A picture in prose must be under /images/, written from the repository root as github.com reads it (D10). */
   function outsideImages(p: Picture, file: string, bodyLine: number) {
     if (picturePath(p.src)) return;
-    push("warning", "W_IMAGE_OUTSIDE", file, `The picture “${p.alt || p.src}” isn't in the novel's images folder: use /images/<name> (from the repository's root, as github.com reads it)`, { line: bodyLine + p.line - 1 });
+    push("warning", "W_IMAGE_OUTSIDE", file, `The picture “${p.alt || p.src}” isn't in the book's images folder: use /images/<name> (from the repository's root, as github.com reads it)`, { line: bodyLine + p.line - 1 });
   }
 
   /**
@@ -169,7 +169,7 @@ export function validateBook(novel: Book): Diagnostic[] {
     n.scenes.forEach((id, i) => ref(id, [kind.piece.key], n.file, `/scenes/${i}`, "scenes"));
     n.pinned.forEach((id, i) => {
       ref(id, [kind.piece.key], n.file, `/pinned/${i}`, "pinned");
-      if (!n.scenes.includes(id)) push("warning", "W_NOTE_PIN", n.file, `Pinned in ${id}, which isn't one of the note's scenes`, { pointer: `/pinned/${i}` });
+      if (!n.scenes.includes(id)) push("warning", "W_NOTE_PIN", n.file, `Pinned in ${id}, which isn't one of the note's ${vocabulary(kind).piece.many}`, { pointer: `/pinned/${i}` });
     });
     for (const m of mentions(n.body)) ref(m.id, MENTIONABLE, n.file, "", `Mention "${m.text}"`, n.bodyLine + m.line - 1);
     for (const pic of pictures(n.body)) outsideImages(pic, n.file, n.bodyLine);
@@ -206,7 +206,7 @@ export function validateBook(novel: Book): Diagnostic[] {
   // Diagram layouts: positions for records that no longer exist are harmless, but stale.
   for (const [name, layout] of Object.entries(novel.layouts)) {
     for (const id of Object.keys(layout.nodes ?? {})) {
-      if (!index.has(id)) push("warning", "W_LAYOUT_UNKNOWN", "diagrams/layouts.yaml", `Layout "${name}" places ${id}, which isn't in the novel`, { pointer: `/layouts/${name}/nodes/${id}` });
+      if (!index.has(id)) push("warning", "W_LAYOUT_UNKNOWN", "diagrams/layouts.yaml", `Layout "${name}" places ${id}, which isn't in the book`, { pointer: `/layouts/${name}/nodes/${id}` });
     }
   }
 

@@ -24,7 +24,7 @@ test("the graph exports as SVG and as Mermaid, as it stands at the page's scene"
       navigator.clipboard.writeText = (text) => ((window as unknown as { __copied: string }).__copied = text, write(text));
     });
   await open(page, app, "Relationships");
-  const slider = page.getByRole("slider", { name: "Story position" });
+  const slider = page.getByRole("slider", { name: "Position in the manuscript" });
   await slider.focus();
   for (let i = 0; i < 4; i++) await page.keyboard.press("ArrowRight");
   await expect(page.getByRole("heading", { name: "At “The Betrayal”" })).toBeVisible();

@@ -96,7 +96,7 @@ test("renames an entry by moving its file only; every reference still resolves",
   expect(novel.lastCommit()).toBe("Bible: rename Ada Varn to Ada Kost");
   expect(app.git(novel.dir, "show", "-M", "--name-status", "--format=", "HEAD").trim()).toMatch(/^R\d+\tbible\/characters\/ada\.md\tbible\/characters\/ada-kost\.md$/);
   // Her scenes still list her, and the backlinks still find them.
-  await expect(page.getByRole("region", { name: "In the story" }).getByRole("link", { name: "The Station" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "In the manuscript" }).getByRole("link", { name: "The Station" })).toBeVisible();
 });
 
 test("lists every scene that refers to a character, and asks before deleting one the story uses", async ({ page, app }) => {
@@ -110,7 +110,7 @@ test("lists every scene that refers to a character, and asks before deleting one
     .filter((f) => readFileSync(f, "utf8").includes(ADA))
     .map((f) => /^title: (.*)$/m.exec(readFileSync(f, "utf8"))![1]!);
   // On the strip, each scene she's in is a link to it.
-  const listed = page.getByRole("region", { name: "In the story" }).getByRole("list", { name: "Scenes, in reading order" }).getByRole("link");
+  const listed = page.getByRole("region", { name: "In the manuscript" }).getByRole("list", { name: "Scenes, in reading order" }).getByRole("link");
   await expect(listed).toHaveCount(naming.length);
   for (const title of naming) await expect(listed.and(page.getByRole("link", { name: new RegExp(`^${title.replace(/[?]/g, "\\?")}: `) }))).toHaveCount(1);
   await expect(page.getByRole("list", { name: "All relationships" })).toContainText("Rivals with Ben Varn, from “The Betrayal”");
@@ -167,7 +167,7 @@ test("searches the bible by name and alias", async ({ page, app }) => {
 test("in the story: a strip of every scene, marking where the entry carries it, is in it or is mentioned", async ({ page, app }) => {
   await open(page, app);
   await page.goto(`${app.url}${new URL(app.launchUrl).pathname.replace(/\/chapter.*$/, "")}/bible/${ADA}`);
-  const story = page.getByRole("region", { name: "In the story" });
+  const story = page.getByRole("region", { name: "In the manuscript" });
   const strip = story.getByRole("list", { name: "Scenes, in reading order" });
   // Her point of view in all but The Flood, where she's in the scene.
   await expect(strip.getByRole("listitem")).toHaveCount(8);
@@ -231,5 +231,5 @@ test("the bible as a gallery: cards with a summary, facts, a strip and a count; 
   await page.keyboard.press("Enter");
   await expect(page.getByRole("heading", { level: 1, name: "Ilse Varn" })).toBeVisible();
   await page.goBack();
-  await expect(cards.filter({ hasText: "Ilse Varn" })).toContainText("Not in the story yet");
+  await expect(cards.filter({ hasText: "Ilse Varn" })).toContainText("Not in the manuscript yet");
 });

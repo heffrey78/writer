@@ -89,7 +89,7 @@ export function InTheStory({ novelId, novel, entity, compact }: { novelId: strin
   const n = presence.scenes.length;
 
   return (
-    <ProfileSection title="In the story">
+    <ProfileSection title={`In the ${w.content.one}`}>
       {n === 0 ? (
         <p className="text-sm text-muted">The book has no {w.piece.many} yet.</p>
       ) : (
@@ -130,7 +130,7 @@ export function InTheStory({ novelId, novel, entity, compact }: { novelId: strin
       <ul className="grid list-disc gap-1 pl-5 text-sm">
         {presence.count === 0 ? (
           <li>
-            Not in the story yet: no {w.piece.one} lists or mentions {entity.name}.
+            Not in the {w.content.one} yet: no {w.piece.one} lists or mentions {entity.name}.
           </li>
         ) : (
           <li>

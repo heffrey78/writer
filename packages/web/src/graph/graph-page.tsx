@@ -141,7 +141,7 @@ export function GraphPage({ novelId, novel }: { novelId: string; novel: Book }) 
           <div className="flex flex-wrap items-end gap-4">
             <div className="grid min-w-64 flex-1 gap-1.5">
               <label htmlFor={`${id}-slider`} className="text-sm font-medium">
-                Story position
+                Position in the {w.content.one}
               </label>
               <input
                 ref={sliderRef}

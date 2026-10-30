@@ -21,7 +21,7 @@ const edge = (page: Page, name: string) => page.locator(`.react-flow__edge[aria-
 
 test("the slider shows relationships as they stand at each scene, in the graph and as a list", async ({ page, app }) => {
   await open(page, app);
-  const slider = page.getByRole("slider", { name: "Story position" });
+  const slider = page.getByRole("slider", { name: "Position in the manuscript" });
   await expect(slider).toHaveAttribute("aria-valuetext", "Scene 1 of 8: The Station, in Arrival");
   await expect(list(page)).toContainText("Ada Varn: Allied with Ben Varn");
   await expect(edge(page, "Ada Varn, Allied with, Ben Varn")).toHaveCount(1);
@@ -150,7 +150,7 @@ test("drawing a line between two characters adds a relationship, shown in both e
 
 test("an edge is ended at the graph's scene, or removed, from its dialog; new entries start here too", async ({ page, app }) => {
   const novel = await open(page, app);
-  const slider = page.getByRole("slider", { name: "Story position" });
+  const slider = page.getByRole("slider", { name: "Position in the manuscript" });
   await slider.focus();
   for (let i = 0; i < 4; i++) await page.keyboard.press("ArrowRight");
   await expect(page.getByRole("heading", { name: "At “The Betrayal”" })).toBeVisible();
@@ -183,7 +183,7 @@ test("an edge is ended at the graph's scene, or removed, from its dialog; new en
 
 test("Play steps through the book until the end or until the author does anything", async ({ page, app }) => {
   await open(page, app);
-  const slider = page.getByRole("slider", { name: "Story position" });
+  const slider = page.getByRole("slider", { name: "Position in the manuscript" });
   const playButton = page.getByRole("button", { name: /^(Play|Pause)$/ });
   await page.getByRole("combobox", { name: "Speed" }).selectOption("fast");
   await playButton.click();
@@ -229,7 +229,7 @@ test("each relationship type is drawn in its palette colour and line, light and 
   await page.emulateMedia({ colorScheme: "dark" });
   await expect.poll(() => stroke("Ada Varn, Sibling of, Ben Varn")).toEqual(["rgb(57, 135, 229)", "none"]);
   // Rivals with: series-8 (red), dashed.
-  await page.getByRole("slider", { name: "Story position" }).focus();
+  await page.getByRole("slider", { name: "Position in the manuscript" }).focus();
   for (let i = 0; i < 4; i++) await page.keyboard.press("ArrowRight");
   await expect.poll(() => stroke("Ada Varn, Rivals with, Ben Varn")).toEqual(["rgb(230, 103, 103)", "6px, 4px"]);
 });

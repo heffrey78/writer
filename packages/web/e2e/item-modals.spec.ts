@@ -201,7 +201,7 @@ test("an entry: made in its modal by a type and a name, its profile in place; Ne
   await expect.poll(() => novel.files("bible/locations")).toContain("the-mill.md");
   const mill = page.getByRole("dialog", { name: "The Mill" });
   await expect(mill.getByRole("button", { name: "Add a summary" })).toBeVisible();
-  await expect(mill.getByRole("region", { name: "In the story" })).toBeVisible();
+  await expect(mill.getByRole("region", { name: "In the manuscript" })).toBeVisible();
   for (const colorScheme of ["light", "dark"] as const) {
     await page.emulateMedia({ colorScheme });
     await axe(page);

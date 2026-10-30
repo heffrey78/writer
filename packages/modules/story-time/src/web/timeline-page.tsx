@@ -50,7 +50,7 @@ export function TimelinePage({ novelId, novel }: { novelId: string; novel: Book 
       <div className="grid gap-3 px-6 py-4">
         <h2 className="sr-only">Timeline</h2>
         <p className="text-muted">
-          {nothingTimed(novel)} Give {w.piece.many} a time in their details (a day of the story, or a date).
+          {nothingTimed(novel)} Give {w.piece.many} a time in their details (a numbered day, or a date).
         </p>
         {adds.length > 0 && <div>{adds}</div>}
       </div>

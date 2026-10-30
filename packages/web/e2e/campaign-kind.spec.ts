@@ -52,7 +52,7 @@ test("the graph shows an NPC change sides at a session", async ({ page, app }) =
   await open(page, app);
   await openView(page, "Relationships");
   await expect(page.getByRole("heading", { level: 1, name: "Relationships" })).toBeVisible();
-  const slider = page.getByRole("slider", { name: /position$/ });
+  const slider = page.getByRole("slider", { name: "Position in the campaign" });
   await expect(slider).toHaveAttribute("aria-valuetext", "Session 1 of 2: Session 1, in The Drowned Bell");
   const edge = (name: string) => page.locator(`.react-flow__edge[aria-label="${name}"]`);
   await expect(edge("Marta Hollin, Member of, The Watch")).toHaveCount(1);

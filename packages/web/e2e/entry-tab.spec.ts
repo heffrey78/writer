@@ -17,7 +17,7 @@ test("the Entry tab: a sheet to read, Back and Forward through names opened, a p
   await expect(ada.getByText("Character", { exact: true })).toBeVisible();
   await expect(ada.getByRole("region", { name: "At “The Station”" })).toBeVisible();
   // The profile at the sidebar's size: its strip, and its arcs read at the caret's scene.
-  const strip = ada.getByRole("region", { name: "In the story" }).getByRole("list", { name: "Scenes, in reading order" });
+  const strip = ada.getByRole("region", { name: "In the manuscript" }).getByRole("list", { name: "Scenes, in reading order" });
   await expect(strip.getByRole("link", { name: "The Station: point of view" })).toBeVisible();
   await expect(ada.getByRole("region", { name: "Relationships" }).getByRole("list", { name: "All relationships" })).toBeVisible();
   await expect(ada.getByRole("region", { name: "Notes", exact: true })).toContainText("Voice: short sentences when she is angry");

@@ -39,7 +39,7 @@ test("@ in the chapter suggests the bible's entries; the mention survives renami
   await expect(page.getByRole("heading", { level: 1, name: "Tomas Brand" })).toBeVisible();
   // The words written stay; the mention still finds its entry, by ID.
   expect(novel.read(STATION)).toContain("[Tomas](#char_t0ma5h) would know.");
-  await expect(page.getByRole("region", { name: "In the story" }).getByRole("link", { name: "The Station" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "In the manuscript" }).getByRole("link", { name: "The Station" })).toBeVisible();
 
   // And @ offers the new name (the entry's modal closed first).
   await page.getByRole("dialog").getByRole("button", { name: "Close" }).click();

@@ -298,7 +298,7 @@ export function FindReplace({ manuscript, editor, onReplace, onOpenScene, words,
                 <section key={scene.sceneId} aria-label={scene.title}>
                   <h4>
                     {scene.title} <span>{scene.matches.length}</span>
-                    {openScenes.has(scene.sceneId) ? null : <span className="ghw-visually-hidden"> (opens the scene)</span>}
+                    {openScenes.has(scene.sceneId) ? null : <span className="ghw-visually-hidden"> (opens the {words.piece.one})</span>}
                   </h4>
                   <ol>
                     {scene.matches.map((match, nth) => {

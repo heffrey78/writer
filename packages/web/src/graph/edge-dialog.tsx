@@ -56,7 +56,7 @@ export function EdgeDialog({
             <Button onClick={onEnd}>End it{at}…</Button>
             <Confirm
               title="Remove this relationship?"
-              description={`“${sentence}” will no longer be in the ${vocabulary(novel.kind).codex.short}, at any point in the story.`}
+              description={`“${sentence}” will no longer be in the ${vocabulary(novel.kind).codex.short}, at any point in the ${vocabulary(novel.kind).content.one}.`}
               action="Remove"
               danger
               onConfirm={() => remove.mutate()}

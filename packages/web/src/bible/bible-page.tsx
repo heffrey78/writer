@@ -197,7 +197,7 @@ function EntryCard({ novelId, entity, presence }: { novelId: string; entity: Ent
             ))}
           </span>
         )}
-        <span className="text-xs whitespace-nowrap text-muted">{count === 0 ? "Not in the story yet" : w.piece.count(count)}</span>
+        <span className="text-xs whitespace-nowrap text-muted">{count === 0 ? `Not in the ${w.content.one} yet` : w.piece.count(count)}</span>
       </span>
     </Link>
   );

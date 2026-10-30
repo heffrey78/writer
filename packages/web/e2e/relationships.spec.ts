@@ -149,7 +149,7 @@ test("a kind of relationship's colour and line are chosen by keyboard, saved in 
 
   // The graph draws Rivals with in violet, dotted.
   await openView(page, "Relationships");
-  await page.getByRole("slider", { name: "Story position" }).focus();
+  await page.getByRole("slider", { name: "Position in the manuscript" }).focus();
   for (let i = 0; i < 4; i++) await page.keyboard.press("ArrowRight");
   const rivals = page.locator('.react-flow__edge[aria-label="Ada Varn, Rivals with, Ben Varn"] path.react-flow__edge-path');
   await expect.poll(() => rivals.evaluate((p) => [getComputedStyle(p).stroke, getComputedStyle(p).strokeDasharray])).toEqual(["rgb(98, 80, 214)", "2px, 4px"]);

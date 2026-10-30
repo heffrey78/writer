@@ -13,7 +13,7 @@ import type { FileSource } from "./source.ts";
 
 export const DICTIONARY_FILE = "dictionary.txt";
 
-const HEADER = "# Words the spell checker accepts in this novel, one per line.\n# Names and aliases from the story bible are accepted already.\n";
+const HEADER = "# Words the spell checker accepts in this book, one per line.\n# Names and aliases from its index are accepted already.\n";
 
 export function parseDictionary(text: string): string[] {
   const words: string[] = [];

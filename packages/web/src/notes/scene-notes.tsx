@@ -312,8 +312,8 @@ function NoteCard({
             <Button size="sm" variant="ghost" aria-pressed={pinned} onClick={() => void act(pinned ? "unpin it" : "pin it", () => api.notes.pin(novelId, note.id, scene.id, !pinned))}>
               <Pin className="size-3.5" fill={pinned ? "currentColor" : "none"} aria-hidden /> {pinned ? "Unpin" : "Pin to the top"}
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => void act("take it off this scene", () => api.notes.update(novelId, note.id, { scenes: note.scenes.filter((s) => s !== scene.id) }))}>
-              <Unlink className="size-3.5" aria-hidden /> Take off this scene
+            <Button size="sm" variant="ghost" onClick={() => void act(`take it off this ${vocabulary(novel.kind).piece.one}`, () => api.notes.update(novelId, note.id, { scenes: note.scenes.filter((s) => s !== scene.id) }))}>
+              <Unlink className="size-3.5" aria-hidden /> Take off this {vocabulary(novel.kind).piece.one}
             </Button>
             <Link to={`/novels/${novelId}/note/${note.id}`} className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-accent hover:bg-paper">
               <ExternalLink className="size-3.5" aria-hidden /> Open the note

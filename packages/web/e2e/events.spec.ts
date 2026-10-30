@@ -230,7 +230,7 @@ test("an event written as a scene: the scene made from it opens, and the event k
   expect(app.git(dir, "status", "--porcelain")).toBe("");
 });
 
-test("events where the story's facts show: @ mentions and their cards, profiles' Off the page, the scene card's From the story", async ({ page, app }) => {
+test("events where the story's facts show: @ mentions and their cards, profiles' Off the page, the scene card's From the manuscript", async ({ page, app }) => {
   const dir = await openNovel(page, app);
   const station = () => readFileSync(join(dir, "manuscript/01-return/01-arrival/01-the-station.md"), "utf8");
 

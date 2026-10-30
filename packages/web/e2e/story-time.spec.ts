@@ -22,7 +22,7 @@ test("the Timeline says when Day 1 is: a date, the day of a dated scene, or none
   await openView(page, "Timeline");
   const dayOne = page.getByRole("region", { name: "When Day 1 is" });
   await expect(dayOne).toContainText("Day 1 has no date.");
-  await expect(dayOne).toContainText("8 scenes and events are on days of the story, not a date: until Day 1 has one, they can't be placed among the dated ones, and come after them.");
+  await expect(dayOne).toContainText("8 scenes and events are on numbered days, not a date: until Day 1 has one, they can't be placed among the dated ones, and come after them.");
   await page.getByText("As a table").click();
   const what = page.getByRole("table", { name: "Every scene and event in story-time order" }).locator("tbody tr td:nth-child(2)");
   await expect(what.nth(2)).toHaveText("the event “Ada leaves for the polytechnic”");
