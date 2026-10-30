@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Page } from "@playwright/test";
-import { axe, expect, openView, test, type App } from "./fixtures.ts";
+import { axe, expect, openView, palette, test, type App } from "./fixtures.ts";
 
 const STATION = "manuscript/01-return/01-arrival/01-the-station.md";
 const LEDGER = "manuscript/01-return/02-old-debts/02-bens-ledger.md";
@@ -72,8 +72,8 @@ test("a card dropped on another column takes its status", async ({ page, app }) 
 test("the palette opens the board", async ({ page, app }) => {
   await open(page, app);
   await page.getByRole("radiogroup", { name: "Show the outline as" }).getByText("Table", { exact: true }).click();
-  await page.keyboard.press("ControlOrMeta+k");
-  await page.keyboard.type("drafting board");
-  await page.keyboard.press("Enter");
+  // Typed once the palette has the focus: typed sooner, its first keys went to the page, and Enter
+  // ran what the rest matched (on CI, the cards).
+  await palette(page, "drafting board");
   await expect(page).toHaveURL(/\/outline\/board$/);
 });
