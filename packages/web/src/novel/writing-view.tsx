@@ -503,7 +503,7 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
 
   // The text scrolls on its own, so the sidebar beside it stays put.
   return (
-    <div className="flex min-h-full flex-col lg:h-full lg:min-h-0 lg:flex-row">
+    <div className="flex min-h-full flex-col max-md:flex-1 lg:h-full lg:min-h-0 lg:flex-row">
       <div className="flex min-w-0 flex-1 flex-col lg:overflow-y-auto">
       <div
         className="mx-auto grid w-full max-w-[calc(var(--ghw-prose-measure)+3rem)] flex-1 content-start gap-3 px-6 py-6"

@@ -33,7 +33,7 @@ import { AdoptConflicts, useSwitchVersion, useVersions } from "./versions.tsx";
 import { SaveConflicts, SyncConflicts } from "./conflicts.tsx";
 import { useNovelEvents } from "./events.ts";
 import { homeOf, Sidebar, useArrangeSidebar, useSidebar } from "./sidebar.tsx";
-import { ArrangeBar, BottomBar, MoreSheet, useArrangeBar } from "./bottom-bar.tsx";
+import { ArrangeBar, BottomBar, MoreSheet, useArrangeBar, useBookBar } from "./bottom-bar.tsx";
 import { GoToButton } from "./go-to.tsx";
 import { StructureCommands } from "./structure-commands.tsx";
 import { useNarrow } from "../narrow.ts";
@@ -87,6 +87,7 @@ export function NovelPage() {
   const collapsed = useSidebar((s) => s.collapsed);
   // A phone (#100): no sidebar, a bar at the bottom, and the page's name a way to go elsewhere.
   const narrow = useNarrow();
+  const bookBar = useBookBar();
   const spell = useSpell(api, novelId, novel.data?.novel);
 
   // What the entries made in place report with: the latest model and navigation.
@@ -333,12 +334,13 @@ export function NovelPage() {
             Writer isn't answering. Your unsaved text is kept in this tab; start Writer again and it will be saved.
           </p>
         )}
-        <div className={focus ? "h-full" : narrow ? "h-full pb-24" : cn("grid h-full", collapsed ? "grid-cols-[3.25rem_minmax(0,1fr)]" : "grid-cols-[3.25rem_minmax(0,1fr)] md:grid-cols-[16rem_minmax(0,1fr)]")}>
+        {/* On a phone the page itself scrolls: this grows with what's in it, so the room for the bottom bar comes after the last of it. */}
+        <div className={focus ? "h-full" : narrow ? cn("flex min-h-full flex-col", bookBar && "pb-[4.75rem]") : cn("grid h-full", collapsed ? "grid-cols-[3.25rem_minmax(0,1fr)]" : "grid-cols-[3.25rem_minmax(0,1fr)] md:grid-cols-[16rem_minmax(0,1fr)]")}>
           {!focus && !narrow && (
             <Sidebar novelId={novelId} novel={book} workspace={workspace} current={current} onGitHub={!!repo} />
           )}
           <StructureCommands novelId={novelId} novel={book} workspace={workspace} current={current} />
-          <div className="md:overflow-y-auto">
+          <div className="max-md:flex max-md:flex-1 max-md:flex-col max-md:*:w-full md:overflow-y-auto">
             <ErrorBoundary what="this view" remount={sameView}>
               <Routes>
                 <Route index element={home ? <Navigate to={`/novels/${novelId}/${home}`} replace /> : pieceSections(book)[0] ? <Navigate to={`/novels/${novelId}/chapter/${pieceSections(book)[0]!.id}`} replace /> : <EmptyManuscript novel={book} />} />

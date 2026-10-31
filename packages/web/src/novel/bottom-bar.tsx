@@ -65,7 +65,7 @@ export function BottomBar({ novelId, novel, onGitHub }: { novelId: string; novel
   if (!shown) return null;
   const pages = barOf(onGitHub, novel);
   return (
-    <nav aria-label="Book" className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-5 border-t border-rule bg-raised px-1 pt-1.5 pb-3">
+    <nav aria-label="Book" className="fixed inset-x-0 bottom-0 z-20 grid min-h-[4.75rem] grid-cols-5 border-t border-rule bg-raised px-1 pt-1.5 pb-3">
       {pages.map((p) => {
         const to = p.path ? `/novels/${novelId}/${p.path}` : `/novels/${novelId}`;
         // The manuscript is wherever its chapters and scenes are written.

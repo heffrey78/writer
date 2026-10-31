@@ -532,3 +532,54 @@ test("on a phone, the outline adds in place by touch, the focus kept between tit
   await expect(page.getByRole("heading", { level: 1, name: "Outline" })).toBeVisible();
   await expect(page.getByRole("button", { name: /^New / })).toHaveCount(0);
 });
+
+// What a page's end does to the bottom bar: nothing is left under it, and a short page's bar reaches it.
+const scrolledToEnd = (page: Page) => page.evaluate(() => scrollTo(0, document.documentElement.scrollHeight));
+const barTop = async (page: Page) => (await page.getByRole("navigation", { name: "Book" }).boundingBox())!.y;
+
+test("on a phone, a long page scrolls clear of the bottom bar: notes and the outline", async ({ page, app }) => {
+  await page.setViewportSize({ width: 412, height: 420 });
+  await app.restart(app.novelRepo("varn"));
+  await launch(page, app);
+  const bar = page.getByRole("navigation", { name: "Book" });
+
+  await bar.getByRole("link", { name: "Outline" }).tap();
+  const last = page.getByRole("button", { name: "New chapter" });
+  await expect(last).toBeVisible();
+  await scrolledToEnd(page);
+  await expect.poll(async () => (await last.boundingBox())!.y + (await last.boundingBox())!.height).toBeLessThanOrEqual(await barTop(page));
+
+  await bar.getByRole("link", { name: "Notes" }).tap();
+  await expect(page.getByRole("heading", { level: 1, name: "Notes" })).toBeVisible();
+  const lastNote = page.locator('a[href*="/note/"]').last();
+  await expect(lastNote).toBeAttached();
+  await scrolledToEnd(page);
+  await expect.poll(async () => (await lastNote.boundingBox())!.y + (await lastNote.boundingBox())!.height).toBeLessThanOrEqual(await barTop(page));
+});
+
+test("on a phone, a short scene's bar sits on the bottom bar, and on the keyboard while it's up", async ({ page, app }) => {
+  await app.restart(app.novelRepo("varn"));
+  await launch(page, app);
+  await page.getByRole("banner").getByRole("button", { name: /go to a scene$/ }).tap();
+  await page.getByRole("dialog", { name: "Go to a scene" }).getByRole("button", { name: /^New scene in / }).first().tap();
+  const dialog = page.getByRole("dialog", { name: "New scene" });
+  await dialog.getByRole("textbox").fill("Hardly begun");
+  await dialog.getByRole("button", { name: "Add scene" }).tap();
+  await expect(page.getByRole("heading", { level: 1, name: "Hardly begun" })).toBeVisible();
+
+  // The keyboard away: the status bar, right on the bottom bar.
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  const status = page.getByRole("group", { name: "This session" }).locator("..");
+  await expect(status).toBeVisible();
+  await expect.poll(async () => Math.abs((await status.boundingBox())!.y + (await status.boundingBox())!.height - (await barTop(page)))).toBeLessThanOrEqual(2);
+  // And nothing to scroll on a page this short.
+  expect(await page.evaluate(() => document.documentElement.scrollHeight <= innerHeight + 1)).toBe(true);
+
+  // The keyboard up, as Android makes it: the window shorter, the bottom bar gone, the writing bar at its foot.
+  const size = page.viewportSize()!;
+  await page.getByRole("textbox", { name: "Scene text" }).tap();
+  await page.setViewportSize({ width: size.width, height: Math.round(size.height * 0.6) });
+  await expect(page.getByRole("navigation", { name: "Book" })).toHaveCount(0);
+  const writing = page.getByRole("toolbar", { name: "Writing" });
+  await expect.poll(async () => Math.abs((await writing.locator("..").boundingBox())!.y + (await writing.locator("..").boundingBox())!.height - Math.round(size.height * 0.6))).toBeLessThanOrEqual(2);
+});
