@@ -1,11 +1,15 @@
 import { carrierOf, pieceSections, vocabulary, type Book, type Piece } from "@writer/core";
+import { useQueryClient } from "@tanstack/react-query";
 import { GripVertical } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
 import { Link, useSearchParams } from "react-router";
+import { keys } from "../api.ts";
 import { Button } from "../ui/button.tsx";
 import { cn } from "../ui/cn.ts";
 import { filterParams, filtersOf, visibleScenes, visibleStep, type CorkboardFilter } from "./corkboard-order.ts";
+import { useAddInPlace } from "./add-in-place.tsx";
 import { chapterTitle } from "./navigation.tsx";
+import { useNotice } from "./notice.tsx";
 import { dropMove, useStructure } from "./structure.ts";
 import type { Workspace } from "./workspace.ts";
 
@@ -33,6 +37,13 @@ export function OutlineCards({ novelId, novel, workspace }: { novelId: string; n
   const [drop, setDrop] = useState<{ id: string; after: boolean }>();
   const name = (id: string | undefined) => novel.entities.find((e) => e.id === id)?.name;
   const filtered = Object.keys(filter).length > 0;
+  const show = useNotice((s) => s.show);
+  const queryClient = useQueryClient();
+  const adding = useAddInPlace(novel, structure, (id, title) => {
+    // Added, and read back: what the filter makes of it needs the book as it is now.
+    const now = queryClient.getQueryData<{ novel: Book }>(keys.novel(novelId))?.novel;
+    if (filtered && now && !visibleScenes(now, filter).some((s) => s.id === id)) show({ message: `Added “${title}”. The filter hides it.` });
+  });
 
   const setFilter = (key: string, value: string) => {
     const next = new URLSearchParams(params);
@@ -154,8 +165,10 @@ export function OutlineCards({ novelId, novel, workspace }: { novelId: string; n
           ) : (
             <p className="text-sm text-muted">No {w.piece.many} yet.</p>
           )}
+          {adding.piece(chapter)}
         </section>
       ))}
+      {adding.sections()}
     </div>
   );
 }

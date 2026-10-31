@@ -65,3 +65,66 @@ test("reorders by dragging a row's handle", async ({ page, app }) => {
     await expect.poll(() => novel.read(ARRIVAL), { timeout: 3_000 }).toContain("scenes: [sc_br1dg3, sc_5tat1n]");
   }).toPass({ timeout: 20_000 });
 });
+
+test("adds scenes in place: titles typed in a row by keyboard alone, in order, one commit each, and the outline stays (#117)", async ({ page, app }) => {
+  const { dir } = await open(page, app);
+  const url = page.url();
+  const commits = () => Number(app.git(dir, "rev-list", "--count", "HEAD").trim());
+  await expect.poll(() => app.git(dir, "status", "--porcelain").trim()).toBe("");
+  const before = commits();
+  const add = page.getByRole("button", { name: "New scene in Arrival" });
+  await add.focus();
+  await page.keyboard.press("Enter");
+  const field = page.getByRole("textbox", { name: "Title: New scene in Arrival" });
+  await expect(field).toBeFocused();
+  await axe(page);
+  // Enter on nothing adds nothing, and leaves the field.
+  await page.keyboard.press("Enter");
+  await expect(field).toBeFocused();
+  for (const title of ["First of three", "Second of three", "Third of three"]) {
+    await page.keyboard.type(title);
+    await page.keyboard.press("Enter");
+    await expect(field).toHaveValue("");
+    await expect(field).toBeFocused();
+  }
+  const rows = page.getByRole("link", { name: /of three$/ });
+  await expect(rows).toHaveText(["First of three", "Second of three", "Third of three"]);
+  expect(page.url()).toBe(url);
+  await expect(page.getByRole("status").filter({ hasText: "Added “Third of three”." })).toBeAttached();
+  await expect.poll(commits).toBe(before + 3);
+
+  await page.keyboard.press("Escape");
+  await expect(add).toBeFocused();
+  await expect(field).toHaveCount(0);
+});
+
+test("adds a chapter at the end in place, and goes on to its first scene; a chapter's title is required here (#117)", async ({ page, app }) => {
+  await open(page, app);
+  await page.getByRole("button", { name: "New chapter" }).click();
+  const field = page.getByRole("textbox", { name: "Title: New chapter" });
+  await page.keyboard.press("Enter");
+  await expect(field).toBeFocused();
+  await expect(page.getByRole("button", { name: /^New scene in Chapter/ })).toHaveCount(0);
+  await field.fill("Outlined");
+  await page.keyboard.press("Enter");
+  const inIt = page.getByRole("textbox", { name: "Title: New scene in Outlined" });
+  await expect(inIt).toBeFocused();
+  await page.keyboard.type("Its first");
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("link", { name: "Its first" })).toBeVisible();
+  await expect(inIt).toBeFocused();
+});
+
+test("the cards add in place too, and say when the filter hides what was added (#117)", async ({ page, app }) => {
+  await open(page, app);
+  await page.goto(`${page.url().replace(/\/outline.*$/, "/outline/cards")}?status=drafted`);
+  await page.getByRole("button", { name: /^New scene in / }).first().click();
+  const field = page.getByRole("textbox", { name: /^Title: New scene in / });
+  await field.fill("Hidden by the filter");
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("status").filter({ hasText: "Added “Hidden by the filter”. The filter hides it." })).toBeVisible();
+  await expect(field).toBeFocused();
+  await page.getByRole("button", { name: "Clear filters" }).click();
+  await expect(page.getByText("Hidden by the filter", { exact: true }).first()).toBeVisible();
+  await axe(page);
+});

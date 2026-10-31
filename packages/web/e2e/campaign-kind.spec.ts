@@ -63,3 +63,13 @@ test("the graph shows an NPC change sides at a session", async ({ page, app }) =
   await expect(page.locator("main")).not.toContainText(novelWords);
   await axe(page);
 });
+
+test("its outline adds a session in place, in a game master's words (#117)", async ({ page, app }) => {
+  await open(page, app);
+  await openView(page, "Outline");
+  await page.getByRole("button", { name: /^New session in / }).first().click();
+  await page.getByRole("textbox", { name: /^Title: New session in / }).fill("The next session");
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("link", { name: "The next session" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "New arc" })).toBeVisible();
+});

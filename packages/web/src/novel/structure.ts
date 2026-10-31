@@ -160,16 +160,19 @@ export function useStructure(novelId: string, novel: Book, workspace: Workspace)
         return run("move it", () => m.move(novelId, id, target.index, target.to), () => `Moved “${name(id)}” ${direction < 0 ? "up" : "down"}${into}.`);
       }),
     rename: (id: string, title: string) => run("rename it", () => m.rename(novelId, id, title), () => `Renamed to “${title}”.`),
-    createScene: (chapter: string, title: string, after?: string | null) =>
+    /** `stay`: added from a list of them, which goes on showing, and says so itself. */
+    createScene: (chapter: string, title: string, after?: string | null, { stay }: { stay?: boolean } = {}) =>
       run(`add the ${w.piece.one}`, () => m.createScene(novelId, chapter, title, after), ({ id }) => {
+        if (stay) return undefined;
         void navigate(`/novels/${novelId}/scene/${id}`);
         return `Added the ${w.piece.one} “${title}”.`;
       }),
     /** A section at a level of the book's kind: one that holds pieces opens, as a chapter does. */
-    createSection: (level: string, parent: string | null, title: string | undefined, after?: string | null) => {
+    createSection: (level: string, parent: string | null, title: string | undefined, after?: string | null, { stay }: { stay?: boolean } = {}) => {
       const { levels } = novel.kind;
       const child = levels[levels.findIndex((l) => l.key === level) + 1];
       return run(`add the ${w.level(level).one}`, () => m.createSection(novelId, level, parent, title, after), ({ id }) => {
+        if (stay) return undefined;
         if (!child) {
           void navigate(`/novels/${novelId}/chapter/${id}`);
           return `Added the ${w.level(level).one}${title ? ` “${title}”` : ""}.`;

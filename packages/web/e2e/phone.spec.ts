@@ -506,3 +506,29 @@ test("on a phone, a journal's dropdown has Today's entry and no New (#116)", asy
   await expect(goTo.getByRole("link", { name: "Today's entry" })).toBeVisible();
   await expect(goTo.getByRole("button", { name: /^New / })).toHaveCount(0);
 });
+
+test("on a phone, the outline adds in place by touch, the focus kept between titles; a journal's adds nothing (#117)", async ({ page, app }) => {
+  await app.restart(app.novelRepo("varn"));
+  await launch(page, app);
+  const bar = page.getByRole("navigation", { name: "Book" });
+  await bar.getByRole("link", { name: "Outline" }).tap();
+  await page.getByRole("button", { name: "New scene in Arrival" }).tap();
+  const field = page.getByRole("textbox", { name: "Title: New scene in Arrival" });
+  await expect(field).toBeFocused();
+  await expect(field).toBeInViewport();
+  await fits(page);
+  await audit(page);
+  for (const title of ["One by thumb", "Two by thumb"]) {
+    await field.fill(title);
+    await page.getByRole("button", { name: "Add", exact: true }).tap();
+    await expect(page.getByRole("link", { name: title })).toBeVisible();
+    await expect(field).toBeFocused();
+    await expect(field).toBeInViewport();
+  }
+
+  await app.restart(app.bookRepo(fileURLToPath(new URL("../../../examples/sample-journal", import.meta.url)), "journal"));
+  await launch(page, app);
+  await page.goto(new URL(page.url()).href.replace(/\/novels\/([^/]+).*$/, "/novels/$1/outline/table"));
+  await expect(page.getByRole("heading", { level: 1, name: "Outline" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^New / })).toHaveCount(0);
+});

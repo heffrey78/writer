@@ -5,6 +5,7 @@ import { Fragment, useEffect, useRef, useState, type DragEvent, type KeyboardEve
 import { Link } from "react-router";
 import { keys } from "../api.ts";
 import { cn } from "../ui/cn.ts";
+import { useAddInPlace } from "./add-in-place.tsx";
 import { chapterTitle } from "./navigation.tsx";
 import { useNotice } from "./notice.tsx";
 import { dropMove, useStructure } from "./structure.ts";
@@ -21,6 +22,7 @@ const number = new Intl.NumberFormat();
 /** Outline as a table: every scene in reading order, with its synopsis and status edited in place. */
 export function OutlineTable({ novelId, novel, workspace }: { novelId: string; novel: Book; workspace: Workspace }) {
   const structure = useStructure(novelId, novel, workspace);
+  const adding = useAddInPlace(novel, structure);
   const dragging = useRef<string | undefined>(undefined);
   const [drop, setDrop] = useState<{ id: string; after: boolean }>();
   const name = (id: string | undefined) => novel.entities.find((e) => e.id === id)?.name;
@@ -170,11 +172,19 @@ export function OutlineTable({ novelId, novel, workspace }: { novelId: string; n
                     <td className="py-2 text-right tabular-nums">{number.format(countWords(scene.body))}</td>
                   </tr>
                 ))}
+                {!novel.kind.piece.madeByDate && (
+                  <tr>
+                    <td colSpan={span} className="py-1">
+                      {adding.piece(chapter)}
+                    </td>
+                  </tr>
+                )}
               </Fragment>
             ))}
           </tbody>
         </table>
       </div>
+      {adding.sections()}
     </div>
   );
 }

@@ -150,6 +150,8 @@ The Android app opens, edits and syncs the same books as your computer, through 
 
 The tree on the left holds the book. **New** adds a scene, a chapter or a part after the selection; F2 renames, Alt+↑ / Alt+↓ move, Delete deletes (deleted things wait in **Recently deleted**). You can drag in the tree, too. In the command palette, *Split the scene at the caret*, *Merge scene with the next* and *Move scene to chapter…* reshape scenes.
 
+**New scene** under each chapter in the table and the cards, and **New chapter** at the end, let you outline by typing: give it a title and press Enter, and the field is ready for the next, without leaving the outline. A title is always needed here (an untitled chapter comes from the tree or the palette). Escape stops. Journals don't have these, since their entries come from their dates.
+
 **Outline** shows every scene in reading order, three ways; switch with **Table**, **Cards** and **Board** at its top, and it remembers which you like:
 
 - **Table**: each scene's synopsis, status, point of view, characters, plotlines and word count; edit the synopsis and status in place, and drag to reorder.
