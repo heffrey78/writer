@@ -75,9 +75,9 @@ Examples here are from the sample novel, *The Bridge at Varn*. Unless it says ot
 
 - **The book's structure** in a tree you can rearrange with the keyboard or by dragging, and an **outline** of every piece as a table or as index cards, filtered by what's in it. A novel's outline is also a drafting board, which can be mirrored on a GitHub Project.
 - **An index** of entries of your kind's types and types you invent, as a gallery of cards and a profile for each entry, read first and edited in place: where it is across the book, piece by piece, and its relationships as arcs that start and end at particular pieces, in colours that stay readable for colour-blind readers. The same relationships are drawn as a **relationship graph** with a slider to step through the book and watch alliances change.
-- **A story map** of the book's elements against its pieces, exportable as SVG (and some as Mermaid). Which tabs it has depends on the kind:
+- **A map** of the book's elements against its pieces, exportable as SVG (and some as Mermaid): a novel's Story map, a Journal map, a Campaign map, a Book map. Which tabs it has depends on the kind:
   - **presence** of people, places and ideas in each piece (every kind);
-  - a **timeline** setting story time against reading order, flashbacks and off-page events included (novel, journal and campaign);
+  - a **timeline** setting when things happen against reading order, flashbacks and off-page events included (novel, journal and campaign);
   - **plotlines** showing each one's beats scene by scene, and where one goes quiet (novel).
 - **A sidebar you can arrange.** Each kind has its own groups and order. Move or hide pages from *Arrange the sidebar…*, and the arrangement is kept in the book, so it's the same on every device.
 

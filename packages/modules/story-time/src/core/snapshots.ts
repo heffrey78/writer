@@ -13,7 +13,7 @@ const tl = (s: string) => s.replace(/:/g, "∶").replace(/#/g, "No.");
 /** The timeline in Mermaid: each moment in story time with what happens then, the book's position and flashbacks noted. */
 export function timelineMermaid(novel: Book): string {
   const t = timeline(novel, defaultLanes(novel.kind));
-  const lines = ["timeline", "  title Story time"];
+  const lines = ["timeline", `  title ${vocabulary(novel.kind).time.One}`];
   let period = "";
   let events: string[] = [];
   const flush = () => period && lines.push(`  ${tl(period)} : ${events.map(tl).join(" : ")}`);
@@ -41,8 +41,8 @@ const LANE_H = 54;
 /** The timeline as drawn in the app: story time in lanes (by point of view, for a novel), joined to reading order below. */
 export function timelineSvg(novel: Book, mode: LaneMode = defaultLanes(novel.kind)): string {
   const t = timeline(novel, mode);
-  const title = "The book in story time, and in reading order";
-  if (!t.items.length) return svg(420, 60, title, `<text x="20" y="36" ${FONT} font-size="13" fill="${C.muted}">${esc(nothingTimed(novel))}</text>\n`);
+  const title = `The book ${vocabulary(novel.kind).time.in}, and in reading order`;
+  if (!t.items.length) return svg(novel, 420, 60, title, `<text x="20" y="36" ${FONT} font-size="13" fill="${C.muted}">${esc(nothingTimed(novel))}</text>\n`);
   const head = 150;
   const top = 44;
   const axisH = 50;
@@ -55,7 +55,7 @@ export function timelineSvg(novel: Book, mode: LaneMode = defaultLanes(novel.kin
   const readSlot = (t.items.length * SLOT) / Math.max(1, reading.length);
   const h = readY + 34 + 16;
   let b = `<text x="20" y="26" ${FONT} font-size="14" font-weight="600" fill="${C.ink}">${esc(title)}</text>\n`;
-  b += `<text x="20" y="${top + 26}" ${FONT} font-size="11" fill="${C.muted}">Story time</text>\n`;
+  b += `<text x="20" y="${top + 26}" ${FONT} font-size="11" fill="${C.muted}">${esc(vocabulary(novel.kind).time.One)}</text>\n`;
   t.items.forEach((item, i) => {
     const x = head + i * SLOT;
     b += `<line x1="${x}" y1="${top}" x2="${x}" y2="${linksY}" stroke="${C.rule}"/>\n`;
@@ -90,7 +90,7 @@ export function timelineSvg(novel: Book, mode: LaneMode = defaultLanes(novel.kin
     b += `<text x="${r(head + rIdx * readSlot + 4)}" y="${readY + 20}" ${FONT} font-size="10.5" fill="${flashback ? C.warn : C.ink}">${esc(cut(`${rIdx + 1}. ${scene.title}`, Math.floor(readSlot / 6.2)))}</text>\n`;
   });
   b += `<line x1="20" y1="${readY}" x2="${w - 20}" y2="${readY}" stroke="${C.rule}"/>\n<text x="20" y="${readY + 20}" ${FONT} font-size="11" fill="${C.muted}">Reading order</text>\n`;
-  return svg(w, h, title, b);
+  return svg(novel, w, h, title, b);
 }
 
 const fence = (s: string) => "```mermaid\n" + s + "```\n";
@@ -110,7 +110,7 @@ export function timelineSnapshots(book: Book) {
       "## Timeline",
       "",
       ...(hasTimes
-        ? ["When things happen in the story, next to where they come in the book.", "", fence(timelineMermaid(book)), "![The book in story time, and in reading order](timeline.svg)"]
+        ? [`When things happen in the ${vocabulary(book.kind).subject}, next to where they come in the book.`, "", fence(timelineMermaid(book)), `![The book ${vocabulary(book.kind).time.in}, and in reading order](timeline.svg)`]
         : [nothingTimed(book)]),
       "",
     ],

@@ -37,6 +37,12 @@ export interface Vocabulary {
   codex: Word;
   /** An item of the codex: "entry". */
   entity: Word;
+  /** The story map, by its name in the kind: "Story map". */
+  map: Word;
+  /** Story time, in the kind's words: "Story time", and how sentences say it. */
+  time: { One: string; in: string; In: string; order: string };
+  /** What's being told, inside a sentence: "story". */
+  subject: string;
   /** A level of sections, by key: "chapter". A key the kind hasn't is said as it is. */
   level(key: string): Word;
   /** The piece or a level, by key: what a section or piece in the tree is. */
@@ -73,6 +79,7 @@ export function vocabulary(kind: BookKind): Vocabulary {
   if (!v) {
     const levels = new Map(kind.levels.map((l) => [l.key, word(l)]));
     const piece = word(kind.piece);
+    const time = kind.words.time ?? { label: "Time", in: "in time", order: "time order" };
     const level = (key: string) => levels.get(key) ?? word({ label: key, plural: key });
     v = {
       book: word(kind),
@@ -80,6 +87,9 @@ export function vocabulary(kind: BookKind): Vocabulary {
       content: word(kind.words.content),
       codex: word(kind.words.codex),
       entity: word(kind.words.entity),
+      map: word(kind.words.map ?? { label: "Map", plural: "Maps" }),
+      time: { One: time.label, in: time.in, In: time.in.charAt(0).toUpperCase() + time.in.slice(1), order: time.order },
+      subject: kind.words.subject ?? word(kind).one,
       level,
       of: (key) => (key === kind.piece.key ? piece : level(key)),
     };

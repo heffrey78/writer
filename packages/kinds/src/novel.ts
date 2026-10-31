@@ -15,6 +15,9 @@ export const novel: BookKind = {
     content: { label: "Manuscript", plural: "Manuscripts" },
     codex: { label: "Story bible", plural: "Story bibles", short: "Bible" },
     entity: { label: "Entry", plural: "Entries", article: "an" },
+    map: { label: "Story map", plural: "Story maps" },
+    time: { label: "Story time", in: "in story time", order: "story-time order" },
+    subject: "story",
   },
   folders: { content: "manuscript", codex: "bible", notes: "notes" },
   // On a phone, after the manuscript: its outline, the notes and the story bible.

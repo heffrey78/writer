@@ -31,7 +31,7 @@ describe("the sidebar", () => {
   it("is a journal's: looking back first, then its people and places, with no outline or comparing", () => {
     expect(sidebar(kindByKey("journal"))).toEqual([
       ["Look back", ["Journal", "Calendar", "Notes", "Issues"]],
-      ["People and places", ["Index", "Relationships", "Story map", "Progress"]],
+      ["People and places", ["Index", "Relationships", "Journal map", "Progress"]],
     ]);
     // Issues only for a book on GitHub.
     expect(sidebar(kindByKey("journal"), false)[0]).toEqual(["Look back", ["Journal", "Calendar", "Notes"]]);
@@ -40,11 +40,11 @@ describe("the sidebar", () => {
   it("is a campaign's and a non-fiction book's own", () => {
     expect(sidebar(kindByKey("campaign"))).toEqual([
       ["Prep", ["Codex", "Notes", "Outline", "Issues"]],
-      ["The world", ["Relationships", "Story map"]],
+      ["The world", ["Relationships", "Campaign map"]],
       ["Look back", ["Progress", "Compare"]],
     ]);
     expect(sidebar(kindByKey("nonfiction"))).toEqual([
-      ["Plan", ["Outline", "Index", "Notes", "Relationships", "Story map", "Progress"]],
+      ["Plan", ["Outline", "Index", "Notes", "Relationships", "Book map", "Progress"]],
       ["Revise", ["Issues", "Compare"]],
     ]);
   });

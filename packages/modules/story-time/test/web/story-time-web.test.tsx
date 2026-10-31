@@ -40,7 +40,7 @@ afterEach(cleanup);
 describe("story time on screen", () => {
   it("is the timeline's tab and an order of the outline, and neither without the module", () => {
     expect(storyMapTabs(kindByKey("novel")).map((t) => t.label)).toEqual(["Timeline"]);
-    expect(storyTimeWeb.outlineOrders?.map((o) => o.label)).toEqual(["Story time"]);
+    expect(storyTimeWeb.outlineOrders?.map((o) => o.label(novel))).toEqual(["Story time"]);
     expect(storyMapTabs({ ...novel, key: "none", modules: [] }).map((t) => t.label)).toEqual([]);
   });
 

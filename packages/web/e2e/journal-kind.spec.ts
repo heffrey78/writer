@@ -45,11 +45,11 @@ test("its sidebar looks back first, then at its people and places, with no outli
   await expect(views.getByRole("heading")).toHaveText(["Look back", "People and places"]);
   // Issues only for a journal on GitHub, which the sample isn't.
   await expect(views.getByRole("group", { name: "Look back" }).getByRole("link")).toHaveText(["Journal", "Calendar", "Notes"]);
-  await expect(views.getByRole("group", { name: "People and places" }).getByRole("link")).toHaveText(["Index", "Relationships", "Story map", "Progress"]);
+  await expect(views.getByRole("group", { name: "People and places" }).getByRole("link")).toHaveText(["Index", "Relationships", "Journal map", "Progress"]);
   // Collapsed to its strip, in the same order.
   await page.getByRole("button", { name: "Collapse the sidebar" }).click();
   const strip = page.getByRole("navigation", { name: "Views" }).getByRole("link");
-  await expect.poll(() => strip.evaluateAll((links) => links.map((l) => l.getAttribute("aria-label")))).toEqual(["Journal", "Calendar", "Notes", "Index", "Relationships", "Story map", "Progress"]);
+  await expect.poll(() => strip.evaluateAll((links) => links.map((l) => l.getAttribute("aria-label")))).toEqual(["Journal", "Calendar", "Notes", "Index", "Relationships", "Journal map", "Progress"]);
 });
 
 test("an entry's card says what the rest of the journal says about it, in a journal's words", async ({ page, app }) => {

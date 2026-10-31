@@ -172,7 +172,23 @@ export interface BookKind extends Noun {
     madeByDate?: boolean;
   };
   /** The words for what isn't a level or the piece: all the sections and pieces, the codex, and an entity of it. */
-  words: { content: Noun; codex: Noun; entity: Noun };
+  words: {
+    content: Noun;
+    codex: Noun;
+    entity: Noun;
+    /** What the story map is called: "Story map". Without it, "Map". */
+    map?: Noun;
+    /** What story time is called, where its modules show it. Without it, "Time". */
+    time?: {
+      label: string;
+      /** How a sentence says a thing is ordered by it: "in story time", "by date". */
+      in: string;
+      /** The order it gives: "story-time order", "date order". */
+      order: string;
+    };
+    /** What a sentence calls what's being told: "story" ("when the story changes"). Without it, the book's word. */
+    subject?: string;
+  };
   folders: {
     /** The sections and pieces. */
     content: string;

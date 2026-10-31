@@ -35,7 +35,7 @@ const noteLine = (r: ModuleRecord) => proseText(r.body).replace(/\s+/g, " ").tri
 /** What a record's in, in the story: its type's group ("Off the page"). */
 const groupOf = (novel: Book, r: ModuleRecord) => timedTypes(novel.kind).find((t) => t.key === r.type)?.group ?? r.type;
 
-const NOT_MOVED = "In story time, nothing is moved: switch to reading order to rearrange the book.";
+const notMoved = (novel: Book) => `${vocabulary(novel.kind).time.In}, nothing is moved: switch to reading order to rearrange the book.`;
 const number = new Intl.NumberFormat();
 
 export function OutlineTimeTable({ novelId, novel, workspace }: { novelId: string; novel: Book; workspace: Workspace }) {
@@ -49,10 +49,10 @@ export function OutlineTimeTable({ novelId, novel, workspace }: { novelId: strin
   const names = (ids: string[] | undefined) => (ids ?? []).map(name).filter(Boolean).join(", ") || <span className="text-muted not-italic">—</span>;
   return (
     <div className="grid gap-2">
-      <p className="text-sm text-muted">{NOT_MOVED}</p>
+      <p className="text-sm text-muted">{notMoved(novel)}</p>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[56rem] border-collapse text-sm">
-          <caption className="sr-only">Every {[w.piece.one, ...timedTypes(novel.kind).map((t) => word(t.noun).one)].join(" and ")} in story-time order</caption>
+          <caption className="sr-only">Every {[w.piece.one, ...timedTypes(novel.kind).map((t) => word(t.noun).one)].join(" and ")} in {w.time.order}</caption>
           <thead>
             <tr className="border-b border-rule text-left text-xs text-muted">
               <th scope="col" className="w-36 py-2 pr-3 font-medium">
@@ -174,9 +174,9 @@ export function OutlineTimeCards({ novelId, novel }: { novelId: string; novel: B
       </div>
       <p role="status" className="text-sm text-muted">
         {filtered ? `${scenes} of ${w.piece.count(novel.pieces.length)} match` : w.piece.count(novel.pieces.length)}
-        {timedTypes(novel.kind).map((t) => `, and ${word(t.noun).count(items.filter((i) => i.kind === "record" && i.record.type === t.key).length)}`)}. {NOT_MOVED}
+        {timedTypes(novel.kind).map((t) => `, and ${word(t.noun).count(items.filter((i) => i.kind === "record" && i.record.type === t.key).length)}`)}. {notMoved(novel)}
       </p>
-      <ol aria-label="In story time" className="grid grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-3">
+      <ol aria-label={w.time.In} className="grid grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-3">
         {items.map((item) =>
           item.kind === "scene" ? (
             <li key={item.scene.id} aria-label={item.scene.title} className={cn("grid content-start gap-1.5 rounded-md border border-l-4 border-rule bg-raised p-3 text-sm shadow-sm", STATUS_TONE[item.scene.status])}>

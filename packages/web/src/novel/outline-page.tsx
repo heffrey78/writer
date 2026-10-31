@@ -59,7 +59,7 @@ export function OutlinePage({ novelId, novel, workspace }: { novelId: string; no
   const group = useRef<HTMLDivElement>(null);
   const [params, setParams] = useSearchParams();
   const orders = moduleOutlineOrders(novel.kind);
-  const ORDERS = [{ key: READING, label: "Reading order" }, ...orders];
+  const ORDERS = [{ key: READING, label: "Reading order" }, ...orders.map((o) => ({ key: o.key, label: o.label(novel.kind) }))];
   const moduleOrder = orders.find((o) => o.key === params.get("order"));
   const order = moduleOrder?.key ?? READING;
   const chooseOrder = (next: string) => {

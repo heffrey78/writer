@@ -1,4 +1,4 @@
-import type { Book, BookKind } from "@writer/core";
+import { vocabulary, type Book, type BookKind } from "@writer/core";
 import { useEffect, useRef, type KeyboardEvent, type ReactNode } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router";
 import { moduleStoryMapTabs } from "../modules.tsx";
@@ -46,8 +46,8 @@ export function StoryMapPage({ novelId, novel, workspace }: { novelId: string; n
   return (
     <div className={cn(PAGE_WIDTH, "grid content-start")}>
       <div className="grid gap-3 px-6 pt-6">
-        <h1 className="text-xl font-semibold">Story map</h1>
-        <div role="tablist" aria-label="Story map" className="flex gap-1 border-b border-rule" onKeyDown={onKey}>
+        <h1 className="text-xl font-semibold">{vocabulary(novel.kind).map.One}</h1>
+        <div role="tablist" aria-label={vocabulary(novel.kind).map.One} className="flex gap-1 border-b border-rule" onKeyDown={onKey}>
           {TABS.map((t, i) => (
             <button
               key={t.key}

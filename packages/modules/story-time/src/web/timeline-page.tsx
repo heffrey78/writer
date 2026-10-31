@@ -78,7 +78,7 @@ export function TimelinePage({ novelId, novel }: { novelId: string; novel: Book 
       </div>
       <DayOne novelId={novelId} novel={novel} />
       <p className="text-sm text-muted">
-        Left to right in story time, evenly spaced; the time between neighbours is above them. Below, the {w.piece.many} in reading order: each line joins {w.piece.a}&apos;s place in the book to its
+        Left to right {w.time.in}, evenly spaced; the time between neighbours is above them. Below, the {w.piece.many} in reading order: each line joins {w.piece.a}&apos;s place in the book to its
         place in time, and a <span className="font-medium text-warn">flashback</span>&apos;s runs back across the others.
       </p>
 
@@ -86,7 +86,7 @@ export function TimelinePage({ novelId, novel }: { novelId: string; novel: Book 
         <div style={{ width: HEAD + n * SLOT }} className="relative">
           {/* Story time: the axis, then a row per lane. */}
           <div role="presentation" style={{ display: "grid", gridTemplateColumns: `${HEAD}px repeat(${n}, ${SLOT}px)` }}>
-            <div className="sticky left-0 z-10 border-b border-rule bg-paper px-3 py-2 text-xs font-medium text-muted">Story time</div>
+            <div className="sticky left-0 z-10 border-b border-rule bg-paper px-3 py-2 text-xs font-medium text-muted">{w.time.One}</div>
             {t.items.map((item, k) => {
               const prev = t.items[k - 1];
               const gap = prev ? jump(prev.at, item.at) : "";
@@ -193,7 +193,7 @@ export function TimelinePage({ novelId, novel }: { novelId: string; novel: Book 
       <details className="text-sm">
         <summary className="cursor-pointer font-semibold">As a table</summary>
         <table className="mt-2 w-full max-w-4xl border-collapse">
-          <caption className="sr-only">Every {[w.piece.one, ...timed.map((type) => word(type.noun).short)].join(" and ")} in story-time order</caption>
+          <caption className="sr-only">Every {[w.piece.one, ...timed.map((type) => word(type.noun).short)].join(" and ")} in {w.time.order}</caption>
           <thead>
             <tr className="border-b border-rule text-left text-xs text-muted">
               <th scope="col" className="py-1 pr-3 font-medium">

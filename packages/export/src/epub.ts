@@ -50,7 +50,8 @@ export function toEpub(book: CompiledBook, { date = new Date(0), cover, pictures
     files.set(path, { id: `picture-${files.size + 1}`, href, type: image.type, bytes: image.bytes });
   }
   // `seen`: the chapter's notes referred to so far, the first reference to each carrying its anchor.
-  const blocks = (list: Block[], seen = new Set<number>()) => xhtmlBlocks(list, book.sceneBreak, files, seen);
+  const breaks: Breaks = { mark: book.sceneBreak, name: book.breakName };
+  const blocks = (list: Block[], seen = new Set<number>()) => xhtmlBlocks(list, breaks, files, seen);
   const add = (page: Omit<Page, "file">) => pages.push({ ...page, file: `${page.id}.xhtml` });
 
   const image = cover && { href: `images/cover.${cover.type === "image/png" ? "png" : "jpg"}`, type: cover.type };
@@ -76,7 +77,7 @@ export function toEpub(book: CompiledBook, { date = new Date(0), cover, pictures
       add({ id: `part-${chapter.part.number}`, title: title ? `${name}: ${title}` : name, toc: true, level: 0, body: `<section epub:type="part" class="part"><h1>${xml(name)}</h1>${title ? `<p class="part-title">${xml(title)}</p>` : ""}</section>` });
     }
     const seen = new Set<number>();
-    add({ id: `chapter-${String(chapter.number).padStart(3, "0")}`, title: chapter.heading, toc: true, level: inPart ? 1 : 0, body: `<section epub:type="chapter"><h2>${xml(chapter.heading)}</h2>${blocks(chapter.blocks, seen)}${chapterNotes(chapter.notes, book.sceneBreak, files, seen)}</section>` });
+    add({ id: `chapter-${String(chapter.number).padStart(3, "0")}`, title: chapter.heading, toc: true, level: inPart ? 1 : 0, body: `<section epub:type="chapter"><h2>${xml(chapter.heading)}</h2>${blocks(chapter.blocks, seen)}${chapterNotes(chapter.notes, breaks, files, seen)}</section>` });
   }
   book.back.forEach((s, i) => add({ id: `back-${i + 1}`, title: s.title, toc: true, level: 0, body: `<section epub:type="backmatter"><h2>${xml(s.title)}</h2>${blocks(s.blocks)}</section>` }));
 
@@ -99,7 +100,13 @@ export function toEpub(book: CompiledBook, { date = new Date(0), cover, pictures
 }
 
 /** Blocks as XHTML: quoted paragraphs and lists together in one blockquote, breaks as the preset's marker. */
-function xhtmlBlocks(list: Block[], sceneBreak: string, pictures: Map<string, PictureFile>, seen: Set<number>): string {
+/** A break between pieces: its mark, and what a screen reader calls it. */
+interface Breaks {
+  mark: string;
+  name: string;
+}
+
+function xhtmlBlocks(list: Block[], breaks: Breaks, pictures: Map<string, PictureFile>, seen: Set<number>): string {
   let out = "";
   let quote = false;
   for (const b of list) {
@@ -108,26 +115,26 @@ function xhtmlBlocks(list: Block[], sceneBreak: string, pictures: Map<string, Pi
       out += q ? "<blockquote>" : "</blockquote>";
       quote = q;
     }
-    out += xhtmlBlock(b, sceneBreak, pictures, seen);
+    out += xhtmlBlock(b, breaks, pictures, seen);
   }
   return quote ? `${out}</blockquote>` : out;
 }
 
 const alignClass = (a: Align) => (a ? ` class="align-${a}"` : "");
 
-function xhtmlBlock(b: Block, sceneBreak: string, pictures: Map<string, PictureFile>, seen: Set<number>): string {
+function xhtmlBlock(b: Block, breaks: Breaks, pictures: Map<string, PictureFile>, seen: Set<number>): string {
   switch (b.kind) {
     case "paragraph":
       return `<p>${runs(b.runs, seen)}</p>`;
     case "break":
-      return `<p class="scene-break" role="separator" aria-label="Scene break">${xml(sceneBreak)}</p>`;
+      return `<p class="scene-break" role="separator" aria-label="${xml(breaks.name)}">${xml(breaks.mark)}</p>`;
     case "heading":
       // Beneath the chapter's h2: a scene's # is h3.
       return `<h${b.level + 2} class="scene-heading">${runs(b.runs, seen)}</h${b.level + 2}>`;
     case "list": {
       const tag = b.ordered ? "ol" : "ul";
       const start = b.ordered && b.start !== 1 ? ` start="${b.start}"` : "";
-      return `<${tag}${start}>${b.items.map((item) => `<li>${item.map((x) => xhtmlBlock(x, sceneBreak, pictures, seen)).join("")}</li>`).join("")}</${tag}>`;
+      return `<${tag}${start}>${b.items.map((item) => `<li>${item.map((x) => xhtmlBlock(x, breaks, pictures, seen)).join("")}</li>`).join("")}</${tag}>`;
     }
     case "table": {
       const head = b.header.map((cell, i) => `<th scope="col"${alignClass(b.align[i] ?? null)}>${runs(cell, seen)}</th>`).join("");
@@ -145,9 +152,9 @@ function xhtmlBlock(b: Block, sceneBreak: string, pictures: Map<string, PictureF
 }
 
 /** A chapter's notes after its text: each linked back to where it's referred to. */
-function chapterNotes(notes: { number: number; blocks: Block[] }[] | undefined, sceneBreak: string, pictures: Map<string, PictureFile>, seen: Set<number>): string {
+function chapterNotes(notes: { number: number; blocks: Block[] }[] | undefined, breaks: Breaks, pictures: Map<string, PictureFile>, seen: Set<number>): string {
   if (!notes?.length) return "";
-  const items = notes.map((n) => `<li id="note-${n.number}" epub:type="endnote" role="doc-endnote">${xhtmlBlocks(n.blocks, sceneBreak, pictures, seen)}<p class="note-back"><a href="#noteref-${n.number}" role="doc-backlink">Back to the text</a></p></li>`);
+  const items = notes.map((n) => `<li id="note-${n.number}" epub:type="endnote" role="doc-endnote">${xhtmlBlocks(n.blocks, breaks, pictures, seen)}<p class="note-back"><a href="#noteref-${n.number}" role="doc-backlink">Back to the text</a></p></li>`);
   return `<section epub:type="endnotes" role="doc-endnotes" class="notes"><h3>Notes</h3><ol>${items.join("")}</ol></section>`;
 }
 

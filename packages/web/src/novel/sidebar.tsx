@@ -63,7 +63,7 @@ export interface PlaceGroup {
 function pagesOf(onGitHub: boolean, kind: BookKind): Map<string, Omit<Place, "key"> | null> {
   return new Map<string, Omit<Place, "key"> | null>([
     ["outline", { path: "outline", label: "Outline", icon: ListTree }],
-    ["story-map", moduleStoryMapTabs(kind).length ? { path: "story-map", label: "Story map", icon: MapIcon } : null],
+    ["story-map", moduleStoryMapTabs(kind).length ? { path: "story-map", label: vocabulary(kind).map.One, icon: MapIcon } : null],
     ["relationships", { path: "relationships", label: "Relationships", icon: Network }],
     ["notes", { path: "notes", label: "Notes", icon: StickyNote }],
     ["progress", { path: "progress", label: "Progress", icon: Goal }],

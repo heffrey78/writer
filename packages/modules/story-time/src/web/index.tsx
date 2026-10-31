@@ -1,3 +1,4 @@
+import { vocabulary } from "@writer/core";
 import type { WebModule } from "@writer/web/modules.tsx";
 import { DateDayOne } from "./day-one.tsx";
 import { OutlineTimeCards, OutlineTimeTable } from "./outline-time.tsx";
@@ -10,7 +11,7 @@ export const storyTimeWeb: WebModule = {
   outlineOrders: [
     {
       key: "time",
-      label: "Story time",
+      label: (kind) => vocabulary(kind).time.One,
       table: (view) => <OutlineTimeTable novelId={view.novelId} novel={view.novel} workspace={view.workspace} />,
       cards: (view) => <OutlineTimeCards novelId={view.novelId} novel={view.novel} />,
     },

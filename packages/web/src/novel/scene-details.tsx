@@ -15,6 +15,7 @@ import { Picker, type PickerItem, type PickerProps } from "../ui/picker.tsx";
 import { useEntryPanel } from "./entry-tab.tsx";
 import { useNotice } from "./notice.tsx";
 import type { Workspace } from "./workspace.ts";
+import { useWords } from "./kind.ts";
 import { storyDate } from "../format.ts";
 
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -549,7 +550,7 @@ export function SceneDetails({
 
       {pinnedHere.length > 0 && (
         <p className="text-xs text-muted">
-          Pinned under each scene's title: {pinnedHere.map((r) => r.label.toLowerCase()).join(", ")}.
+          Pinned under each {w.piece.one}'s title: {pinnedHere.map((r) => r.label.toLowerCase()).join(", ")}.
         </p>
       )}
 
@@ -600,8 +601,9 @@ export function StoryTimeFields({
   // The day it was on before it was given a date: a module may offer to make that date that day.
   const [wasDay, setWasDay] = useState<number>();
   const { novelId } = useParams<{ novelId: string }>();
+  const time = useWords().time.One;
   return (
-    <Group label="Story time">
+    <Group label={time}>
       <SelectField
         label="When it happens"
         value={whenKind}

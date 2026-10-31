@@ -50,7 +50,8 @@ A book's kind gives it its structure, its words and some features of its own. Th
 | **Statuses** | Idea, outlined, drafted, revised, final | Draft, kept | Planned, prepped, played | Outline, draft, revised, checked |
 | **Kinds of issue** | Plot hole, continuity, research, idea, revision | Follow up, fact | Loose end, ruling, idea | Fact check, citation needed, research, idea |
 | **Sidebar groups** | Plan, Revise | Look back, People and places | Prep, The world, Look back | Plan, Revise |
-| **Story map** | Plotlines, presence, timeline | Presence, timeline | Presence, timeline | Presence |
+| **Its map** | Story map: plotlines, presence, timeline | Journal map: presence, timeline | Campaign map: presence, timeline | Book map: presence |
+| **Time, on its timeline** | Story time | Dates | Campaign time | |
 | **Only this kind** | Point of view, off-page events, the drafting board, standard manuscript format | The Journal page, Today's entry, the calendar | A session's prep sheet, *Note from the table* | Citations and a bibliography |
 
 Any kind can add entry types of its own, and every kind has notes, relationships, progress, drafts, compare, issues and compile. A page a kind's sidebar leaves out, such as a journal's Outline and Compare, is still in the command palette under *Go to*.

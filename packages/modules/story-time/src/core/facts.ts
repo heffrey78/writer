@@ -1,4 +1,4 @@
-import type { Book, Piece } from "@writer/core";
+import { vocabulary, type Book, type Piece } from "@writer/core";
 import { pieceInstant, recordWords, storyTimeline } from "./time.ts";
 
 const MINUTE = 60_000;
@@ -40,7 +40,7 @@ export function timeFacts(novel: Book, scene: Piece): string[] {
   }
   if (latest) {
     if (here.start < latest.start) facts.push(`A flashback: ${readableSpan(latest.start - here.start)} before “${latest.title}”.`);
-    else if (here.start < latest.end) facts.push(`Overlaps “${latest.title}” in story time.`);
+    else if (here.start < latest.end) facts.push(`Overlaps “${latest.title}” ${vocabulary(novel.kind).time.in}.`);
     else if (here.start === latest.end) facts.push(`Follows straight on from “${latest.title}”.`);
     else facts.push(`${readableSpan(here.start - latest.end)} after “${latest.title}”.`);
   }

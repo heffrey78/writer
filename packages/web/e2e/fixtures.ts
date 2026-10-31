@@ -321,7 +321,7 @@ export async function openView(page: Page, view: View) {
     // The switch's radios are drawn as their labels: click the one that shows.
     await page.getByRole("radiogroup", { name: "Show the outline as" }).getByText(view, { exact: true }).click();
   } else if (view === "Plotlines" || view === "Presence" || view === "Timeline") {
-    await views.getByRole("link", { name: "Story map" }).click();
+    await views.getByRole("link", { name: / map$/ }).click();
     await page.getByRole("tab", { name: view }).click();
     await expect(page.getByRole("tab", { name: view, selected: true })).toBeVisible();
   } else await views.getByRole("link", { name: view }).click();

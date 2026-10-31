@@ -27,6 +27,8 @@ export const campaign: BookKind = {
     content: { label: "Campaign", plural: "Campaigns" },
     codex: { label: "Codex", plural: "Codices" },
     entity: { label: "Entry", plural: "Entries", article: "an" },
+    map: { label: "Campaign map", plural: "Campaign maps" },
+    time: { label: "Campaign time", in: "in campaign time", order: "campaign-time order" },
   },
   folders: { content: "sessions", codex: "codex", notes: "notes" },
   entityTypes: [

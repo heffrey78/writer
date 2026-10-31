@@ -49,9 +49,9 @@ test("a journal's sidebar arranged by keyboard: kept in book.yaml in one commit,
   await press(page, "Move “Index” up");
   await expect(dialog.getByText("“Index” moved to Look back.")).toBeAttached();
 
-  // Story map hidden; Outline, which a journal leaves out, shown.
-  await press(page, "Hide “Story map”");
-  await expect(dialog.getByRole("button", { name: "Show “Story map”" })).toBeFocused();
+  // Journal map hidden; Outline, which a journal leaves out, shown.
+  await press(page, "Hide “Journal map”");
+  await expect(dialog.getByRole("button", { name: "Show “Journal map”" })).toBeFocused();
   await press(page, "Show “Outline”");
   await expect(dialog.getByRole("button", { name: "Hide “Outline”" })).toBeFocused();
 

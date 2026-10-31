@@ -108,7 +108,7 @@ export function NovelPage() {
       onMade: async (e) => {
         await queryClient.invalidateQueries({ queryKey: keys.novel(novelId) });
         show({
-          message: `Added ${label(e.type)} “${e.name}” to the ${words()?.codex.one ?? "story bible"}.`,
+          message: `Added ${label(e.type)} “${e.name}” to the ${words()?.codex.one ?? "index"}.`,
           action: {
             label: "Add details",
             run: () => {
@@ -122,7 +122,7 @@ export function NovelPage() {
       },
       onRefused: (e, why) =>
         show({
-          message: `Couldn't add “${e.name}” to the ${words()?.codex.one ?? "story bible"}: ${why}`,
+          message: `Couldn't add “${e.name}” to the ${words()?.codex.one ?? "index"}: ${why}`,
           action: { label: "Try again", run: () => made.retry(e.id) },
           secondary: {
             label: "Unlink",
@@ -211,7 +211,7 @@ export function NovelPage() {
       ...(engineInPage ? [] : [{ id: "novel.compile", title: `Compile the ${w?.content.one ?? "manuscript"}…`, group: w?.book.One ?? "Novel", keywords: ["export", "docx", "word", "epub", "pdf", "e-book", w?.content.one ?? "manuscript"], run: () => setCompiling(true) }]),
       { id: "novel.arrangeSidebar", title: "Arrange the sidebar…", group: "App", keywords: ["order", "hide", "show", "pages", "views", "menu"], run: () => useArrangeSidebar.getState().set(true) },
       { id: "novel.arrangeBar", title: "Arrange the bar…", group: "App", keywords: ["phone", "bottom", "order", "pages", "tabs"], run: () => useArrangeBar.getState().set(true) },
-      { id: "novel.bible", title: w?.codex.One ?? "Story bible", group: "Go to", run: () => void navigate(`/novels/${novelId}/bible`) },
+      { id: "novel.bible", title: w?.codex.One ?? "Index", group: "Go to", run: () => void navigate(`/novels/${novelId}/bible`) },
       { id: "novel.outline", title: "Outline", group: "Go to", keywords: ["table"], run: () => void navigate(`/novels/${novelId}/outline/table`) },
       { id: "novel.outlineCards", title: "Outline: cards", group: "Go to", keywords: ["corkboard", "index cards"], run: () => void navigate(`/novels/${novelId}/outline/cards`) },
       { id: "novel.progress", title: "Progress", group: "Go to", keywords: ["stats", "statistics", "goal", "target", "deadline", "streak", "words a day"], run: () => void navigate(`/novels/${novelId}/progress`) },
@@ -226,7 +226,7 @@ export function NovelPage() {
       { id: "novel.notes", title: "Notes", group: "Go to", keywords: ["ideas", "brainstorm", "cards"], run: () => void navigate(`/novels/${novelId}/notes`) },
       { id: "novel.newNote", title: "New note", group: "Notes", keywords: ["idea", "brainstorm", "what if"], run: () => useNewNote.getState().set(true) },
       ...(model?.notes ?? []).map((n) => ({ id: `novel.note.${n.id}`, title: `Note: ${n.title}`, group: "Go to", keywords: n.tags, run: () => void navigate(`/novels/${novelId}/note/${n.id}`) })),
-      ...(model?.entityTypes ?? []).map((t) => ({ id: `novel.newEntry.${t.key}`, title: `New ${t.label.toLowerCase()}`, group: w?.codex.One ?? "Story bible", run: () => openNew(`bible/new?type=${encodeURIComponent(t.key)}`, "bible") })),
+      ...(model?.entityTypes ?? []).map((t) => ({ id: `novel.newEntry.${t.key}`, title: `New ${t.label.toLowerCase()}`, group: w?.codex.One ?? "Index", run: () => openNew(`bible/new?type=${encodeURIComponent(t.key)}`, "bible") })),
       ...(model?.entities ?? []).map((e) => ({
         id: `novel.entry.${e.id}`,
         title: `${model!.entityTypes.find((t) => t.key === e.type)?.label ?? e.type}: ${e.name}`,

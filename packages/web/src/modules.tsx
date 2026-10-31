@@ -1,4 +1,4 @@
-import { recordTypesOf, type Book, type BookKind, type Entity, type ModuleRecord, type Note, type RecordTypeDef } from "@writer/core";
+import { recordTypesOf, vocabulary, type Book, type BookKind, type Entity, type ModuleRecord, type Note, type RecordTypeDef } from "@writer/core";
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { Route, useNavigate } from "react-router";
@@ -49,7 +49,7 @@ export interface StoryMapTab {
 /** An order the outline can show its table and cards in, beside reading order (story time): at ?order=<key>, remembered. */
 export interface OutlineOrder {
   key: string;
-  label: string;
+  label: (kind: BookKind) => string;
   table(view: BookView): ReactNode;
   cards(view: BookView): ReactNode;
 }
@@ -187,7 +187,7 @@ export function ModuleCommands(view: BookView) {
       webModulesOf(novel.kind).flatMap((m) => [
         // A view without a place in the sidebar is reached another way (today's entry, by its own command).
         ...(m.views ?? []).filter((v) => v.group).map((v) => ({ id: `${m.id}.view.${v.path}`, title: v.label, group: "Go to", run: () => void navigate(`/novels/${novelId}/${v.path}`) })),
-        ...(m.storyMapTabs ?? []).map((t) => ({ id: `${m.id}.story-map.${t.key}`, title: `Story map: ${t.label}`, group: "Go to", keywords: ["diagram", ...(t.keywords ?? [])], run: () => void navigate(`/novels/${novelId}/story-map/${t.key}`) })),
+        ...(m.storyMapTabs ?? []).map((t) => ({ id: `${m.id}.story-map.${t.key}`, title: `${vocabulary(novel.kind).map.One}: ${t.label}`, group: "Go to", keywords: ["diagram", ...(t.keywords ?? [])], run: () => void navigate(`/novels/${novelId}/story-map/${t.key}`) })),
         ...(m.commands?.({ ...view, navigate: (to) => void navigate(to) }) ?? []),
       ]),
     [novelId, novel, workspace, navigate],

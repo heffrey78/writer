@@ -53,7 +53,7 @@ function LocationSection({ novelId, novel, entity }: { novelId: string; novel: B
   return (
     <ProfileSection title="Who comes here">
       {p.visitors.length ? <Tallied novelId={novelId} tally={p.visitors} unit={w.piece} /> : <p className="text-sm text-muted">No one yet: no {w.piece.one} set here has {typesInSentence(novel.entityTypes.filter((t) => t.is === "person"))}.</p>}
-      {p.span && <p className="text-sm">Story time: {p.span.from === p.span.to ? p.span.from : `${p.span.from} to ${p.span.to}`}.</p>}
+      {p.span && <p className="text-sm">{w.time.One}: {p.span.from === p.span.to ? p.span.from : `${p.span.from} to ${p.span.to}`}.</p>}
     </ProfileSection>
   );
 }

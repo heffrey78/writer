@@ -305,7 +305,7 @@ export function EntryPage({
         <AlertDialog.Portal>
           <AlertDialog.Overlay className="fixed inset-0 z-[60] bg-black/40" />
           <AlertDialog.Content className="fixed top-1/2 left-1/2 z-[60] grid max-h-[80vh] w-[min(32rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 gap-3 overflow-y-auto rounded-lg border border-rule bg-raised p-5 text-ink shadow-xl">
-            <AlertDialog.Title className="text-base font-semibold">Delete “{entity.name}”? The story still refers to it.</AlertDialog.Title>
+            <AlertDialog.Title className="text-base font-semibold">Delete “{entity.name}”? The {vocabulary(novel.kind).subject} still refers to it.</AlertDialog.Title>
             <AlertDialog.Description className="text-sm text-muted">These will point at {vocabulary(novel.kind).entity.a} that no longer exists, and the validator will list them until they're changed:</AlertDialog.Description>
             <ul className="grid gap-1 text-sm">
               {references?.map((r) => (

@@ -104,7 +104,7 @@ export function toDocx(book: CompiledBook, { date = new Date(0), pictures = new 
       { path: "docProps/core.xml", data: core(book, date) },
       { path: "docProps/app.xml", data: app },
       { path: "word/document.xml", data: document },
-      { path: "word/styles.xml", data: styles(book.language, book.spacing, notes) },
+      { path: "word/styles.xml", data: styles(book.language, book.spacing, notes, book.breakName) },
       { path: "word/settings.xml", data: settings(book.language, notes) },
       { path: "word/header1.xml", data: header },
       { path: "word/header2.xml", data: headerFirst },
@@ -235,7 +235,7 @@ function footnotesPart(footnotes: string[]): string {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<w:footnotes ${W}>${separator(-1, "separator", "separator")}${separator(0, "continuationSeparator", "continuationSeparator")}${footnotes.join("")}</w:footnotes>`;
 }
 
-function styles(language: string, spacing: number, notes = false): string {
+function styles(language: string, spacing: number, notes: boolean, breakName: string): string {
   // Double-spaced (manuscript format): 480, twice the single line's 240.
   const line = Math.round(240 * spacing);
   const paragraph = (id: string, name: string, pPr: string, rPr = "", extra = "") =>
@@ -251,7 +251,7 @@ function styles(language: string, spacing: number, notes = false): string {
     paragraph("Heading2", "heading 2", `<w:keepNext/><w:spacing w:before="${INCH * 2}" w:after="${240}"/>${centred}<w:outlineLvl w:val="1"/>`, "", '<w:next w:val="Normal"/><w:qFormat/>'),
     paragraph("PartHeading", "Part heading", `<w:keepNext/><w:spacing w:before="${INCH * 3}"/>${centred}<w:outlineLvl w:val="0"/>`),
     paragraph("PartTitle", "Part title", centred),
-    paragraph("SceneBreak", "Scene break", `<w:keepNext/>${centred}`),
+    paragraph("SceneBreak", breakName, `<w:keepNext/>${centred}`),
     paragraph("Quote", "Quote", `<w:ind w:left="${INCH / 2}" w:right="${INCH / 2}" w:firstLine="0"/>`),
     paragraph("SceneHeading1", "heading 3", `<w:keepNext/><w:spacing w:before="240"/>${centred}<w:outlineLvl w:val="2"/>`, "<w:b/>", '<w:next w:val="Normal"/><w:qFormat/>'),
     paragraph("SceneHeading2", "heading 4", '<w:keepNext/><w:spacing w:before="240"/><w:ind w:firstLine="0"/><w:outlineLvl w:val="3"/>', "<w:b/>", '<w:next w:val="Normal"/><w:qFormat/>'),

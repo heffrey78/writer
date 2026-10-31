@@ -88,6 +88,8 @@ export interface CompiledBook {
   /** Line spacing, in lines: 2, double-spaced (manuscript format). */
   spacing: number;
   sceneBreak: string;
+  /** What Word's style list and a screen reader call that break, in the kind's words: "Scene break". */
+  breakName: string;
   front: Matter[];
   chapters: CompiledChapter[];
   back: Matter[];
@@ -258,6 +260,7 @@ export async function compileBook(novel: Book, source: Pick<FileSource, "read">,
     ...(layout.end ? { end: layout.end } : {}),
     spacing: layout.spacing,
     sceneBreak: preset.scene_break ?? "#",
+    breakName: `${vocabulary(novel.kind).piece.One} break`,
     front: await matter(preset.front),
     chapters: chapterOut,
     back: [...(await matter(preset.back)), ...hooks.flatMap((h) => h.back?.(novel, { pieces: compiled, mentioned }) ?? [])],

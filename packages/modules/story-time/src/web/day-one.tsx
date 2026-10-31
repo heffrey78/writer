@@ -156,7 +156,7 @@ export function DateDayOne({ novelId, novel, day, date, done }: { novelId: strin
   return (
     <div role="group" aria-label="Date Day 1 from this" className="grid gap-1.5 rounded-md border border-rule bg-raised p-2 text-sm">
       <p>
-        This was Day {day}. Make {readDate(date)} Day {day}, so Day 1 is {readDate(start)}? Every day of the story then has its date.
+        This was Day {day}. Make {readDate(date)} Day {day}, so Day 1 is {readDate(start)}? Every day of the {vocabulary(novel.kind).subject} then has its date.
       </p>
       <div className="flex gap-2">
         <Button

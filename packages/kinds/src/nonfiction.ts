@@ -22,6 +22,8 @@ export const nonfiction: BookKind = {
     content: { label: "Text", plural: "Texts" },
     codex: { label: "Index", plural: "Indexes", article: "an" },
     entity: { label: "Entry", plural: "Entries", article: "an" },
+    map: { label: "Book map", plural: "Book maps" },
+    subject: "book",
   },
   folders: { content: "text", codex: "index", notes: "notes" },
   entityTypes: [

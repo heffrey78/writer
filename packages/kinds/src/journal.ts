@@ -21,6 +21,8 @@ export const journal: BookKind = {
     content: { label: "Journal", plural: "Journals" },
     codex: { label: "Index", plural: "Indexes", article: "an" },
     entity: { label: "Item", plural: "Items", article: "an" },
+    map: { label: "Journal map", plural: "Journal maps" },
+    time: { label: "Dates", in: "by date", order: "date order" },
   },
   folders: { content: "entries", codex: "index", notes: "notes" },
   entityTypes: [
