@@ -423,3 +423,21 @@ for (const [sample, name, section, piece] of [
     await expect(page.getByRole("heading", { level: 1, name: "Its first" })).toBeVisible();
   });
 }
+
+test("on a phone, the top bar is the page's name, and the dropdown names the book (#115)", async ({ page, app }) => {
+  await app.restart(app.novelRepo("varn"));
+  await launch(page, app);
+  const banner = page.getByRole("banner");
+  await expect(banner.getByRole("group", { name: "History" })).toHaveCount(0);
+  const name = banner.getByRole("button", { name: "Arrival, in The Bridge at Varn: go to a scene" });
+  expect((await name.boundingBox())!.height).toBeGreaterThanOrEqual(48);
+  await name.tap();
+  const goTo = page.getByRole("dialog", { name: "Go to a scene" });
+  await expect(goTo.getByText("The Bridge at Varn", { exact: true })).toBeVisible();
+  await audit(page);
+});
+  await dialog.getByRole("textbox").fill("A chapter whose title is much too long to fit in the top bar of any phone");
+  await dialog.getByRole("button", { name: "Add chapter" }).tap();
+  await expect(page.getByRole("heading", { level: 1, name: /^A chapter whose title/ })).toBeVisible();
+  await fits(page);
+});

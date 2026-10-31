@@ -43,16 +43,12 @@ export function GoToButton({ novelId, novel, onGitHub }: { novelId: string; nove
   const page = pageOf(novelId, novel, pathname, onGitHub);
   const title = novel.config?.title ?? "Untitled";
   const w = vocabulary(novel.kind);
-  const section = page.section && (page.piece || page.section) ? chapterTitle(novel, page.section) : undefined;
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
       <Dialog.Trigger asChild>
-        <button type="button" aria-label={`${page.name}, in ${title}: go to ${w.piece.a}`} className={cn("grid min-h-11 min-w-0 justify-items-start rounded-md px-2 text-left", open && "bg-accent-soft")}>
-          <span className="max-w-full truncate text-xs text-muted">{section && page.piece ? `${title} · ${section}` : title}</span>
-          <span className="flex max-w-full items-center gap-1 font-semibold">
-            <span className="truncate">{page.name}</span>
-            {open ? <ChevronUp className="size-4 shrink-0" aria-hidden /> : <ChevronDown className="size-4 shrink-0" aria-hidden />}
-          </span>
+        <button type="button" aria-label={`${page.name}, in ${title}: go to ${w.piece.a}`} className={cn("flex min-h-12 max-w-full min-w-0 items-center gap-1 rounded-md px-2 text-left text-lg font-semibold", open && "bg-accent-soft")}>
+          <span className="truncate">{page.name}</span>
+          {open ? <ChevronUp className="size-5 shrink-0" aria-hidden /> : <ChevronDown className="size-5 shrink-0" aria-hidden />}
         </button>
       </Dialog.Trigger>
       <Dialog.Portal>
@@ -92,6 +88,7 @@ function GoTo({ novelId, novel, onGitHub, current }: { novelId: string; novel: B
   );
   return (
     <>
+      <p className="truncate text-sm font-semibold">{novel.config?.title ?? "Untitled"}</p>
       <Dialog.Title asChild>
         <label htmlFor={searchId} className="text-sm font-semibold text-muted">
           Go to {w.piece.a}

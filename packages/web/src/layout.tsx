@@ -41,6 +41,7 @@ export function Shell({
   chrome?: boolean;
   title?: string;
 }) {
+  const narrow = useNarrow();
   const showLibrary = useShowLibrary();
   useEffect(() => {
     document.title = title ? `${title} · Writer` : "writer";
@@ -51,7 +52,7 @@ export function Shell({
         Skip to content
       </a>
       {chrome && (
-      <header className="flex items-center gap-3 border-b border-rule bg-panel px-4 py-2">
+      <header className="flex items-center gap-3 border-b border-rule bg-panel px-4 py-2 max-md:py-1">
         <Link
           to="/"
           onClick={(e) => {
@@ -66,7 +67,8 @@ export function Shell({
           <Logo />
           {!heading && "writer"}
         </Link>
-        <HistoryButtons />
+        {/* On a phone, Android's back does this, and the page's name needs the room (#115). */}
+        {!narrow && <HistoryButtons />}
         {heading && <div className="flex min-w-0 items-center gap-1">{heading}</div>}
         <div className="flex flex-1 items-center justify-end gap-2">
           {actions}
