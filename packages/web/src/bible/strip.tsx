@@ -89,7 +89,7 @@ export function InTheStory({ novelId, novel, entity, compact }: { novelId: strin
   const n = presence.scenes.length;
 
   return (
-    <ProfileSection title={`In the ${w.content.one}`}>
+    <ProfileSection title={`In the ${w.subject}`}>
       {n === 0 ? (
         <p className="text-sm text-muted">The book has no {w.piece.many} yet.</p>
       ) : (

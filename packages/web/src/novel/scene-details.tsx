@@ -538,7 +538,7 @@ export function SceneDetails({
       {facts.length > 0 && (
         <section aria-labelledby={`${headingId}-facts`} className="grid gap-1.5 border-t border-rule pt-3">
           <h3 id={`${headingId}-facts`} className="text-xs font-semibold tracking-wide text-muted uppercase">
-            From the {w.content.one}
+            From the {w.subject}
           </h3>
           <ul className="grid list-disc gap-1 pl-4">
             {facts.map((f) => (
