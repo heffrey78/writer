@@ -16,7 +16,7 @@ export const journal: BookKind = {
     { key: "year", label: "Year", plural: "Years", prefix: "yr", list: "years", optional: true, titled: true, formerPrefixes: ["pt"] },
     { key: "month", label: "Month", plural: "Months", prefix: "mon", list: "months", titled: true, formerPrefixes: ["ch"] },
   ],
-  piece: { key: "entry", label: "Entry", plural: "Entries", article: "an", prefix: "ent", list: "entries", formerPrefixes: ["sc"] },
+  piece: { key: "entry", label: "Entry", plural: "Entries", article: "an", prefix: "ent", list: "entries", madeByDate: true, formerPrefixes: ["sc"] },
   words: {
     content: { label: "Journal", plural: "Journals" },
     codex: { label: "Index", plural: "Indexes", article: "an" },

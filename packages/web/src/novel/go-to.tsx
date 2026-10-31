@@ -1,5 +1,5 @@
 import { pieceSections, sectionById, vocabulary, type Book, type Section } from "@writer/core";
-import { CalendarDays, ChevronDown, ChevronRight, ChevronUp, ListTree } from "lucide-react";
+import { CalendarDays, ChevronDown, ChevronRight, ChevronUp, ListTree, Plus } from "lucide-react";
 import { Dialog } from "radix-ui";
 import { useEffect, useId, useState } from "react";
 import { Link, useLocation } from "react-router";
@@ -8,11 +8,16 @@ import { cn } from "../ui/cn.ts";
 import { SheetHandle } from "../ui/sheet-handle.tsx";
 import { chapterTitle } from "./navigation.tsx";
 import { arrangedBy, arrangement } from "./sidebar.tsx";
+import { StructureDialogs, type StructureDialog } from "./structure-dialogs.tsx";
+import { newSectionAtEnd, usableLevels, useStructure } from "./structure.ts";
+import type { Workspace } from "./workspace.ts";
 
 /*
  * On a phone (#100), the page's name in the top bar is a dropdown: Go to an entry, or a scene. A
  * search, what the book's modules offer from the shelf (Today's entry), then its sections folded (a
- * journal's months, newest first; a novel's chapters), the one being read open.
+ * journal's months, newest first; a novel's chapters), the one being read open. Each section ends
+ * with New for its pieces, and the list with New for the sections (#116), unless the kind's pieces
+ * come from their dates.
  */
 
 /** The page in view, by its address: its name, and the piece or section it's on. */
@@ -36,7 +41,7 @@ function pageOf(novelId: string, novel: Book, pathname: string, onGitHub: boolea
   return { name: novel.config?.title ?? "Untitled" };
 }
 
-export function GoToButton({ novelId, novel, onGitHub }: { novelId: string; novel: Book; onGitHub: boolean }) {
+export function GoToButton({ novelId, novel, workspace, onGitHub }: { novelId: string; novel: Book; workspace: Workspace; onGitHub: boolean }) {
   const [open, setOpen] = useState(false);
   const { pathname } = useLocation();
   useEffect(() => setOpen(false), [pathname]);
@@ -54,7 +59,7 @@ export function GoToButton({ novelId, novel, onGitHub }: { novelId: string; nove
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-40 bg-black/40" />
         <Dialog.Content aria-describedby={undefined} className="fixed inset-x-0 top-0 z-50 grid max-h-[85dvh] gap-2 overflow-y-auto rounded-b-2xl border-b border-rule bg-raised px-4 pt-3 pb-1 text-ink shadow-xl">
-          <GoTo novelId={novelId} novel={novel} onGitHub={onGitHub} current={page} />
+          <GoTo novelId={novelId} novel={novel} workspace={workspace} onGitHub={onGitHub} current={page} />
           <SheetHandle edge="top" onClose={() => setOpen(false)} />
         </Dialog.Content>
       </Dialog.Portal>
@@ -62,8 +67,11 @@ export function GoToButton({ novelId, novel, onGitHub }: { novelId: string; nove
   );
 }
 
-function GoTo({ novelId, novel, onGitHub, current }: { novelId: string; novel: Book; onGitHub: boolean; current: { section?: Section; piece?: string } }) {
+function GoTo({ novelId, novel, workspace, onGitHub, current }: { novelId: string; novel: Book; workspace: Workspace; onGitHub: boolean; current: { section?: Section; piece?: string } }) {
   const w = vocabulary(novel.kind);
+  const structure = useStructure(novelId, novel, workspace);
+  const [dialog, setDialog] = useState<StructureDialog>();
+  const adds = !novel.kind.piece.madeByDate;
   const searchId = useId();
   const [query, setQuery] = useState("");
   const sections = novel.kind.newestFirst ? [...pieceSections(novel)].reverse() : pieceSections(novel);
@@ -116,16 +124,37 @@ function GoTo({ novelId, novel, onGitHub, current }: { novelId: string; novel: B
                   <span className="flex-1 truncate font-semibold">{chapterTitle(novel, s)}</span>
                   <span className="text-sm text-muted">{w.piece.count(list.length)}</span>
                 </button>
-                {open && <ul className="grid pb-1 pl-7">{list.map(piece)}</ul>}
+                {open && (
+                  <ul className="grid pb-1 pl-7">
+                    {list.map(piece)}
+                    {adds && (
+                      <li>
+                        <button type="button" aria-label={`New ${w.piece.one} in ${chapterTitle(novel, s)}`} onClick={() => setDialog({ kind: "new-scene", chapter: s.id })} className={cn(row, "w-full text-left text-accent")}>
+                          <Plus className="size-4 shrink-0" aria-hidden /> New {w.piece.one}
+                        </button>
+                      </li>
+                    )}
+                  </ul>
+                )}
               </li>
             );
           })}
         </ul>
       )}
+      {adds &&
+        !q &&
+        usableLevels(novel)
+          .filter(({ disabled }) => !disabled)
+          .map(({ level }) => (
+            <button key={level.key} type="button" onClick={() => setDialog({ kind: "new-section", level, ...newSectionAtEnd(novel, level) })} className={cn(row, "w-full text-left text-accent")}>
+              <Plus className="size-5 shrink-0" aria-hidden /> New {w.level(level.key).one}
+            </button>
+          ))}
       <Link to={`/novels/${novelId}/${calendar ? calendar.path : "outline"}`} className={cn(row, "border-t border-rule text-accent")}>
         {calendar ? <CalendarDays className="size-5" aria-hidden /> : <ListTree className="size-5" aria-hidden />}
         {calendar ? "Pick a day on the calendar" : "The whole outline"}
       </Link>
+      {dialog && <StructureDialogs novelId={novelId} novel={novel} structure={structure} dialog={dialog} onClose={() => setDialog(undefined)} />}
     </>
   );
 }

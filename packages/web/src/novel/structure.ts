@@ -36,6 +36,15 @@ export function usableLevels(novel: Book): { level: LevelDef; disabled: boolean 
   });
 }
 
+/** Where a new section goes at the end of the book: in the last section of the level above, after the last of its own there. */
+export function newSectionAtEnd(novel: Book, level: LevelDef): { parent: string | null; after: string | null } {
+  const { levels } = novel.kind;
+  const above = level.key === novel.levels[0] ? undefined : levels[levels.findIndex((l) => l.key === level.key) - 1];
+  const parent = (above && novel.sections.filter((s) => s.level === above.key).at(-1)?.id) || null;
+  const after = novel.sections.filter((s) => s.level === level.key && (s.parentId ?? null) === parent).at(-1)?.id ?? null;
+  return { parent, after };
+}
+
 /** Where a new section of a level goes: in the open chapter's section of the level above (or the first), after its own. */
 export function newSectionPlace(novel: Book, level: LevelDef, current: string | undefined): { parent: string | null; after: string | null } {
   const inner = pieceLevel(novel);

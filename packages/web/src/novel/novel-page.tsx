@@ -251,7 +251,7 @@ export function NovelPage() {
     novel.data &&
     (narrow && !unreadable(novel.data.novel) ? (
       <>
-        <GoToButton novelId={novelId} novel={novel.data.novel} onGitHub={!!repo} />
+        <GoToButton novelId={novelId} novel={novel.data.novel} workspace={workspace} onGitHub={!!repo} />
         <DraftsButton novelId={novelId} workspace={workspace} button={false} />
       </>
     ) : (

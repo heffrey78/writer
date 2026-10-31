@@ -165,6 +165,11 @@ export interface BookKind extends Noun {
      * novel's scenes).
      */
     headed?: boolean;
+    /**
+     * Its pieces come from their dates, as a journal's entries do: the phone's dropdown and the
+     * outline offer no New. The tree and the palette still can, for a day gone by.
+     */
+    madeByDate?: boolean;
   };
   /** The words for what isn't a level or the piece: all the sections and pieces, the codex, and an entity of it. */
   words: { content: Noun; codex: Noun; entity: Noun };

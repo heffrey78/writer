@@ -435,9 +435,74 @@ test("on a phone, the top bar is the page's name, and the dropdown names the boo
   const goTo = page.getByRole("dialog", { name: "Go to a scene" });
   await expect(goTo.getByText("The Bridge at Varn", { exact: true })).toBeVisible();
   await audit(page);
-});
+
+  // A long name fits.
+  await goTo.getByRole("button", { name: "New chapter" }).tap();
+  const dialog = page.getByRole("dialog", { name: "New chapter" });
   await dialog.getByRole("textbox").fill("A chapter whose title is much too long to fit in the top bar of any phone");
   await dialog.getByRole("button", { name: "Add chapter" }).tap();
   await expect(page.getByRole("heading", { level: 1, name: /^A chapter whose title/ })).toBeVisible();
   await fits(page);
+});
+
+test("on a phone, the dropdown adds a scene to any chapter, and a chapter after the last (#116)", async ({ page, app }) => {
+  const dir = app.novelRepo("varn");
+  await app.restart(dir);
+  await launch(page, app);
+  const open = () => page.getByRole("banner").getByRole("button", { name: /go to a scene$/ }).tap();
+  const goTo = page.getByRole("dialog", { name: "Go to a scene" });
+
+  await open();
+  await goTo.getByRole("button", { name: /^Old Debts/ }).tap();
+  const add = goTo.getByRole("button", { name: "New scene in Old Debts" });
+  expect((await add.boundingBox())!.height).toBeGreaterThanOrEqual(48);
+  await add.tap();
+  await fits(page);
+  await audit(page);
+  const scene = page.getByRole("dialog", { name: "New scene" });
+  await scene.getByRole("textbox").fill("From the dropdown");
+  await scene.getByRole("button", { name: "Add scene" }).tap();
+  await expect(page.getByRole("heading", { level: 1, name: "From the dropdown" })).toBeVisible();
+  await expect(goTo).toHaveCount(0);
+  // At the end of the chapter it was asked of, though another was open.
+  const id = /\/scene\/([^/?]+)/.exec(page.url())![1]!;
+  await expect.poll(() => readFileSync(join(dir, "manuscript/01-return/02-old-debts/_chapter.yaml"), "utf8")).toMatch(new RegExp(`${id}\\s*\\]?\\s*$`));
+
+  await open();
+  await goTo.getByRole("button", { name: "New chapter" }).tap();
+  const chapter = page.getByRole("dialog", { name: "New chapter" });
+  await chapter.getByRole("textbox").fill("After the last");
+  await chapter.getByRole("button", { name: "Add chapter" }).tap();
+  await expect(page.getByRole("heading", { level: 1, name: "After the last" })).toBeVisible();
+  await open();
+  // The last of the list, whichever was open.
+  await expect(goTo.getByRole("list", { name: "Manuscript" }).getByRole("button", { name: /^(?!New )/ }).last()).toContainText("After the last");
+});
+
+for (const [sample, name, section, piece] of [
+  ["sample-campaign", "campaign", "arc", "session"],
+  ["sample-nonfiction", "nonfiction", "chapter", "section"],
+] as const) {
+  test(`on a phone, the dropdown adds in a ${name}'s words (#116)`, async ({ page, app }) => {
+    await app.restart(app.bookRepo(fileURLToPath(new URL(`../../../examples/${sample}`, import.meta.url)), name));
+    await launch(page, app);
+    await page.getByRole("banner").getByRole("button", { name: new RegExp(`go to a ${piece}$`) }).tap();
+    const goTo = page.getByRole("dialog", { name: `Go to a ${piece}` });
+    await goTo.getByRole("button", { name: new RegExp(`^New ${piece} in `) }).first().tap();
+    const dialog = page.getByRole("dialog", { name: `New ${piece}` });
+    await dialog.getByRole("textbox").fill("From the dropdown");
+    await dialog.getByRole("button", { name: `Add ${piece}` }).tap();
+    await expect(page.getByRole("heading", { level: 1, name: "From the dropdown" })).toBeVisible();
+    await page.getByRole("banner").getByRole("button", { name: new RegExp(`go to a ${piece}$`) }).tap();
+    await expect(goTo.getByRole("button", { name: `New ${section}` })).toBeVisible();
+  });
+}
+
+test("on a phone, a journal's dropdown has Today's entry and no New (#116)", async ({ page, app }) => {
+  await app.restart(app.bookRepo(fileURLToPath(new URL("../../../examples/sample-journal", import.meta.url)), "journal"));
+  await launch(page, app);
+  await page.getByRole("banner").getByRole("button", { name: /go to an entry$/ }).tap();
+  const goTo = page.getByRole("dialog", { name: "Go to an entry" });
+  await expect(goTo.getByRole("link", { name: "Today's entry" })).toBeVisible();
+  await expect(goTo.getByRole("button", { name: /^New / })).toHaveCount(0);
 });
