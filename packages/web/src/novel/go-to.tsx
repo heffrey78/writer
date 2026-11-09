@@ -1,4 +1,4 @@
-import { pieceSections, sectionById, vocabulary, type Book, type Section } from "@writer/core";
+import { listedOrder, pieceSections, sectionById, vocabulary, type Book, type Section } from "@writer/core";
 import { CalendarDays, ChevronDown, ChevronRight, ChevronUp, ListTree, Plus } from "lucide-react";
 import { Dialog } from "radix-ui";
 import { useEffect, useId, useState } from "react";
@@ -74,13 +74,10 @@ function GoTo({ novelId, novel, workspace, onGitHub, current }: { novelId: strin
   const adds = !novel.kind.piece.madeByDate;
   const searchId = useId();
   const [query, setQuery] = useState("");
-  const sections = novel.kind.newestFirst ? [...pieceSections(novel)].reverse() : pieceSections(novel);
+  const sections = listedOrder(novel, pieceSections(novel));
   // The one being read, else the newest of a journal's, else the first.
   const [opened, setOpened] = useState<string | undefined>(() => current.section?.id ?? sections[0]?.id);
-  const pieces = (s: Section) => {
-    const list = s.childIds.flatMap((id) => novel.allPieces.find((p) => p.id === id) ?? []);
-    return novel.kind.newestFirst ? list.reverse() : list;
-  };
+  const pieces = (s: Section) => listedOrder(novel, s.childIds.flatMap((id) => novel.allPieces.find((p) => p.id === id) ?? []));
   const q = query.trim().toLowerCase();
   const found = q ? novel.allPieces.filter((p) => p.title.toLowerCase().includes(q)) : [];
   const actions = webModulesByIds(novel.kind.modules ?? []).flatMap((m) => m.shelfActions ?? []);

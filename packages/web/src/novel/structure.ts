@@ -99,6 +99,12 @@ export function stepMove(novel: Book, id: string, direction: -1 | 1): { index: n
   return { index: direction < 0 ? next.childIds.length : 0, to: next.id };
 }
 
+/**
+ * A step up (-1) or down (1) on the screen, in reading order: the other way where the book's lists
+ * are newest first, as a journal's tree is (`listedOrder`).
+ */
+export const listedStep = (novel: Book, shown: -1 | 1): -1 | 1 => (novel.kind.newestFirst ? (-shown as -1 | 1) : shown);
+
 /** Moving `id` to just before or after `target`, an item of the same kind: the server's index and container. */
 export function dropMove(novel: Book, id: string, target: string, after: boolean): { index: number; to: string | null } | undefined {
   const at = siblingsOf(novel, target);
@@ -151,13 +157,15 @@ export function useStructure(novelId: string, novel: Book, workspace: Workspace)
       enqueue(novelId, () => run("move it", () => m.move(novelId, id, index, to), () => `Moved “${name(id)}” to ${where(to)}, position ${index + 1}.`)),
     // Each step is worked out when its turn comes, from the model as the moves before it left it:
     // two quick presses move two places, not one twice.
-    step: (id: string, direction: -1 | 1) =>
+    // `direction` is in reading order; `shown`, where the list is newest first (a journal's tree), is
+    // the way it went on the screen, which is what's announced.
+    step: (id: string, direction: -1 | 1, shown: -1 | 1 = direction) =>
       enqueue(novelId, async () => {
         const now = queryClient.getQueryData<{ novel: Book }>(keys.novel(novelId))?.novel ?? novel;
         const target = stepMove(now, id, direction);
         if (!target) return undefined;
         const into = target.to !== siblingsOf(now, id)?.container ? ` into “${(target.to && itemOf(now, target.to)?.title) || ""}”` : "";
-        return run("move it", () => m.move(novelId, id, target.index, target.to), () => `Moved “${name(id)}” ${direction < 0 ? "up" : "down"}${into}.`);
+        return run("move it", () => m.move(novelId, id, target.index, target.to), () => `Moved “${name(id)}” ${shown < 0 ? "up" : "down"}${into}.`);
       }),
     rename: (id: string, title: string) => run("rename it", () => m.rename(novelId, id, title), () => `Renamed to “${title}”.`),
     /** `stay`: added from a list of them, which goes on showing, and says so itself. */

@@ -1,4 +1,4 @@
-import { countWords, pieceLevel, sectionById, vocabulary, type Book, type LevelDef, type Section } from "@writer/core";
+import { countWords, listedOrder, pieceLevel, sectionById, vocabulary, type Book, type LevelDef, type Section } from "@writer/core";
 import { ChevronDown, ChevronRight, Ellipsis, FilePlus, FolderPlus, History, Layers, Plus } from "lucide-react";
 import { ContextMenu, DropdownMenu } from "radix-ui";
 import { memo, useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
@@ -6,7 +6,7 @@ import { useNavigate } from "react-router";
 import { Button } from "../ui/button.tsx";
 import { cn } from "../ui/cn.ts";
 import { chapterTitle } from "./navigation.tsx";
-import { dropMove, newSectionPlace, openSection, stepMove, usableLevels, useStructure, type ItemKind, type Structure } from "./structure.ts";
+import { dropMove, listedStep, newSectionPlace, openSection, stepMove, usableLevels, useStructure, type ItemKind, type Structure } from "./structure.ts";
 import type { Workspace } from "./workspace.ts";
 import { StructureDialogs, type StructureDialog } from "./structure-dialogs.tsx";
 
@@ -21,9 +21,11 @@ interface TreeNode {
   title: string;
   level: number;
   parent: string | null;
-  /** Position among siblings, 1-based, and how many there are (aria-posinset/setsize). */
+  /** Position among siblings as listed, 1-based, and how many there are (aria-posinset/setsize). */
   pos: number;
   size: number;
+  /** Whether it's the last of its siblings in reading order, whichever way they're listed. */
+  last: boolean;
   words: number;
   hasChildren: boolean;
 }
@@ -38,7 +40,6 @@ type Dialog = StructureDialog;
  */
 export function ManuscriptTree({ novelId, novel, structure, current }: { novelId: string; novel: Book; structure: Structure; current: string | undefined }) {
   const navigate = useNavigate();
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [focused, setFocused] = useState<string>();
   const [dialog, setDialog] = useState<Dialog>();
   const [drop, setDrop] = useState<{ id: string; at: "before" | "after" | "inside" }>();
@@ -59,16 +60,18 @@ export function ManuscriptTree({ novelId, novel, structure, current }: { novelId
   const all = useMemo(() => {
     const out: TreeNode[] = [];
     const words = new Map(novel.allPieces.map((s) => [s.id, countWords(s.body)]));
-    /** Sections in a list, each followed by what it holds; returns their words. */
+    /** Sections in a list (in reading order), each followed by what it holds, as listed; returns their words. */
     const sectionNodes = (sections: Section[], level: number, parent: string | null): number => {
       let total = 0;
-      sections.forEach((s, i) => {
+      const lastSection = sections.at(-1);
+      listedOrder(novel, sections).forEach((s, i) => {
         const at = out.length;
-        out.push({ id: s.id, kind: s.level, role: s.level === inner ? "inner" : "outer", title: chapterTitle(novel, s), level, parent, pos: i + 1, size: sections.length, words: 0, hasChildren: false });
+        out.push({ id: s.id, kind: s.level, role: s.level === inner ? "inner" : "outer", title: chapterTitle(novel, s), level, parent, pos: i + 1, size: sections.length, last: s === lastSection, words: 0, hasChildren: false });
         let n = 0;
         if (s.level === inner) {
           const pieces = s.childIds.map((id) => novel.allPieces.find((p) => p.id === id)).filter((p) => p !== undefined);
-          pieces.forEach((p, j) => out.push({ id: p.id, kind: piece.key, role: "piece", title: p.title, level: level + 1, parent: s.id, pos: j + 1, size: pieces.length, words: words.get(p.id) ?? 0, hasChildren: false }));
+          const lastPiece = pieces.at(-1);
+          listedOrder(novel, pieces).forEach((p, j) => out.push({ id: p.id, kind: piece.key, role: "piece", title: p.title, level: level + 1, parent: s.id, pos: j + 1, size: pieces.length, last: p === lastPiece, words: words.get(p.id) ?? 0, hasChildren: false }));
           n = pieces.reduce((w, p) => w + (words.get(p.id) ?? 0), 0);
           out[at]!.hasChildren = pieces.length > 0;
         } else {
@@ -84,6 +87,27 @@ export function ManuscriptTree({ novelId, novel, structure, current }: { novelId
     sectionNodes(novel.sections.filter((s) => !s.parentId), 1, null);
     return out;
   }, [novel, inner, piece.key]);
+
+  /** The item and the sections it's in. */
+  const pathTo = (id: string | undefined): string[] => {
+    const path: string[] = [];
+    for (let n = all.find((x) => x.id === id); n; n = n.parent ? all.find((x) => x.id === n!.parent) : undefined) path.push(n.id);
+    return path;
+  };
+  // A book listed newest first (a journal) opens folded but for the month being written in, else the
+  // newest: a year of months open would put today a long scroll down. Others open all unfolded.
+  const newestFirst = novel.kind.newestFirst === true;
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => {
+    if (!newestFirst) return new Set();
+    const open = new Set(pathTo(current && all.some((n) => n.id === current) ? current : all.find((n) => n.role === "inner")?.id));
+    return new Set(all.filter((n) => n.hasChildren && !open.has(n.id)).map((n) => n.id));
+  });
+  // There, going to an entry elsewhere (from the calendar, the journal page) unfolds its month.
+  useEffect(() => {
+    if (!newestFirst || !current) return;
+    const path = pathTo(current);
+    setCollapsed((c) => (path.some((id) => c.has(id)) ? new Set([...c].filter((id) => !path.includes(id))) : c));
+  }, [current, newestFirst]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Visible: everything whose ancestors are all expanded.
   const visible = useMemo(() => {
@@ -144,7 +168,8 @@ export function ManuscriptTree({ novelId, novel, structure, current }: { novelId
     if (e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
       e.preventDefault();
       refocus.current = n.id;
-      void Promise.resolve(structure.step(n.id, e.key === "ArrowUp" ? -1 : 1)).finally(() => setTimeout(() => (refocus.current = undefined), 1000));
+      const shown = e.key === "ArrowUp" ? -1 : 1;
+      void Promise.resolve(structure.step(n.id, listedStep(novel, shown), shown)).finally(() => setTimeout(() => (refocus.current = undefined), 1000));
       return;
     }
     switch (e.key) {
@@ -219,15 +244,16 @@ export function ManuscriptTree({ novelId, novel, structure, current }: { novelId
       void structure.move(id, list.filter((x) => x !== id).length, target.id);
       return;
     }
-    const move = dropMove(novel, id, target.id, target.at === "after");
+    // Below an item on the screen is before it in reading order where the list is newest first.
+    const move = dropMove(novel, id, target.id, (target.at === "after") !== newestFirst);
     if (move) void structure.move(id, move.index, move.to);
   };
 
   /** What can be done to an item: the right-click menu and the toolbar's ⋯ menu both list these. */
   type Action = { label: string; keys?: string; disabled?: boolean; danger?: boolean; run: () => void } | "separator";
   const actions = (n: TreeNode): Action[] => {
-    const up = stepMove(novel, n.id, -1);
-    const down = stepMove(novel, n.id, 1);
+    const up = stepMove(novel, n.id, listedStep(novel, -1));
+    const down = stepMove(novel, n.id, listedStep(novel, 1));
     const chapterOf = n.role === "piece" ? n.parent : n.role === "inner" ? n.id : null;
     const child = childLevel(n.kind);
     // Where it can move to: a piece to another section that holds pieces, a section to another of the level above.
@@ -239,10 +265,10 @@ export function ManuscriptTree({ novelId, novel, structure, current }: { novelId
       ...(n.role === "outer" && child ? [{ label: `New ${w.level(child.key).one} at the start`, run: () => setDialog({ kind: "new-section", level: child, parent: n.id, after: null }) }] : []),
       ...(n.role !== "piece" ? [{ label: `New ${w.of(n.kind).one} after this`, run: () => setDialog({ kind: "new-section", level: levelOf(n.kind)!, parent: n.parent, after: n.id }) }] : []),
       "separator",
-      { label: "Move up", keys: "Alt+↑", disabled: !up, run: () => void structure.step(n.id, -1) },
-      { label: "Move down", keys: "Alt+↓", disabled: !down, run: () => void structure.step(n.id, 1) },
+      { label: "Move up", keys: "Alt+↑", disabled: !up, run: () => void structure.step(n.id, listedStep(novel, -1), -1) },
+      { label: "Move down", keys: "Alt+↓", disabled: !down, run: () => void structure.step(n.id, listedStep(novel, 1), 1) },
       ...(moveTo ? [{ label: `Move to ${w.level(moveTo).one}…`, run: () => setDialog({ kind: "move", id: n.id }) }] : []),
-      ...(n.role === "piece" && n.pos < n.size ? [{ label: `Merge with the next ${w.piece.one}`, run: () => void structure.merge(n.id) }] : []),
+      ...(n.role === "piece" && !n.last ? [{ label: `Merge with the next ${w.piece.one}`, run: () => void structure.merge(n.id) }] : []),
       "separator",
       { label: "Delete", keys: "Del", danger: true, run: () => void structure.remove(n.id) },
     ];

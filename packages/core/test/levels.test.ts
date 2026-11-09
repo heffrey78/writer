@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { chapterTitle, sceneColumns } from "../src/diagrams.ts";
-import { compileBook, loadBook, memorySource, pieceSections, schemaFor, sectionById, sectionsAt, validateBook, type Book, type BookKind } from "../src/index.ts";
+import { compileBook, listedOrder, loadBook, memorySource, pieceSections, schemaFor, sectionById, sectionsAt, validateBook, type Book, type BookKind } from "../src/index.ts";
 import { diary, lines, pieceFile, saga } from "./kinds.ts";
 
 /** Levels from the kind (#24): books with one level, and with three, load, validate and compile. */
@@ -68,6 +68,19 @@ const A_SAGA = {
   "manuscript/01-the-north/02-spring/01-thaw/_chapter.yaml": lines("id: ch_000002", "scenes: [sc_000003]"),
   "manuscript/01-the-north/02-spring/01-thaw/01-meltwater.md": pieceFile("sc_000003", "Meltwater"),
 };
+
+describe("the order a kind's lists are in (#130)", () => {
+  it("is reading order, unless the kind reads its pieces newest first, and the book keeps reading order either way", async () => {
+    const book = await load(diary, A_DIARY);
+    const titles = (b: Book) => listedOrder(b, pieceSections(b)).map((s) => s.title ?? s.id);
+    expect(titles(book)).toEqual(["March", "mon_000002"]);
+    const newest = await load({ ...diary, newestFirst: true }, A_DIARY);
+    expect(titles(newest)).toEqual(["mon_000002", "March"]);
+    expect(listedOrder(newest, pieceSections(newest)[0]!.childIds)).toEqual(["day_000002", "day_000001"]);
+    expect(pieceSections(newest).map((s) => s.id)).toEqual(["mon_000001", "mon_000002"]);
+    expect(pieceSections(newest)[0]!.childIds).toEqual(["day_000001", "day_000002"]);
+  });
+});
 
 describe("a kind with three levels (a saga: volumes, parts, chapters)", () => {
   it("loads every level, each section before what it holds", async () => {

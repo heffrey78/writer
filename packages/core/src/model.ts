@@ -203,6 +203,12 @@ export const sectionsAt = (book: Book, level: string) => book.sections.filter((s
 /** The sections that hold the pieces (a novel's chapters), in reading order. */
 export const pieceSections = (book: Book) => sectionsAt(book, pieceLevel(book));
 
+/**
+ * Sections or pieces in the order they're listed to go to one: newest first in a kind whose pieces are
+ * read so (a journal's), else in reading order. The book's order files keep reading order either way.
+ */
+export const listedOrder = <T>(book: Book, list: readonly T[]): T[] => (book.kind.newestFirst ? [...list].reverse() : [...list]);
+
 /** The sections one level out from the pieces' (a novel's parts), in reading order: none in a book without that level. */
 export function outerSections(book: Book): Section[] {
   const level = book.kind.levels.at(-2);

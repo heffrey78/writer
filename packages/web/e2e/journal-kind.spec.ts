@@ -27,16 +27,71 @@ async function open(page: Page, app: App) {
   return dir;
 }
 
+/** A month folded in the tree, unfolded from the keyboard. */
+async function unfold(page: Page, month: string) {
+  const item = page.getByRole("tree").getByRole("treeitem", { name: new RegExp(`^${month},`) });
+  await item.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(item).toHaveAttribute("aria-expanded", "true");
+}
+
 test("opens on its journal page, in its months and entries, in a journal's words", async ({ page, app }) => {
   await open(page, app);
   await expect(page.getByRole("heading", { level: 1, name: "Journal" })).toBeVisible();
   const tree = page.getByRole("tree");
-  for (const name of ["2026", "September", "October", "Monday, 28 September", "Thursday, 1 October"]) await expect(tree.getByRole("treeitem", { name, exact: false }).first()).toBeVisible();
+  for (const name of ["2026", "October", "Thursday, 1 October", "September"]) await expect(tree.getByRole("treeitem", { name, exact: false }).first()).toBeVisible();
   await expect(page.locator("body")).not.toContainText(novelWords);
   for (const colorScheme of ["light", "dark"] as const) {
     await page.emulateMedia({ colorScheme });
     await axe(page);
   }
+});
+
+test("its tree lists the newest month and entry first, the older months folded, as on a phone (#130)", async ({ page, app }) => {
+  const dir = await open(page, app);
+  const orderFiles = ["entries/_order.yaml", "entries/01-2026/_year.yaml", "entries/01-2026/01-september/_month.yaml", "entries/01-2026/02-october/_month.yaml"];
+  const stored = orderFiles.map((f) => readFileSync(join(dir, f), "utf8"));
+  const tree = page.getByRole("tree");
+  const listed = () => tree.getByRole("treeitem").evaluateAll((items) => items.map((i) => i.getAttribute("aria-label")!.replace(/, [\d,]+ words$/, "")));
+  await expect.poll(listed).toEqual(["2026", "October", "Sunday, 4 October", "Saturday, 3 October", "Thursday, 1 October", "September"]);
+  const item = (name: string) => tree.getByRole("treeitem", { name: new RegExp(`^${name},`) });
+  await expect(item("October")).toHaveAttribute("aria-expanded", "true");
+  await expect(item("September")).toHaveAttribute("aria-expanded", "false");
+  await expect(item("October")).toHaveAttribute("aria-posinset", "1");
+  await expect(item("Sunday, 4 October")).toHaveAttribute("aria-posinset", "1");
+
+  // The keyboard walks it as listed, newest to oldest.
+  await item("2026").focus();
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("ArrowDown");
+  await expect(item("Sunday, 4 October")).toBeFocused();
+  await page.keyboard.press("End");
+  await expect(item("September")).toBeFocused();
+  await page.keyboard.press("ArrowRight");
+  await expect.poll(listed).toEqual(["2026", "October", "Sunday, 4 October", "Saturday, 3 October", "Thursday, 1 October", "September", "Wednesday, 30 September", "Monday, 28 September"]);
+  for (const colorScheme of ["light", "dark"] as const) {
+    await page.emulateMedia({ colorScheme });
+    await axe(page);
+  }
+  // Only shown so: the book's order files are as they were.
+  expect(orderFiles.map((f) => readFileSync(join(dir, f), "utf8"))).toEqual(stored);
+
+  // Going to an entry elsewhere unfolds its month, folded again here.
+  await item("September").focus();
+  await page.keyboard.press("ArrowLeft");
+  await expect(item("September")).toHaveAttribute("aria-expanded", "false");
+  await page.getByRole("navigation", { name: "Views" }).getByRole("link", { name: "Calendar" }).click();
+  await page.getByRole("button", { name: "Earlier month" }).click();
+  await page.getByRole("table").getByRole("link", { name: /28 September/ }).first().click();
+  await expect(item("September")).toHaveAttribute("aria-expanded", "true");
+  await expect(item("Monday, 28 September")).toHaveAttribute("aria-selected", "true");
+
+  // Moving up moves it up the screen: Thursday above Saturday, so after it in reading order.
+  await item("Thursday, 1 October").focus();
+  await page.keyboard.press("Alt+ArrowUp");
+  await expect(page.getByRole("status").filter({ has: page.getByRole("button", { name: "Dismiss" }) })).toContainText("Moved “Thursday, 1 October” up.");
+  await expect.poll(listed).toEqual(["2026", "October", "Sunday, 4 October", "Thursday, 1 October", "Saturday, 3 October", "September", "Wednesday, 30 September", "Monday, 28 September"]);
+  await expect.poll(() => readFileSync(join(dir, orderFiles[3]!), "utf8")).toContain("entries: [ent_03ctb0, ent_01ctb0, ent_04ctb0]");
 });
 
 test("its sidebar looks back first, then at its people and places, with no outline or comparing", async ({ page, app }) => {
@@ -54,6 +109,7 @@ test("its sidebar looks back first, then at its people and places, with no outli
 
 test("an entry's card says what the rest of the journal says about it, in a journal's words", async ({ page, app }) => {
   await open(page, app);
+  await unfold(page, "September");
   await page.getByRole("tree").getByRole("treeitem", { name: "Monday, 28 September" }).click();
   const facts = page.getByRole("region", { name: /^Details of/ }).getByRole("region", { name: "From the journal" });
   await expect(facts.getByRole("listitem").first()).toBeVisible();

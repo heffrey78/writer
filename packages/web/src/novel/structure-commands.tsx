@@ -2,7 +2,7 @@ import { pieceLevel, sectionById, vocabulary, type Book, type LevelDef } from "@
 import { memo, useState } from "react";
 import { useCommands, type Command } from "../commands.ts";
 import { StructureDialogs, type StructureDialog } from "./structure-dialogs.tsx";
-import { itemOf, newSectionPlace, openSection, siblingsOf, usableLevels, useStructure } from "./structure.ts";
+import { itemOf, listedStep, newSectionPlace, openSection, siblingsOf, usableLevels, useStructure } from "./structure.ts";
 import type { Workspace } from "./workspace.ts";
 
 /**
@@ -34,8 +34,8 @@ export const StructureCommands = memo(function StructureCommands({ novelId, nove
       ...(here
         ? [
             { id: "tree.rename", title: `Rename ${w.of(here.kind).one}…`, group: w.content.One, keys: "F2", run: () => setDialog({ kind: "rename", id: here.id, title: sectionById(novel, here.id)?.title ?? itemOf(novel, here.id)?.title ?? "" }) },
-            { id: "tree.up", title: `Move ${w.of(here.kind).one} up`, group: w.content.One, keys: "Alt-ArrowUp", run: () => void structure.step(here.id, -1) },
-            { id: "tree.down", title: `Move ${w.of(here.kind).one} down`, group: w.content.One, keys: "Alt-ArrowDown", run: () => void structure.step(here.id, 1) },
+            { id: "tree.up", title: `Move ${w.of(here.kind).one} up`, group: w.content.One, keys: "Alt-ArrowUp", run: () => void structure.step(here.id, listedStep(novel, -1), -1) },
+            { id: "tree.down", title: `Move ${w.of(here.kind).one} down`, group: w.content.One, keys: "Alt-ArrowDown", run: () => void structure.step(here.id, listedStep(novel, 1), 1) },
             ...(here.role === "piece" ? [{ id: "tree.moveTo", title: `Move ${w.piece.one} to ${w.level(inner).one}…`, group: w.content.One, run: () => setDialog({ kind: "move", id: here.id }) }] : []),
             ...(here.role === "piece" && here.pos < here.size ? [{ id: "tree.merge", title: `Merge ${w.piece.one} with the next`, group: w.content.One, run: () => void structure.merge(here.id) }] : []),
             { id: "tree.delete", title: `Delete ${w.of(here.kind).one}`, group: w.content.One, keys: "Delete", run: () => void structure.remove(here.id) },
