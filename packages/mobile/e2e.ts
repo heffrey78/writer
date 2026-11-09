@@ -58,14 +58,14 @@ async function tapAndroid(text: RegExp) {
 
 /** Long-press the first `word` in `page`'s element `selector`, at its place on the screen. */
 async function longPress(page: Page, selector: string, word: string) {
-  // Measured once it holds still: the page scrolls as the keyboard comes up.
+  // Measured once it holds still: the page scrolls as the keyboard comes up, and can pause for a
+  // frame or two on the way, so one unchanged reading isn't enough. A second without moving is.
   let at = await where(page, selector, word);
-  for (let i = 0; i < 20; i++) {
+  for (let i = 0, still = 0; i < 40 && still < 4; i++) {
     await sleep(250);
     const now = await where(page, selector, word);
-    const still = now.x === at.x && now.y === at.y;
+    still = now.x === at.x && now.y === at.y ? still + 1 : 0;
     at = now;
-    if (still) break;
   }
   const view = androidUi().find((n) => n.cls === "android.webkit.WebView")!;
   const x = Math.round(view.x1 + at.x * at.dpr);
