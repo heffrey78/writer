@@ -29,6 +29,10 @@ const wordsNow = async (dir: string) => (await loadBook(nodeSource(dir))).allPie
 describe("writingHistory", { timeout: 30_000 }, () => {
   it("counts each day's words added and removed from the commits, on the writer's own date", async () => {
     const dir = novelRepo(fresh("novel"));
+    // The book's first commit is dated before the edits below, whatever today's date: made today,
+    // it sorted after them once today passed 3 November 2026, and the days came out shifted.
+    const before = "2026-10-31T12:00:00-04:00";
+    execFileSync("git", ["-C", dir, "commit", "-q", "--amend", "--no-edit", "--date", before], { env: { ...process.env, GIT_COMMITTER_DATE: before } });
     const start = await wordsNow(dir);
     edit(dir, RIVET, "walk across.", "walk across. One two three.");
     // The synopsis, in the front matter, isn't the story: it doesn't count.
