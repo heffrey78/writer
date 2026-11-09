@@ -215,7 +215,7 @@ export function NotePage({
           The note
         </h2>
         {file ? (
-          <div ref={prose} className="-mx-1 rounded-md px-1 focus-within:bg-panel/60">
+          <div ref={prose}>
             <SceneEditor
               key={note.file}
               sceneId={note.file}

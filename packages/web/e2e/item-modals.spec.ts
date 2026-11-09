@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Page } from "@playwright/test";
-import { axe, caretAtEnd, expect, openView, palette, test, type App } from "./fixtures.ts";
+import { axe, caretAtEnd, expect, openView, palette, proseOnItsGround, test, type App } from "./fixtures.ts";
 
 /** Notes, off-page events and entries open as a modal over their gallery (heffrey78/gh-writer#233), their parts saved on leaving them (heffrey78/gh-writer#234). */
 
@@ -206,6 +206,8 @@ test("an entry: made in its modal by a type and a name, its profile in place; Ne
     await page.emulateMedia({ colorScheme });
     await axe(page);
   }
+  // Its notes are written on the modal's own ground, the caret in them or not (#127).
+  await proseOnItsGround(page, mill.getByRole("textbox", { name: "Notes on The Mill" }), mill, mill.getByRole("button", { name: "Add a summary" }));
   await mill.getByRole("button", { name: "Add a summary" }).click();
   await page.keyboard.type("Where the flour came from.");
   await page.mouse.click(4, 4);

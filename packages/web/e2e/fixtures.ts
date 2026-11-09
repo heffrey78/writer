@@ -178,6 +178,41 @@ export async function caretAtEnd(page: Page, box: Locator) {
   }).toPass({ timeout: 5_000 });
 }
 
+/**
+ * Prose written on the ground around it, as a scene is in the writing view (#127): nothing from the text box up to
+ * `ground` paints a background of its own, so what shows behind the words is the ground's, with the caret in them
+ * and with the focus `elsewhere`, in light and dark. axe audits it with the caret in.
+ */
+export async function proseOnItsGround(page: Page, box: Locator, ground: Locator, elsewhere: Locator) {
+  for (const colorScheme of ["light", "dark"] as const) {
+    await page.emulateMedia({ colorScheme });
+    await caretAtEnd(page, box);
+    await expectNothingPainted(box, ground);
+    await axe(page);
+    await elsewhere.focus();
+    await expect(box).not.toBeFocused();
+    await expectNothingPainted(box, ground);
+  }
+  await page.emulateMedia({ colorScheme: "light" });
+}
+
+async function expectNothingPainted(box: Locator, ground: Locator) {
+  const painted = await box.evaluate(
+    (el, ground) => {
+      const found: string[] = [];
+      let at: Element | null = el;
+      for (; at && at !== ground; at = at.parentElement) {
+        const background = getComputedStyle(at).backgroundColor;
+        if (background !== "rgba(0, 0, 0, 0)" && background !== "transparent") found.push(`${at.tagName.toLowerCase()}.${at.className}: ${background}`);
+      }
+      if (!at) found.push("the ground isn't around the text box");
+      return found;
+    },
+    await ground.elementHandle(),
+  );
+  expect(painted).toEqual([]);
+}
+
 /** Open the app with its launch URL, and wait until it has traded the token for a session. */
 export async function launch(page: Page, app: App, path = "/") {
   await page.goto(app.launchUrl.replace("/?", `${path}?`));

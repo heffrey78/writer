@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Page } from "@playwright/test";
-import { axe, caretAtEnd, expect, palette, test, type App } from "./fixtures.ts";
+import { axe, caretAtEnd, expect, palette, proseOnItsGround, test, type App } from "./fixtures.ts";
 
 /** The writer's notes (heffrey78/gh-writer#205). */
 
@@ -35,6 +35,8 @@ test("a note's page: its title, tags and prose edited in place, mentions include
 
   // The prose, with a mention.
   const prose = page.getByRole("textbox", { name: "Note: What if Ben never sold the plans?" });
+  // On the modal's own ground, the caret in it or not: no box appears around the words (#127).
+  await proseOnItsGround(page, prose, page.getByRole("dialog"), page.getByRole("button", { name: "Edit title" }));
   await caretAtEnd(page, prose);
   await page.keyboard.type(" Ask @tomas");
   await expect(page.getByRole("listbox", { name: "Mention suggestions" })).toBeVisible();

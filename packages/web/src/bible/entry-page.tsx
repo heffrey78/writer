@@ -269,20 +269,18 @@ export function EntryPage({
         </h2>
         {file ? (
           // Prose that edits in place, as part of the page.
-          <div className="-mx-1 rounded-md px-1 focus-within:bg-panel/60">
-            <SceneEditor
-              key={entity.file}
-              sceneId={entity.file}
-              label={`Notes on ${entity.name}`}
-              placeholder="Backstory, voice, anything worth remembering…"
-              markdown={file.body}
-              onChange={(md) => workspace.change(entity.file, md)}
-              entities={mentions}
-              pictureUrl={(path) => imageUrl(novelId, path)}
-              className={cn("ghw-notes", tab && "[--ghw-prose-size:1rem]")}
-              {...(spell ? { spell } : {})}
-            />
-          </div>
+          <SceneEditor
+            key={entity.file}
+            sceneId={entity.file}
+            label={`Notes on ${entity.name}`}
+            placeholder="Backstory, voice, anything worth remembering…"
+            markdown={file.body}
+            onChange={(md) => workspace.change(entity.file, md)}
+            entities={mentions}
+            pictureUrl={(path) => imageUrl(novelId, path)}
+            className={cn("ghw-notes", tab && "[--ghw-prose-size:1rem]")}
+            {...(spell ? { spell } : {})}
+          />
         ) : (
           <p className="text-sm text-muted">Opening…</p>
         )}

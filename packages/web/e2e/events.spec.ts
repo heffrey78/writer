@@ -2,7 +2,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Page } from "@playwright/test";
 import { asFormatV1 } from "../../server/test/fixtures.ts";
-import { axe, caretAtEnd, expect, selectionSettled, test, type App } from "./fixtures.ts";
+import { axe, caretAtEnd, expect, proseOnItsGround, selectionSettled, test, type App } from "./fixtures.ts";
 
 /** Off-page events as pages of their own (heffrey78/gh-writer#165, heffrey78/gh-writer#210). */
 
@@ -70,6 +70,7 @@ test("an event's page: read first, each part edited in place by keyboard, its no
 
   // The note is prose, written in place.
   const note = page.getByRole("textbox", { name: "Note on The flood of '09" });
+  await proseOnItsGround(page, note, modal, page.getByRole("button", { name: "Edit when and how long" }));
   await caretAtEnd(page, note);
   await page.keyboard.type(" Ada was eleven.");
   await expect.poll(file).toMatch(/\n---\n\n?The father holds the seventh pier through the night and dies of pneumonia a week later\. Ada was eleven\.\n$/);

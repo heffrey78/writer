@@ -229,20 +229,18 @@ export function EventPage({
           Note
         </h2>
         {file ? (
-          <div className="-mx-1 rounded-md px-1 focus-within:bg-panel/60">
-            <SceneEditor
-              key={event.file}
-              sceneId={event.file}
-              label={`Note on ${event.title}`}
-              placeholder="What happens, and why it matters…"
-              markdown={file.body}
-              onChange={(md) => workspace.change(event.file, md)}
-              entities={mentions}
-              pictureUrl={(path) => imageUrl(novelId, path)}
-              className="ghw-notes"
-              {...(spell ? { spell } : {})}
-            />
-          </div>
+          <SceneEditor
+            key={event.file}
+            sceneId={event.file}
+            label={`Note on ${event.title}`}
+            placeholder="What happens, and why it matters…"
+            markdown={file.body}
+            onChange={(md) => workspace.change(event.file, md)}
+            entities={mentions}
+            pictureUrl={(path) => imageUrl(novelId, path)}
+            className="ghw-notes"
+            {...(spell ? { spell } : {})}
+          />
         ) : own ? (
           <p className="text-sm text-muted">Opening…</p>
         ) : (

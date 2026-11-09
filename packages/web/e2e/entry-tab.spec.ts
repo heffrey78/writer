@@ -1,4 +1,4 @@
-import { axe, expect, test } from "./fixtures.ts";
+import { axe, expect, proseOnItsGround, test } from "./fixtures.ts";
 
 test("the Entry tab: a sheet to read, Back and Forward through names opened, a pin to keep it, the form in place", async ({ page, app }) => {
   await app.restart(app.novelRepo("varn"));
@@ -26,6 +26,8 @@ test("the Entry tab: a sheet to read, Back and Forward through names opened, a p
   await page.emulateMedia({ colorScheme: "dark" });
   await axe(page);
   await page.emulateMedia({ colorScheme: "light" });
+  // Its notes are written on the sidebar's own ground, the caret in them or not (#127).
+  await proseOnItsGround(page, ada.getByRole("textbox", { name: "Notes on Ada Varn" }), sidebar, ada.getByRole("button", { name: "Edit occupation" }));
 
   // Another, then Back and Forward.
   await sceneTab.click();
