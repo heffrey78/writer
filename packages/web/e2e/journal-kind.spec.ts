@@ -216,6 +216,44 @@ test("written where it's read: today on top, made with its first words, and earl
   await expect(page.getByRole("textbox", { name: "Entry text", exact: true })).toContainText("Rain at dusk.");
 });
 
+test("typewriter scrolling keeps the caret in today's entry, its words close under its date and the entries close beneath it", async ({ page, app }) => {
+  await open(page, app);
+  const entries = page.getByRole("list", { name: "Journal" }).getByRole("article");
+  // One entry's text ends a short gap above the next entry, without the writing view's room below the text.
+  const sunday = entries.nth(1).getByRole("textbox").locator(":scope > *").last();
+  await expect(sunday).toBeVisible();
+  const end = (await sunday.boundingBox())!;
+  const next = (await entries.nth(2).boundingBox())!;
+  expect(next.y - (end.y + end.height)).toBeLessThan(80);
+
+  /** The caret line's middle, as a fraction of the height of the area the text scrolls in. */
+  const caretHeight = () =>
+    page.evaluate(() => {
+      const range = window.getSelection()!.getRangeAt(0);
+      const caret = range.getClientRects()[0] ?? range.getBoundingClientRect();
+      let area = document.activeElement as HTMLElement | null;
+      while (area && !(getComputedStyle(area).overflowY === "auto" && area.scrollHeight > area.clientHeight)) area = area.parentElement;
+      const top = area ? area.getBoundingClientRect().top : 0;
+      return ((caret.top + caret.bottom) / 2 - top) / (area ? area.clientHeight : window.innerHeight);
+    });
+  await selectionSettled(page);
+  // Lines enough above the caret for it to reach its line.
+  for (let i = 0; i < 8; i++) await page.keyboard.type(`${i ? "\n" : ""}Fog on the water till noon, hour ${i + 1}.`);
+  await page.keyboard.press("ControlOrMeta+Shift+L");
+  await expect(begin(page)).toHaveClass(/ghw-typewriter/);
+  await expect.poll(caretHeight).toBeCloseTo(0.4, 1);
+  await expect(begin(page)).toBeFocused();
+  // Its words begin just under its date, with no room for the caret's line between them.
+  const date = (await entries.first().locator("time").boundingBox())!;
+  const first = (await begin(page).locator(":scope > *").first().boundingBox())!;
+  expect(first.y - (date.y + date.height)).toBeLessThan(80);
+  // Off again: the caret stays where it was on the screen.
+  await page.keyboard.press("ControlOrMeta+Shift+L");
+  await expect(begin(page)).not.toHaveClass(/ghw-typewriter/);
+  await page.waitForTimeout(100);
+  expect(await caretHeight()).toBeCloseTo(0.4, 1);
+});
+
 test("today's place, left untouched, makes nothing", async ({ page, app }) => {
   const dir = await open(page, app);
   const head = app.git(dir, "rev-parse", "HEAD");

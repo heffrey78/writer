@@ -88,6 +88,9 @@ describe("writing modes", () => {
 });
 
 describe("typewriter scrolling", () => {
+  // The writer's caret is the focused editor's; jsdom's detached editors never have the focus.
+  beforeEach(() => void vi.spyOn(editor.view, "hasFocus").mockReturnValue(true));
+
   test("scrolls so the caret line sits at the typewriter height", () => {
     const scrollBy = vi.spyOn(window, "scrollBy").mockImplementation(() => {});
     vi.spyOn(editor.view, "coordsAtPos").mockReturnValue({ top: 900, bottom: 920, left: 0, right: 0 });
@@ -125,5 +128,37 @@ describe("typewriter scrolling", () => {
     expect(scrollBy).not.toHaveBeenCalled();
     editor.view.dispatch(editor.state.tr.insertText("x"));
     expect(scrollBy).toHaveBeenCalledTimes(1);
+  });
+
+  test("only the editor with the focus scrolls: a journal's page has an editor for each entry", () => {
+    const other = new Editor({ element: document.createElement("div"), extensions: [...proseContent, WritingModesExtension] });
+    try {
+      loadMarkdown(other, "Yesterday's entry.\n");
+      vi.spyOn(other.view, "hasFocus").mockReturnValue(false);
+      vi.spyOn(window, "requestAnimationFrame").mockImplementation((run) => (run(0), 0));
+      const scrollBy = vi.spyOn(window, "scrollBy").mockImplementation(() => {});
+      vi.spyOn(editor.view, "coordsAtPos").mockReturnValue({ top: 600, bottom: 620, left: 0, right: 0 });
+      vi.spyOn(other.view, "coordsAtPos").mockReturnValue({ top: 1500, bottom: 1520, left: 0, right: 0 });
+      writingModes.getState().set({ typewriter: true });
+      other.view.dispatch(other.state.tr.insertText("x", 1));
+      for (const call of scrollBy.mock.calls as unknown[][]) expect(call).toEqual([{ top: 610 - window.innerHeight * TYPEWRITER_LINE, behavior: "instant" }]);
+      expect(scrollBy).toHaveBeenCalled();
+    } finally {
+      other.destroy();
+    }
+  });
+
+  test("turning it on or off keeps the caret where it was on the screen", () => {
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation(() => 0);
+    const scrollBy = vi.spyOn(window, "scrollBy").mockImplementation(() => {});
+    // The room above the text pushes the caret 300px down the screen.
+    vi.spyOn(editor.view, "coordsAtPos").mockImplementation(() => {
+      const top = editor.view.dom.classList.contains("ghw-typewriter") ? 500 : 200;
+      return { top, bottom: top + 20, left: 0, right: 0 };
+    });
+    writingModes.getState().set({ typewriter: true });
+    expect(scrollBy).toHaveBeenLastCalledWith({ top: 300, behavior: "instant" });
+    writingModes.getState().set({ typewriter: false });
+    expect(scrollBy).toHaveBeenLastCalledWith({ top: -300, behavior: "instant" });
   });
 });

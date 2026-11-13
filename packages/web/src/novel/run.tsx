@@ -183,7 +183,7 @@ export function RunPieces({ run, workspace, label, tools, onFocus, piece: noun }
   const fill = narrow && items[0]?.key === BEGIN;
   return (
     <>
-      <ol ref={list} aria-label={run.heading} className="grid gap-10">
+      <ol ref={list} aria-label={run.heading} className="ghw-run grid gap-10">
         {items.slice(0, shown).map(({ key, piece }, i) => (
           // Each day's place its own: React would give the next day's the component, and the state,
           // of the piece the last one made.

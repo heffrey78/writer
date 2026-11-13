@@ -198,6 +198,17 @@ main[tabindex="-1"]:focus-visible,
   max-width: none;
 }
 
+/* A run of pieces (a journal's entries): the writing view's room below the text belongs at the run's
+   end, not between its pieces, where the pieces beside them give the caret room enough. Typewriter
+   scrolling's room above the text would sit between a piece's header and its words: without it, a
+   piece's first lines sit higher until there's text enough above the caret to bring it to its line. */
+.ghw-run > li:not(:last-child) .ghw-prose {
+  padding-bottom: 0;
+}
+.ghw-run .ghw-prose.ghw-typewriter {
+  padding-top: 2rem;
+}
+
 /* A scene's note just made (heffrey78/gh-writer#222): a moment's outline draws the eye to it, unless motion is unwanted. */
 @media (prefers-reduced-motion: no-preference) {
   .ghw-just-made {

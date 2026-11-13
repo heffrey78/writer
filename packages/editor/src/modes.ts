@@ -181,12 +181,19 @@ function writingModesPlugin(): Plugin {
       sync();
       const unsubscribe = writingModes.subscribe((modes, prev) => {
         if (view.isDestroyed) return;
+        // Typewriter scrolling's room above the text comes and goes with it: the caret stays where
+        // it was on the screen, not pushed down or pulled up by that room.
+        const before = modes.typewriter !== prev.typewriter && view.hasFocus() ? caretLine(view) : undefined;
         sync();
+        const after = before === undefined ? undefined : caretLine(view);
+        if (before !== undefined && after !== undefined) scrollBy(view, after - before);
         if (modes.focus !== prev.focus || modes.dim !== prev.dim) view.dispatch(view.state.tr.setMeta(modesKey, true));
         // The app's chrome comes and goes with focus mode; keep the caret in sight once it has.
+        // Only the writer's caret: a page of several editors (a journal's entries) has one in each,
+        // and each scrolling to its own leaves the page at whichever went last.
         if (modes.focus !== prev.focus || modes.typewriter !== prev.typewriter) {
           requestAnimationFrame(() => {
-            if (view.isDestroyed) return;
+            if (view.isDestroyed || !view.hasFocus()) return;
             if (writingModes.getState().typewriter) centreCaret(view);
             else view.dispatch(view.state.tr.scrollIntoView());
           });
@@ -194,7 +201,7 @@ function writingModesPlugin(): Plugin {
       });
       return {
         update: (view, before) => {
-          if (!writingModes.getState().typewriter) return;
+          if (!writingModes.getState().typewriter || !view.hasFocus()) return;
           const moved = !before.selection.eq(view.state.selection);
           if (view.state.doc !== before.doc || (moved && lastInput === "key")) centreCaret(view);
         },
@@ -214,22 +221,27 @@ function currentParagraph(state: EditorState): DecorationSet {
 
 /** Scroll so the caret line sits at TYPEWRITER_LINE of the scrolling area's height. */
 export function centreCaret(view: EditorView): void {
-  let caret: { top: number; bottom: number };
-  try {
-    caret = view.coordsAtPos(view.state.selection.head);
-  } catch {
-    return; // Not laid out (e.g. hidden).
-  }
-  const line = (caret.top + caret.bottom) / 2;
+  const line = caretLine(view);
+  if (line === undefined) return;
   const scroller = scrollParent(view.dom);
-  if (scroller) {
-    const box = scroller.getBoundingClientRect();
-    const delta = line - (box.top + scroller.clientHeight * TYPEWRITER_LINE);
-    if (Math.abs(delta) >= 1) scroller.scrollBy({ top: delta, behavior: "instant" });
-  } else {
-    const delta = line - window.innerHeight * TYPEWRITER_LINE;
-    if (Math.abs(delta) >= 1) window.scrollBy({ top: delta, behavior: "instant" });
+  const target = scroller ? scroller.getBoundingClientRect().top + scroller.clientHeight * TYPEWRITER_LINE : window.innerHeight * TYPEWRITER_LINE;
+  scrollBy(view, line - target);
+}
+
+/** The caret line's vertical middle in the window, or undefined when the editor isn't laid out. */
+function caretLine(view: EditorView): number | undefined {
+  try {
+    const caret = view.coordsAtPos(view.state.selection.head);
+    return (caret.top + caret.bottom) / 2;
+  } catch {
+    return undefined; // Not laid out (e.g. hidden).
   }
+}
+
+/** Scroll the editor's scrolling area, or the page, down by `delta` pixels. */
+function scrollBy(view: EditorView, delta: number): void {
+  if (Math.abs(delta) < 1) return;
+  (scrollParent(view.dom) ?? window).scrollBy({ top: delta, behavior: "instant" });
 }
 
 /** The nearest scrolling ancestor, or null for the page itself. */
