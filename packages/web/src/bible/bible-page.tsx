@@ -1,4 +1,4 @@
-import { entryPresences, typePlural, vocabulary, word, type Entity, type EntryPresence, type Book, type Vocabulary } from "@writer/core";
+import { defaultEntrySort, entryPresences, sortEntries, typePlural, vocabulary, word, type Book, type Entity, type EntryPresence, type EntrySort, type Vocabulary } from "@writer/core";
 import { Plus, Search } from "lucide-react";
 import { Fragment, useEffect, useId, useMemo, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
@@ -14,9 +14,9 @@ import { entriesByType, matches } from "./types.ts";
 import { PAGE } from "../ui/page.ts";
 import { cn } from "../ui/cn.ts";
 
-type Sort = "first" | "name" | "most";
-const sorts = (w: Vocabulary): { key: Sort; label: string }[] => [
+const sorts = (w: Vocabulary): { key: EntrySort; label: string }[] => [
   { key: "first", label: "First appearance" },
+  { key: "last", label: "Last appearance" },
   { key: "name", label: "Name" },
   { key: "most", label: `Most ${w.piece.many}` },
 ];
@@ -25,8 +25,8 @@ const MARK = { carries: "bg-accent", present: "bg-accent/40", mentioned: "bg-acc
 
 /**
  * The story bible (heffrey78/gh-writer#162): every entry as a card, grouped by type, with its picture (heffrey78/gh-writer#168), its summary, a fact or two, a
- * small strip of the scenes it's in and how many; searchable by name or other name and sorted by
- * first appearance, name or most scenes. The kind's modules add their records' sections after the
+ * small strip of the scenes it's in and how many; searchable by anything an entry says (#134) and sorted by
+ * first or last appearance, name or most scenes. The kind's modules add their records' sections after the
  * entries (off-page events). An entry or a record opens in a modal over it (`over`, heffrey78/gh-writer#236, heffrey78/gh-writer#237).
  */
 export function BiblePage({ novelId, novel, over }: { novelId: string; novel: Book; over?: ReactNode }) {
@@ -38,20 +38,11 @@ export function BiblePage({ novelId, novel, over }: { novelId: string; novel: Bo
   const add = (type?: string) => void navigate(`/novels/${novelId}/bible/new${type ? `?type=${encodeURIComponent(type)}` : ""}`, { state: { fromGallery: true } });
   const [addingType, setAddingType] = useState(false);
   const searchId = useId();
-  const sort: Sort = (params.get("sort") as Sort | null) ?? "first";
+  const fallback = defaultEntrySort(novel.kind);
+  const sort: EntrySort = (params.get("sort") as EntrySort | null) ?? fallback;
   const sortId = useId();
   const presences = useMemo(() => entryPresences(novel), [novel]);
-  const order = (a: Entity, b: Entity) => {
-    const pa = presences.get(a.id);
-    const pb = presences.get(b.id);
-    if (sort === "most") return (pb?.count ?? 0) - (pa?.count ?? 0) || a.name.localeCompare(b.name);
-    if (sort === "first") {
-      const at = (p: EntryPresence | undefined) => (p?.first ? novel.pieces.indexOf(p.first) : Infinity);
-      return at(pa) - at(pb) || a.name.localeCompare(b.name);
-    }
-    return a.name.localeCompare(b.name);
-  };
-  const groups = entriesByType(novel).map((g) => ({ ...g, shown: g.entries.filter((e) => matches(e, query)).sort(order) }));
+  const groups = entriesByType(novel).map((g) => ({ ...g, shown: sortEntries(novel, g.entries.filter((e) => matches(e, query)), sort, presences) }));
   const setParam = (key: string, value: string | undefined) => {
     const next = new URLSearchParams(params);
     if (value) next.set(key, value);
@@ -86,7 +77,7 @@ export function BiblePage({ novelId, novel, over }: { novelId: string; novel: Bo
           <input
             id={searchId}
             type="search"
-            placeholder="Search by name or other name"
+            placeholder="Search names, notes and fields"
             value={query}
             onChange={(e) => setParam("q", e.target.value || undefined)}
             className="h-9 w-full rounded-md border border-rule bg-raised pr-3 pl-9 text-sm"
@@ -94,7 +85,7 @@ export function BiblePage({ novelId, novel, over }: { novelId: string; novel: Bo
         </div>
         <label htmlFor={sortId} className="flex items-center gap-2 text-sm text-muted">
           Sort
-          <select id={sortId} value={sort} onChange={(e) => setParam("sort", e.target.value === "first" ? undefined : e.target.value)} className="h-9 rounded-md border border-rule bg-raised px-2 text-ink">
+          <select id={sortId} value={sort} onChange={(e) => setParam("sort", e.target.value === fallback ? undefined : e.target.value)} className="h-9 rounded-md border border-rule bg-raised px-2 text-ink">
             {sorts(w).map((s) => (
               <option key={s.key} value={s.key}>
                 {s.label}

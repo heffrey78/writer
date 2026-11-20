@@ -151,14 +151,24 @@ test("a new type of entry works at once, with no code changes", async ({ page, a
   expect(novel.read("bible/vehicles/the-night-train.md")).toMatch(/^---\nid: vehi_[0-9a-hjkmnp-tv-z]{6}\nname: The Night Train\n---\n$/);
 });
 
-test("searches the bible by name and alias", async ({ page, app }) => {
+test("searches the bible by anything an entry says: names, other names, summaries, fields and notes", async ({ page, app }) => {
   await open(page, app);
   await palette(page, "story bible");
-  await page.getByRole("searchbox", { name: "Search the bible" }).fill("ada");
-  await expect(page.getByText(/entr(y|ies) match “ada”/)).toBeVisible();
+  const search = page.getByRole("searchbox", { name: "Search the bible" });
   const results = page.getByRole("main").getByRole("region", { name: /^Characters/ });
+  // A field's value: only Ada's eyes are grey.
+  await search.fill("GREY");
+  await expect(page.getByText(/entr(y|ies) match “GREY”/)).toBeVisible();
+  await expect(results.getByRole("link")).toHaveCount(1);
   await expect(results.getByRole("link", { name: /^Ada Varn/ })).toBeVisible();
-  await expect(results.getByRole("link", { name: /^Ben/ })).toHaveCount(0);
+  // Another name, in any case; and a summary and notes: Ben is “Ada's younger brother”, Tomas “taught Ada to read a gauge”.
+  await search.fill("m. k.");
+  await expect(results.getByRole("link", { name: /^Mirela Kost/ })).toBeVisible();
+  await search.fill("ada");
+  await expect(results.getByRole("link", { name: /^Ada Varn/ })).toBeVisible();
+  await expect(results.getByRole("link", { name: /^Ben Varn/ })).toBeVisible();
+  await expect(results.getByRole("link", { name: /^Tomas Hale/ })).toBeVisible();
+  await expect(results.getByRole("link", { name: /^Mirela/ })).toHaveCount(0);
   await axe(page);
   await page.emulateMedia({ colorScheme: "dark" });
   await axe(page);
@@ -191,7 +201,7 @@ test("in the story: a strip of every scene, marking where the entry carries it, 
   await expect(page.getByRole("heading", { level: 1, name: "Mirela's Offer" })).toBeVisible();
 });
 
-test("the bible as a gallery: cards with a summary, facts, a strip and a count; sorted three ways by keyboard", async ({ page, app }) => {
+test("the bible as a gallery: cards with a summary, facts, a strip and a count; sorted four ways by keyboard", async ({ page, app }) => {
   const novel = await open(page, app);
   await palette(page, "story bible");
   const characters = page.getByRole("main").getByRole("region", { name: /^Characters/ });
@@ -212,9 +222,14 @@ test("the bible as a gallery: cards with a summary, facts, a strip and a count; 
   await axe(page);
   await page.emulateMedia({ colorScheme: "light" });
 
-  // Sorted by name, then by most scenes, from the keyboard; the choice is in the address.
+  // Sorted by last appearance, by name, then by most scenes, from the keyboard; the choice is in the address.
   const sort = page.getByRole("combobox", { name: "Sort" });
   await sort.focus();
+  await page.keyboard.press("ArrowDown");
+  await expect(sort).toHaveValue("last");
+  // Ada, Ben and Tomas are in the last scene; Mirela last appears at her offer, the scene before.
+  await expect(cards.locator("span.font-semibold:not([aria-hidden])")).toHaveText(["Ada Varn", "Ben Varn", "Tomas Hale", "Mirela Kost"]);
+  await expect(page).toHaveURL(/sort=last/);
   await page.keyboard.press("ArrowDown");
   await expect(sort).toHaveValue("name");
   await expect(cards.locator("span.font-semibold:not([aria-hidden])")).toHaveText(["Ada Varn", "Ben Varn", "Mirela Kost", "Tomas Hale"]);

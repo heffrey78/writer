@@ -1,4 +1,4 @@
-import { recordTypesOf, type Entity, type Book } from "@writer/core";
+import { matchEntry, recordTypesOf, type Entity, type Book } from "@writer/core";
 import type { MentionEntity } from "@writer/editor";
 
 /** A type's name for a list of its entries: "Characters". */
@@ -14,11 +14,8 @@ export function entriesByType(novel: Book): { type: Book["entityTypes"][number];
   }));
 }
 
-/** Whether an entry matches a search, by name or alias. */
-export const matches = (entity: Entity, query: string) => {
-  const q = query.trim().toLowerCase();
-  return !q || [entity.name, ...entity.aliases].some((n) => n.toLowerCase().includes(q));
-};
+/** Whether an entry matches a search: by anything it says (its name, other names, summary, fields, tags or notes; #134). */
+export const matches = (entity: Entity, query: string) => matchEntry(entity, query) !== undefined;
 
 /**
  * Every entry, for @ suggestions: by type in the bible's order, then by name; then the modules'
