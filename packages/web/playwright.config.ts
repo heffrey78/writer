@@ -24,7 +24,8 @@ export default defineConfig({
     ...(browsers.includes("webkit") ? [{ name: "webkit", use: { browserName: "webkit" as const, viewport: { width: 1280, height: 720 } }, testIgnore: /performance/, timeout: 60_000, expect: { timeout: 10_000 } }] : []),
     { name: "engine-in-page-chromium", use: { ...devices["Desktop Chrome"], ...engineInPage }, testMatch: WRITING_VIEW },
     ...(browsers.includes("webkit") ? [{ name: "engine-in-page-webkit", use: { browserName: "webkit" as const, viewport: { width: 1280, height: 720 }, ...engineInPage }, testMatch: WRITING_VIEW, timeout: 60_000, expect: { timeout: 10_000 } }] : []),
-    // The benchmarks run alone, after the rest and one at a time, so nothing competes with them for the CPU.
-    { name: "performance", use: { ...devices["Desktop Chrome"] }, testMatch: /performance/, dependencies: ["chromium"], fullyParallel: false, workers: 1 },
+    // The benchmarks run alone, after the rest and one at a time, so nothing competes with them for the CPU;
+    // untraced, as a trace snapshots the page around every action, on the page's own thread, inside what's timed.
+    { name: "performance", use: { ...devices["Desktop Chrome"], trace: "off" }, testMatch: /performance/, dependencies: ["chromium"], fullyParallel: false, workers: 1 },
   ],
 });

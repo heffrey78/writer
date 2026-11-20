@@ -2,7 +2,7 @@ import { defaultEntrySort, entryPresences, filterEntries, matchEntry, piecesMatc
 import { findPanel } from "@writer/editor";
 import type { SpellService } from "@writer/editor/react";
 import { ChevronLeft, ChevronRight, Expand, LayoutGrid, List, PanelLeftClose, PanelLeftOpen, Plus, Search, Table2, X } from "lucide-react";
-import { Fragment, useEffect, useId, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
+import { Fragment, memo, useCallback, useEffect, useId, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 import { create } from "zustand";
 import { useCommands } from "../commands.ts";
@@ -12,9 +12,9 @@ import { Button } from "../ui/button.tsx";
 import { cn } from "../ui/cn.ts";
 import { PAGE } from "../ui/page.ts";
 import { useViewParams } from "../ui/view-params.ts";
-import { useBookKind, useWords } from "../novel/kind.ts";
 import { EntryPage } from "./entry-page.tsx";
-import { Picture, usePictureUrl } from "./picture.tsx";
+import { imageUrl } from "@writer/client";
+import { Picture, useImageVersions } from "./picture.tsx";
 import { pictureAlt, shapeForType } from "./pictures.ts";
 import { anyFilter, FilterBar, FILTER_KEYS, filtersOf } from "./filters.tsx";
 import { NewTypeDialog } from "./new-entry.tsx";
@@ -87,6 +87,9 @@ function useIndexLayout(novelId: string): [IndexLayout, (change: Partial<IndexLa
   };
   return [layout, set];
 }
+
+/** How many rows of the list are drawn at a time. */
+const STRETCH = 120;
 
 /** The entry beside the list, for the keyboard to find. */
 const PANE_ID = "index-entry";
@@ -175,6 +178,18 @@ export function BiblePage({
   const found = groups.reduce((n, g) => n + g.shown.length, 0);
   const listed = groups.flatMap((g) => g.shown);
 
+  // A long list is drawn a stretch at a time: the first rows at once, the rest in the moments after,
+  // so a search, a sort or a filter answers within a frame or two however long the bible is. The open
+  // entry's row is always among those drawn.
+  const orderKey = `${query}|${sort}|${ids}|${filterKey}|${layout.view}`;
+  const [progress, setProgress] = useState({ key: orderKey, limit: STRETCH });
+  const drawn = progress.key === orderKey ? progress.limit : STRETCH;
+  useEffect(() => {
+    if (drawn >= listed.length) return;
+    const t = setTimeout(() => setProgress({ key: orderKey, limit: drawn + STRETCH }));
+    return () => clearTimeout(t);
+  }, [drawn, listed.length, orderKey]);
+
   const setParam = (key: string, value: string | undefined) => setParamsTo({ [key]: value });
   // Pieces whose own words match: offered after the entries, as a way into the book's find.
   const pieces = useMemo(() => (query.trim() ? piecesMatching(novel, query) : []), [novel, query]);
@@ -193,8 +208,23 @@ export function BiblePage({
     if (await saveOpenParts(parts)) void navigate(to);
   };
   const entryHref = (id: string) => `/novels/${novelId}/bible/${id}${search}`;
+  // What every row needs, worked out once for the list (a long book's has hundreds of rows): the
+  // pictures' addresses, each type's words for its marks, what a search matched. Each row is drawn
+  // again only when its own change, so stepping through the list redraws two rows, not all of them.
+  const versions = useImageVersions(novelId);
+  const pictureOf = (e: Entity) => (e.image ? imageUrl(novelId, e.image, versions[e.image]) : undefined);
+  const marksByType = useMemo(() => new Map(novel.entityTypes.map((t) => [t.key, markWords(novel.kind, t.key, w)])), [novel, w]);
+  const matches = useMemo(() => new Map(query ? novel.entities.map((e) => [e.id, matchEntry(e, query, { around: 3 })]) : []), [novel, query]);
+  const latest = useRef({ go, selectedId: undefined as string | undefined, entryHref });
+  const onOpen = useCallback((to: string, e?: MouseEvent) => latest.current.go(to, e), []);
+  const onEnter = useCallback((id: string) => {
+    const { selectedId, entryHref } = latest.current;
+    if (id === selectedId) document.getElementById(PANE_ID)?.focus();
+    else void navigate(entryHref(id), { state: { focusEntry: true } });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const selectedId = selected && "entry" in selected ? selected.entry : selected?.record.id;
+  latest.current = { go, selectedId, entryHref };
   const list = useRef<HTMLDivElement>(null);
   // The one open, in view in the list; and arriving at a group (the book pane's Off the page links to #off-the-page), that group.
   useEffect(() => {
@@ -205,6 +235,9 @@ export function BiblePage({
   }, [hash]);
 
   const view: View = layout.view;
+  // How many rows to draw now, and how many come before each group's.
+  const limit = Math.max(drawn, listed.findIndex((e) => e.id === selectedId) + 1 + STRETCH / 4);
+  const before = groups.map((_, i) => groups.slice(0, i).reduce((n, x) => n + x.shown.length, 0));
 
   // The keyboard (#134): j and k (and the arrows in the list) open the next and previous entry in the
   // list's order, the focus on its row; Enter on a row moves into the entry, Escape back to its row;
@@ -345,7 +378,7 @@ export function BiblePage({
           {records.length > 0 && query && ` (and the ${records.map((t) => word(t.def.noun).many).join(" and ")} below that do)`}
         </p>
       )}
-      {groups.map(({ type, count, shown }) =>
+      {groups.map(({ type, count, shown }, g) =>
         (query || filtered) && !shown.length ? null : (
           <section key={type.key} aria-labelledby={`type-${type.key}`} className="grid gap-2">
             <div className="flex items-center justify-between gap-2">
@@ -358,12 +391,12 @@ export function BiblePage({
             </div>
             {shown.length ? (
               <ul className={view === "cards" ? cn("grid gap-3", selected ? "grid-cols-[repeat(auto-fill,minmax(15rem,1fr))]" : "sm:grid-cols-2 lg:grid-cols-3") : "grid gap-0.5"}>
-                {shown.map((e) => (
+                {shown.slice(0, Math.max(0, limit - before[g]!)).map((e) => (
                   <li key={e.id} className="grid" data-entry={e.id}>
                     {view === "cards" ? (
-                      <EntryCard novelId={novelId} entity={e} presence={presences.get(e.id)} href={entryHref(e.id)} current={e.id === selectedId} onOpen={go} />
+                      <EntryCard entity={e} presence={presences.get(e.id)} href={entryHref(e.id)} current={e.id === selectedId} onOpen={onOpen} url={pictureOf(e)} marks={marksByType.get(e.type)!} w={w} />
                     ) : (
-                      <EntryRow novelId={novelId} entity={e} presence={presences.get(e.id)} href={entryHref(e.id)} current={e.id === selectedId} onOpen={go} onEnter={() => (e.id === selectedId ? document.getElementById(PANE_ID)?.focus() : void navigate(entryHref(e.id), { state: { focusEntry: true } }))} match={query ? matchEntry(e, query, { around: 3 }) : undefined} />
+                      <EntryRow entity={e} presence={presences.get(e.id)} href={entryHref(e.id)} current={e.id === selectedId} onOpen={onOpen} onEnter={onEnter} match={matches.get(e.id)} url={pictureOf(e)} marks={marksByType.get(e.type)!} w={w} />
                     )}
                   </li>
                 ))}
@@ -610,7 +643,7 @@ function EntryPane({
       <div className="px-6 pt-4 pb-10">
         <OpenParts.Provider value={parts}>
           {entity ? (
-            <EntryPage key={entity.id} novelId={novelId} novel={novel} entity={entity} workspace={workspace} spell={spell} embedded={{ headingId, modal: alone }} />
+            <EntryBody key={entity.id} novelId={novelId} novel={novel} entity={entity} workspace={workspace} spell={spell} headingId={headingId} alone={alone} />
           ) : record && "record" in selected ? (
             <Fragment key={record.id}>{selected.record.type.page({ novelId, novel, workspace, record, spell, embedded: { headingId, modal: alone } })}</Fragment>
           ) : (
@@ -622,22 +655,54 @@ function EntryPane({
   );
 }
 
+const STRENGTH = { absent: 0, mentioned: 1, present: 2, carries: 3 } as const;
+
+/**
+ * The strip's marks, at most `most` of them: a long book's pieces taken a stretch at a time, each
+ * stretch marked by the strongest way the entry is in it. Hundreds of entries by hundreds of pieces
+ * would otherwise be a mark each, too many to draw quickly and too small to see.
+ */
+export function stripMarks(presence: EntryPresence | undefined, most: number): { title: string; mark: keyof typeof STRENGTH }[] {
+  const scenes = presence?.scenes ?? [];
+  if (scenes.length <= most) return scenes.map(({ scene, mark }) => ({ title: scene.title, mark }));
+  const size = Math.ceil(scenes.length / most);
+  const out: { title: string; mark: keyof typeof STRENGTH }[] = [];
+  for (let i = 0; i < scenes.length; i += size) {
+    const stretch = scenes.slice(i, i + size);
+    const mark = stretch.reduce<keyof typeof STRENGTH>((m, s) => (STRENGTH[s.mark] > STRENGTH[m] ? s.mark : m), "absent");
+    out.push({ title: `${stretch[0]!.scene.title} to ${stretch.at(-1)!.scene.title}`, mark });
+  }
+  return out;
+}
+
+/**
+ * The entry's profile beside the list, drawn again only when the book, the entry or how it's shown
+ * changes: not as the list beside it is searched, filtered or stepped through.
+ */
+const EntryBody = memo(
+  function EntryBody({ novelId, novel, entity, workspace, spell, headingId, alone }: { novelId: string; novel: Book; entity: Entity; workspace: Workspace; spell: { service: SpellService; onAddWord: (w: string) => void } | undefined; headingId: string; alone: boolean }) {
+    return <EntryPage novelId={novelId} novel={novel} entity={entity} workspace={workspace} spell={spell} embedded={{ headingId, modal: alone }} />;
+  },
+  (a, b) => a.novel === b.novel && a.entity === b.entity && a.workspace === b.workspace && a.spell?.service === b.spell?.service && a.headingId === b.headingId && a.alone === b.alone,
+);
+
 /** A small strip of the pieces an entry is in, by how. */
 function MiniStrip({ presence, words }: { presence: EntryPresence | undefined; words: Record<string, string | undefined> }) {
-  const n = presence?.scenes.length ?? 0;
-  if (!n) return null;
+  const marks = stripMarks(presence, 24);
+  if (!marks.length) return null;
   return (
-    <span aria-hidden className="grid w-16 shrink-0" style={{ gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))`, gap: n > 24 ? 0 : 1 }}>
-      {presence!.scenes.map(({ scene, mark }) => (
-        <span key={scene.id} title={`${scene.title}: ${mark === "absent" ? "not there" : (words[mark] ?? words.present)}`} className={`h-1.5 rounded-[1px] ${MARK[mark]}`} />
+    <span aria-hidden className="grid w-16 shrink-0" style={{ gridTemplateColumns: `repeat(${marks.length}, minmax(0, 1fr))`, gap: 1 }}>
+      {marks.map(({ title, mark }, i) => (
+        <span key={i} title={`${title}: ${mark === "absent" ? "not there" : (words[mark] ?? words.present)}`} className={`h-1.5 rounded-[1px] ${MARK[mark]}`} />
       ))}
     </span>
   );
 }
 
+type Marks = ReturnType<typeof markWords>;
+
 /** An entry in the List: its picture or initials, name, what matched or its summary, where it is. */
-function EntryRow({
-  novelId,
+const EntryRow = memo(function EntryRow({
   entity,
   presence,
   href,
@@ -645,21 +710,25 @@ function EntryRow({
   onOpen,
   onEnter,
   match,
+  url,
+  marks: words,
+  w,
 }: {
-  novelId: string;
   entity: Entity;
   presence: EntryPresence | undefined;
   href: string;
   current: boolean;
   onOpen: (to: string, e?: MouseEvent) => Promise<void>;
   /** Enter on it: into the entry beside the list. */
-  onEnter: () => void;
+  onEnter: (id: string) => void;
   match: ReturnType<typeof matchEntry> | undefined;
+  /** Its picture's address. */
+  url: string | undefined;
+  /** Its type's words for how it's in a piece. */
+  marks: Marks;
+  w: Vocabulary;
 }) {
   const shape = shapeForType(entity.type);
-  const url = usePictureUrl(novelId, entity.image);
-  const w = useWords();
-  const words = markWords(useBookKind(), entity.type, w);
   const count = presence?.count ?? 0;
   const where = match && match.where !== "name" ? match : undefined;
   const second = where?.text ? (
@@ -679,7 +748,7 @@ function EntryRow({
       onKeyDown={(e) => {
         if (e.key !== "Enter" || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
         e.preventDefault();
-        onEnter();
+        onEnter(entity.id);
       }}
       aria-current={current ? "page" : undefined}
       className={cn(
@@ -705,19 +774,34 @@ function EntryRow({
       </span>
     </a>
   );
-}
+});
 
 /**
  * An entry in the Cards: what it is at a glance, opening its profile. A portrait sits beside the
  * name (its initials where there's none); a place's picture is a banner across the card.
  */
-function EntryCard({ novelId, entity, presence, href, current, onOpen }: { novelId: string; entity: Entity; presence: EntryPresence | undefined; href: string; current: boolean; onOpen: (to: string, e?: MouseEvent) => Promise<void> }) {
+const EntryCard = memo(function EntryCard({
+  entity,
+  presence,
+  href,
+  current,
+  onOpen,
+  url,
+  marks: words,
+  w,
+}: {
+  entity: Entity;
+  presence: EntryPresence | undefined;
+  href: string;
+  current: boolean;
+  onOpen: (to: string, e?: MouseEvent) => Promise<void>;
+  url: string | undefined;
+  marks: Marks;
+  w: Vocabulary;
+}) {
   const shape = shapeForType(entity.type);
-  const url = usePictureUrl(novelId, entity.image);
   const count = presence?.count ?? 0;
   const n = presence?.scenes.length ?? 0;
-  const w = useWords();
-  const words = markWords(useBookKind(), entity.type, w);
   const facts = [
     ...Object.entries(entity.fields)
       .slice(0, 2)
@@ -760,9 +844,9 @@ function EntryCard({ novelId, entity, presence, href, current, onOpen }: { novel
       {facts.length > 0 && <span className="text-[13px] text-muted">{facts.join(" · ")}</span>}
       <span className="flex items-center gap-2.5">
         {n > 0 && (
-          <span aria-hidden className="grid flex-1" style={{ gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))`, gap: n > 40 ? 0 : 2 }}>
-            {presence!.scenes.map(({ scene, mark }) => (
-              <span key={scene.id} title={`${scene.title}: ${mark === "absent" ? "not there" : (words[mark] ?? words.present)}`} className={`h-2 rounded-[2px] ${MARK[mark]}`} />
+          <span aria-hidden className="grid flex-1" style={{ gridTemplateColumns: `repeat(${Math.min(n, 60)}, minmax(0, 1fr))`, gap: n > 40 ? 0 : 2 }}>
+            {stripMarks(presence, 60).map(({ title, mark }, i) => (
+              <span key={i} title={`${title}: ${mark === "absent" ? "not there" : (words[mark] ?? words.present)}`} className={`h-2 rounded-[2px] ${MARK[mark]}`} />
             ))}
           </span>
         )}
@@ -770,7 +854,7 @@ function EntryCard({ novelId, entity, presence, href, current, onOpen }: { novel
       </span>
     </a>
   );
-}
+});
 
 /** "AV" for Ada Varn: a stand-in for a portrait. */
 function initials(name: string): string {

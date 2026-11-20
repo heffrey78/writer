@@ -26,8 +26,23 @@ export function backlinks(novel: Book, id: string): Backlinks {
   return {
     scenes,
     relationships: novel.relationships.filter((r) => r.from === id || r.to === id),
-    records: novel.moduleRecords.filter((r) => (recordType(novel.kind, r.type)?.fields(novel.kind) ?? []).some((f) => entryIds(f, r.fields[f.key]).includes(id))),
+    records: recordsNaming(novel, id),
   };
+}
+
+/** The modules' records whose fields name an entry: the off-page events it's part of. */
+export function recordsNaming(novel: Book, id: string): ModuleRecord[] {
+  return novel.moduleRecords.filter((r) => (recordType(novel.kind, r.type)?.fields(novel.kind) ?? []).some((f) => entryIds(f, r.fields[f.key]).includes(id)));
+}
+
+/** Every entry's records, by its ID, worked out in one pass over the records: recordsNaming for all. */
+export function recordsByEntry(novel: Book): Map<string, ModuleRecord[]> {
+  const out = new Map<string, ModuleRecord[]>();
+  for (const r of novel.moduleRecords) {
+    const ids = new Set((recordType(novel.kind, r.type)?.fields(novel.kind) ?? []).flatMap((f) => entryIds(f, r.fields[f.key])));
+    for (const id of ids) out.set(id, [...(out.get(id) ?? []), r]);
+  }
+  return out;
 }
 
 /** Prose that mentions a record, by what it is: a piece, an entry, a module's record (by its type's key, "event"), a note. */

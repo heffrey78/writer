@@ -262,12 +262,27 @@ export interface PresenceMatrix {
  * Where each entry of a type is in the book: listed in a scene's metadata (characters: point of
  * view or characters; locations, themes and plotlines: their lists), and named in its prose.
  */
+/**
+ * A piece body's mentioned IDs and word count, by its text: the same for every type's presence, and
+ * for a body that hasn't changed since the book was last loaded (a long book's index works out every
+ * type's at once).
+ */
+const bodyFacts = new Map<string, { named: Set<string>; words: number }>();
+function factsOf(body: string): { named: Set<string>; words: number } {
+  let facts = bodyFacts.get(body);
+  if (!facts) {
+    if (bodyFacts.size >= 4000) bodyFacts.delete(bodyFacts.keys().next().value!);
+    bodyFacts.set(body, (facts = { named: new Set(mentions(body).map((m) => m.id)), words: countWords(body) }));
+  }
+  return facts;
+}
+
 export function presence(novel: Book, type: string, scenes: Piece[] = novel.pieces): PresenceMatrix {
   const rows = novel.entities.filter((e) => e.type === type).sort((a, b) => a.name.localeCompare(b.name));
   const ids = new Set(rows.map((r) => r.id));
   const marks = new Map<string, Presence>();
   for (const scene of scenes) {
-    const named = new Set(mentions(scene.body).map((m) => m.id));
+    const { named } = factsOf(scene.body);
     const listed = new Map<string, Omit<Presence, "listed" | "carries" | "mentioned">>(entriesOf(novel, scene, type).map((id) => [id, {}]));
     const carrier = carrierOf(novel.kind, scene);
     for (const f of novel.kind.fields) {
@@ -282,7 +297,7 @@ export function presence(novel: Book, type: string, scenes: Piece[] = novel.piec
       marks.set(gridKey(id, scene.id), { ...listed.get(id), listed: listed.has(id), carries: carrier === id, mentioned: named.has(id) });
     }
   }
-  return { type, rows, scenes, marks, words: scenes.map((s) => countWords(s.body)), ...sceneColumns(novel, scenes) };
+  return { type, rows, scenes, marks, words: scenes.map((s) => factsOf(s.body).words), ...sceneColumns(novel, scenes) };
 }
 
 /** What an item of a list field carries, for presence: its choice (weight), its scale (strength) and its first text (note). */

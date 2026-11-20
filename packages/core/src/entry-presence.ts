@@ -1,6 +1,6 @@
 import { gridKey, presence, sceneColumns, type PresenceMatrix } from "./diagrams.ts";
 import type { Book, ModuleRecord, Piece } from "./model.ts";
-import { backlinks } from "./queries.ts";
+import { recordsByEntry, recordsNaming } from "./queries.ts";
 
 /**
  * How an entry is in a scene: carrying it (a character's point of view, a plotline's major beat, a
@@ -31,20 +31,21 @@ export interface EntryPresence {
  */
 export function entryPresence(novel: Book, id: string): EntryPresence | undefined {
   const entity = novel.entities.find((e) => e.id === id);
-  return entity && fromMatrix(novel, presence(novel, entity.type), id);
+  return entity && fromMatrix(novel, presence(novel, entity.type), id, recordsNaming(novel, id));
 }
 
 /** Every entry's presence, by ID: each type's marks worked out once (the bible's gallery). */
 export function entryPresences(novel: Book): Map<string, EntryPresence> {
   const out = new Map<string, EntryPresence>();
+  const records = recordsByEntry(novel);
   for (const type of new Set(novel.entities.map((e) => e.type))) {
     const matrix = presence(novel, type);
-    for (const e of novel.entities) if (e.type === type) out.set(e.id, fromMatrix(novel, matrix, e.id));
+    for (const e of novel.entities) if (e.type === type) out.set(e.id, fromMatrix(novel, matrix, e.id, records.get(e.id) ?? []));
   }
   return out;
 }
 
-function fromMatrix(novel: Book, matrix: PresenceMatrix, id: string): EntryPresence {
+function fromMatrix(novel: Book, matrix: PresenceMatrix, id: string, records: ModuleRecord[]): EntryPresence {
   const scenes = matrix.scenes.map((scene) => {
     const p = matrix.marks.get(gridKey(id, scene.id));
     const mark: PresenceMark = !p
@@ -73,6 +74,6 @@ function fromMatrix(novel: Book, matrix: PresenceMatrix, id: string): EntryPrese
     ...(first ? { first } : {}),
     ...(last ? { last } : {}),
     ...(longestAbsence ? { longestAbsence } : {}),
-    records: backlinks(novel, id).records,
+    records,
   };
 }

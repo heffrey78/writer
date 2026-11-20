@@ -105,11 +105,18 @@ function excerpt(text: string, [start, end]: [number, number], words = 8): { tex
  * text as `around` words each side of the match. Undefined when it doesn't match; for an empty
  * search, a match on its name.
  */
+/** Each entry's parts and their folded text, worked out once per entry as loaded: a search runs on every keystroke. */
+const partsCache = new WeakMap<Entity, { all: Part[]; folded: string[] }>();
+
 export function matchEntry(entity: Entity, query: string, { around = 8 }: { around?: number } = {}): EntryMatch | undefined {
   const terms = searchTerms(query);
-  const all = parts(entity);
   if (!terms.length) return { entity, where: "name", rank: 0 };
-  const folded = all.map((p) => searchable(p.text));
+  let cached = partsCache.get(entity);
+  if (!cached) {
+    const all = parts(entity);
+    partsCache.set(entity, (cached = { all, folded: all.map((p) => searchable(p.text)) }));
+  }
+  const { all, folded } = cached;
   if (!terms.every((t) => folded.some((f) => f.includes(t)))) return undefined;
   const best = all.findIndex((_, i) => folded[i]!.includes(terms[0]!));
   const part = all[best]!;
