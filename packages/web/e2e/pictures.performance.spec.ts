@@ -11,7 +11,7 @@ test("a 20-megapixel photo is resized and saved in under 2 seconds", async ({ pa
   await app.restart(dir);
   const novelPath = new URL(app.launchUrl).pathname;
   await page.goto(app.launchUrl.replace(novelPath, `${novelPath}/bible/char_7f3k2q`));
-  await expect(page.getByRole("heading", { level: 1, name: "Ada Varn" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Ada Varn" })).toBeVisible();
   await makePicture(page, { width: 5472, height: 3648, name: "camera.jpg" });
 
   const dialog = page.getByRole("dialog", { name: "Portrait of Ada Varn" });

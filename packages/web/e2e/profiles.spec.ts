@@ -40,7 +40,7 @@ test("a location's profile: who comes there and the story time its scenes span",
   await expect(who.getByRole("listitem")).toHaveText(["Ada Varn (4 scenes)", "Ben Varn (4 scenes)", "Tomas Hale (2 scenes)"]);
   await expect(who).toContainText("Story time: 2 Nov 2009, 23:00 to Day 5, 06:00 (5 Mar 2024).");
   await who.getByRole("link", { name: "Tomas Hale" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Tomas Hale" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Tomas Hale" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Who comes here" })).toHaveCount(0);
 });
 

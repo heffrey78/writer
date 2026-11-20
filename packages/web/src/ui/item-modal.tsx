@@ -6,9 +6,10 @@ import { OpenParts, partEscapes, saveOpenParts } from "../bible/profile.tsx";
 import { ErrorAlert } from "./alert.tsx";
 
 /*
- * A note, an off-page event or a story bible entry opens as a modal over its gallery (heffrey78/gh-writer#233), like a
- * card picked up off a board: its whole profile, edited in place, everything saved as it's made.
- * ✕, Escape or a click outside closes it, saving the part that's open first.
+ * A note opens as a modal over its gallery (heffrey78/gh-writer#233), like a card picked up off a board: its whole
+ * profile, edited in place, everything saved as it's made. A new entry or off-page event is named in
+ * one, then opens beside the index's list (#134). ✕, Escape or a click outside closes it, saving the
+ * part that's open first.
  */
 
 /** Where an item's modal was opened from: its gallery (so closing goes back there, as it was). */

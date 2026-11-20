@@ -206,7 +206,7 @@ test("written where it's read: today on top, made with its first words, and earl
   await expect(page.getByRole("list", { name: "Journal" }).getByRole("textbox")).toHaveCount(0);
   await expect(entries.first()).toContainText("Fog on the water till noon. Then sun.");
   await entries.nth(2).getByRole("link", { name: "the sluice" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "The Old Sluice" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "The Old Sluice" })).toBeVisible();
   await page.goBack();
   await page.getByRole("button", { name: "Reading" }).click();
 

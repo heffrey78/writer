@@ -50,8 +50,8 @@ export function EntryPage({
   entity: Entity;
   workspace: Workspace;
   spell?: { service: SpellService; onAddWord: (w: string) => void } | undefined;
-  /** Shown in a side panel beside the text or a modal over the gallery (heffrey78/gh-writer#237): its name is a level-2 heading with this ID, and it takes the panel's or modal's width. */
-  embedded?: { headingId: string; /** In a modal (heffrey78/gh-writer#233), the dialog's own top heading. */ modal?: boolean };
+  /** Shown beside the text, or beside the index's list (#134): its name is a level-2 heading with this ID, and it takes the panel's width. */
+  embedded?: { headingId: string; /** The page's own top heading: the index's list isn't showing beside it. */ modal?: boolean };
   /** A part to open for editing at once ("name" after a quick entry's Add details). */
   startEditing?: "name";
   /**

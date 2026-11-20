@@ -31,34 +31,29 @@ test("Back and Forward by button and by Alt+Left/Right, but not in text", async 
   await expect(page.getByRole("heading", { level: 1, name: "Notes" })).toBeVisible();
   await expect(forward).toBeDisabled();
 
-  // An entry and an event open in modals over the Story bible (heffrey78/gh-writer#233); the keys walk them too, away from text.
+  // An entry and an event open beside the Story bible's list (#134); the keys walk them too, away from text.
   await palette(page, "character: ada");
-  await expect(page.getByRole("dialog", { name: "Ada Varn" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Ada Varn" })).toBeVisible();
   await palette(page, "off the page: the flood");
-  await expect(page.getByRole("dialog", { name: "The flood of '09" })).toBeVisible();
-  await page.getByRole("heading", { level: 1, name: "The flood of '09" }).click();
+  await expect(page.getByRole("region", { name: "The flood of '09" })).toBeVisible();
+  await page.getByRole("heading", { level: 2, name: "The flood of '09" }).click();
   await page.keyboard.press("Alt+ArrowLeft");
-  await expect(page.getByRole("dialog", { name: "Ada Varn" })).toBeVisible();
-  await page.getByRole("heading", { level: 1, name: "Ada Varn" }).click();
+  await expect(page.getByRole("region", { name: "Ada Varn" })).toBeVisible();
+  await page.getByRole("heading", { level: 2, name: "Ada Varn" }).click();
   await page.keyboard.press("Alt+ArrowLeft");
-  await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.getByRole("heading", { level: 1, name: "Notes" })).toBeVisible();
   await page.locator("main").focus();
   await page.keyboard.press("Alt+ArrowRight");
-  await expect(page.getByRole("dialog", { name: "Ada Varn" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Ada Varn" })).toBeVisible();
 
   // In text they're the text's: nothing moves.
   await page.getByRole("textbox", { name: "Notes on Ada Varn" }).click();
   await page.keyboard.press("Alt+ArrowLeft");
-  await expect(page.getByRole("dialog", { name: "Ada Varn" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Ada Varn" })).toBeVisible();
 
-  // Back to the chapter, through the modal again: there, the caret is in its text, where Alt+Right is the text's.
-  await page.keyboard.press("Escape");
-  await expect(page.getByRole("dialog")).toHaveCount(0);
+  // Out of the text, back to Notes, then the Story bible and the chapter, where the caret is in its text and Alt+Right is the text's.
+  await page.getByRole("heading", { level: 2, name: "Ada Varn" }).click();
   await page.keyboard.press("Alt+ArrowLeft");
-  await expect(page.getByRole("dialog", { name: "Ada Varn" })).toBeVisible();
-  await page.keyboard.press("Alt+ArrowLeft");
-  await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.getByRole("heading", { level: 1, name: "Notes" })).toBeVisible();
   await back.click();
   await expect(page.getByRole("heading", { level: 1, name: "Story bible" })).toBeVisible();
@@ -76,11 +71,11 @@ test("Back and Forward by button and by Alt+Left/Right, but not in text", async 
 test("Go back and Go forward are in the palette, and in the shortcuts list", async ({ page, app }) => {
   await openNovel(page, app);
   await palette(page, "character: ada");
-  await expect(page.getByRole("heading", { level: 1, name: "Ada Varn" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Ada Varn" })).toBeVisible();
   await palette(page, "go back");
   await expect(page.getByRole("textbox", { name: "Chapter text" })).toBeVisible();
   await palette(page, "go forward");
-  await expect(page.getByRole("heading", { level: 1, name: "Ada Varn" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Ada Varn" })).toBeVisible();
   await page.keyboard.press("ControlOrMeta+/");
   const shortcuts = page.getByRole("dialog", { name: "Keyboard shortcuts" });
   await expect(shortcuts).toContainText("Go back");

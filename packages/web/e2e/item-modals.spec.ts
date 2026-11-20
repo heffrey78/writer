@@ -3,7 +3,7 @@ import { join } from "node:path";
 import type { Page } from "@playwright/test";
 import { axe, caretAtEnd, expect, openView, palette, proseOnItsGround, test, type App } from "./fixtures.ts";
 
-/** Notes, off-page events and entries open as a modal over their gallery (heffrey78/gh-writer#233), their parts saved on leaving them (heffrey78/gh-writer#234). */
+/** Notes open as a modal over their gallery (heffrey78/gh-writer#233); entries and off-page events beside the index's list (#134), new ones named in a modal; their parts saved on leaving them (heffrey78/gh-writer#234). */
 
 const ADA = "bible/characters/ada.md";
 
@@ -87,69 +87,71 @@ test("a note: made in its modal over Notes by a title, written, closed by clicki
   await expect(under(page, /^Notes/)).toBeAttached();
 });
 
-test("a part saves when the focus leaves it, another opens or the modal closes; Escape cancels it, not the modal (heffrey78/gh-writer#234)", async ({ page, app }) => {
+test("an entry beside the list: a part saves when the focus leaves it, another opens or another entry is opened; Escape cancels it (heffrey78/gh-writer#234, #134)", async ({ page, app }) => {
   const novel = await openNovel(page, app);
   await palette(page, "character: ada");
-  const modal = page.getByRole("dialog", { name: "Ada Varn" });
-  await expect(modal).toBeVisible();
-  await expect(under(page, "Story bible")).toBeAttached();
+  const entry = page.getByRole("region", { name: "Ada Varn" });
+  await expect(entry.getByRole("heading", { level: 2, name: "Ada Varn" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Story bible" })).toBeVisible();
 
-  // Escape puts the part back as it was, and the modal stays.
-  await modal.getByRole("button", { name: "Edit summary" }).click();
-  await page.keyboard.press("End");
+  // Escape puts the part back as it was.
+  await entry.getByRole("button", { name: "Edit summary" }).click();
+  // To the end of the summary, which wraps beside the list.
+  await page.keyboard.press("ControlOrMeta+End");
   await page.keyboard.type(" Not this.");
   await page.keyboard.press("Escape");
-  await expect(modal.getByRole("button", { name: "Edit summary" })).toBeFocused();
+  await expect(entry.getByRole("button", { name: "Edit summary" })).toBeFocused();
   expect(novel.read(ADA)).not.toContain("Not this.");
 
   // Clicking elsewhere saves it.
-  await modal.getByRole("button", { name: "Edit summary" }).click();
-  await page.keyboard.press("End");
+  await entry.getByRole("button", { name: "Edit summary" }).click();
+  // To the end of the summary, which wraps beside the list.
+  await page.keyboard.press("ControlOrMeta+End");
   await page.keyboard.type(" She counts.");
-  await modal.getByRole("heading", { level: 1, name: "Ada Varn" }).click();
+  await entry.getByRole("heading", { level: 2, name: "Ada Varn" }).click();
   await expect.poll(() => novel.read(ADA)).toContain("being sold. She counts.");
-  await expect(modal.getByRole("textbox", { name: "Summary" })).toHaveCount(0);
+  await expect(entry.getByRole("textbox", { name: "Summary" })).toHaveCount(0);
 
   // Opening another part saves the one that was open.
-  await modal.getByRole("button", { name: "Edit tags" }).click();
+  await entry.getByRole("button", { name: "Edit tags" }).click();
   await page.keyboard.press("End");
   await page.keyboard.type(", engineer");
-  await modal.getByRole("button", { name: "Edit other names" }).click();
-  await expect(modal.getByRole("textbox", { name: "Other names" })).toBeFocused();
+  await entry.getByRole("button", { name: "Edit other names" }).click();
+  await expect(entry.getByRole("textbox", { name: "Other names" })).toBeFocused();
   await expect.poll(() => novel.read(ADA)).toMatch(/tags: \[protagonist, pov, engineer\]\n|tags:\n {2}- protagonist\n {2}- pov\n {2}- engineer\n/);
 
   // A field, saved by Tab out of it.
   await page.keyboard.press("Escape");
-  await modal.getByRole("button", { name: "Edit eyes" }).click();
-  await modal.getByRole("textbox", { name: "Value" }).fill("grey-green");
-  await modal.getByRole("textbox", { name: "Value" }).press("Tab");
+  await entry.getByRole("button", { name: "Edit eyes" }).click();
+  await entry.getByRole("textbox", { name: "Value" }).fill("grey-green");
+  await entry.getByRole("textbox", { name: "Value" }).press("Tab");
   await page.keyboard.press("Tab");
   await page.keyboard.press("Tab");
   await page.keyboard.press("Tab");
   await expect.poll(() => novel.read(ADA)).toContain("eyes: grey-green");
 
-  // Closing the modal saves the part that's open.
-  await modal.getByRole("button", { name: "Edit summary" }).click();
-  await page.keyboard.press("End");
+  // Going on to the next entry saves the part that's open, and the list stays where it was.
+  await entry.getByRole("button", { name: "Edit summary" }).click();
+  // To the end of the summary, which wraps beside the list.
+  await page.keyboard.press("ControlOrMeta+End");
   await page.keyboard.type(" Twice.");
-  await modal.getByRole("button", { name: "Close" }).click();
-  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.getByRole("link", { name: "Next entry" }).click();
+  await expect(page.getByRole("region", { name: "Ben Varn" })).toBeVisible();
   await expect.poll(() => novel.read(ADA)).toContain("She counts. Twice.");
+  await expect(page.getByRole("region", { name: /^Characters/ }).locator("a[aria-current=page]")).toContainText("Ben Varn");
 
-  // In its notes, Escape closes the mention suggestions first, then the modal.
-  await palette(page, "character: ada");
+  // In its notes, Escape closes the mention suggestions, and the entry stays.
+  await page.goBack();
   const notes = page.getByRole("textbox", { name: "Notes on Ada Varn" });
   await caretAtEnd(page, notes);
   await page.keyboard.type(" @tom");
   await expect(page.getByRole("listbox", { name: "Mention suggestions" })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("listbox", { name: "Mention suggestions" })).toBeHidden();
-  await expect(modal).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(entry).toBeVisible();
 });
 
-test("an off-page event: made in its modal over the Story bible by a title; the Timeline and the palette open it there (heffrey78/gh-writer#236)", async ({ page, app }) => {
+test("an off-page event: made in its modal over the Story bible by a title, then beside the list; the Timeline and the palette open it there (heffrey78/gh-writer#236, #134)", async ({ page, app }) => {
   const novel = await openNovel(page, app);
   await views(page).getByRole("link", { name: "Story bible" }).click();
   await page.getByRole("button", { name: "New off-page event" }).click();
@@ -157,31 +159,31 @@ test("an off-page event: made in its modal over the Story bible by a title; the 
   await expect(modal.getByRole("textbox", { name: "Title" })).toBeFocused();
   await page.keyboard.type("The bell is sold");
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("dialog", { name: "The bell is sold" }).getByRole("heading", { level: 1, name: "The bell is sold" })).toBeVisible();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "The bell is sold" }).getByRole("heading", { level: 2, name: "The bell is sold" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "The bell is sold" })).toBeFocused();
   await expect(page).toHaveURL(/\/event\/evt_[0-9a-z]{6}$/);
   await expect.poll(() => (existsSync(join(novel.dir, "bible/events/the-bell-is-sold.md")) ? novel.read("bible/events/the-bell-is-sold.md") : "")).toMatch(/title: The bell is sold\n/);
   for (const colorScheme of ["light", "dark"] as const) {
     await page.emulateMedia({ colorScheme });
     await axe(page);
   }
-  await page.getByRole("dialog").getByRole("button", { name: "Close" }).click();
+  await page.getByRole("link", { name: "Close the event" }).click();
   await expect(page).toHaveURL(/\/bible$/);
   await expect(page.getByRole("region", { name: /^Off the page/ }).getByRole("link", { name: /The bell is sold/ })).toBeVisible();
 
-  // From the Timeline: over the Story bible, and closed, the Story bible's off-page events.
+  // From the Timeline: beside the Story bible's list.
   await openView(page, "Timeline");
   await page.getByRole("tabpanel", { name: "Timeline" }).getByRole("link", { name: /The flood of '09/ }).first().click();
-  await expect(page.getByRole("dialog", { name: "The flood of '09" })).toBeVisible();
-  await expect(under(page, "Story bible")).toBeAttached();
-  await page.keyboard.press("Escape");
-  await expect(page).toHaveURL(/\/bible#off-the-page$/);
+  await expect(page.getByRole("region", { name: "The flood of '09" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Story bible" })).toBeVisible();
 
   // From the palette, the same.
   await palette(page, "off the page: the plans");
-  await expect(page.getByRole("dialog", { name: "The plans are stolen" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "The plans are stolen" })).toBeVisible();
 });
 
-test("an entry: made in its modal by a type and a name, its profile in place; New on a type's group starts with that type (heffrey78/gh-writer#237)", async ({ page, app }) => {
+test("an entry: made in its modal by a type and a name, then open beside the list; New on a type's group starts with that type (heffrey78/gh-writer#237, #134)", async ({ page, app }) => {
   const novel = await openNovel(page, app);
   await views(page).getByRole("link", { name: "Story bible" }).click();
   await page.getByRole("button", { name: "New entry" }).click();
@@ -191,29 +193,30 @@ test("an entry: made in its modal by a type and a name, its profile in place; Ne
   await expect(modal).toBeVisible();
   await axe(page);
 
-  // Back to the name: choosing the type made nothing; moving on from the name makes it.
+  // Back to the name: choosing the type made nothing; moving on from the name makes it, and it opens beside the list.
   const before = novel.files("bible/locations");
   expect(before).not.toContain("the-mill.md");
   await modal.getByRole("textbox", { name: "Name" }).fill("The Mill");
   await page.keyboard.press("Tab");
-  await expect(page.getByRole("dialog", { name: "The Mill" }).getByRole("heading", { level: 1, name: "The Mill" })).toBeVisible();
+  const mill = page.getByRole("region", { name: "The Mill" });
+  await expect(mill.getByRole("heading", { level: 2, name: "The Mill" })).toBeVisible();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(mill).toBeFocused();
   await expect(page).toHaveURL(/\/bible\/loc_[0-9a-z]{6}$/);
   await expect.poll(() => novel.files("bible/locations")).toContain("the-mill.md");
-  const mill = page.getByRole("dialog", { name: "The Mill" });
   await expect(mill.getByRole("button", { name: "Add a summary" })).toBeVisible();
   await expect(mill.getByRole("region", { name: "In the story" })).toBeVisible();
   for (const colorScheme of ["light", "dark"] as const) {
     await page.emulateMedia({ colorScheme });
     await axe(page);
   }
-  // Its notes are written on the modal's own ground, the caret in them or not (#127).
+  // Its notes are written on the page's own ground, the caret in them or not (#127).
   await proseOnItsGround(page, mill.getByRole("textbox", { name: "Notes on The Mill" }), mill, mill.getByRole("button", { name: "Add a summary" }));
   await mill.getByRole("button", { name: "Add a summary" }).click();
   await page.keyboard.type("Where the flour came from.");
-  await page.mouse.click(4, 4);
-  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await mill.getByRole("heading", { level: 2, name: "The Mill" }).click();
   await expect.poll(() => novel.read("bible/locations/the-mill.md")).toContain("summary: Where the flour came from.");
-  await expect(page.getByRole("link", { name: /The Mill/ })).toContainText("Where the flour came from.");
+  await expect(page.getByRole("link", { name: /^The Mill/ })).toContainText("Where the flour came from.");
 
   // New on the characters' group: a character, by its name alone; closed without one, nothing.
   const characters = novel.files("bible/characters");
@@ -225,8 +228,8 @@ test("an entry: made in its modal by a type and a name, its profile in place; Ne
   await expect(page.getByRole("dialog")).toHaveCount(0);
   expect(novel.files("bible/characters")).toEqual(characters);
 
-  // A link to an entry (the palette's) opens it over the gallery.
+  // A link to an entry (the palette's) opens it beside the list.
   await palette(page, "character: ben varn");
-  await expect(page.getByRole("dialog", { name: "Ben Varn" })).toBeVisible();
-  await expect(under(page, "Story bible")).toBeAttached();
+  await expect(page.getByRole("region", { name: "Ben Varn" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Story bible" })).toBeVisible();
 });

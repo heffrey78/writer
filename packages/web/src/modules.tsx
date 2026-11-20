@@ -70,10 +70,10 @@ export interface ProfileSection {
   render(view: BookView & { entity: Entity }): ReactNode;
 }
 
-/** A module's record as its page shows it: on its own, in a modal over the codex's gallery, or in the right sidebar's Entry tab. */
+/** A module's record as its page shows it: on its own, beside the codex's list (#134), or in the right sidebar's Entry tab. */
 export interface RecordPageView extends BookView {
   record: ModuleRecord;
-  /** In a modal or the Entry tab: its title is a level-2 heading with this ID (a modal's own top heading, in one). */
+  /** Beside the codex's list or in the Entry tab: its title is a level-2 heading with this ID; with `modal`, the page's own top heading (the list not showing, or in a modal). */
   embedded?: { headingId: string; modal?: boolean };
   /** The whole page, or the Entry tab's, which leaves out deleting it and links to the page. */
   size?: "page" | "tab";

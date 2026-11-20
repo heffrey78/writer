@@ -22,6 +22,7 @@ import { useNewFormat } from "./new-format.tsx";
 import { convertedNotes, useConversions } from "./convert.tsx";
 import { BookKindContext, useWords } from "./kind.ts";
 import { EntryOver, NoteOver, RecordOver } from "./item-modals.tsx";
+import { EntryPage } from "../bible/entry-page.tsx";
 import { cn } from "../ui/cn.ts";
 import { DraftsButton, useDrafts } from "./drafts.tsx";
 import { ArrangeSidebar } from "./arrange-sidebar.tsx";
@@ -358,11 +359,10 @@ export function NovelPage() {
                 <Route path="story-map/:tab" element={<StoryMapPage novelId={novelId} novel={book} workspace={workspace} />} />
                 <Route path="outline" element={<OutlinePage novelId={novelId} novel={book} workspace={workspace} />} />
                 <Route path="outline/:view" element={<OutlinePage novelId={novelId} novel={book} workspace={workspace} />} />
-                <Route path="bible" element={<BiblePage novelId={novelId} novel={book} />} />
-                {/* An entry or a module's record (an event) opens over the Story bible, a note over Notes (heffrey78/gh-writer#233): the gallery stays as it was underneath. */}
-                <Route path="bible/:entityId" element={<BiblePage novelId={novelId} novel={book} over={<EntryOver novelId={novelId} novel={book} workspace={workspace} spell={spell} />} />} />
+                {/* An entry or a module's record (an event) opens beside the index's list (#134); a new one is named in a modal over it, a note over Notes (heffrey78/gh-writer#233). */}
+                <Route path="bible/*" element={<BibleRoute novelId={novelId} novel={book} workspace={workspace} spell={spell} />} />
                 {moduleRecordTypes(book.kind).map((t) => (
-                  <Route key={t.type} path={`${t.type}/:recordId`} element={<BiblePage novelId={novelId} novel={book} over={<RecordOver type={t} novelId={novelId} novel={book} workspace={workspace} spell={spell} />} />} />
+                  <Route key={t.type} path={`${t.type}/:recordId`} element={<RecordRoute type={t} novelId={novelId} novel={book} workspace={workspace} spell={spell} />} />
                 ))}
                 <Route path="note/:noteId" element={<NotesPage novelId={novelId} novel={book} over={<NoteOver novelId={novelId} novel={book} workspace={workspace} spell={spell} />} />} />
                 <Route path="progress" element={<ProgressPage novelId={novelId} novel={book} />} />
@@ -405,6 +405,25 @@ const viewOf = (over: string[]) => {
 };
 
 type RouteProps = { novelId: string; novel: Book; workspace: Workspace; spell: ReturnType<typeof useSpell>; entries?: QuickEntries | undefined };
+
+/** The index, with an entry beside its list (/bible/<id>), a new one being named over it (/bible/new), or an entry as a page of its own (/bible/<id>/page). */
+function BibleRoute({ novelId, novel, workspace, spell }: RouteProps) {
+  const [id, page] = (useParams()["*"] ?? "").split("/");
+  if (id && page === "page") {
+    const entity = novel.entities.find((e) => e.id === id);
+    return entity ? <EntryPage key={entity.id} novelId={novelId} novel={novel} entity={entity} workspace={workspace} spell={spell} /> : <Missing what={vocabulary(novel.kind).entity.one} />;
+  }
+  if (id === "new") return <BiblePage novelId={novelId} novel={novel} workspace={workspace} spell={spell} over={<EntryOver novelId={novelId} novel={novel} workspace={workspace} spell={spell} />} />;
+  return <BiblePage novelId={novelId} novel={novel} workspace={workspace} spell={spell} selected={id ? { entry: id } : undefined} />;
+}
+
+/** A module's record (an off-page event) beside the index's list, or a new one being named over it. */
+function RecordRoute({ type, ...props }: RouteProps & { type: ReturnType<typeof moduleRecordTypes>[number] }) {
+  const { recordId } = useParams();
+  const { novelId, novel, workspace, spell } = props;
+  if (recordId === "new") return <BiblePage novelId={novelId} novel={novel} workspace={workspace} spell={spell} over={<RecordOver type={type} {...props} />} />;
+  return <BiblePage novelId={novelId} novel={novel} workspace={workspace} spell={spell} selected={recordId ? { record: { type, id: recordId } } : undefined} />;
+}
 
 function ChapterRoute(props: RouteProps) {
   const { chapterId } = useParams();

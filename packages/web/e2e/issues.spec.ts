@@ -467,8 +467,7 @@ test("an entry's open issues on its page, a scene's in its details; renames foll
   await expect(openIssues).toContainText("On GitHub it's the label char/ada-kost.");
   await expect(openIssues.getByRole("listitem")).toHaveText([/^Where was Ada at noon\?/]);
 
-  // The Station's details: the issue about its passage, opened beside the text (the entry's modal closed first).
-  await page.getByRole("dialog").getByRole("button", { name: "Close" }).click();
+  // The Station's details: the issue about its passage, opened beside the text.
   await page.getByRole("tree", { name: "Manuscript" }).getByRole("treeitem", { name: /^The Station,/ }).click();
   await expect(page.getByRole("textbox", { name: "Scene text" })).toBeFocused();
   await page.keyboard.press("ControlOrMeta+k");
@@ -482,7 +481,7 @@ test("an entry's open issues on its page, a scene's in its details; renames foll
   const made = (await (await page.request.post(`${app.url}/api/novels/${id}/bible/entities`, { data: { type: "character", name: "Lena Dray" }, headers })).json()) as { id: string };
   await page.request.post(`${app.url}/api/novels/${id}/issues/labels`, { data: { name: "char/lena-dray", color: "1f77b4", description: `Lena Dray · ${made.id}` }, headers });
   await page.goto(`${app.url}/novels/${id}/bible/${made.id}`);
-  await expect(page.getByRole("heading", { level: 1, name: "Lena Dray" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Lena Dray" })).toBeVisible();
   await page.getByRole("button", { name: "Delete", exact: true }).click();
   await expect(notice(page)).toContainText("Deleted “Lena Dray”. Its label char/lena-dray is still on GitHub");
   await notice(page).getByRole("button", { name: "Remove label" }).click();

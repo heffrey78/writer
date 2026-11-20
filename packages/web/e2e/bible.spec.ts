@@ -24,7 +24,7 @@ test("adds a character, fills in the details and notes, all saved to its file", 
   await page.getByRole("button", { name: "New character" }).click();
   await page.getByRole("dialog").getByRole("textbox", { name: "Name" }).fill("Ilse Varn");
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("heading", { level: 1, name: "Ilse Varn" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Ilse Varn" })).toBeVisible();
   expect(novel.lastCommit()).toBe("Bible: add Ilse Varn");
   const file = "bible/characters/ilse-varn.md";
 
@@ -34,7 +34,7 @@ test("adds a character, fills in the details and notes, all saved to its file", 
   await expect(page.getByRole("textbox", { name: "Other names" })).toBeFocused();
   await page.keyboard.type("Ilse, the Aunt");
   await page.keyboard.press("Enter");
-  // Exactly: the gallery's card behind the profile says "also Ilse, the Aunt" too, once it has caught up.
+  // Exactly: the profile's, not the list's.
   await expect(page.getByText("Also Ilse, the Aunt", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Edit other names" })).toBeFocused();
   await page.getByRole("button", { name: "Add a summary" }).click();
@@ -60,7 +60,7 @@ test("adds a character, fills in the details and notes, all saved to its file", 
   await page.keyboard.type(" Not this.");
   await page.keyboard.press("Escape");
   await expect(page.getByRole("button", { name: "Edit summary" })).toBeFocused();
-  await expect(page.getByRole("dialog").getByText("Ada's aunt, who never left.", { exact: true })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Ilse Varn" }).getByText("Ada's aunt, who never left.", { exact: true })).toBeVisible();
 
   // A field renamed and changed, another added and removed.
   await page.getByRole("button", { name: "Edit age" }).click();
@@ -88,11 +88,11 @@ test("adds a character, fills in the details and notes, all saved to its file", 
 test("renames an entry by moving its file only; every reference still resolves", async ({ page, app }) => {
   const novel = await open(page, app);
   await palette(page, "character: ada");
-  await expect(page.getByRole("heading", { level: 1, name: "Ada Varn" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Ada Varn" })).toBeVisible();
   await page.getByRole("button", { name: "Edit name" }).click();
   await page.getByRole("textbox", { name: "Name", exact: true }).fill("Ada Kost");
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("heading", { level: 1, name: "Ada Kost" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Ada Kost" })).toBeVisible();
   expect(novel.lastCommit()).toBe("Bible: rename Ada Varn to Ada Kost");
   expect(app.git(novel.dir, "show", "-M", "--name-status", "--format=", "HEAD").trim()).toMatch(/^R\d+\tbible\/characters\/ada\.md\tbible\/characters\/ada-kost\.md$/);
   // Her scenes still list her, and the backlinks still find them.
@@ -102,7 +102,7 @@ test("renames an entry by moving its file only; every reference still resolves",
 test("lists every scene that refers to a character, and asks before deleting one the story uses", async ({ page, app }) => {
   const novel = await open(page, app);
   await page.goto(`${app.url}${new URL(app.launchUrl).pathname.replace(/\/chapter.*$/, "")}/bible/${ADA}`);
-  await expect(page.getByRole("heading", { level: 1, name: "Ada Varn" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Ada Varn" })).toBeVisible();
   // Every scene file that names her, in front matter or prose, is listed.
   const scenes = (dir: string): string[] =>
     readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? scenes(join(dir, e.name)) : e.name.endsWith(".md") ? [join(dir, e.name)] : []));
@@ -129,9 +129,11 @@ test("deletes an entry nobody refers to", async ({ page, app }) => {
   await palette(page, "new location");
   await page.getByRole("dialog").getByRole("textbox", { name: "Name" }).fill("The Old Mill");
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("heading", { level: 1, name: "The Old Mill" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "The Old Mill" })).toBeVisible();
   await page.getByRole("button", { name: "Delete", exact: true }).click();
+  await expect(page.getByRole("region", { name: "The Old Mill" })).toHaveCount(0);
   await expect(page.getByRole("heading", { level: 1, name: "Story bible" })).toBeVisible();
+  await expect(page).toHaveURL(/\/bible$/);
   expect(existsSync(join(novel.dir, "bible/locations/the-old-mill.md"))).toBe(false);
   expect(novel.lastCommit()).toBe("Bible: remove The Old Mill");
 });
@@ -147,7 +149,7 @@ test("a new type of entry works at once, with no code changes", async ({ page, a
   await page.getByRole("button", { name: "New vehicle" }).click();
   await page.getByRole("dialog").getByRole("textbox", { name: "Name" }).fill("The Night Train");
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("heading", { level: 1, name: "The Night Train" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "The Night Train" })).toBeVisible();
   expect(novel.read("bible/vehicles/the-night-train.md")).toMatch(/^---\nid: vehi_[0-9a-hjkmnp-tv-z]{6}\nname: The Night Train\n---\n$/);
 });
 
@@ -204,6 +206,9 @@ test("in the story: a strip of every scene, marking where the entry carries it, 
 test("the bible as a gallery: cards with a summary, facts, a strip and a count; sorted four ways by keyboard", async ({ page, app }) => {
   const novel = await open(page, app);
   await palette(page, "story bible");
+  // The Cards, chosen over the List (#134), and kept.
+  await page.getByRole("button", { name: "Cards" }).click();
+  await expect(page.getByRole("button", { name: "Cards" })).toHaveAttribute("aria-pressed", "true");
   const characters = page.getByRole("main").getByRole("region", { name: /^Characters/ });
   const cards = characters.getByRole("listitem").getByRole("link");
   // By first appearance: Ada at the station, Ben on the span, Tomas in his workshop, Mirela at her offer.
@@ -244,7 +249,83 @@ test("the bible as a gallery: cards with a summary, facts, a strip and a count; 
   await page.getByRole("button", { name: "New character" }).click();
   await page.getByRole("dialog").getByRole("textbox", { name: "Name" }).fill("Ilse Varn");
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("heading", { level: 1, name: "Ilse Varn" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Ilse Varn" })).toBeVisible();
   await page.goBack();
   await expect(cards.filter({ hasText: "Ilse Varn" })).toContainText("Not in the manuscript yet");
+});
+
+test("an entry opens beside the list: stepped through in the list's order, the list kept where it was; Open as page; one pane at a time when narrow (#134)", async ({ page, app }) => {
+  await open(page, app);
+  await page.setViewportSize({ width: 1440, height: 700 });
+  await palette(page, "story bible");
+  // Nothing open yet: the list, and a word on what goes beside it.
+  await expect(page.getByText("Choose an entry from the list to read it here.")).toBeVisible();
+  const list = page.getByRole("heading", { level: 1, name: "Story bible" }).locator("xpath=ancestor::div[contains(@class,'overflow-y-auto')][1]");
+  const rows = page.getByRole("region", { name: /^Characters/ }).getByRole("link");
+  await expect(rows.locator("span.font-semibold:not([aria-hidden])")).toHaveText(["Ada Varn", "Ben Varn", "Tomas Hale", "Mirela Kost"]);
+
+  // A row opens the entry beside the list, marked as the one open; the address names it and keeps the sort.
+  await page.getByRole("combobox", { name: "Sort" }).selectOption("name");
+  await rows.filter({ hasText: "Ada Varn" }).click();
+  const ada = page.getByRole("region", { name: "Ada Varn" });
+  await expect(ada.getByRole("heading", { level: 2, name: "Ada Varn" })).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`/bible/${ADA}\\?sort=name$`));
+  await expect(rows.filter({ hasText: "Ada Varn" })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByText(/^1 of \d+$/)).toBeVisible();
+  for (const colorScheme of ["light", "dark"] as const) {
+    await page.emulateMedia({ colorScheme });
+    await axe(page);
+  }
+  await page.emulateMedia({ colorScheme: "light" });
+
+  // Scrolled down the list, then stepped on: the next by name, and the list stays where it was.
+  await list.evaluate((el) => (el.scrollTop = 120));
+  await page.getByRole("link", { name: "Next entry" }).click();
+  await expect(page.getByRole("region", { name: "Ben Varn" })).toBeVisible();
+  await expect(page.getByText(/^2 of \d+$/)).toBeVisible();
+  expect(await list.evaluate((el) => el.scrollTop)).toBe(120);
+  await page.getByRole("link", { name: "Next entry" }).click();
+  await expect(page.getByRole("region", { name: "Mirela Kost" })).toBeVisible();
+  await page.getByRole("link", { name: "Previous entry" }).click();
+  await expect(page.getByRole("region", { name: "Ben Varn" })).toBeVisible();
+  // Back and Forward go through them too.
+  await page.goBack();
+  await expect(page.getByRole("region", { name: "Mirela Kost" })).toBeVisible();
+  await page.goBack();
+  await page.goBack();
+  await expect(page.getByRole("region", { name: "Ada Varn" })).toBeVisible();
+
+  // An edit saved beside the list changes its row, and the list doesn't move: renamed, Ada stays first.
+  await ada.getByRole("button", { name: "Edit name" }).click();
+  await page.getByRole("textbox", { name: "Name", exact: true }).fill("Zelda Varn");
+  await page.keyboard.press("Enter");
+  await expect(rows.locator("span.font-semibold:not([aria-hidden])")).toHaveText(["Zelda Varn", "Ben Varn", "Mirela Kost", "Tomas Hale"]);
+
+  // The entry as a page of its own, and back.
+  await page.getByRole("link", { name: "Open as page" }).click();
+  await expect(page).toHaveURL(new RegExp(`/bible/${ADA}/page$`));
+  await expect(page.getByRole("heading", { level: 1, name: "Zelda Varn" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Story bible" })).toHaveCount(0);
+  await page.goBack();
+
+  // Closed: the list alone, with the sort it had.
+  await page.getByRole("link", { name: "Close the entry" }).click();
+  await expect(page).toHaveURL(/\/bible\?sort=name$/);
+  await expect(page.getByText("Choose an entry from the list to read it here.")).toBeVisible();
+
+  // The list folded away and back.
+  await page.getByRole("button", { name: "Hide the list" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Story bible" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Show the list" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Story bible" })).toBeVisible();
+
+  // Too narrow for both: the list, then the entry in its place, with the way back to the list.
+  await page.setViewportSize({ width: 900, height: 700 });
+  await rows.filter({ hasText: "Ben Varn" }).click();
+  await expect(page.getByRole("region", { name: "Ben Varn" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Story bible" })).toHaveCount(0);
+  await axe(page);
+  await page.getByRole("link", { name: "Story bible" }).first().click();
+  await expect(page.getByRole("heading", { level: 1, name: "Story bible" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Ben Varn" })).toHaveCount(0);
 });

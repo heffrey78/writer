@@ -85,13 +85,15 @@ test("drafts: versions with their checkpoints", async ({ page, app }) => {
 test("the story bible", async ({ page, app }) => {
   await open(page, app);
   await page.getByRole("navigation", { name: "Views" }).getByRole("link", { name: "Story bible" }).click();
-  await page.waitForTimeout(500);
-  await shoot(page, "gallery");
+  // The list beside Ada Varn (#134); then the gallery of cards, with nothing open.
   await page.getByRole("main").getByRole("link", { name: /^Ada Varn/ }).first().click();
-  // Tall enough for her strip and arcs.
-  await page.setViewportSize({ width: 1440, height: 1500 });
+  await expect(page.getByRole("heading", { level: 2, name: "Ada Varn" })).toBeVisible();
   await page.waitForTimeout(800);
   await shoot(page, "bible");
+  await page.getByRole("button", { name: "Cards" }).click();
+  await page.getByRole("link", { name: "Close the entry" }).click();
+  await page.waitForTimeout(500);
+  await shoot(page, "gallery");
 });
 
 test("the command palette and compiling", async ({ page, app }) => {

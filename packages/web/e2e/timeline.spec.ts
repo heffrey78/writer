@@ -74,7 +74,7 @@ test("an off-page event is added from the timeline, made in its modal, and the t
   await dialog.getByRole("textbox", { name: "Title" }).fill("Ada at the station again");
   await axe(page);
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("heading", { level: 1, name: "Ada at the station again" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Ada at the station again" })).toBeVisible();
   await expect.poll(event).toMatch(/^---\nid: evt_[0-9a-z]{6}\ntitle: Ada at the station again\n---\n$/);
 
   // Day 1 at 17:50, at the station, with Ada.
@@ -107,7 +107,6 @@ test("an off-page event is added from the timeline, made in its modal, and the t
   await page.getByRole("textbox", { name: "Time" }).fill("08:00");
   await page.keyboard.press("Enter");
   await expect.poll(event).toContain('  time: "08:00"\n');
-  await page.getByRole("dialog").getByRole("button", { name: "Close" }).click();
   await openView(page, "Timeline");
   await expect(conflicts).toContainText("Nobody is in two places at once.");
 });

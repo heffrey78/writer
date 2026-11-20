@@ -139,7 +139,7 @@ test("refuses an image over GitHub's limit, and a file that isn't an image, befo
   expect(novel.clean()).toBe("");
 });
 
-test("a portrait on the gallery card, the mention card and the Entry tab; initials and No picture yet without one", async ({ page, app }) => {
+test("a portrait on the gallery card and the list's row, the mention card and the Entry tab; initials and No picture yet without one", async ({ page, app }) => {
   // Ada has a portrait already, committed with the novel.
   const dir = app.novelRepo("varn");
   mkdirSync(join(dir, "images"));
@@ -152,6 +152,7 @@ test("a portrait on the gallery card, the mention card and the Entry tab; initia
   const novelPath = new URL(app.launchUrl).pathname;
 
   await page.goto(app.launchUrl.replace(novelPath, `${novelPath}/bible`));
+  await page.getByRole("button", { name: "Cards" }).click();
   const characters = page.getByRole("region", { name: /^Characters/ });
   const portrait = characters.getByRole("link", { name: /^Portrait of Ada Varn Ada Varn/ }).getByRole("img", { name: "Portrait of Ada Varn" });
   await expect(portrait).toHaveAttribute("loading", "lazy");

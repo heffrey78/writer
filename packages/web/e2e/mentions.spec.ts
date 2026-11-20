@@ -36,13 +36,12 @@ test("@ in the chapter suggests the bible's entries; the mention survives renami
   await page.getByRole("button", { name: "Edit name" }).click();
   await page.getByRole("textbox", { name: "Name", exact: true }).fill("Tomas Brand");
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("heading", { level: 1, name: "Tomas Brand" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Tomas Brand" })).toBeVisible();
   // The words written stay; the mention still finds its entry, by ID.
   expect(novel.read(STATION)).toContain("[Tomas](#char_t0ma5h) would know.");
   await expect(page.getByRole("region", { name: "In the story" }).getByRole("link", { name: "The Station" })).toBeVisible();
 
-  // And @ offers the new name (the entry's modal closed first).
-  await page.getByRole("dialog").getByRole("button", { name: "Close" }).click();
+  // And @ offers the new name.
   await page.getByRole("tree", { name: "Manuscript" }).getByRole("treeitem", { name: /^Arrival,/ }).click();
   await caretInStation(page);
   await page.keyboard.type(" @tomas b");

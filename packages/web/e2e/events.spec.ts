@@ -25,7 +25,7 @@ async function openEvent(page: Page, title: string) {
   await page.keyboard.press("ControlOrMeta+k");
   await page.keyboard.type(`off the page: ${title}`);
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("heading", { level: 1, name: title })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: title })).toBeVisible();
 }
 
 test("an event's page: read first, each part edited in place by keyboard, its note as prose", async ({ page, app }) => {
@@ -33,8 +33,8 @@ test("an event's page: read first, each part edited in place by keyboard, its no
   const file = () => readFileSync(join(dir, FLOOD), "utf8");
   await openEvent(page, "The flood of '09");
 
-  // In its modal over the Story bible (heffrey78/gh-writer#236).
-  const modal = page.getByRole("dialog", { name: "The flood of '09" });
+  // Beside the Story bible's list (heffrey78/gh-writer#236, #134).
+  const modal = page.getByRole("region", { name: "The flood of '09" });
   await expect(modal.getByText("Story bible · Off the page")).toBeVisible();
   await expect(modal.getByText("2 Nov 2009 · 3 days")).toBeVisible();
   const rows = page.locator("dl[aria-label='Who, where and plotlines']");
@@ -85,7 +85,7 @@ test("a new title moves the event's file; deleting one the story mentions asks f
   await page.getByRole("button", { name: "Edit title" }).click();
   await page.getByRole("textbox", { name: "Title" }).fill("The great flood");
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("heading", { level: 1, name: "The great flood" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "The great flood" })).toBeVisible();
   await expect.poll(() => existsSync(join(dir, "bible/events/the-great-flood.md"))).toBe(true);
   expect(existsSync(join(dir, FLOOD))).toBe(false);
 
@@ -97,9 +97,9 @@ test("a new title moves the event's file; deleting one the story mentions asks f
   expect(existsSync(join(dir, "bible/events/the-great-flood.md"))).toBe(true);
   await page.getByRole("button", { name: "Delete", exact: true }).click();
   await ask.getByRole("button", { name: "Delete anyway" }).click();
-  // Back to the Story bible's off-page events, the modal closed.
+  // Back to the Story bible, nothing open beside its list.
   await expect(page.getByRole("heading", { level: 1, name: "Story bible" })).toBeVisible();
-  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "The great flood" })).toHaveCount(0);
   expect(existsSync(join(dir, "bible/events/the-great-flood.md"))).toBe(false);
   await expect.poll(() => app.git(dir, "log", "-1", "--format=%s").trim()).toBe("Bible: remove event “The great flood”");
 });
@@ -108,7 +108,7 @@ test("in a novel in format v1, the first change asks to move it to the new forma
   const dir = await openNovel(page, app, asFormatV1);
   const head = app.git(dir, "rev-parse", "HEAD");
   await openEvent(page, "The flood of '09");
-  await expect(page.getByRole("dialog").getByText("The father holds the seventh pier")).toBeVisible();
+  await expect(page.getByRole("region", { name: "The flood of '09" }).getByText("The father holds the seventh pier")).toBeVisible();
 
   await page.getByRole("button", { name: "Edit when and how long" }).click();
   const ask = page.getByRole("alertdialog", { name: "Move this novel to the new format?" });
@@ -273,7 +273,7 @@ test("events where the story's facts show: @ mentions and their cards, profiles'
   await page.keyboard.type("character: ben varn");
   await page.keyboard.press("Enter");
   await page.getByRole("link", { name: "The plans are stolen" }).last().click();
-  await expect(page.getByRole("heading", { level: 1, name: "The plans are stolen" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "The plans are stolen" })).toBeVisible();
 });
 
 test("the Story bible shows off-page events as cards, searched and sorted with the entries", async ({ page, app }) => {
@@ -300,5 +300,5 @@ test("the Story bible shows off-page events as cards, searched and sorted with t
   await expect(cards).toHaveCount(1);
   await expect(cards).toContainText("The flood of '09");
   await cards.getByRole("link").click();
-  await expect(page.getByRole("heading", { level: 1, name: "The flood of '09" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "The flood of '09" })).toBeVisible();
 });

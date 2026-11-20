@@ -1,18 +1,32 @@
-import { defaultEntrySort, entryPresences, sortEntries, typePlural, vocabulary, word, type Book, type Entity, type EntryPresence, type EntrySort, type Vocabulary } from "@writer/core";
-import { Plus, Search } from "lucide-react";
-import { Fragment, useEffect, useId, useMemo, useState, type ReactNode } from "react";
+import { defaultEntrySort, entryPresences, matchEntry, sortEntries, typePlural, vocabulary, word, type Book, type Entity, type EntryPresence, type EntrySort, type Vocabulary } from "@writer/core";
+import type { SpellService } from "@writer/editor/react";
+import { ChevronLeft, ChevronRight, Expand, LayoutGrid, List, PanelLeftClose, PanelLeftOpen, Plus, Search, Table2, X } from "lucide-react";
+import { Fragment, useEffect, useId, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
+import { create } from "zustand";
 import { moduleRecordTypes } from "../modules.tsx";
+import type { Workspace } from "../novel/workspace.ts";
 import { Button } from "../ui/button.tsx";
+import { cn } from "../ui/cn.ts";
+import { PAGE } from "../ui/page.ts";
+import { useBookKind, useWords } from "../novel/kind.ts";
+import { EntryPage } from "./entry-page.tsx";
 import { Picture, usePictureUrl } from "./picture.tsx";
 import { pictureAlt, shapeForType } from "./pictures.ts";
 import { NewTypeDialog } from "./new-entry.tsx";
+import { OpenParts, saveOpenParts } from "./profile.tsx";
 import { RelationshipTypes } from "./relationship-types.tsx";
 import { markWords } from "./strip.tsx";
-import { useBookKind, useWords } from "../novel/kind.ts";
-import { entriesByType, matches } from "./types.ts";
-import { PAGE } from "../ui/page.ts";
-import { cn } from "../ui/cn.ts";
+import { entriesByType } from "./types.ts";
+
+/*
+ * The index (the Story bible, a campaign's Codex, a journal's Index; heffrey78/gh-writer#162, #134): its
+ * entries listed by type, searchable by anything they say and sorted four ways, and the one chosen open
+ * beside the list, so moving to the next is one step and the list keeps its place. The list is a List
+ * of rows or the Cards of the gallery; the kind's modules add their records after the entries (off-page
+ * events), opening beside it too. In a window too narrow for both, the list and the entry are one
+ * screen each.
+ */
 
 const sorts = (w: Vocabulary): { key: EntrySort; label: string }[] => [
   { key: "first", label: "First appearance" },
@@ -23,53 +37,170 @@ const sorts = (w: Vocabulary): { key: EntrySort; label: string }[] => [
 
 const MARK = { carries: "bg-accent", present: "bg-accent/40", mentioned: "bg-accent/15", absent: "bg-rule/60" } as const;
 
-/**
- * The story bible (heffrey78/gh-writer#162): every entry as a card, grouped by type, with its picture (heffrey78/gh-writer#168), its summary, a fact or two, a
- * small strip of the scenes it's in and how many; searchable by anything an entry says (#134) and sorted by
- * first or last appearance, name or most scenes. The kind's modules add their records' sections after the
- * entries (off-page events). An entry or a record opens in a modal over it (`over`, heffrey78/gh-writer#236, heffrey78/gh-writer#237).
- */
-export function BiblePage({ novelId, novel, over }: { novelId: string; novel: Book; over?: ReactNode }) {
+type View = "list" | "cards";
+
+/** What the index shows beside its list: an entry, a module's record, or nothing yet. */
+export type Selected = { entry: string } | { record: { type: ReturnType<typeof moduleRecordTypes>[number]; id: string } } | undefined;
+
+/** The list's view and width, and whether it's folded away: kept per book on this device. */
+interface IndexLayout {
+  view: View;
+  width: Record<View, number>;
+  collapsed: boolean;
+}
+const LAYOUT_DEFAULT: IndexLayout = { view: "list", width: { list: 352, cards: 560 }, collapsed: false };
+const MIN_WIDTH = 260;
+const MAX_WIDTH = 760;
+const layoutKey = (novelId: string) => `ghw:index:${novelId}`;
+
+function readLayout(novelId: string): IndexLayout {
+  try {
+    const saved = JSON.parse(localStorage.getItem(layoutKey(novelId)) ?? "{}") as Partial<IndexLayout>;
+    const clamp = (n: unknown, d: number) => Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, Number(n) || d));
+    return {
+      view: saved.view === "cards" ? "cards" : "list",
+      width: { list: clamp(saved.width?.list, LAYOUT_DEFAULT.width.list), cards: clamp(saved.width?.cards, LAYOUT_DEFAULT.width.cards) },
+      collapsed: saved.collapsed === true,
+    };
+  } catch {
+    return LAYOUT_DEFAULT;
+  }
+}
+
+const useLayouts = create<Record<string, IndexLayout>>(() => ({}));
+
+function useIndexLayout(novelId: string): [IndexLayout, (change: Partial<IndexLayout>) => void] {
+  const layout = useLayouts((s) => s[novelId]) ?? readLayout(novelId);
+  const set = (change: Partial<IndexLayout>) => {
+    const next = { ...(useLayouts.getState()[novelId] ?? readLayout(novelId)), ...change };
+    useLayouts.setState({ [novelId]: next });
+    try {
+      localStorage.setItem(layoutKey(novelId), JSON.stringify(next));
+    } catch {
+      // Not kept for next time; still as asked now.
+    }
+  };
+  return [layout, set];
+}
+
+/** Wide enough for the list and an entry side by side. */
+const TWO_PANES = "(min-width: 70rem)";
+
+function useTwoPanes(): boolean {
+  const [wide, setWide] = useState(() => typeof matchMedia !== "function" || matchMedia(TWO_PANES).matches);
+  useEffect(() => {
+    if (typeof matchMedia !== "function") return;
+    const query = matchMedia(TWO_PANES);
+    const on = () => setWide(query.matches);
+    query.addEventListener("change", on);
+    return () => query.removeEventListener("change", on);
+  }, []);
+  return wide;
+}
+
+export function BiblePage({
+  novelId,
+  novel,
+  workspace,
+  spell,
+  selected,
+  over,
+}: {
+  novelId: string;
+  novel: Book;
+  workspace?: Workspace;
+  spell?: { service: SpellService; onAddWord: (w: string) => void } | undefined;
+  selected?: Selected;
+  /** A modal over it: a new entry or record being named. */
+  over?: ReactNode;
+}) {
   const w = vocabulary(novel.kind);
   const [params, setParams] = useSearchParams();
+  const { search, hash } = useLocation();
   const query = params.get("q") ?? "";
   const navigate = useNavigate();
-  /** A new entry (of a type, or chosen), in its modal over the gallery. */
+  const [layout, setLayout] = useIndexLayout(novelId);
+  const twoPanes = useTwoPanes();
+  /** A new entry (of a type, or chosen), in its modal over the index. */
   const add = (type?: string) => void navigate(`/novels/${novelId}/bible/new${type ? `?type=${encodeURIComponent(type)}` : ""}`, { state: { fromGallery: true } });
   const [addingType, setAddingType] = useState(false);
   const searchId = useId();
+  const sortId = useId();
   const fallback = defaultEntrySort(novel.kind);
   const sort: EntrySort = (params.get("sort") as EntrySort | null) ?? fallback;
-  const sortId = useId();
   const presences = useMemo(() => entryPresences(novel), [novel]);
-  const groups = entriesByType(novel).map((g) => ({ ...g, shown: sortEntries(novel, g.entries.filter((e) => matches(e, query)), sort, presences) }));
+  const records = moduleRecordTypes(novel.kind);
+
+  // The list's order and what's in it, kept while the entries change underneath (an entry renamed, a
+  // summary edited no longer matching): it's worked out again when the search, the sort or which
+  // entries there are changes, so the list never moves under the writer as they work through it.
+  // Which types and entries there are, not the order they're loaded in (a renamed entry's file moves).
+  const ids = `${novel.entityTypes.map((t) => t.key).join(" ")}|${novel.entities.map((e) => e.id).sort().join(" ")}`;
+  const order = useMemo(
+    () =>
+      entriesByType(novel).map((g) => ({
+        type: g.type.key,
+        count: g.entries.length,
+        shown: sortEntries(novel, g.entries.filter((e) => matchEntry(e, query)), sort, presences).map((e) => e.id),
+      })),
+    [query, sort, ids], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  const byId = new Map(novel.entities.map((e) => [e.id, e]));
+  const groups = order.flatMap((g) => {
+    const type = novel.entityTypes.find((t) => t.key === g.type);
+    return type ? [{ type, count: novel.entities.filter((e) => e.type === g.type).length, shown: g.shown.flatMap((id) => byId.get(id) ?? []) }] : [];
+  });
+  const found = groups.reduce((n, g) => n + g.shown.length, 0);
+  const listed = groups.flatMap((g) => g.shown);
+
   const setParam = (key: string, value: string | undefined) => {
     const next = new URLSearchParams(params);
     if (value) next.set(key, value);
     else next.delete(key);
     setParams(next, { replace: true });
   };
-  const found = groups.reduce((n, g) => n + g.shown.length, 0);
-  const records = moduleRecordTypes(novel.kind);
-  // Arriving at a group (the book pane's Off the page links to #off-the-page): scrolled to it.
-  const { hash } = useLocation();
+
+  // The parts of the entry beside the list open for editing: saved before another entry is opened.
+  const parts = useMemo(() => new Set<() => Promise<boolean>>(), []);
+  const go = async (to: string, e?: MouseEvent) => {
+    if (e && (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0)) return; // a new tab or window: as the browser does
+    e?.preventDefault();
+    if (await saveOpenParts(parts)) void navigate(to);
+  };
+  const entryHref = (id: string) => `/novels/${novelId}/bible/${id}${search}`;
+
+  const selectedId = selected && "entry" in selected ? selected.entry : selected?.record.id;
+  const list = useRef<HTMLDivElement>(null);
+  // The one open, in view in the list; and arriving at a group (the book pane's Off the page links to #off-the-page), that group.
+  useEffect(() => {
+    if (selectedId) list.current?.querySelector(`[data-entry="${CSS.escape(selectedId)}"]`)?.scrollIntoView({ block: "nearest" });
+  }, [selectedId]);
   useEffect(() => {
     if (hash) document.getElementById(hash.slice(1))?.scrollIntoView();
   }, [hash]);
 
-  return (
-    <div className={cn(PAGE, "grid gap-6")}>
-      <div className="flex flex-wrap items-center justify-between gap-3">
+  const view: View = layout.view;
+  const listContent = (
+    <div ref={list} className={cn("grid content-start gap-5", view === "cards" && !selected ? PAGE : "px-4 py-4")}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-xl font-semibold">{w.codex.One}</h1>
-        <div className="flex gap-2">
-          <Button onClick={() => setAddingType(true)}>New type</Button>
-          <Button variant="primary" onClick={() => add()}>
+        <div className="flex flex-wrap gap-2">
+
+          <Button size="sm" onClick={() => setAddingType(true)}>
+            New type
+          </Button>
+          <Button size="sm" variant="primary" onClick={() => add()}>
             <Plus className="size-4" aria-hidden /> New {w.entity.one}
           </Button>
+          {twoPanes && (view === "list" || selected) && (
+            <Button size="sm" variant="ghost" onClick={() => setLayout({ collapsed: true })} aria-label="Hide the list" title="Hide the list">
+              <PanelLeftClose className="size-4" aria-hidden />
+            </Button>
+          )}
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative min-w-60 flex-1">
+      <div className="grid gap-2">
+        <div className="relative">
           <label htmlFor={searchId} className="sr-only">
             Search the {w.codex.short}
           </label>
@@ -83,38 +214,45 @@ export function BiblePage({ novelId, novel, over }: { novelId: string; novel: Bo
             className="h-9 w-full rounded-md border border-rule bg-raised pr-3 pl-9 text-sm"
           />
         </div>
-        <label htmlFor={sortId} className="flex items-center gap-2 text-sm text-muted">
-          Sort
-          <select id={sortId} value={sort} onChange={(e) => setParam("sort", e.target.value === fallback ? undefined : e.target.value)} className="h-9 rounded-md border border-rule bg-raised px-2 text-ink">
-            {sorts(w).map((s) => (
-              <option key={s.key} value={s.key}>
-                {s.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <ViewSwitch view={view} onChange={(v) => setLayout({ view: v })} />
+          <label htmlFor={sortId} className="flex items-center gap-2 text-sm text-muted">
+            Sort
+            <select id={sortId} value={sort} onChange={(e) => setParam("sort", e.target.value === fallback ? undefined : e.target.value)} className="h-8 rounded-md border border-rule bg-raised px-2 text-ink">
+              {sorts(w).map((s) => (
+                <option key={s.key} value={s.key}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
       </div>
       {query && (
         <p role="status" className="text-sm text-muted">
           {w.entity.count(found)} match “{query}”{records.length > 0 && ` (and the ${records.map((t) => word(t.def.noun).many).join(" and ")} below that do)`}
         </p>
       )}
-      {groups.map(({ type, entries, shown }) =>
+      {groups.map(({ type, count, shown }) =>
         query && !shown.length ? null : (
           <section key={type.key} aria-labelledby={`type-${type.key}`} className="grid gap-2">
             <div className="flex items-center justify-between gap-2">
               <h2 id={`type-${type.key}`} className="font-semibold">
-                {typePlural(type)} <span className="text-sm font-normal text-muted">{entries.length}</span>
+                {typePlural(type)} <span className="text-sm font-normal text-muted">{count}</span>
               </h2>
               <Button size="sm" variant="ghost" onClick={() => add(type.key)} aria-label={`New ${type.label.toLowerCase()}`}>
                 <Plus className="size-4" aria-hidden /> New
               </Button>
             </div>
             {shown.length ? (
-              <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <ul className={view === "cards" ? cn("grid gap-3", selected ? "grid-cols-[repeat(auto-fill,minmax(15rem,1fr))]" : "sm:grid-cols-2 lg:grid-cols-3") : "grid gap-0.5"}>
                 {shown.map((e) => (
-                  <li key={e.id} className="grid">
-                    <EntryCard novelId={novelId} entity={e} presence={presences.get(e.id)} />
+                  <li key={e.id} className="grid" data-entry={e.id}>
+                    {view === "cards" ? (
+                      <EntryCard novelId={novelId} entity={e} presence={presences.get(e.id)} href={entryHref(e.id)} current={e.id === selectedId} onOpen={go} />
+                    ) : (
+                      <EntryRow novelId={novelId} entity={e} presence={presences.get(e.id)} href={entryHref(e.id)} current={e.id === selectedId} onOpen={go} match={query ? matchEntry(e, query) : undefined} />
+                    )}
                   </li>
                 ))}
               </ul>
@@ -128,17 +266,317 @@ export function BiblePage({ novelId, novel, over }: { novelId: string; novel: Bo
         <Fragment key={t.type}>{t.gallery({ novelId, novel, query, sort })}</Fragment>
       ))}
       {!query && <RelationshipTypes novelId={novelId} novel={novel} />}
+    </div>
+  );
+
+  const step = selected && "entry" in selected ? listed.findIndex((e) => e.id === selected.entry) : -1;
+  const pane = selected && (
+    <EntryPane
+      novelId={novelId}
+      novel={novel}
+      workspace={workspace}
+      spell={spell}
+      selected={selected}
+      parts={parts}
+      twoPanes={twoPanes}
+      alone={!twoPanes || layout.collapsed}
+      position={step >= 0 ? { at: step, of: listed.length, previous: listed[step - 1]?.id, next: listed[step + 1]?.id } : undefined}
+      href={entryHref}
+      onGo={go}
+      closeTo={`/novels/${novelId}/bible${search}`}
+    />
+  );
+
+  const dialogs = (
+    <>
       <NewTypeDialog novelId={novelId} novel={novel} open={addingType} onOpenChange={setAddingType} />
       {over}
+    </>
+  );
+
+  // One pane: the list, or the entry with a way back to it. The gallery of cards, with nothing open, as wide as any page.
+  if (!twoPanes || (view === "cards" && !selected)) {
+    return (
+      <>
+        {selected && !twoPanes ? pane : listContent}
+        {dialogs}
+      </>
+    );
+  }
+
+  const width = layout.width[view];
+  return (
+    <div className="grid h-full min-h-0" style={{ gridTemplateColumns: layout.collapsed ? "2.75rem minmax(0,1fr)" : `${width}px 0.375rem minmax(0,1fr)` }}>
+      {layout.collapsed ? (
+        <div className="flex flex-col items-center gap-1 border-r border-rule bg-panel py-2">
+          <button type="button" onClick={() => setLayout({ collapsed: false })} aria-label="Show the list" title="Show the list" className="rounded-md p-2 text-muted hover:bg-paper hover:text-ink">
+            <PanelLeftOpen className="size-4" aria-hidden />
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="min-h-0 overflow-y-auto">{listContent}</div>
+          <ResizeHandle width={width} onResize={(n) => setLayout({ width: { ...layout.width, [view]: n } })} label="Resize the list" />
+        </>
+      )}
+      <div className="min-h-0 overflow-y-auto">
+        {pane ?? (
+          <div className="grid h-full place-items-center px-6 py-10 text-center text-muted">
+            <div className="grid max-w-sm gap-2">
+              <p>Choose {w.entity.a} from the list to read it here.</p>
+              <p className="text-sm">Or make one with New {w.entity.one}.</p>
+            </div>
+          </div>
+        )}
+      </div>
+      {dialogs}
     </div>
   );
 }
 
+function ViewSwitch({ view, onChange }: { view: View; onChange: (v: View) => void }) {
+  const options = [
+    { key: "list" as const, label: "List", icon: List },
+    { key: "cards" as const, label: "Cards", icon: LayoutGrid },
+  ];
+  return (
+    <div role="group" aria-label="Show as" className="flex overflow-hidden rounded-md border border-rule text-xs">
+      {options.map((o) => (
+        <button key={o.key} type="button" aria-pressed={view === o.key} onClick={() => onChange(o.key)} className={cn("flex items-center gap-1 border-r border-rule px-2.5 py-1", view === o.key ? "bg-ink text-paper" : "bg-raised hover:bg-panel")}>
+          <o.icon className="size-3.5" aria-hidden /> {o.label}
+        </button>
+      ))}
+      <button type="button" disabled title="Coming next: every entry of a type in a table" className="flex cursor-not-allowed items-center gap-1 bg-raised px-2.5 py-1 text-muted">
+        <Table2 className="size-3.5" aria-hidden /> Table
+      </button>
+    </div>
+  );
+}
+
+/** The edge between the list and the entry: dragged, or moved with the arrow keys. */
+function ResizeHandle({ width, onResize, label }: { width: number; onResize: (n: number) => void; label: string }) {
+  const clamp = (n: number) => Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, n));
+  return (
+    <div
+      role="separator"
+      aria-orientation="vertical"
+      aria-label={label}
+      aria-valuemin={MIN_WIDTH}
+      aria-valuemax={MAX_WIDTH}
+      aria-valuenow={width}
+      tabIndex={0}
+      onKeyDown={(e) => {
+        const by = e.shiftKey ? 64 : 16;
+        if (e.key === "ArrowLeft") onResize(clamp(width - by));
+        else if (e.key === "ArrowRight") onResize(clamp(width + by));
+        else return;
+        e.preventDefault();
+      }}
+      onPointerDown={(e) => {
+        e.preventDefault();
+        const start = e.clientX;
+        const move = (m: PointerEvent) => onResize(clamp(width + m.clientX - start));
+        const up = () => {
+          window.removeEventListener("pointermove", move);
+          window.removeEventListener("pointerup", up);
+        };
+        window.addEventListener("pointermove", move);
+        window.addEventListener("pointerup", up);
+      }}
+      className="h-full cursor-col-resize border-l border-rule hover:bg-accent/30 focus-visible:bg-accent/40 focus-visible:outline-none"
+    />
+  );
+}
+
+/** The entry or record beside the list (or, one pane at a time, in its place), with the way through the list. */
+function EntryPane({
+  novelId,
+  novel,
+  workspace,
+  spell,
+  selected,
+  parts,
+  twoPanes,
+  alone,
+  position,
+  href,
+  onGo,
+  closeTo,
+}: {
+  novelId: string;
+  novel: Book;
+  workspace: Workspace | undefined;
+  spell: { service: SpellService; onAddWord: (w: string) => void } | undefined;
+  selected: NonNullable<Selected>;
+  parts: Set<() => Promise<boolean>>;
+  twoPanes: boolean;
+  /** Without the list beside it: its name is then the page's heading. */
+  alone: boolean;
+  position: { at: number; of: number; previous: string | undefined; next: string | undefined } | undefined;
+  href: (id: string) => string;
+  onGo: (to: string, e?: MouseEvent) => Promise<void>;
+  closeTo: string;
+}) {
+  const w = vocabulary(novel.kind);
+  const headingId = useId();
+  const state = useLocation().state as { focusProse?: boolean } | null;
+  const pane = useRef<HTMLElement>(null);
+  const entity = "entry" in selected ? novel.entities.find((e) => e.id === selected.entry) : undefined;
+  const record = "record" in selected ? novel.moduleRecords.find((r) => r.type === selected.record.type.type && r.id === selected.record.id) : undefined;
+  const id = "entry" in selected ? selected.entry : selected.record.id;
+  // Just made (its modal closing as it opens here): in focus, after the modal has given the focus back
+  // to what opened it, so a screen reader says its name and Tab goes on into it.
+  useEffect(() => {
+    if (!state?.focusProse) return;
+    const t = setTimeout(() => pane.current?.focus());
+    return () => clearTimeout(t);
+  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const nav = (to: string | undefined, label: string, icon: ReactNode) =>
+    to ? (
+      <a href={href(to)} onClick={(e) => void onGo(href(to), e)} aria-label={label} title={label} className="rounded-md p-1.5 text-muted hover:bg-panel hover:text-ink">
+        {icon}
+      </a>
+    ) : (
+      <span aria-hidden className="rounded-md p-1.5 text-muted/40">
+        {icon}
+      </span>
+    );
+
+  const gone = (
+    <div className="grid gap-2 px-6 py-6">
+      <h2 className="text-xl font-semibold">No such {"entry" in selected ? w.entity.one : (selected.record.type.def.noun.short ?? selected.record.type.def.noun.label).toLowerCase()}</h2>
+      <p className="text-muted">It may have been deleted.</p>
+    </div>
+  );
+
+  if (!workspace) return gone;
+  return (
+    <section ref={pane} aria-labelledby={headingId} tabIndex={-1} className="grid content-start outline-none">
+      <div className={cn("flex flex-wrap items-center gap-1 border-b border-rule px-4 py-1.5 text-sm", !twoPanes && "sticky top-0 z-10 bg-paper")}>
+        {!twoPanes && (
+          <Link to={closeTo} onClick={(e) => void onGo(closeTo, e)} className="flex items-center gap-1 rounded-md px-1.5 py-1 text-muted hover:bg-panel hover:text-ink">
+            <ChevronLeft className="size-4" aria-hidden /> {w.codex.One}
+          </Link>
+        )}
+        {position && (
+          <>
+            {nav(position.previous, `Previous ${w.entity.one}`, <ChevronLeft className="size-4" aria-hidden />)}
+            <span className="text-xs text-muted tabular-nums">
+              {position.at + 1} of {position.of}
+            </span>
+            {nav(position.next, `Next ${w.entity.one}`, <ChevronRight className="size-4" aria-hidden />)}
+          </>
+        )}
+        <span className="flex-1" />
+        {entity && (
+          <Link to={`/novels/${novelId}/bible/${entity.id}/page`} onClick={(e) => void onGo(`/novels/${novelId}/bible/${entity.id}/page`, e)} className="flex items-center gap-1 rounded-md px-1.5 py-1 text-muted hover:bg-panel hover:text-ink">
+            <Expand className="size-4" aria-hidden /> Open as page
+          </Link>
+        )}
+        {twoPanes && (
+          <Link to={closeTo} onClick={(e) => void onGo(closeTo, e)} aria-label={`Close the ${"entry" in selected ? w.entity.one : (selected.record.type.def.noun.short ?? selected.record.type.def.noun.label).toLowerCase()}`} title="Close" className="rounded-md p-1.5 text-muted hover:bg-panel hover:text-ink">
+            <X className="size-4" aria-hidden />
+          </Link>
+        )}
+      </div>
+      <div className="px-6 pt-4 pb-10">
+        <OpenParts.Provider value={parts}>
+          {entity ? (
+            <EntryPage key={entity.id} novelId={novelId} novel={novel} entity={entity} workspace={workspace} spell={spell} embedded={{ headingId, modal: alone }} />
+          ) : record && "record" in selected ? (
+            <Fragment key={record.id}>{selected.record.type.page({ novelId, novel, workspace, record, spell, embedded: { headingId, modal: alone } })}</Fragment>
+          ) : (
+            gone
+          )}
+        </OpenParts.Provider>
+      </div>
+    </section>
+  );
+}
+
+/** A small strip of the pieces an entry is in, by how. */
+function MiniStrip({ presence, words }: { presence: EntryPresence | undefined; words: Record<string, string | undefined> }) {
+  const n = presence?.scenes.length ?? 0;
+  if (!n) return null;
+  return (
+    <span aria-hidden className="grid w-16 shrink-0" style={{ gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))`, gap: n > 24 ? 0 : 1 }}>
+      {presence!.scenes.map(({ scene, mark }) => (
+        <span key={scene.id} title={`${scene.title}: ${mark === "absent" ? "not there" : (words[mark] ?? words.present)}`} className={`h-1.5 rounded-[1px] ${MARK[mark]}`} />
+      ))}
+    </span>
+  );
+}
+
+/** An entry in the List: its picture or initials, name, what matched or its summary, where it is. */
+function EntryRow({
+  novelId,
+  entity,
+  presence,
+  href,
+  current,
+  onOpen,
+  match,
+}: {
+  novelId: string;
+  entity: Entity;
+  presence: EntryPresence | undefined;
+  href: string;
+  current: boolean;
+  onOpen: (to: string, e?: MouseEvent) => Promise<void>;
+  match: ReturnType<typeof matchEntry> | undefined;
+}) {
+  const shape = shapeForType(entity.type);
+  const url = usePictureUrl(novelId, entity.image);
+  const w = useWords();
+  const words = markWords(useBookKind(), entity.type, w);
+  const count = presence?.count ?? 0;
+  const where = match && match.where !== "name" ? match : undefined;
+  const second = where?.text ? (
+    <>
+      {where.text.slice(0, where.at![0])}
+      <mark className="rounded-sm bg-accent-soft text-ink">{where.text.slice(...where.at!)}</mark>
+      {where.text.slice(where.at![1])}
+      <span className="text-muted"> · {where.where === "alias" ? "other name" : where.where}</span>
+    </>
+  ) : (
+    entity.summary
+  );
+  return (
+    <a
+      href={href}
+      onClick={(e) => void onOpen(href, e)}
+      aria-current={current ? "page" : undefined}
+      className={cn(
+        "flex items-center gap-3 rounded-md px-2 py-1.5 hover:bg-panel focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none",
+        current && "bg-accent-soft shadow-[inset_2px_0_0_var(--color-accent)] hover:bg-accent-soft",
+      )}
+    >
+      {url ? (
+        // Decorative: the name beside it says who it is.
+        <Picture src={url} alt="" decorative focus={entity.imageFocus} className={shape.key === "wide" ? "h-7 w-10 shrink-0 rounded" : "h-10 w-8 shrink-0 rounded"} />
+      ) : (
+        <span aria-hidden className={cn("grid shrink-0 place-items-center rounded bg-panel text-[11px] font-semibold text-muted", shape.key === "wide" ? "h-7 w-10" : "h-10 w-8")}>
+          {initials(entity.name)}
+        </span>
+      )}
+      <span className="grid min-w-0 flex-1">
+        <span className="truncate font-semibold">{entity.name}</span>
+        {second && <span className="truncate text-xs text-muted">{second}</span>}
+      </span>
+      <span className="flex shrink-0 flex-col items-end gap-1">
+        <MiniStrip presence={presence} words={words} />
+        <span className="text-[11px] whitespace-nowrap text-muted tabular-nums">{count === 0 ? "Not yet" : w.piece.count(count)}</span>
+      </span>
+    </a>
+  );
+}
+
 /**
- * An entry in the gallery: what it is at a glance, opening its profile. A portrait sits beside the
+ * An entry in the Cards: what it is at a glance, opening its profile. A portrait sits beside the
  * name (its initials where there's none); a place's picture is a banner across the card.
  */
-function EntryCard({ novelId, entity, presence }: { novelId: string; entity: Entity; presence: EntryPresence | undefined }) {
+function EntryCard({ novelId, entity, presence, href, current, onOpen }: { novelId: string; entity: Entity; presence: EntryPresence | undefined; href: string; current: boolean; onOpen: (to: string, e?: MouseEvent) => Promise<void> }) {
   const shape = shapeForType(entity.type);
   const url = usePictureUrl(novelId, entity.image);
   const count = presence?.count ?? 0;
@@ -153,7 +591,12 @@ function EntryCard({ novelId, entity, presence }: { novelId: string; entity: Ent
     ...(entity.aliases.length ? [`also ${entity.aliases.join(", ")}`] : []),
   ].slice(0, 2);
   return (
-    <Link to={`/novels/${novelId}/bible/${entity.id}`} state={{ fromGallery: true }} className="grid content-start gap-2 rounded-lg border border-rule bg-raised px-4 py-3 hover:border-accent focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none">
+    <a
+      href={href}
+      onClick={(e) => void onOpen(href, e)}
+      aria-current={current ? "page" : undefined}
+      className={cn("grid content-start gap-2 rounded-lg border border-rule bg-raised px-4 py-3 hover:border-accent focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none", current && "border-accent ring-1 ring-accent")}
+    >
       {shape.key === "wide" ? (
         <>
           {url ? (
@@ -190,11 +633,11 @@ function EntryCard({ novelId, entity, presence }: { novelId: string; entity: Ent
         )}
         <span className="text-xs whitespace-nowrap text-muted">{count === 0 ? `Not in the ${w.content.one} yet` : w.piece.count(count)}</span>
       </span>
-    </Link>
+    </a>
   );
 }
 
-/** "AV" for Ada Varn: a card's stand-in for a portrait. */
+/** "AV" for Ada Varn: a stand-in for a portrait. */
 function initials(name: string): string {
   return name
     .split(/\s+/)

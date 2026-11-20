@@ -67,8 +67,10 @@ test("notes are made from the palette, made into an event or a scene, and delete
   const dialog = page.getByRole("dialog", { name: "Make “What if Ben never sold the plans?” part of the manuscript" });
   await axe(page);
   await dialog.getByRole("button", { name: "Make the event" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "What if Ben never sold the plans?" })).toBeVisible();
-  await expect(page.getByText("Story bible · Off the page")).toBeVisible();
+  // The event, beside the Story bible's list (#134).
+  const event = page.getByRole("region", { name: "What if Ben never sold the plans?" });
+  await expect(event.getByRole("heading", { level: 2, name: "What if Ben never sold the plans?" })).toBeVisible();
+  await expect(event.getByText("Story bible · Off the page")).toBeVisible();
   await palette(page, "note: what if ben");
   await expect(page.getByText("Became the off-page event “What if Ben never sold the plans?”.")).toBeVisible();
 
@@ -108,10 +110,10 @@ test("an entry's and an event's profiles list the notes that mention them", asyn
   await expect(section).toContainText("ending, ben");
   await axe(page);
   await palette(page, "off the page: the flood");
-  await expect(page.getByRole("dialog", { name: "The flood of '09" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "The flood of '09" })).toBeVisible();
   await expect(page.getByRole("region", { name: "In your notes" }).getByRole("link")).toHaveText(["What if Ben never sold the plans?"]);
   await palette(page, "character: ben varn");
-  await expect(page.getByRole("heading", { level: 1, name: "Ben Varn" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Ben Varn" })).toBeVisible();
   await expect(page.getByRole("region", { name: "In your notes" })).toHaveCount(0);
   await palette(page, "character: ada");
   await page.getByRole("region", { name: "In your notes" }).getByRole("link", { name: "What if Ben never sold the plans?" }).click();

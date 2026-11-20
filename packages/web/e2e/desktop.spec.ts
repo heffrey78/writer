@@ -74,11 +74,11 @@ test("in the desktop app, the mouse's back and forward buttons go back and forwa
   await page.keyboard.press("ControlOrMeta+k");
   await page.keyboard.type("character: ada");
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("heading", { level: 1, name: "Ada Varn" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Ada Varn" })).toBeVisible();
 
   const press = (button: number) => page.evaluate((b) => window.dispatchEvent(new MouseEvent("mouseup", { button: b, cancelable: true })), button);
   await press(3);
   await expect(page.getByRole("textbox", { name: "Chapter text" })).toBeVisible();
   await press(4);
-  await expect(page.getByRole("heading", { level: 1, name: "Ada Varn" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Ada Varn" })).toBeVisible();
 });
