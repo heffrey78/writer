@@ -4,6 +4,7 @@ import { BookOpen, CircleDot, Columns2, Goal, ListTree, Map as MapIcon, Network,
 import { Dialog } from "radix-ui";
 import { useEffect, useId, useState, type ReactNode } from "react";
 import { Link, NavLink, useLocation } from "react-router";
+import { useRecentEntries } from "../bible/recent.ts";
 import { create } from "zustand";
 import { typePlural } from "@writer/core";
 import { useCommands } from "../commands.ts";
@@ -191,6 +192,7 @@ function Expanded({ novelId, novel, workspace, current, onGitHub, toggle }: { no
                   <p.icon className="size-4 shrink-0 text-muted" aria-hidden />
                   {p.label}
                 </NavLink>
+                {p.path === "bible" && <RecentEntries novelId={novelId} novel={novel} />}
                 {p.path === "bible" && (
                   <ul aria-label={`${vocabulary(novel.kind).codex.One} types`} className="mt-0.5 grid gap-0.5 pl-8 text-xs text-muted">
                     {novel.entityTypes.map((t) => (
@@ -264,5 +266,27 @@ function Strip({ novelId, novel, onGitHub, toggle }: { novelId: string; novel: B
         ))}
       </nav>
     </aside>
+  );
+}
+
+/** The entries last opened in the index (#134), newest first, under its types: the few being worked with, a click away. */
+function RecentEntries({ novelId, novel }: { novelId: string; novel: Book }) {
+  const recent = useRecentEntries(novelId).flatMap((id) => {
+    const entity = novel.entities.find((e) => e.id === id);
+    if (entity) return [{ id, name: entity.name, to: `/novels/${novelId}/bible/${id}` }];
+    const record = novel.moduleRecords.find((r) => r.id === id);
+    return record ? [{ id, name: record.title, to: `/novels/${novelId}/${record.type}/${id}` }] : [];
+  });
+  if (!recent.length) return null;
+  return (
+    <ul aria-label={`Recent in the ${vocabulary(novel.kind).codex.short ?? vocabulary(novel.kind).codex.one}`} className="mt-0.5 grid gap-0.5 pl-8 text-xs text-muted">
+      {recent.map((r) => (
+        <li key={r.id}>
+          <Link to={r.to} className="block truncate rounded px-1 italic hover:bg-paper hover:text-ink">
+            {r.name}
+          </Link>
+        </li>
+      ))}
+    </ul>
   );
 }

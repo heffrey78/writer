@@ -99,8 +99,8 @@ test("its sidebar looks back first, then at its people and places, with no outli
   const views = page.getByRole("navigation", { name: "Views" });
   await expect(views.getByRole("heading")).toHaveText(["Look back", "People and places"]);
   // Issues only for a journal on GitHub, which the sample isn't.
-  await expect(views.getByRole("group", { name: "Look back" }).getByRole("link", { name: /\D$/ })).toHaveText(["Journal", "Calendar", "Notes"]);
-  await expect(views.getByRole("group", { name: "People and places" }).getByRole("link", { name: /\D$/ })).toHaveText(["Index", "Relationships", "Journal map", "Progress"]);
+  await expect(views.getByRole("group", { name: "Look back" }).locator(":scope > ul > li > a")).toHaveText(["Journal", "Calendar", "Notes"]);
+  await expect(views.getByRole("group", { name: "People and places" }).locator(":scope > ul > li > a")).toHaveText(["Index", "Relationships", "Journal map", "Progress"]);
   // Collapsed to its strip, in the same order.
   await page.getByRole("button", { name: "Collapse the sidebar" }).click();
   const strip = page.getByRole("navigation", { name: "Views" }).getByRole("link");

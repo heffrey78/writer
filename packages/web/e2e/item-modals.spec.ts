@@ -216,7 +216,7 @@ test("an entry: made in its modal by a type and a name, then open beside the lis
   await page.keyboard.type("Where the flour came from.");
   await mill.getByRole("heading", { level: 2, name: "The Mill" }).click();
   await expect.poll(() => novel.read("bible/locations/the-mill.md")).toContain("summary: Where the flour came from.");
-  await expect(page.getByRole("link", { name: /^The Mill/ })).toContainText("Where the flour came from.");
+  await expect(page.getByRole("region", { name: /^Locations/ }).getByRole("link", { name: /^The Mill/ })).toContainText("Where the flour came from.");
 
   // New on the characters' group: a character, by its name alone; closed without one, nothing.
   const characters = novel.files("bible/characters");

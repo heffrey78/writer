@@ -3,19 +3,22 @@ import { findPanel } from "@writer/editor";
 import type { SpellService } from "@writer/editor/react";
 import { ChevronLeft, ChevronRight, Expand, LayoutGrid, List, PanelLeftClose, PanelLeftOpen, Plus, Search, Table2, X } from "lucide-react";
 import { Fragment, useEffect, useId, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
-import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
+import { Link, useLocation, useNavigate } from "react-router";
 import { create } from "zustand";
+import { useCommands } from "../commands.ts";
 import { moduleRecordTypes } from "../modules.tsx";
 import type { Workspace } from "../novel/workspace.ts";
 import { Button } from "../ui/button.tsx";
 import { cn } from "../ui/cn.ts";
 import { PAGE } from "../ui/page.ts";
+import { useViewParams } from "../ui/view-params.ts";
 import { useBookKind, useWords } from "../novel/kind.ts";
 import { EntryPage } from "./entry-page.tsx";
 import { Picture, usePictureUrl } from "./picture.tsx";
 import { pictureAlt, shapeForType } from "./pictures.ts";
 import { anyFilter, FilterBar, FILTER_KEYS, filtersOf } from "./filters.tsx";
 import { NewTypeDialog } from "./new-entry.tsx";
+import { opened } from "./recent.ts";
 import { OpenParts, saveOpenParts } from "./profile.tsx";
 import { RelationshipTypes } from "./relationship-types.tsx";
 import { markWords } from "./strip.tsx";
@@ -85,6 +88,16 @@ function useIndexLayout(novelId: string): [IndexLayout, (change: Partial<IndexLa
   return [layout, set];
 }
 
+/** The entry beside the list, for the keyboard to find. */
+const PANE_ID = "index-entry";
+
+/** Typing somewhere: a field, a menu's list, the notes' text, a part being edited. The index's keys are then the text's. */
+function typing(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false;
+  if (target.closest("[data-part-editor], [contenteditable=true], [role=listbox], [role=menu], select, textarea")) return true;
+  return target instanceof HTMLInputElement && !["button", "checkbox", "radio", "submit", "reset", "range"].includes(target.type);
+}
+
 /** Wide enough for the list and an entry side by side. */
 const TWO_PANES = "(min-width: 70rem)";
 
@@ -117,8 +130,11 @@ export function BiblePage({
   over?: ReactNode;
 }) {
   const w = vocabulary(novel.kind);
-  const [params, setParams] = useSearchParams();
-  const { search, hash } = useLocation();
+  // Answering at once, the address following: typed fast, a search keeps every letter.
+  const [params, setParamsTo] = useViewParams();
+  const { hash } = useLocation();
+  // The search, sort and filters, carried to an entry's address and back.
+  const search = params.toString() ? `?${params.toString()}` : "";
   const query = params.get("q") ?? "";
   const navigate = useNavigate();
   const [layout, setLayout] = useIndexLayout(novelId);
@@ -160,14 +176,6 @@ export function BiblePage({
   const listed = groups.flatMap((g) => g.shown);
 
   const setParam = (key: string, value: string | undefined) => setParamsTo({ [key]: value });
-  const setParamsTo = (changes: Record<string, string | undefined>) => {
-    const next = new URLSearchParams(params);
-    for (const [key, value] of Object.entries(changes)) {
-      if (value) next.set(key, value);
-      else next.delete(key);
-    }
-    setParams(next, { replace: true });
-  };
   // Pieces whose own words match: offered after the entries, as a way into the book's find.
   const pieces = useMemo(() => (query.trim() ? piecesMatching(novel, query) : []), [novel, query]);
   const searchPieces = () => {
@@ -197,6 +205,82 @@ export function BiblePage({
   }, [hash]);
 
   const view: View = layout.view;
+
+  // The keyboard (#134): j and k (and the arrows in the list) open the next and previous entry in the
+  // list's order, the focus on its row; Enter on a row moves into the entry, Escape back to its row;
+  // / searches, e edits, n makes a new entry of the open one's type, [ folds the list away and back.
+  const searchRef = useRef<HTMLInputElement>(null);
+  const focusRow = useRef<string | undefined>(undefined);
+  const rowLink = (id: string) => list.current?.querySelector<HTMLElement>(`[data-entry="${CSS.escape(id)}"] a`);
+  const stepTo = (by: number | "first" | "last") => {
+    if (!listed.length) return;
+    const at = listed.findIndex((e) => e.id === selectedId);
+    const to = by === "first" ? 0 : by === "last" ? listed.length - 1 : at < 0 ? (by > 0 ? 0 : listed.length - 1) : Math.min(listed.length - 1, Math.max(0, at + by));
+    const id = listed[to]!.id;
+    if (id === selectedId) return void rowLink(id)?.focus();
+    focusRow.current = id;
+    void go(entryHref(id));
+  };
+  useEffect(() => {
+    if (selectedId && focusRow.current === selectedId) {
+      focusRow.current = undefined;
+      rowLink(selectedId)?.focus();
+    }
+  }, [selectedId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const newOfType = () => add(selected && "entry" in selected ? novel.entities.find((e) => e.id === selected.entry)?.type : undefined);
+  const toggleList = () => setLayout({ collapsed: !layout.collapsed });
+  const editPart = () => {
+    const pane = document.getElementById(PANE_ID);
+    const here = document.activeElement?.closest(".group")?.querySelector<HTMLElement>('button[aria-label^="Edit "]');
+    const button = (here && pane?.contains(here) ? here : null) ?? pane?.querySelector<HTMLElement>('button[aria-label="Edit summary"]') ?? [...(pane?.querySelectorAll<HTMLElement>("button") ?? [])].find((b) => b.textContent?.trim() === "Add a summary");
+    button?.click();
+  };
+  const keys = useRef({ stepTo, newOfType, toggleList, editPart, selectedId });
+  keys.current = { stepTo, newOfType, toggleList, editPart, selectedId };
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey || typing(e.target) || document.querySelector('[role="dialog"], [role="alertdialog"]')) return;
+      const k = keys.current;
+      const inList = !!list.current?.contains(e.target as Node);
+      const inPane = !!document.getElementById(PANE_ID)?.contains(e.target as Node);
+      const act = (run: () => void) => {
+        e.preventDefault();
+        run();
+      };
+      if (e.key === "/") act(() => searchRef.current?.focus());
+      else if (e.key === "j" || (inList && e.key === "ArrowDown")) act(() => k.stepTo(1));
+      else if (e.key === "k" || (inList && e.key === "ArrowUp")) act(() => k.stepTo(-1));
+      else if (inList && e.key === "Home") act(() => k.stepTo("first"));
+      else if (inList && e.key === "End") act(() => k.stepTo("last"));
+      else if (e.key === "e") act(k.editPart);
+      else if (e.key === "n") act(k.newOfType);
+      else if (e.key === "[") act(k.toggleList);
+      else if (e.key === "Escape" && inPane && k.selectedId) act(() => rowLink(k.selectedId!)?.focus());
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Said to a screen reader once moving settles: which entry, what it is, and where in the list.
+  const [said, setSaid] = useState("");
+  const selectedEntry = selected && "entry" in selected ? novel.entities.find((e) => e.id === selected.entry) : undefined;
+  const sayIt = selectedEntry ? `${selectedEntry.name}, ${(novel.entityTypes.find((t) => t.key === selectedEntry.type)?.label ?? "").toLowerCase()}, ${listed.findIndex((e) => e.id === selectedEntry.id) + 1} of ${listed.length}` : "";
+  useEffect(() => {
+    const t = setTimeout(() => setSaid(sayIt), 300);
+    return () => clearTimeout(t);
+  }, [sayIt]);
+
+  useCommands(
+    () => [
+      { id: "index.search", title: `Search the ${w.codex.short ?? w.codex.one}`, group: w.codex.One, keys: "/", run: () => searchRef.current?.focus() },
+      { id: "index.next", title: `Next ${w.entity.one}`, group: w.codex.One, keys: "j", run: () => keys.current.stepTo(1) },
+      { id: "index.previous", title: `Previous ${w.entity.one}`, group: w.codex.One, keys: "k", run: () => keys.current.stepTo(-1) },
+      { id: "index.edit", title: `Edit the ${w.entity.one}'s summary`, group: w.codex.One, keys: "e", run: () => keys.current.editPart() },
+      { id: "index.newOfType", title: `New ${w.entity.one} of this type`, group: w.codex.One, keys: "n", run: () => keys.current.newOfType() },
+      { id: "index.toggleList", title: layout.collapsed ? "Show the list" : "Hide the list", group: w.codex.One, keys: "[", run: () => keys.current.toggleList() },
+    ],
+    [w, layout.collapsed],
+  );
   const listContent = (
     <div ref={list} className={cn("grid content-start gap-5", view === "cards" && !selected ? PAGE : "px-4 py-4")}>
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -223,11 +307,19 @@ export function BiblePage({
           </label>
           <Search className="pointer-events-none absolute top-2.5 left-3 size-4 text-muted" aria-hidden />
           <input
+            ref={searchRef}
             id={searchId}
             type="search"
             placeholder="Search names, notes and fields"
+            aria-keyshortcuts="/"
             value={query}
             onChange={(e) => setParam("q", e.target.value || undefined)}
+            // Down from the search into what it found: the first entry, opened.
+            onKeyDown={(e) => {
+              if (e.key !== "ArrowDown") return;
+              e.preventDefault();
+              keys.current.stepTo("first");
+            }}
             className="h-9 w-full rounded-md border border-rule bg-raised pr-3 pl-9 text-sm"
           />
         </div>
@@ -271,7 +363,7 @@ export function BiblePage({
                     {view === "cards" ? (
                       <EntryCard novelId={novelId} entity={e} presence={presences.get(e.id)} href={entryHref(e.id)} current={e.id === selectedId} onOpen={go} />
                     ) : (
-                      <EntryRow novelId={novelId} entity={e} presence={presences.get(e.id)} href={entryHref(e.id)} current={e.id === selectedId} onOpen={go} match={query ? matchEntry(e, query, { around: 3 }) : undefined} />
+                      <EntryRow novelId={novelId} entity={e} presence={presences.get(e.id)} href={entryHref(e.id)} current={e.id === selectedId} onOpen={go} onEnter={() => (e.id === selectedId ? document.getElementById(PANE_ID)?.focus() : void navigate(entryHref(e.id), { state: { focusEntry: true } }))} match={query ? matchEntry(e, query, { around: 3 }) : undefined} />
                     )}
                   </li>
                 ))}
@@ -317,6 +409,9 @@ export function BiblePage({
 
   const dialogs = (
     <>
+      <p aria-live="polite" className="sr-only">
+        {said}
+      </p>
       <NewTypeDialog novelId={novelId} novel={novel} open={addingType} onOpenChange={setAddingType} />
       {over}
     </>
@@ -447,15 +542,19 @@ function EntryPane({
 }) {
   const w = vocabulary(novel.kind);
   const headingId = useId();
-  const state = useLocation().state as { focusProse?: boolean } | null;
+  const state = useLocation().state as { focusProse?: boolean; focusEntry?: boolean } | null;
   const pane = useRef<HTMLElement>(null);
   const entity = "entry" in selected ? novel.entities.find((e) => e.id === selected.entry) : undefined;
   const record = "record" in selected ? novel.moduleRecords.find((r) => r.type === selected.record.type.type && r.id === selected.record.id) : undefined;
   const id = "entry" in selected ? selected.entry : selected.record.id;
+  const found = !!(entity ?? record);
+  useEffect(() => {
+    if (found) opened(novelId, id);
+  }, [novelId, id, found]);
   // Just made (its modal closing as it opens here): in focus, after the modal has given the focus back
   // to what opened it, so a screen reader says its name and Tab goes on into it.
   useEffect(() => {
-    if (!state?.focusProse) return;
+    if (!state?.focusProse && !state?.focusEntry) return;
     const t = setTimeout(() => pane.current?.focus());
     return () => clearTimeout(t);
   }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -480,7 +579,7 @@ function EntryPane({
 
   if (!workspace) return gone;
   return (
-    <section ref={pane} aria-labelledby={headingId} tabIndex={-1} className="grid content-start outline-none">
+    <section ref={pane} id={PANE_ID} aria-labelledby={headingId} tabIndex={-1} className="grid content-start outline-none">
       <div className={cn("flex flex-wrap items-center gap-1 border-b border-rule px-4 py-1.5 text-sm", !twoPanes && "sticky top-0 z-10 bg-paper")}>
         {!twoPanes && (
           <Link to={closeTo} onClick={(e) => void onGo(closeTo, e)} className="flex items-center gap-1 rounded-md px-1.5 py-1 text-muted hover:bg-panel hover:text-ink">
@@ -544,6 +643,7 @@ function EntryRow({
   href,
   current,
   onOpen,
+  onEnter,
   match,
 }: {
   novelId: string;
@@ -552,6 +652,8 @@ function EntryRow({
   href: string;
   current: boolean;
   onOpen: (to: string, e?: MouseEvent) => Promise<void>;
+  /** Enter on it: into the entry beside the list. */
+  onEnter: () => void;
   match: ReturnType<typeof matchEntry> | undefined;
 }) {
   const shape = shapeForType(entity.type);
@@ -574,6 +676,11 @@ function EntryRow({
     <a
       href={href}
       onClick={(e) => void onOpen(href, e)}
+      onKeyDown={(e) => {
+        if (e.key !== "Enter" || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+        e.preventDefault();
+        onEnter();
+      }}
       aria-current={current ? "page" : undefined}
       className={cn(
         "flex items-center gap-3 rounded-md px-2 py-1.5 hover:bg-panel focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none",

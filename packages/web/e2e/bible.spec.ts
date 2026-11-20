@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Page } from "@playwright/test";
-import { axe, expect, palette, test, type App } from "./fixtures.ts";
+import { axe, caretAtEnd, expect, palette, test, type App } from "./fixtures.ts";
 
 const ADA = "char_7f3k2q";
 
@@ -430,4 +430,72 @@ test("the index's search says where each entry matched, filters narrow it as chi
   await adding.getByRole("combobox", { name: "By" }).selectOption("absent");
   await adding.getByRole("button", { name: "Add the filter" }).click();
   await expect(locations.getByRole("link").locator("span.font-semibold:not([aria-hidden])")).toHaveText(["The Old Mill"]);
+});
+
+test("the index by the keyboard alone: / searches, j and k open the next and previous, Enter into the entry and Escape out, e edits, n makes one, [ folds the list; each said (#134)", async ({ page, app }) => {
+  const novel = await open(page, app);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await palette(page, "story bible");
+  const search = page.getByRole("searchbox", { name: "Search the bible" });
+  const said = page.locator("p[aria-live=polite].sr-only");
+  const focusedRow = (name: RegExp) => page.getByRole("region", { name: /^Characters/ }).getByRole("link", { name });
+
+  // / to search; down from it, the first it found opened, its row in focus.
+  await expect(page.getByRole("heading", { level: 1, name: "Story bible" })).toBeVisible();
+  await page.keyboard.press("/");
+  await expect(search).toBeFocused();
+  await page.keyboard.type("varn");
+  await page.keyboard.press("ArrowDown");
+  await expect(page.getByRole("region", { name: "Ada Varn" })).toBeVisible();
+  await expect(focusedRow(/^Ada Varn/)).toBeFocused();
+  await expect(said).toHaveText(/^Ada Varn, character, 1 of \d+$/);
+
+  // j and k, the arrows too: the next and previous, opened, said.
+  await page.keyboard.press("j");
+  await expect(page.getByRole("region", { name: "Ben Varn" })).toBeVisible();
+  await expect(focusedRow(/^Ben Varn/)).toBeFocused();
+  await expect(said).toHaveText(/^Ben Varn, character, 2 of \d+$/);
+  await page.keyboard.press("ArrowUp");
+  await expect(page.getByRole("region", { name: "Ada Varn" })).toBeVisible();
+  await expect(focusedRow(/^Ada Varn/)).toBeFocused();
+
+  // Enter goes into the entry; e edits its summary; Escape leaves the part, then the entry, back to its row.
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("region", { name: "Ada Varn" })).toBeFocused();
+  await page.keyboard.press("e");
+  await expect(page.getByRole("textbox", { name: "Summary" })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("button", { name: "Edit summary" })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(focusedRow(/^Ada Varn/)).toBeFocused();
+
+  // In the notes, the keys are the text's.
+  const notes = page.getByRole("textbox", { name: "Notes on Ada Varn" });
+  await caretAtEnd(page, notes);
+  await page.keyboard.type(" jk/");
+  await expect.poll(() => novel.read("bible/characters/ada.md")).toContain(" jk/");
+  await expect(page.getByRole("region", { name: "Ada Varn" })).toBeVisible();
+
+  // n: a new one of the open one's type.
+  await focusedRow(/^Ada Varn/).focus();
+  await page.keyboard.press("n");
+  await expect(page.getByRole("dialog", { name: "New character" }).getByRole("textbox", { name: "Name" })).toBeFocused();
+  await page.keyboard.press("Escape");
+
+  // [ folds the list away (the entry's name is then the page's heading) and back.
+  await page.keyboard.press("[");
+  await expect(page.getByRole("heading", { level: 1, name: "Ada Varn" })).toBeVisible();
+  await page.keyboard.press("[");
+  await expect(page.getByRole("heading", { level: 1, name: "Story bible" })).toBeVisible();
+
+  // The two just opened, newest first, under the Story bible in the sidebar.
+  await expect(page.getByRole("list", { name: "Recent in the bible" }).getByRole("link")).toHaveText(["Ada Varn", "Ben Varn"]);
+  await axe(page);
+
+  // Every key is in the palette too.
+  await page.keyboard.press("ControlOrMeta+k");
+  await page.keyboard.type("next entry");
+  await expect(page.getByRole("dialog", { name: "Command palette" }).getByRole("option", { name: /Next entry/ })).toBeVisible();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("region", { name: "Ben Varn" })).toBeVisible();
 });
