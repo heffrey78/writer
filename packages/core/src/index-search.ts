@@ -101,10 +101,11 @@ function excerpt(text: string, [start, end]: [number, number], words = 8): { tex
 
 /**
  * Whether an entry matches a search, and where: every term must be somewhere in it (its name, other
- * names, summary, fields, tags or notes). The part said is the best one holding the first term.
- * Undefined when it doesn't match; for an empty search, a match on its name.
+ * names, summary, fields, tags or notes). The part said is the best one holding the first term, long
+ * text as `around` words each side of the match. Undefined when it doesn't match; for an empty
+ * search, a match on its name.
  */
-export function matchEntry(entity: Entity, query: string): EntryMatch | undefined {
+export function matchEntry(entity: Entity, query: string, { around = 8 }: { around?: number } = {}): EntryMatch | undefined {
   const terms = searchTerms(query);
   const all = parts(entity);
   if (!terms.length) return { entity, where: "name", rank: 0 };
@@ -113,7 +114,7 @@ export function matchEntry(entity: Entity, query: string): EntryMatch | undefine
   const best = all.findIndex((_, i) => folded[i]!.includes(terms[0]!));
   const part = all[best]!;
   const at = find(part.text, terms[0]!)!;
-  const shown = part.long ? excerpt(part.text, at) : { text: part.text, at };
+  const shown = part.long ? excerpt(part.text, at, around) : { text: part.text, at };
   return { entity, where: part.where, ...(part.where === "name" ? {} : shown), rank: RANK[part.where] };
 }
 
@@ -208,4 +209,21 @@ export function sortEntries(book: Book, entities: readonly Entity[], sort: Entry
     most: (a, b) => (presences.get(b.id)?.count ?? 0) - (presences.get(a.id)?.count ?? 0) || byName(a, b),
   };
   return [...entities].sort(order[sort]);
+}
+
+/** Each piece body's words as a search compares them, by its text: worked out once while it's unchanged. */
+const foldedCache = new Map<string, string>();
+
+/** The pieces, in reading order, whose words have every word of a search: a way on into the book's own find. */
+export function piecesMatching(book: Book, query: string): Piece[] {
+  const terms = searchTerms(query);
+  if (!terms.length) return [];
+  return book.pieces.filter((p) => {
+    let folded = foldedCache.get(p.body);
+    if (folded === undefined) {
+      if (foldedCache.size >= 4000) foldedCache.delete(foldedCache.keys().next().value!);
+      foldedCache.set(p.body, (folded = searchable(proseText(p.body))));
+    }
+    return terms.every((t) => folded.includes(t));
+  });
 }

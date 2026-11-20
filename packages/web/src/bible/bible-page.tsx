@@ -1,4 +1,5 @@
-import { defaultEntrySort, entryPresences, matchEntry, sortEntries, typePlural, vocabulary, word, type Book, type Entity, type EntryPresence, type EntrySort, type Vocabulary } from "@writer/core";
+import { defaultEntrySort, entryPresences, filterEntries, matchEntry, piecesMatching, sortEntries, typePlural, vocabulary, word, type Book, type Entity, type EntryPresence, type EntrySort, type Vocabulary } from "@writer/core";
+import { findPanel } from "@writer/editor";
 import type { SpellService } from "@writer/editor/react";
 import { ChevronLeft, ChevronRight, Expand, LayoutGrid, List, PanelLeftClose, PanelLeftOpen, Plus, Search, Table2, X } from "lucide-react";
 import { Fragment, useEffect, useId, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
@@ -13,6 +14,7 @@ import { useBookKind, useWords } from "../novel/kind.ts";
 import { EntryPage } from "./entry-page.tsx";
 import { Picture, usePictureUrl } from "./picture.tsx";
 import { pictureAlt, shapeForType } from "./pictures.ts";
+import { anyFilter, FilterBar, FILTER_KEYS, filtersOf } from "./filters.tsx";
 import { NewTypeDialog } from "./new-entry.tsx";
 import { OpenParts, saveOpenParts } from "./profile.tsx";
 import { RelationshipTypes } from "./relationship-types.tsx";
@@ -129,7 +131,11 @@ export function BiblePage({
   const fallback = defaultEntrySort(novel.kind);
   const sort: EntrySort = (params.get("sort") as EntrySort | null) ?? fallback;
   const presences = useMemo(() => entryPresences(novel), [novel]);
-  const records = moduleRecordTypes(novel.kind);
+  const filters = filtersOf(params);
+  const filtered = anyFilter(filters);
+  const filterKey = FILTER_KEYS.map((k) => params.get(k) ?? "").join("|");
+  // A module's records aren't entries: the filters are the entries', so they're left out while any is set.
+  const records = filtered ? [] : moduleRecordTypes(novel.kind);
 
   // The list's order and what's in it, kept while the entries change underneath (an entry renamed, a
   // summary edited no longer matching): it's worked out again when the search, the sort or which
@@ -141,9 +147,9 @@ export function BiblePage({
       entriesByType(novel).map((g) => ({
         type: g.type.key,
         count: g.entries.length,
-        shown: sortEntries(novel, g.entries.filter((e) => matchEntry(e, query)), sort, presences).map((e) => e.id),
+        shown: sortEntries(novel, filterEntries(novel, g.entries.filter((e) => matchEntry(e, query)), filters, presences), sort, presences).map((e) => e.id),
       })),
-    [query, sort, ids], // eslint-disable-line react-hooks/exhaustive-deps
+    [query, sort, ids, filterKey], // eslint-disable-line react-hooks/exhaustive-deps
   );
   const byId = new Map(novel.entities.map((e) => [e.id, e]));
   const groups = order.flatMap((g) => {
@@ -153,11 +159,22 @@ export function BiblePage({
   const found = groups.reduce((n, g) => n + g.shown.length, 0);
   const listed = groups.flatMap((g) => g.shown);
 
-  const setParam = (key: string, value: string | undefined) => {
+  const setParam = (key: string, value: string | undefined) => setParamsTo({ [key]: value });
+  const setParamsTo = (changes: Record<string, string | undefined>) => {
     const next = new URLSearchParams(params);
-    if (value) next.set(key, value);
-    else next.delete(key);
+    for (const [key, value] of Object.entries(changes)) {
+      if (value) next.set(key, value);
+      else next.delete(key);
+    }
     setParams(next, { replace: true });
+  };
+  // Pieces whose own words match: offered after the entries, as a way into the book's find.
+  const pieces = useMemo(() => (query.trim() ? piecesMatching(novel, query) : []), [novel, query]);
+  const searchPieces = () => {
+    const first = pieces[0];
+    if (!first) return;
+    findPanel.setState((f) => ({ open: true, scope: "manuscript", seed: query.trim(), request: f.request + 1 }));
+    void navigate(`/novels/${novelId}/scene/${first.id}`);
   };
 
   // The parts of the entry beside the list open for editing: saved before another entry is opened.
@@ -214,6 +231,7 @@ export function BiblePage({
             className="h-9 w-full rounded-md border border-rule bg-raised pr-3 pl-9 text-sm"
           />
         </div>
+        <FilterBar novel={novel} filters={filters} onChange={setParamsTo} />
         <div className="flex flex-wrap items-center justify-between gap-2">
           <ViewSwitch view={view} onChange={(v) => setLayout({ view: v })} />
           <label htmlFor={sortId} className="flex items-center gap-2 text-sm text-muted">
@@ -228,13 +246,15 @@ export function BiblePage({
           </label>
         </div>
       </div>
-      {query && (
+      {(query || filtered) && (
         <p role="status" className="text-sm text-muted">
-          {w.entity.count(found)} match “{query}”{records.length > 0 && ` (and the ${records.map((t) => word(t.def.noun).many).join(" and ")} below that do)`}
+          {w.entity.count(found)} {found === 1 ? "matches" : "match"} {query ? `“${query}”` : "the filters"}
+          {query && filtered && " and the filters"}
+          {records.length > 0 && query && ` (and the ${records.map((t) => word(t.def.noun).many).join(" and ")} below that do)`}
         </p>
       )}
       {groups.map(({ type, count, shown }) =>
-        query && !shown.length ? null : (
+        (query || filtered) && !shown.length ? null : (
           <section key={type.key} aria-labelledby={`type-${type.key}`} className="grid gap-2">
             <div className="flex items-center justify-between gap-2">
               <h2 id={`type-${type.key}`} className="font-semibold">
@@ -251,7 +271,7 @@ export function BiblePage({
                     {view === "cards" ? (
                       <EntryCard novelId={novelId} entity={e} presence={presences.get(e.id)} href={entryHref(e.id)} current={e.id === selectedId} onOpen={go} />
                     ) : (
-                      <EntryRow novelId={novelId} entity={e} presence={presences.get(e.id)} href={entryHref(e.id)} current={e.id === selectedId} onOpen={go} match={query ? matchEntry(e, query) : undefined} />
+                      <EntryRow novelId={novelId} entity={e} presence={presences.get(e.id)} href={entryHref(e.id)} current={e.id === selectedId} onOpen={go} match={query ? matchEntry(e, query, { around: 3 }) : undefined} />
                     )}
                   </li>
                 ))}
@@ -265,7 +285,15 @@ export function BiblePage({
       {records.map((t) => (
         <Fragment key={t.type}>{t.gallery({ novelId, novel, query, sort })}</Fragment>
       ))}
-      {!query && <RelationshipTypes novelId={novelId} novel={novel} />}
+      {pieces.length > 0 && (
+        <p className="text-sm text-muted">
+          Also in {w.piece.count(pieces.length)}:{" "}
+          <button type="button" onClick={searchPieces} className="text-accent underline decoration-accent/35 underline-offset-[3px] hover:decoration-accent">
+            search the {w.content.one} for “{query.trim()}”
+          </button>
+        </p>
+      )}
+      {!query && !filtered && <RelationshipTypes novelId={novelId} novel={novel} />}
     </div>
   );
 

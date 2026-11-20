@@ -58,6 +58,16 @@ for (const [name, map] of [
     await page.getByRole("main").locator('a[href*="/bible/"]').first().click();
     await clean(page, "an entry");
     await page.keyboard.press("Escape");
+
+    // The index's filters, each kind of filter and its choices in the kind's words (#134).
+    await go("bible");
+    await page.getByRole("button", { name: "Filter", exact: true }).click();
+    const filtering = page.getByRole("dialog", { name: /^Filter the/ });
+    for (const by of await filtering.getByRole("combobox", { name: "By" }).locator("option").allTextContents()) {
+      await filtering.getByRole("combobox", { name: "By" }).selectOption({ label: by });
+      await clean(page, `the index's filter by ${by}`);
+    }
+    await page.keyboard.press("Escape");
     await page.goto(new URL(`/novels/${id}/outline/table`, app.url).href);
     await page.locator('a[href*="/scene/"]').first().click();
     await expect(views).toBeVisible();

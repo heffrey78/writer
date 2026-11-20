@@ -12,7 +12,8 @@ import { axe, expect, palette, test } from "./fixtures.ts";
 
 const sample = fileURLToPath(new URL("../../../examples/sample-journal", import.meta.url));
 const arrange = (page: Page) => page.getByRole("dialog", { name: "Arrange the sidebar" });
-const links = (page: Page, group: string) => page.getByRole("navigation", { name: "Views" }).getByRole("group", { name: group }).getByRole("link");
+/** A group's views: not the index's types under it (“Characters 4”), whose names end in their count. */
+const links = (page: Page, group: string) => page.getByRole("navigation", { name: "Views" }).getByRole("group", { name: group }).getByRole("link", { name: /\D$/ });
 /** Press a button as the keyboard does: focus it, then Enter. */
 async function press(page: Page, name: string) {
   await arrange(page).getByRole("button", { name, exact: true }).focus();

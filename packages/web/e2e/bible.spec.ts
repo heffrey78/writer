@@ -160,7 +160,7 @@ test("searches the bible by anything an entry says: names, other names, summarie
   const results = page.getByRole("main").getByRole("region", { name: /^Characters/ });
   // A field's value: only Ada's eyes are grey.
   await search.fill("GREY");
-  await expect(page.getByText(/entr(y|ies) match “GREY”/)).toBeVisible();
+  await expect(page.getByText(/entr(y|ies) match(es)? “GREY”/)).toBeVisible();
   await expect(results.getByRole("link")).toHaveCount(1);
   await expect(results.getByRole("link", { name: /^Ada Varn/ })).toBeVisible();
   // Another name, in any case; and a summary and notes: Ben is “Ada's younger brother”, Tomas “taught Ada to read a gauge”.
@@ -328,4 +328,106 @@ test("an entry opens beside the list: stepped through in the list's order, the l
   await page.getByRole("link", { name: "Story bible" }).first().click();
   await expect(page.getByRole("heading", { level: 1, name: "Story bible" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Ben Varn" })).toHaveCount(0);
+});
+
+test("the index's search says where each entry matched, filters narrow it as chips kept in the address, and scenes that match are offered last (#134)", async ({ page, app }) => {
+  await open(page, app);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await palette(page, "story bible");
+  const search = page.getByRole("searchbox", { name: "Search the bible" });
+  const characters = page.getByRole("region", { name: /^Characters/ });
+  const locations = page.getByRole("region", { name: /^Locations/ });
+  const found = page.getByRole("status").filter({ hasText: / match/ });
+
+  // Where each matched: Ada in her notes, the bridge in its summary, each with the word marked.
+  await search.fill("iron");
+  await expect(characters.getByRole("link", { name: /^Ada Varn/ })).toContainText("notes");
+  await expect(characters.getByRole("link", { name: /^Ada Varn/ }).locator("mark")).toHaveText("iron");
+  await expect(locations.getByRole("link", { name: /^The Varn Bridge/ })).toContainText("summary");
+  await expect(found).toHaveText("2 entries match “iron” (and the off-page events below that do)");
+
+  // A filter by type, from + Filter: only characters, said as a chip; the count says so.
+  await page.getByRole("button", { name: "Filter", exact: true }).click();
+  const adding = page.getByRole("dialog", { name: "Filter the bible" });
+  await expect(adding.getByRole("combobox", { name: "By" })).toHaveValue("type");
+  await adding.getByRole("combobox", { name: "Type" }).selectOption("character");
+  await adding.getByRole("button", { name: "Add the filter" }).click();
+  await expect(page.getByRole("button", { name: "Remove the filter: Characters" })).toBeVisible();
+  await expect(locations).toHaveCount(0);
+  await expect(found).toHaveText("1 entry matches “iron” and the filters");
+  for (const colorScheme of ["light", "dark"] as const) {
+    await page.emulateMedia({ colorScheme });
+    await axe(page);
+  }
+  await page.emulateMedia({ colorScheme: "light" });
+
+  // A word only the scenes have: none of the entries, and the scene offered, opening the book's find on it.
+  await search.fill("stitches");
+  await expect(found).toHaveText("0 entries match “stitches” and the filters");
+  await page.getByRole("button", { name: "search the manuscript for “stitches”" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "The Station" })).toBeVisible();
+  await expect(page.getByRole("searchbox", { name: "Find" })).toHaveValue("stitches");
+  await page.goBack();
+
+  // A tag too, and the filters kept in the address: opened again from it, the same list.
+  await search.fill("");
+  await page.getByRole("button", { name: "Filter", exact: true }).click();
+  await adding.getByRole("combobox", { name: "By" }).selectOption("tag");
+  await adding.getByRole("combobox", { name: "Tag" }).selectOption("protagonist");
+  await adding.getByRole("button", { name: "Add the filter" }).click();
+  await expect(characters.getByRole("link")).toHaveCount(1);
+  await expect(page).toHaveURL(/[?&]type=character&tag=protagonist$/);
+  const address = page.url();
+  await page.goto("about:blank");
+  await page.goto(address);
+  await expect(page.getByRole("button", { name: "Remove the filter: Tag: protagonist" })).toBeVisible();
+  await expect(characters.getByRole("link")).toHaveCount(1);
+  await expect(characters.getByRole("link", { name: /^Ada Varn/ })).toBeVisible();
+
+  // A chip goes with Backspace, the focus on to the next.
+  await page.getByRole("button", { name: "Remove the filter: Characters" }).focus();
+  await page.keyboard.press("Backspace");
+  await expect(page.getByRole("button", { name: "Remove the filter: Characters" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Remove the filter: Tag: protagonist" })).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("group", { name: "Filters" }).getByRole("button", { name: /^Remove/ })).toHaveCount(0);
+
+  // A field's value; a role a scene gives; a chapter.
+  await page.getByRole("button", { name: "Filter", exact: true }).click();
+  await adding.getByRole("combobox", { name: "By" }).selectOption("field");
+  await adding.getByRole("combobox", { name: "Field" }).selectOption("occupation");
+  await adding.getByRole("combobox", { name: "Value" }).selectOption("Toll keeper");
+  await adding.getByRole("button", { name: "Add the filter" }).click();
+  await expect(characters.getByRole("link").locator("span.font-semibold:not([aria-hidden])")).toHaveText(["Ben Varn"]);
+  await expect(locations).toHaveCount(0);
+  await page.getByRole("button", { name: "Remove the filter: Occupation: Toll keeper" }).click();
+  await page.getByRole("button", { name: "Filter", exact: true }).click();
+  await adding.getByRole("combobox", { name: "By" }).selectOption("role");
+  await adding.getByRole("combobox", { name: "Role" }).selectOption("pov");
+  await adding.getByRole("button", { name: "Add the filter" }).click();
+  await expect(characters.getByRole("link").locator("span.font-semibold:not([aria-hidden])")).toHaveText(["Ada Varn", "Ben Varn"]);
+  await page.getByRole("button", { name: "Filter", exact: true }).click();
+  await adding.getByRole("combobox", { name: "By" }).selectOption("in");
+  await adding.getByRole("combobox", { name: /^In a/ }).selectOption({ label: "Chapter: Arrival" });
+  await adding.getByRole("button", { name: "Add the filter" }).click();
+  await expect(page.getByRole("button", { name: "Remove the filter: In “Arrival”" })).toBeVisible();
+  // Ben's point of view is in The Sale; in Arrival, Ada's alone.
+  await expect(characters.getByRole("link").locator("span.font-semibold:not([aria-hidden])")).toHaveText(["Ada Varn"]);
+
+  // The sidebar's types open the index filtered to them.
+  await page.getByRole("navigation", { name: "Views" }).getByRole("link", { name: /^Locations/ }).click();
+  await expect(page).toHaveURL(/\/bible\?type=location$/);
+  await expect(page.getByRole("button", { name: "Remove the filter: Locations" })).toBeVisible();
+  await expect(characters).toHaveCount(0);
+
+  // Not in the story yet: an entry no scene uses.
+  await palette(page, "new location");
+  await page.getByRole("dialog").getByRole("textbox", { name: "Name" }).fill("The Old Mill");
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("heading", { level: 2, name: "The Old Mill" })).toBeVisible();
+  await page.getByRole("link", { name: "Close the entry" }).click();
+  await page.getByRole("button", { name: "Filter", exact: true }).click();
+  await adding.getByRole("combobox", { name: "By" }).selectOption("absent");
+  await adding.getByRole("button", { name: "Add the filter" }).click();
+  await expect(locations.getByRole("link").locator("span.font-semibold:not([aria-hidden])")).toHaveText(["The Old Mill"]);
 });

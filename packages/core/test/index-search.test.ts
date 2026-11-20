@@ -2,7 +2,7 @@ import fc from "fast-check";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { journal, novel as novelKind } from "@writer/kinds";
-import { defaultEntrySort, entryPresences, filterEntries, loadBook, matchEntry, piecesInSection, searchable, searchEntries, sortEntries, type Entity } from "../src/index.ts";
+import { defaultEntrySort, entryPresences, filterEntries, loadBook, matchEntry, piecesInSection, piecesMatching, searchable, searchEntries, sortEntries, type Entity } from "../src/index.ts";
 import { nodeSource } from "../src/node.ts";
 
 const novel = await loadBook(nodeSource(fileURLToPath(new URL("../../../examples/sample-novel/", import.meta.url))));
@@ -131,5 +131,14 @@ describe("sortEntries", () => {
   it("sorts a journal's people by when they were last written about until the writer picks a sort", () => {
     expect(defaultEntrySort(journal)).toBe("last");
     expect(defaultEntrySort(novelKind)).toBe("first");
+  });
+});
+
+describe("piecesMatching", () => {
+  it("finds the pieces whose words have every word of a search, ignoring case, accents and Markdown", () => {
+    expect(piecesMatching(novel, "STITCHES wound").map((p) => p.title)).toEqual(["The Station"]);
+    // A mention's words count, its target doesn't.
+    expect(piecesMatching(novel, "char_7f3k2q")).toEqual([]);
+    expect(piecesMatching(novel, "  ")).toEqual([]);
   });
 });

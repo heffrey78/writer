@@ -3,7 +3,7 @@ import { arrangeSidebar, MANIFEST, vocabulary, type Book, type BookKind, type Si
 import { BookOpen, CircleDot, Columns2, Goal, ListTree, Map as MapIcon, Network, PanelLeftClose, PanelLeftOpen, PenLine, StickyNote, type LucideIcon } from "lucide-react";
 import { Dialog } from "radix-ui";
 import { useEffect, useId, useState, type ReactNode } from "react";
-import { NavLink, useLocation } from "react-router";
+import { Link, NavLink, useLocation } from "react-router";
 import { create } from "zustand";
 import { typePlural } from "@writer/core";
 import { useCommands } from "../commands.ts";
@@ -194,9 +194,12 @@ function Expanded({ novelId, novel, workspace, current, onGitHub, toggle }: { no
                 {p.path === "bible" && (
                   <ul aria-label={`${vocabulary(novel.kind).codex.One} types`} className="mt-0.5 grid gap-0.5 pl-8 text-xs text-muted">
                     {novel.entityTypes.map((t) => (
-                      <li key={t.key} className="flex justify-between pr-2">
-                        <span>{typePlural(t)}</span>
-                        <span className="tabular-nums">{novel.entities.filter((e) => e.type === t.key).length}</span>
+                      <li key={t.key}>
+                        {/* The index filtered to the type (#134). */}
+                        <Link to={`/novels/${novelId}/bible?type=${encodeURIComponent(t.key)}`} className="flex justify-between rounded px-1 pr-2 hover:bg-paper hover:text-ink">
+                          <span>{typePlural(t)}</span>
+                          <span className="tabular-nums">{novel.entities.filter((e) => e.type === t.key).length}</span>
+                        </Link>
                       </li>
                     ))}
                   </ul>

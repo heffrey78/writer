@@ -16,7 +16,8 @@ test("the sidebar groups the views, collapses to a strip of icons with Ctrl+\\, 
     ["Plan", ["Outline", "Story map", "Relationships", "Notes", "Progress", "Story bible"]],
     ["Revise", ["Compare"]],
   ] as const) {
-    await expect(views.getByRole("group", { name: group }).getByRole("link")).toHaveText([...places]);
+    // Its views, not the Story bible's types under it (“Characters 4”, each a link to the bible filtered to it).
+    await expect(views.getByRole("group", { name: group }).getByRole("link", { name: /\D$/ })).toHaveText([...places]);
   }
   await axe(page);
 
