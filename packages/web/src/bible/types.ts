@@ -1,4 +1,4 @@
-import { matchEntry, recordTypesOf, type Entity, type Book } from "@writer/core";
+import { matchEntry, mentionTargets, type Entity, type Book } from "@writer/core";
 import type { MentionEntity } from "@writer/editor";
 
 /** A type's name for a list of its entries: "Characters". */
@@ -20,22 +20,6 @@ export const matches = (entity: Entity, query: string) => matchEntry(entity, que
 /**
  * Every entry, for @ suggestions: by type in the bible's order, then by name; then the modules'
  * records prose may mention, by their type's group ("Off the page": off-page events, heffrey78/gh-writer#165).
+ * Core's, so the editor's underlines and an entry's passages (#135) name the same things.
  */
-export function mentionEntities(novel: Book): MentionEntity[] {
-  return [
-    ...novel.entityTypes.flatMap((t) =>
-      novel.entities
-        .filter((e) => e.type === t.key)
-        .sort((a, b) => a.name.localeCompare(b.name))
-        .map((e) => ({ id: e.id, name: e.name, aliases: e.aliases, type: t.label })),
-    ),
-    ...recordTypesOf(novel.kind)
-      .filter((t) => t.mentionable)
-      .flatMap((t) =>
-        novel.moduleRecords
-          .filter((r) => r.type === t.key)
-          .sort((a, b) => a.title.localeCompare(b.title))
-          .map((r) => ({ id: r.id, name: r.title, aliases: [], type: t.group })),
-      ),
-  ];
-}
+export const mentionEntities = (novel: Book): MentionEntity[] => mentionTargets(novel);

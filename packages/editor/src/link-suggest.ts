@@ -2,6 +2,7 @@ import { Extension, type Editor } from "@tiptap/core";
 import type { Node } from "@tiptap/pm/model";
 import { Plugin, PluginKey, type EditorState } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
+import { nameMatcher, type NameMatcher } from "@writer/core";
 import type { MentionEntity } from "./mention-suggest.ts";
 import { writingModes, type EditorCommand } from "./modes.ts";
 
@@ -10,23 +11,13 @@ export interface LinkSuggestOptions {
   entities: () => readonly MentionEntity[];
 }
 
-interface Matcher {
-  pattern: RegExp;
-  /** Each name or alias, to the entity it names (the first, if two share one). */
-  ids: Map<string, string>;
-}
-
-/** Names and aliases as one pattern, longest first, matching whole words only and with their case. */
-function matcher(entities: readonly MentionEntity[]): Matcher | undefined {
-  const ids = new Map<string, string>();
-  for (const e of entities) for (const term of [e.name, ...e.aliases]) if (term.trim().length > 1 && !ids.has(term)) ids.set(term, e.id);
-  if (!ids.size) return undefined;
-  const terms = [...ids.keys()].sort((a, b) => b.length - a.length).map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-  return { pattern: new RegExp(`(?<![\\p{L}\\p{N}_])(?:${terms.join("|")})(?![\\p{L}\\p{N}_])`, "gu"), ids };
-}
+/*
+ * The names and aliases looked for are core's (nameMatcher), which an entry's profile uses to list
+ * the same names as passages not linked (#135): the two never disagree.
+ */
 
 /** Unmarked names in a textblock, as [from, to, id] offsets into it (one character per position). */
-function scan(block: Node, m: Matcher): [number, number, string][] {
+function scan(block: Node, m: NameMatcher): [number, number, string][] {
   const text = block.textBetween(0, block.content.size, undefined, "￼");
   const out: [number, number, string][] = [];
   for (const hit of text.matchAll(m.pattern)) {
@@ -60,14 +51,14 @@ export const LinkSuggestExtension = Extension.create<LinkSuggestOptions>({
     const options = this.options;
     let cache = new WeakMap<Node, [number, number, string][]>();
     let source: readonly MentionEntity[] | undefined;
-    let m: Matcher | undefined;
+    let m: NameMatcher | undefined;
 
     const decorate = (state: EditorState): DecorationSet => {
       if (!writingModes.getState().linkSuggestions) return DecorationSet.empty;
       const entities = options.entities();
       if (entities !== source) {
         source = entities;
-        m = matcher(entities);
+        m = nameMatcher(entities);
         cache = new WeakMap();
       }
       if (!m) return DecorationSet.empty;

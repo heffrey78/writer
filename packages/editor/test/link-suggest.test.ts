@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import "./dom.ts";
 import { Editor } from "@tiptap/core";
+import { nameMatcher, namesInBlock, proseBlocks } from "@writer/core";
+import fc from "fast-check";
 import { afterEach, beforeEach, expect, test } from "vitest";
 import { getMarkdown, linkNameAtCaret, linkSuggestKey, LinkSuggestExtension, loadMarkdown, proseContent, writingModes, type MentionEntity } from "../src/index.ts";
 
@@ -60,4 +62,45 @@ test("Alt+Enter links the name at the caret, beside the mention card's shortcut"
   const event = new KeyboardEvent("keydown", { key: "Enter", altKey: true, bubbles: true, cancelable: true });
   expect(editor.view.someProp("handleKeyDown", (f) => f(editor.view, event))).toBe(true);
   expect(getMarkdown(editor)).toBe("Then [the bridge](#loc_br1dg3) held.\n");
+});
+
+// The names underlined here are the passages not linked on an entry's profile (#135): core finds both.
+const coreSuggested = (markdown: string) => {
+  const m = nameMatcher(entities);
+  return proseBlocks(markdown).flatMap((b) => namesInBlock(markdown, b, m).filter((h) => !h.linked).map((h) => b.text.slice(...h.at)));
+};
+
+test("underlines exactly the names core lists as passages not linked", () => {
+  for (const markdown of [
+    "Ada Varn met Ben on the bridge. Adam and BEN didn't. [Ada](#char_7f3k2q) and [Ben](https://x.example) waved, and *Ada* too.\n",
+    "# Ada at the bridge\n\nShe saw *Ada* Varn and **the bridge**, snake_Ada and _Ben_.\n",
+    "- Ben first\n- then Ada\n\n> Ben, quoted.\n\n```\nAda in code\n```\n\nA note `Ben` in code.\n",
+    "Fish \\& chips &amp; Ben. ![Ada](/images/ada.jpg) Ada.\n",
+    "| Who | Where |\n| --- | --- |\n| Ada | the bridge |\n",
+  ]) {
+    open(markdown);
+    expect(suggested(), markdown).toEqual(coreSuggested(markdown));
+    editor.destroy();
+  }
+});
+
+test("agrees with core on random prose of names, words, emphasis and links", () => {
+  const token = fc.oneof(
+    fc.constantFrom("she", "walked", "Adam", "Bennet", "bridges", ",", ".", "Varn", "the"),
+    fc.constantFrom("Ada", "Ada Varn", "Ben", "the bridge"),
+    fc.constantFrom("[Ada](#char_7f3k2q)", "[a link](https://x.example)", "*Ben*", "**Ada**", "_the bridge_", "`Ada`"),
+  );
+  const paragraph = fc.array(token, { minLength: 1, maxLength: 10 }).map((t) => t.join(" ").replace(/ ([,.])/g, "$1"));
+  fc.assert(
+    fc.property(fc.array(paragraph, { minLength: 1, maxLength: 3 }), (paragraphs) => {
+      const markdown = `${paragraphs.join("\n\n")}\n`;
+      open(markdown);
+      try {
+        expect(suggested()).toEqual(coreSuggested(markdown));
+      } finally {
+        editor.destroy();
+      }
+    }),
+    { numRuns: 60 },
+  );
 });

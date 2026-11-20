@@ -27,4 +27,5 @@ export { sceneFacts } from "./facts.ts";
 export { LEGACY_COLOURS, nextSeriesSlot, relationshipStyle, SERIES, seriesHex, seriesSlot, type RelationshipLine, type SeriesColour, type SeriesSlot } from "./palette.ts";
 export { entryPresence, entryPresences, type EntryPresence, type PresenceMark } from "./entry-presence.ts";
 export { defaultEntrySort, fieldNames, filterEntries, matchEntry, piecesInSection, searchable, searchEntries, searchTerms, sortEntries, type EntryFilters, type EntryMatch, type EntryMatchWhere, type EntrySort } from "./index-search.ts";
+export { bookNameMatcher, mentionTargets, nameMatcher, namesInBlock, passagesOf, proseBlocks, sentenceAround, sentenceStarts, type NameHit, type NameMatcher, type NameTarget, type Passage } from "./passages.ts";
 export { locationProfile, tally, themeProfile, type LocationProfile, type Tally, type ThemeProfile } from "./entry-profile.ts";
