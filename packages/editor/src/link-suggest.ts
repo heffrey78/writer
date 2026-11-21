@@ -102,11 +102,17 @@ export function linkNameAtCaret(editor: Editor): boolean {
   const head = state.selection.head;
   const found = linkSuggestKey.getState(state)?.find(head, head) ?? [];
   const hit = found.find((d) => d.from <= head && head <= d.to);
+  return !!hit && linkName(editor, hit.from, hit.to, (hit.spec as { id: string }).id);
+}
+
+/** Make the words between `from` and `to` a mention of `id`, showing them as written (with their marks). False if they can't be. */
+export function linkName(editor: Editor, from: number, to: number, id: string): boolean {
+  const { state } = editor;
   const mention = state.schema.nodes.mention;
-  if (!hit || !mention) return false;
-  const label = state.doc.textBetween(hit.from, hit.to);
-  const node = mention.create({ id: (hit.spec as { id: string }).id, label }, null, state.doc.nodeAt(hit.from)?.marks ?? []);
-  editor.view.dispatch(state.tr.replaceWith(hit.from, hit.to, node).scrollIntoView());
+  if (!mention || from >= to) return false;
+  const label = state.doc.textBetween(from, to);
+  const node = mention.create({ id, label }, null, state.doc.nodeAt(from)?.marks ?? []);
+  editor.view.dispatch(state.tr.replaceWith(from, to, node).scrollIntoView());
   return true;
 }
 

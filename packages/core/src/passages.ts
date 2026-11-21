@@ -444,18 +444,40 @@ export function passagesOf(book: Book, id: string): Passage[] {
     const blocks = blocksOf(piece);
     blocks.forEach((b, i) => {
       if (!terms.some((t) => b.text.includes(t)) && !b.runs.some((r) => r.id === id)) return;
-      let nth: number | undefined;
-      for (const hit of namesInBlock(piece.body, b, matcher)) {
-        if (hit.id !== id) continue;
-        let starts = startsCache.get(b);
-        if (!starts) startsCache.set(b, (starts = sentenceStarts(b.text)));
-        const { text, at } = sentenceAround(b.text, hit.at, 30, starts);
-        nth ??= blocks.slice(0, i).filter((x) => x.text === b.text).length;
-        const [from, to] = sentenceBounds(b.text, hit.at[0], hit.at[1], starts);
-        const sentence: [number, number] = [from, from + b.text.slice(from, to).trimEnd().length];
-        out.push({ piece, linked: hit.linked, text, at, ...(hit.raw ? { raw: hit.raw } : {}), roles, block: { text: b.text, nth, at: hit.at, sentence } });
-      }
+      for (const hit of namesInBlock(piece.body, b, matcher)) if (hit.id === id) out.push(passage(piece, blocks, i, hit, roles));
     });
   }
   return out;
+}
+
+/** A name found in a piece's `i`th block, as a passage: its sentence, and where it is. */
+function passage(piece: Piece, blocks: Block[], i: number, hit: NameHit, roles: string[]): Passage {
+  const b = blocks[i]!;
+  let starts = startsCache.get(b);
+  if (!starts) startsCache.set(b, (starts = sentenceStarts(b.text)));
+  const { text, at } = sentenceAround(b.text, hit.at, 30, starts);
+  let nth = 0;
+  for (let j = 0; j < i; j++) if (blocks[j]!.text === b.text) nth++;
+  const [from, to] = sentenceBounds(b.text, hit.at[0], hit.at[1], starts);
+  const sentence: [number, number] = [from, from + b.text.slice(from, to).trimEnd().length];
+  return { piece, linked: hit.linked, text, at, ...(hit.raw ? { raw: hit.raw } : {}), roles, block: { text: b.text, nth, at: hit.at, sentence } };
+}
+
+/**
+ * The names a piece writes without a link (#156), as the editor underlines them: by what each names,
+ * in the order they first come, with its passages there.
+ */
+export function namesNotLinkedIn(book: Book, piece: Piece): { id: string; passages: Passage[] }[] {
+  const matcher = bookNameMatcher(book);
+  if (!matcher) return [];
+  const byId = new Map<string, Passage[]>();
+  const blocks = blocksOf(piece);
+  blocks.forEach((b, i) => {
+    for (const hit of namesInBlock(piece.body, b, matcher)) {
+      if (hit.linked) continue;
+      const roles = Object.keys(piece.fields).filter((k) => fieldNames(piece.fields[k], hit.id));
+      byId.set(hit.id, [...(byId.get(hit.id) ?? []), passage(piece, blocks, i, hit, roles)]);
+    }
+  });
+  return [...byId].map(([id, passages]) => ({ id, passages }));
 }

@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { axe, caretAtEnd, expect, proseOnItsGround, test } from "./fixtures.ts";
 
 test("the Entry tab: a sheet to read, Back and Forward through names opened, a pin to keep it, the form in place", async ({ page, app }) => {
@@ -119,4 +121,59 @@ test("In this scene: everyone and everything in the scene once, with its role an
   await page.keyboard.type("who's in this scene");
   await page.keyboard.press("Enter");
   await expect(tab).toHaveAttribute("aria-selected", "true");
+});
+
+test("entries pinned beside the text stay first in every scene and after a reload; a name written without a link here is linked from the tab (#156)", async ({ page, app }) => {
+  const dir = app.novelRepo("varn");
+  await app.restart(dir);
+  const STATION = "manuscript/01-return/01-arrival/01-the-station.md";
+  const was = readFileSync(join(dir, STATION), "utf8");
+  await page.goto(app.launchUrl);
+  const text = page.getByRole("textbox", { name: "Chapter text" });
+  await expect(text).toBeFocused();
+  const sidebar = page.getByRole("complementary", { name: "Right sidebar" });
+  const tab = sidebar.getByRole("tab", { name: "In this scene" });
+  await tab.click();
+  const pinned = sidebar.getByRole("list", { name: "Pinned" });
+
+  // Pinned by the keyboard in The Station, first in Walking the Span, which doesn't have it.
+  await sidebar.getByRole("button", { name: "Pin Varn Station beside the text" }).focus();
+  await page.keyboard.press("Enter");
+  await expect(sidebar.getByRole("status")).toHaveText("Pinned Varn Station beside the text.");
+  await expect(pinned.getByRole("listitem")).toHaveCount(1);
+  await expect(sidebar.getByRole("list", { name: "In “The Station”" }).getByRole("listitem")).toHaveCount(3);
+  await caretAtEnd(page, text);
+  await expect(sidebar.getByRole("list", { name: "In “Walking the Span”" })).toBeVisible();
+  await expect(pinned.getByRole("listitem")).toHaveText([/^VSVarn Stationnot in this scene/]);
+  await axe(page);
+  await page.emulateMedia({ colorScheme: "dark" });
+  await axe(page);
+  await page.emulateMedia({ colorScheme: "light" });
+
+  // And from the Entry tab: kept after a reload, in the order pinned.
+  await sidebar.getByRole("tab", { name: "Scene", exact: true }).click();
+  await sidebar.getByRole("region", { name: "Details of “Walking the Span”" }).getByRole("button", { name: "Ben Varn" }).first().click();
+  await sidebar.getByRole("button", { name: "Pin Ben Varn beside the text" }).click();
+  await page.reload();
+  await expect(text).toBeVisible();
+  await tab.click();
+  await expect(pinned.getByRole("listitem")).toHaveText([/^VSVarn Station/, /^BVBen Varn/]);
+  await sidebar.getByRole("button", { name: "Unpin Varn Station" }).click();
+  await expect(sidebar.getByRole("status")).toHaveText("Unpinned Varn Station.");
+  await expect(pinned.getByRole("listitem")).toHaveText([/^BVBen Varn/]);
+  await sidebar.getByRole("button", { name: "Unpin Ben Varn" }).click();
+  await expect(pinned).toHaveCount(0);
+
+  // The Station writes "the bridge" without a link: linked from the tab, as Alt+Enter links it in the text.
+  await expect(sidebar.getByRole("list", { name: "In “The Station”" })).toBeVisible();
+  const bridge = sidebar.getByRole("button", { name: "Link “the bridge” to The Varn Bridge: 1 not linked in this scene" });
+  await bridge.focus();
+  await page.keyboard.press("Enter");
+  await expect(sidebar.getByRole("status")).toHaveText("Linked “the bridge” to The Varn Bridge.");
+  await expect(text.locator('[data-mention="loc_br1dg3"]')).toHaveText("the bridge");
+  await expect(bridge).toHaveCount(0);
+  await expect
+    .poll(() => readFileSync(join(dir, STATION), "utf8"))
+    .toBe(was.replace("she could see the bridge,", "she could see [the bridge](#loc_br1dg3),").replace("locations: [loc_5tat10]", "locations: [loc_5tat10, loc_br1dg3]"));
+  await expect(sidebar.getByRole("list", { name: "In “The Station”" }).getByRole("listitem").filter({ hasText: "The Varn Bridge" })).toContainText("set here");
 });

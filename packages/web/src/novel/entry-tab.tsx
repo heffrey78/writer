@@ -1,9 +1,11 @@
 import { vocabulary, type Book } from "@writer/core";
 import type { SpellService } from "@writer/editor/react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Pin, PinOff } from "lucide-react";
 import { Fragment, useEffect, useId, useRef } from "react";
 import { create } from "zustand";
 import { EntryPage } from "../bible/entry-page.tsx";
+import { setPinned, usePinnedEntries } from "../bible/pins.ts";
+import { useCommands } from "../commands.ts";
 import { moduleRecordType } from "../modules.tsx";
 import { typeOf } from "../bible/types.ts";
 import { useRightSidebar } from "./right-sidebar.tsx";
@@ -73,6 +75,17 @@ export function EntryTab({
   // the Notes tab (heffrey78/gh-writer#222).
   const record = id && !entity ? novel.moduleRecords.find((r) => r.id === id) : undefined;
   const recordType = record && moduleRecordType(novel.kind, record.type);
+  // Pinned (#156): kept first in the In this scene tab, in every piece.
+  const pins = usePinnedEntries(novelId);
+  const shownName = entity?.name ?? record?.title;
+  const isPinned = id !== undefined && pins.includes(id);
+  useCommands(
+    () =>
+      id === undefined || shownName === undefined
+        ? []
+        : [{ id: "entry.pin", title: isPinned ? `Unpin ${shownName}` : `Pin ${shownName} beside the text`, group: "Writing", keywords: ["pin", "keep", w.codex.one], run: () => setPinned(novelId, id, !isPinned) }],
+    [id, shownName, isPinned, novelId, w],
+  );
 
   // To the profile as it opens; or, with its name ready to edit, the profile has put the focus there.
   useEffect(() => {
@@ -100,6 +113,17 @@ export function EntryTab({
           <ChevronRight className="size-4" aria-hidden />
         </button>
         <span className="flex-1 text-xs text-muted">{recordType ? recordType.def.group : (type?.label ?? w.entity.One)}</span>
+        {shownName !== undefined && (
+          <button
+            type="button"
+            onClick={() => setPinned(novelId, id, !isPinned)}
+            aria-label={isPinned ? `Unpin ${shownName}` : `Pin ${shownName} beside the text`}
+            title={isPinned ? "Unpin" : `Keep it first in In this ${w.piece.one}, in every ${w.piece.one}`}
+            className="rounded p-1 text-muted hover:bg-paper hover:text-ink"
+          >
+            {isPinned ? <PinOff className="size-4" aria-hidden /> : <Pin className="size-4" aria-hidden />}
+          </button>
+        )}
       </div>
       {entity ? (
         <EntryPage

@@ -1,7 +1,7 @@
 import fc from "fast-check";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { bookNameMatcher, countWords, loadBook, mentionTargets, nameMatcher, namesInBlock, passagesOf, proseBlocks, sentenceAround, type Book, type Piece } from "../src/index.ts";
+import { bookNameMatcher, countWords, loadBook, mentionTargets, nameMatcher, namesInBlock, namesNotLinkedIn, passagesOf, proseBlocks, sentenceAround, type Book, type Piece } from "../src/index.ts";
 import { nodeSource } from "../src/node.ts";
 
 const novel = await loadBook(nodeSource(fileURLToPath(new URL("../../../examples/sample-novel/", import.meta.url))));
@@ -183,6 +183,21 @@ describe("passagesOf", () => {
       return performance.now() - t;
     });
     expect(times.sort((a, b) => a - b)[2]).toBeLessThan(400);
+  });
+});
+
+describe("namesNotLinkedIn", () => {
+  it("lists the names a piece writes without a link, by what they name, in the order they come, as each entry's passages do", () => {
+    const flood = novel.pieces.find((p) => p.title === "The Flood")!;
+    const names = namesNotLinkedIn(novel, flood);
+    expect(names.map(({ id, passages }) => [id, passages.map((p) => p.text.slice(...p.at))])).toEqual([
+      [BEN, ["Ben", "Ben"]],
+      ["char_t0ma5h", ["Tomas"]],
+      [ADA, ["Ada"]],
+    ]);
+    // The same passages an entry's Appears in lists as not linked there.
+    for (const { id, passages } of names) expect(passages).toEqual(passagesOf(novel, id).filter((p) => p.piece === flood && !p.linked));
+    expect(namesNotLinkedIn(novel, novel.pieces.find((p) => p.title === "Walking the Span")!)).toEqual([]);
   });
 });
 
