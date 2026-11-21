@@ -28,8 +28,11 @@ async function write(page: Page, day: string, words: () => Promise<void>) {
   await palette(page, "today's entry");
   await expect(page).toHaveURL(/\/read$/);
   // Today's place, not yesterday's entry made in the place before (which keeps its name): the
-  // command runs a frame after the palette closes, and the page sees the new day then.
-  await expect(page.getByRole("article", { name: "Write today's entry" }).getByRole("textbox", { name: "Write today's entry" })).toBeFocused();
+  // command runs a frame after the palette closes, and the page sees the new day then. Until then
+  // the focus is back in the place the palette was opened from, the day before's (#158).
+  const place = page.getByRole("article", { name: "Write today's entry" });
+  await expect(place.locator(`time[datetime="${day}"]`)).toBeVisible();
+  await expect(place.getByRole("textbox", { name: "Write today's entry" })).toBeFocused();
   await selectionSettled(page);
   await words();
 }
@@ -137,4 +140,49 @@ test("words begun just before the day turns reach that day's entry, though its f
   // Every word in the 20th's entry: in its file, and on the page.
   await expect.poll(() => fileOn("2026-10-20"), { timeout: 10_000 }).toContain("Rain on the Spit.");
   await expect(yesterday).toContainText("Rain on the Spit.");
+});
+
+test("every word typed while today's entry is being made is kept, in order, mentions and all (#158)", async ({ page, app }) => {
+  await launch(page, app);
+  await page.getByRole("list", { name: "Books" }).getByRole("button", { name: "New book" }).click();
+  const dialog = page.getByRole("dialog", { name: "New book" });
+  await dialog.getByRole("radio", { name: "Journal" }).check();
+  await dialog.getByRole("textbox", { name: "Title" }).fill("Days");
+  await dialog.getByRole("button", { name: "Create" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Journal" })).toBeVisible();
+  const entries = join(app.home, "writer", "days", "entries");
+  const body = () =>
+    readdirSync(entries, { recursive: true, encoding: "utf8" })
+      .filter((f) => f.endsWith(".md"))
+      .map((f) => readFileSync(join(entries, f), "utf8").replace(/^---\n[\s\S]*?\n---\n/, ""))[0];
+
+  // A slow machine: the entry is made 800 ms after the first word asks for it.
+  await page.route("**/api/novels/*/daily/today", async (route) => {
+    const made = await route.fetch();
+    await new Promise((r) => setTimeout(r, 800));
+    await route.fulfill({ response: made });
+  });
+  await write(page, "2026-10-19", async () => {
+    await page.keyboard.type("Out early with the tide. ");
+    await newItem(page, "Mira Hale", 0);
+    await page.keyboard.type("came too.");
+  });
+  await expect.poll(body, { timeout: 10_000 }).toMatch(/^Out early with the tide\. \[Mira Hale\]\(#[a-z]+_[0-9a-z]{6}\) came too\.\n$/);
+});
+
+test("a journal page left open overnight offers the new day's place when it's come back to, before a word is typed (#158)", async ({ page, app }) => {
+  await launch(page, app);
+  await page.getByRole("list", { name: "Books" }).getByRole("button", { name: "New book" }).click();
+  const dialog = page.getByRole("dialog", { name: "New book" });
+  await dialog.getByRole("radio", { name: "Journal" }).check();
+  await dialog.getByRole("textbox", { name: "Title" }).fill("Days");
+  await dialog.getByRole("button", { name: "Create" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Journal" })).toBeVisible();
+  await write(page, "2026-10-19", async () => {});
+  const place = page.getByRole("article", { name: "Write today's entry" });
+  // Midnight passes with nothing happening on the page; the writer comes back to the window.
+  await page.clock.setFixedTime(new Date("2026-10-20T07:30:00"));
+  await expect(place.locator('time[datetime="2026-10-19"]')).toBeVisible();
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await expect(place.locator('time[datetime="2026-10-20"]')).toBeVisible();
 });

@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { countWords, vocabulary, type Piece } from "@writer/core";
-import { useMemo, useState, type MouseEvent } from "react";
+import { useEffect, useMemo, useReducer, useState, type MouseEvent } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 import { api, keys } from "@writer/web/api.ts";
 import type { BookView } from "@writer/web/modules.tsx";
@@ -31,7 +31,7 @@ export function ReadPage({ novelId, novel, workspace, spell, entries }: BookView
   const run = useMemo(() => newestFirst(novel), [novel]);
   const days = useMemo(() => new Map(run.map(({ piece, day }) => [piece.id, day])), [run]);
   const [reading, setReading] = useState(() => remembered());
-  const now = today();
+  const now = useToday();
   const todays = entryOn(novel, now);
   // Where a day's place keeps its words until its entry's file has them.
   const keepOn = (day: Day) => `writer:today:${novelId}:${day}`;
@@ -148,4 +148,34 @@ function remember(reading: boolean): void {
   } catch {
     // Not remembered where storage is blocked.
   }
+}
+
+/**
+ * Today, kept current (#158): the page is drawn again as the day turns, and when it's come back to
+ * (shown again, or its window focused), so a page left open overnight offers the new day's place
+ * before the first word is typed, not yesterday's, which would take those words.
+ */
+function useToday() {
+  const [, redraw] = useReducer((n: number) => n + 1, 0);
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    const atMidnight = () => {
+      const now = new Date();
+      const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 1);
+      timer = setTimeout(() => {
+        redraw();
+        atMidnight();
+      }, Math.min(next.getTime() - now.getTime(), 2 ** 31 - 1));
+    };
+    atMidnight();
+    const back = () => document.visibilityState === "visible" && redraw();
+    document.addEventListener("visibilitychange", back);
+    window.addEventListener("focus", back);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("visibilitychange", back);
+      window.removeEventListener("focus", back);
+    };
+  }, []);
+  return today();
 }
