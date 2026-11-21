@@ -25,7 +25,7 @@ test("the Entry tab: a sheet to read, Back and Forward through names opened, a p
   // What the book has said of her up to the scene being written (#153); one selects its sentence in the chapter.
   const appears = ada.getByRole("region", { name: "Appears in · 7" });
   await expect(appears).toContainText("The latest up to “The Station”:");
-  const passages = appears.getByRole("list", { name: "Passages naming Ada Varn" }).getByRole("button");
+  const passages = appears.getByRole("list", { name: "Passages naming Ada Varn" }).getByRole("button").filter({ hasNotText: /^Link it$/ });
   await expect(passages).toHaveCount(1);
   await expect(passages).toHaveAccessibleName(/^The Station, point of view: The train gave up the last of its heat/);
   await axe(page);

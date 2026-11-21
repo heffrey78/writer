@@ -61,6 +61,8 @@ export interface Workspace {
   open(paths: string[]): Promise<void>;
   /** The editor's new body for a file: saved after a pause. */
   change(path: string, body: string): void;
+  /** An open file's whole text, front matter and all, put back as it was (an Undo from outside the editor): saved after a pause. */
+  replace(path: string, text: string): void;
   /** An open file's body as it stands, with text typed but not reported yet. */
   current(path: string): string | undefined;
   /** Report text typed but not reported yet, then save everything now: before the desktop app quits. */
@@ -190,6 +192,15 @@ export function createWorkspace({ api, novelId, interval, storage, onModelSaved 
       setFile(path, next);
       autosave.change(path, joinSceneFile(next));
       for (const listener of editListeners) listener(path, f.body, body);
+    },
+
+    replace(path, text) {
+      const f = file(path);
+      if (!f) return;
+      const { frontMatter, body } = splitSceneFile(text);
+      if (f.frontMatter === frontMatter && f.body === body) return;
+      setFile(path, { ...f, frontMatter, body });
+      autosave.change(path, joinSceneFile({ ...f, frontMatter, body }));
     },
 
     current(path) {

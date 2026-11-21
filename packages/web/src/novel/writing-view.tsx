@@ -50,7 +50,6 @@ import { EntryTab, useEntryPanel } from "./entry-tab.tsx";
 import { useBookKind, useWords } from "./kind.ts";
 import { SceneNotes, useSceneNotes } from "../notes/scene-notes.tsx";
 import { leaveMention, MentionCard, useMentionCard } from "./mention-card.tsx";
-import { mentionEdits } from "./mention-sync.ts";
 import { useNotice } from "./notice.tsx";
 import { isSidebarKey, RightSidebar, useRightSidebar, useWideSidebar } from "./right-sidebar.tsx";
 import { usePageMenu } from "../page-menu.ts";
@@ -295,21 +294,6 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
   const toText = () => {
     if (editor && !editor.isDestroyed) editor.commands.focus(null, { scrollIntoView: false });
   };
-
-  // A new mention of someone or somewhere adds them to the scene's characters or locations.
-  const latestNovel = useRef(novel);
-  latestNovel.current = novel;
-  useEffect(
-    () =>
-      workspace.onEdit((path, before, after) => {
-        const book = latestNovel.current;
-        const f = workspace.store.getState().files[path];
-        if (!f || !book.allPieces.some((s) => s.file === path)) return;
-        const edits = mentionEdits(book, joinSceneFile(f), before, after);
-        if (edits.length) void workspace.editFrontMatter(path, edits);
-      }),
-    [workspace],
-  );
 
   // Mentions: a card on hover or Alt+Enter, and the entry on the sidebar's Entry tab.
   useEffect(

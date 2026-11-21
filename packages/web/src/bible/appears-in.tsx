@@ -3,6 +3,9 @@ import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { requestPassage } from "../novel/go-to-passage.ts";
 import { useCurrentScene } from "../novel/current.ts";
+import { useNotice } from "../novel/notice.tsx";
+import type { Workspace } from "../novel/workspace.ts";
+import { linkPassage } from "./link-passage.ts";
 import { cn } from "../ui/cn.ts";
 import { ProfileSection } from "./profile.tsx";
 import { markWords } from "./strip.tsx";
@@ -11,7 +14,7 @@ import { markWords } from "./strip.tsx";
  * Appears in (#135, #153): what the book says about an entry. Every passage that names it, linked or
  * written as plain words, grouped by piece in reading order, each saying the entry's role there as
  * the strip does. Chips narrow it to a role or to the names not linked; a passage opens its piece
- * with the name selected.
+ * with its sentence selected, and a name not linked is linked from here (#154).
  */
 
 /** Shown at first; More shows the rest. */
@@ -36,12 +39,61 @@ export function usePassages(novel: Book, id: string): Passage[] {
 type Show = "all" | "unlinked" | Exclude<PresenceMark, "absent">;
 const sentence = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-export function AppearsIn({ novelId, novel, entity, passages, compact, id }: { novelId: string; novel: Book; entity: Entity; passages: Passage[]; compact?: boolean; id?: string }) {
+export function AppearsIn({
+  novelId,
+  novel,
+  entity,
+  workspace,
+  passages,
+  compact,
+  id,
+}: {
+  novelId: string;
+  novel: Book;
+  entity: Entity;
+  workspace: Workspace;
+  passages: Passage[];
+  compact?: boolean;
+  id?: string;
+}) {
   const w = vocabulary(novel.kind);
   const navigate = useNavigate();
   const current = useCurrentScene((s) => s.scene?.id);
-  const [show, setShow] = useState<Show>("all");
+  const [showing, setShowing] = useState<Show>("all");
   const [more, setMore] = useState(false);
+  // Linked from here, until the book is read again with the mention in it.
+  const [linked, setLinked] = useState<ReadonlySet<Passage>>(new Set());
+  const show = useNotice((n) => n.show);
+  // The book isn't read again for a change to a piece's words alone: what's linked from here counts at once.
+  const isLinked = (p: Passage) => p.linked || linked.has(p);
+  const open = (p: Passage) => {
+    const to = requestPassage(novelId, p);
+    if (to) void navigate(to);
+  };
+  const link = async (p: Passage) => {
+    const words = p.text.slice(...p.at);
+    const undo = await linkPassage(workspace, novel, p, entity.id);
+    if (!undo) {
+      show({ message: `“${words}” reads differently in “${p.piece.title}” now, so it wasn't linked. Link it in the text.`, action: { label: `Open “${p.piece.title}”`, run: () => open(p) } });
+      return;
+    }
+    setLinked((s) => new Set(s).add(p));
+    show({
+      message: `Linked “${words}” to ${entity.name} in “${p.piece.title}”.`,
+      action: {
+        label: "Undo",
+        run: () => {
+          undo();
+          setLinked((s) => {
+            const next = new Set(s);
+            next.delete(p);
+            return next;
+          });
+          show({ message: `Unlinked “${words}” in “${p.piece.title}” again.` });
+        },
+      },
+    });
+  };
   const words = markWords(novel.kind, entity.type, w);
   // Its role in each piece, as the strip marks it: a name written without a link there counts as mentioned.
   const marks = useMemo(() => new Map(entryPresence(novel, entity.id)?.scenes.map((s) => [s.scene.id, s.mark === "absent" ? "mentioned" : s.mark] as const)), [novel, entity.id]);
@@ -53,11 +105,11 @@ export function AppearsIn({ novelId, novel, entity, passages, compact, id }: { n
     const count = passages.filter((p) => markOf(p) === mark).length;
     if (count) chips.push({ show: mark, label: sentence(said(mark)), count });
   }
-  const unlinked = passages.filter((p) => !p.linked).length;
+  const unlinked = passages.filter((p) => !isLinked(p)).length;
   if (unlinked) chips.push({ show: "unlinked", label: "Not linked", count: unlinked });
-  const chosen = chips.some((c) => c.show === show) ? show : "all";
+  const chosen = chips.some((c) => c.show === showing) ? showing : "all";
 
-  let listed = chosen === "all" ? passages : passages.filter((p) => (chosen === "unlinked" ? !p.linked : markOf(p) === chosen));
+  let listed = chosen === "all" ? passages : passages.filter((p) => (chosen === "unlinked" ? !isLinked(p) : markOf(p) === chosen));
   let hidden = 0;
   const at = compact ? novel.pieces.findIndex((p) => p.id === current) : -1;
   if (compact) {
@@ -94,7 +146,7 @@ export function AppearsIn({ novelId, novel, entity, passages, compact, id }: { n
                   type="button"
                   aria-pressed={chosen === c.show}
                   onClick={() => {
-                    setShow(c.show);
+                    setShowing(c.show);
                     setMore(false);
                   }}
                   className={cn(
@@ -123,31 +175,48 @@ export function AppearsIn({ novelId, novel, entity, passages, compact, id }: { n
                     </span>
                   </p>
                   <ul className="grid gap-1">
-                    {g.passages.map((p, i) => (
-                      <li key={i}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const to = requestPassage(novelId, p);
-                            if (to) void navigate(to);
-                          }}
-                          title={`Open “${g.piece.title}” at this passage`}
-                          className={cn(
-                            "-mx-2 block w-[calc(100%+1rem)] rounded-md border-l-2 px-2 py-1 text-left font-prose hover:bg-accent-soft/60 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none",
-                            p.linked ? "border-rule" : "border-warn/60",
-                            compact ? "text-sm" : "text-[15px] leading-snug",
+                    {g.passages.map((p, i) => {
+                      const linkedHere = isLinked(p);
+                      return (
+                        <li key={i} className="-mx-2 flex items-start gap-1">
+                          <button
+                            type="button"
+                            onClick={() => open(p)}
+                            onKeyDown={(e) => {
+                              // Alt+Enter links it, as in the text.
+                              if (e.key !== "Enter" || !e.altKey || linkedHere) return;
+                              e.preventDefault();
+                              void link(p);
+                            }}
+                            title={`Open “${g.piece.title}” at this passage${linkedHere ? "" : " (Alt+Enter links the name)"}`}
+                            aria-keyshortcuts={linkedHere ? undefined : "Alt+Enter"}
+                            className={cn(
+                              "block min-w-0 flex-1 rounded-md border-l-2 px-2 py-1 text-left font-prose hover:bg-accent-soft/60 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none",
+                              linkedHere ? "border-rule" : "border-warn/60",
+                              compact ? "text-sm" : "text-[15px] leading-snug",
+                            )}
+                          >
+                            <span className="sr-only">
+                              {g.piece.title}, {role}
+                              {linkedHere ? "" : ", not linked"}:{" "}
+                            </span>
+                            {p.text.slice(0, p.at[0])}
+                            <mark className={cn("rounded-sm px-0.5 text-ink", linkedHere ? "bg-accent-soft" : "bg-warn-soft underline decoration-warn decoration-dashed underline-offset-2")}>{p.text.slice(...p.at)}</mark>
+                            {p.text.slice(p.at[1])}
+                          </button>
+                          {!linkedHere && (
+                            <button
+                              type="button"
+                              onClick={() => void link(p)}
+                              aria-label={`Link “${p.text.slice(...p.at)}” in “${g.piece.title}” to ${entity.name}`}
+                              className="mt-0.5 shrink-0 rounded-md border border-warn/50 px-2 py-0.5 text-xs text-warn hover:bg-warn-soft focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+                            >
+                              Link it
+                            </button>
                           )}
-                        >
-                          <span className="sr-only">
-                            {g.piece.title}, {role}
-                            {p.linked ? "" : ", not linked"}:{" "}
-                          </span>
-                          {p.text.slice(0, p.at[0])}
-                          <mark className={cn("rounded-sm px-0.5 text-ink", p.linked ? "bg-accent-soft" : "bg-warn-soft underline decoration-warn decoration-dashed underline-offset-2")}>{p.text.slice(...p.at)}</mark>
-                          {p.text.slice(p.at[1])}
-                        </button>
-                      </li>
-                    ))}
+                        </li>
+                      );
+                    })}
                   </ul>
                 </li>
               );

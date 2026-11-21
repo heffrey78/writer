@@ -1,6 +1,6 @@
 import type { SyncStatus } from "@writer/client";
 import { pieceLevel, pieceSections, sectionById, unreadable, vocabulary, type Book } from "@writer/core";
-import { writingModes } from "@writer/editor";
+import { joinSceneFile, writingModes } from "@writer/editor";
 import { useWritingModes } from "@writer/editor/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from "react";
@@ -47,6 +47,7 @@ import { useSpell } from "./spell.ts";
 import { usePublish } from "../github/publish.tsx";
 import { SyncBadge } from "./sync-badge.tsx";
 import { createWorkspace, type Workspace } from "./workspace.ts";
+import { mentionEdits } from "./mention-sync.ts";
 import { createQuickEntries, type QuickEntries } from "../bible/quick-entries.ts";
 import { unlink } from "../bible/quick-entry.ts";
 import { useEntryPanel } from "./entry-tab.tsx";
@@ -134,9 +135,19 @@ export function NovelPage() {
           },
         }),
     });
+    // A new mention of someone or somewhere adds them to the piece's characters or locations, wherever
+    // it's made: typed in the text, or linked from an entry's profile (#154).
+    const unmention = ws.onEdit((path, before, after) => {
+      const book = latest.current.novel;
+      const f = ws.store.getState().files[path];
+      if (!book || !f || !book.allPieces.some((s) => s.file === path)) return;
+      const edits = mentionEdits(book, joinSceneFile(f), before, after);
+      if (edits.length) void ws.editFrontMatter(path, edits);
+    });
     setWorkspace(ws);
     setEntries(made);
     return () => {
+      unmention();
       detach();
       unflush();
       made.dispose();

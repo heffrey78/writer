@@ -65,6 +65,15 @@ describe("workspace", () => {
     await until(() => file().hash === hashText(disk()));
   });
 
+  it("puts a scene's whole text back, front matter and all, byte for byte (an Undo from an entry's profile, #154)", async () => {
+    const was = disk();
+    ws.change(SCENE, file().body.replace("Ada", "[Ada](#char_7f3k2q)"));
+    await ws.editFrontMatter(SCENE, [{ path: ["characters", 1], value: "char_b3n0vs" }]);
+    await until(() => disk().includes("char_b3n0vs") && disk().includes("[Ada](#char_7f3k2q)"));
+    ws.replace(SCENE, was);
+    await until(() => disk() === was);
+  });
+
   it("reloads a scene changed on disk when it has no unsaved text", async () => {
     const changed = replaceParagraph(disk(), 1, "Changed in another editor.");
     writeFileSync(join(root, SCENE), changed);

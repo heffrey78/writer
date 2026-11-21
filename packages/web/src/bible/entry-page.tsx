@@ -306,7 +306,7 @@ export function EntryPage({
       {!tab && <EntryIssues novelId={novelId} novel={novel} entity={entity} />}
 
       <InTheStory novelId={novelId} novel={novel} entity={entity} compact={tab} id={part("story")} />
-      <AppearsIn novelId={novelId} novel={novel} entity={entity} passages={passages} compact={tab} id={part("passages")} />
+      <AppearsIn novelId={novelId} novel={novel} entity={entity} workspace={workspace} passages={passages} compact={tab} id={part("passages")} />
       <NotesAbout novelId={novelId} novel={novel} id={entity.id} />
       {!tab && <TypeSections novelId={novelId} novel={novel} entity={entity} workspace={workspace} />}
 

@@ -207,7 +207,8 @@ test("an entry's profile lists every passage naming it, by scene and role; chips
   await open(page, app);
   await page.goto(`${app.url}${new URL(app.launchUrl).pathname.replace(/\/chapter.*$/, "")}/bible/char_b3n0vs/page`);
   const part = page.getByRole("region", { name: "Appears in · 6" });
-  const passages = part.getByRole("list", { name: "Passages naming Ben Varn" }).getByRole("button");
+  // Each passage, without its Link it (#154).
+  const passages = part.getByRole("list", { name: "Passages naming Ben Varn" }).getByRole("button").filter({ hasNotText: /^Link it$/ });
   // In reading order, each with its scene and his role there; the names written without a link say so.
   await expect(passages).toHaveCount(6);
   await expect(passages.first()).toHaveAccessibleName("Walking the Span, in the scene: Ben met her at the toll house with two coffees and a grin that was a size too large for him.");
@@ -243,6 +244,40 @@ test("an entry's profile lists every passage naming it, by scene and role; chips
   await expect(page).toHaveURL(/\/scene\/sc_br1dg3$/);
   await expect(page.getByRole("textbox", { name: "Scene text" })).toBeFocused();
   await expect.poll(() => page.evaluate(() => getSelection()?.toString())).toBe("Ben met her at the toll house with two coffees and a grin that was a size too large for him.");
+});
+
+test("a name written without a link is linked from the entry's profile: only its bytes change, the scene lists him, Undo puts it back (#154)", async ({ page, app }) => {
+  const { read } = await open(page, app);
+  const LEDGER = "manuscript/01-return/02-old-debts/02-bens-ledger.md";
+  const FLOOD = "manuscript/02-the-sale/01-night-crossing/02-the-flood.md";
+  const was = read(LEDGER);
+  await page.goto(`${app.url}${new URL(app.launchUrl).pathname.replace(/\/chapter.*$/, "")}/bible/char_b3n0vs/page`);
+  const part = page.getByRole("region", { name: "Appears in · 6" });
+  const notLinked = part.getByRole("group", { name: "Show" }).getByRole("button", { name: /^Not linked/ });
+  await expect(notLinked).toHaveText("Not linked · 3");
+
+  // Link it: the name becomes a mention, as the editor writes one, and Ben's Ledger lists him; nothing else changes.
+  await part.getByRole("button", { name: "Link “Ben” in “Ben's Ledger” to Ben Varn" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Linked “Ben” to Ben Varn in “Ben's Ledger”." })).toBeVisible();
+  await expect.poll(() => read(LEDGER)).toBe(was.replace("which meant Ben had", "which meant [Ben](#char_b3n0vs) had").replace("characters: [char_7f3k2q]", "characters: [char_7f3k2q, char_b3n0vs]"));
+  await expect(notLinked).toHaveText("Not linked · 2");
+
+  // Undo: the scene byte for byte as it was.
+  await page.getByRole("status").getByRole("button", { name: "Undo" }).click();
+  await expect.poll(() => read(LEDGER)).toBe(was);
+  await expect(notLinked).toHaveText("Not linked · 3");
+
+  // Alt+Enter on a passage links it too; opened, the text shows the mention.
+  const flood = part.getByRole("button", { name: /^The Flood, point of view, not linked: Ben was fourteen/ });
+  await flood.focus();
+  await page.keyboard.press("Alt+Enter");
+  await expect.poll(() => read(FLOOD)).toContain("[Ben](#char_b3n0vs) was fourteen");
+  await expect(notLinked).toHaveText("Not linked · 2");
+  await part.getByRole("button", { name: /^The Flood, point of view: Ben was fourteen/ }).click();
+  const text = page.getByRole("textbox", { name: "Scene text" });
+  await expect(text).toBeFocused();
+  await expect.poll(() => page.evaluate(() => getSelection()?.toString())).toBe("Ben was fourteen, and the river was louder than he had known a river could be.");
+  await expect(text.locator('[data-mention="char_b3n0vs"]').first()).toHaveText("Ben");
 });
 
 test("the bible as a gallery: cards with a summary, facts, a strip and a count; sorted four ways by keyboard", async ({ page, app }) => {
