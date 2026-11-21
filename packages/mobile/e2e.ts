@@ -56,6 +56,9 @@ async function tapAndroid(text: RegExp) {
   throw new Error(`Android showed nothing matching ${text}.`);
 }
 
+/** Where Writer's webview was on the screen the last time Android said. */
+let webviewAt: ReturnType<typeof androidUi>[number] | undefined;
+
 /** Long-press the first `word` in `page`'s element `selector`, at its place on the screen. */
 async function longPress(page: Page, selector: string, word: string) {
   // Measured once it holds still: the page scrolls as the keyboard comes up, and can pause for a
@@ -67,7 +70,16 @@ async function longPress(page: Page, selector: string, word: string) {
     still = now.x === at.x && now.y === at.y ? still + 1 : 0;
     at = now;
   }
-  const view = androidUi().find((n) => n.cls === "android.webkit.WebView")!;
+  // Android's dump of the screen can leave the webview out (with a large page, as a novel's, open):
+  // asked again, then where it was the last time, since it doesn't move.
+  let view: ReturnType<typeof androidUi>[number] | undefined;
+  for (let i = 0; i < 6 && !view; i++) {
+    view = androidUi().find((n) => n.cls === "android.webkit.WebView");
+    if (!view) await sleep(500);
+  }
+  view ??= webviewAt;
+  if (!view) throw new Error("Android's screen shows no webview to long-press in.");
+  webviewAt = view;
   const x = Math.round(view.x1 + at.x * at.dpr);
   const y = Math.round(view.y1 + at.y * at.dpr);
   adb("shell", "input", "swipe", String(x), String(y), String(x), String(y), "900");
@@ -159,6 +171,7 @@ try {
   android = await attach();
   if (!android) throw new Error("Playwright sees no Android device.");
   let page: Page = await (await android.webView({ pkg: PACKAGE }, { timeout: 30_000 })).page();
+  page.on("pageerror", (e) => console.error("PAGEERROR", e.message));
 
   await expect(page.getByRole("heading", { level: 1, name: "Your books" })).toBeVisible();
   await expect(page.getByText("No books yet. Start one, or clone one from GitHub.")).toBeVisible();
@@ -186,6 +199,7 @@ try {
   await android.close();
   android = await attach();
   page = await (await android!.webView({ pkg: PACKAGE }, { timeout: 30_000 })).page();
+  page.on("pageerror", (e) => console.error("PAGEERROR", e.message));
   const waiting = page.getByRole("dialog", { name: "Connect to GitHub" });
   await expect(waiting.getByLabel("Your code")).toHaveText(fake.userCode);
   fake.approve();
@@ -307,6 +321,7 @@ try {
   if (screenOn()) throw new Error("The screen is still kept on once listening stopped.");
   android = await attach();
   page = await (await android!.webView({ pkg: PACKAGE }, { timeout: 30_000 })).page();
+  page.on("pageerror", (e) => console.error("PAGEERROR", e.message));
   await expect(page.getByRole("group", { name: "Dictation" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Dictate", exact: true })).toBeVisible();
   await expect.poll(settled, { timeout: 20_000, message: "the settled phrase in place of the greyed words" }).toBe(2);
@@ -370,20 +385,22 @@ try {
   await book.getByRole("button", { name: "More" }).click();
   const more = page.getByRole("dialog", { name: "Days: more" });
   await expect(more.getByRole("region", { name: "This entry" })).toBeVisible();
-  adb("shell", "input", "keyevent", "KEYCODE_BACK");
-  await expect(more).toHaveCount(0);
-  await book.getByRole("link", { name: "Calendar" }).click();
-  await expect(book.getByRole("link", { name: "Calendar" })).toHaveAttribute("aria-current", "page");
-  await book.getByRole("link", { name: "Journal" }).click();
-  await expect(page.getByRole("textbox", { name: /Entry text/ }).first()).toBeVisible();
-  // Who's in the entry (#149), from More: the sidebar's tab, as a sheet.
-  await book.getByRole("button", { name: "More" }).click();
+  // Who's in the entry (#149), from More: the sidebar's tab, as a sheet. While the keyboard's away:
+  // back on the journal's page, the caret goes to today's entry and the keyboard (and the bar) come and go.
   await more.getByRole("button", { name: "Who's in it" }).click();
   const sheet = page.getByRole("complementary", { name: "Right sidebar" });
   await expect(sheet.getByRole("tab", { name: "In this entry" })).toHaveAttribute("aria-selected", "true");
   await expect(sheet.getByRole("tabpanel")).toBeVisible();
   await sheet.getByRole("button", { name: "Hide the right sidebar" }).click();
   await expect(sheet).toHaveCount(0);
+  await book.getByRole("button", { name: "More" }).click();
+  await expect(more.getByRole("region", { name: "This entry" })).toBeVisible();
+  adb("shell", "input", "keyevent", "KEYCODE_BACK");
+  await expect(more).toHaveCount(0);
+  await book.getByRole("link", { name: "Calendar" }).click();
+  await expect(book.getByRole("link", { name: "Calendar" })).toHaveAttribute("aria-current", "page");
+  await book.getByRole("link", { name: "Journal" }).click();
+  await expect(page.getByRole("textbox", { name: /Entry text/ }).first()).toBeVisible();
   step("the book's bar: away for the keyboard, back once it's hidden; More closed by Android's back; a page from it; who's in the entry from it");
 
   // A novel cloned from GitHub, opened; a change made elsewhere, taken by a sync.
@@ -406,6 +423,25 @@ try {
   for (let i = 0; i < 80 && !taken; i++, await sleep(250)) taken = inApp("grep -l \"A line from the desktop.\" books/*/README.md || true").trim();
   if (!taken) throw new Error("The change from GitHub didn't arrive.");
   step("synced: a change made elsewhere arrived");
+
+  // Words selected in the novel, into an entry from Android's toolbar (#157).
+  await page.getByRole("textbox", { name: "Chapter text" }).click();
+  // On screen above the keyboard.
+  await longPress(page, ".ghw-prose", "spine");
+  await expect.poll(() => page.evaluate(() => getSelection()?.toString()), { timeout: 10_000, message: "the word selected" }).toBe("spine");
+  await android!.wait({ text: "Copy" }, { timeout: 10_000 });
+  const add = { text: "Add to an entry…" };
+  if (!(await android!.wait(add, { timeout: 2_000 }).then(() => true, () => false))) await android!.tap({ desc: "More options" });
+  await android!.tap(add);
+  await expect(page.getByRole("dialog", { name: "Add to an entry" })).toContainText("spine");
+  await page.keyboard.type("ada");
+  await page.keyboard.press("Enter");
+  await page.getByRole("dialog", { name: "Add to Ada Varn" }).getByRole("button", { name: "Add to its notes" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Added to Ada Varn's notes, from “The Station”." })).toBeVisible();
+  let kept = "";
+  for (let i = 0; i < 40 && !kept; i++, await sleep(250)) kept = inApp("grep -l \"spine\" books/*/bible/characters/ada.md || true").trim();
+  if (!kept) throw new Error("The words weren't saved to Ada Varn's notes.");
+  step("words selected in a novel, added to an entry from Android's toolbar");
 
   // Typing, then the app killed before the autosave lands; opened again, the text is there and saved.
   const todaysEntry = async (p: Page) => {
@@ -462,12 +498,19 @@ try {
   console.log(`\nAll ${steps.length} steps passed on ${device.split("\t")[0]}.`);
 } catch (e) {
   console.error(`FAIL ${e instanceof Error ? e.message : String(e)}`);
+  try {
+    writeFileSync(join(tmp, "..", "failed.png"), execFileSync(ADB, ["exec-out", "screencap", "-p"]));
+  } catch {
+    // Only a picture of what went wrong.
+  }
   process.exitCode = 1;
 } finally {
   await android?.close();
   try {
     adb("reverse", "--remove", `tcp:${port}`);
-  } catch {}
+  } catch {
+    // Only a picture of what went wrong.
+  }
   await fake.close();
   rmSync(tmp, { recursive: true, force: true });
 }

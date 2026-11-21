@@ -1,5 +1,8 @@
 import type { Editor } from "@tiptap/core";
 import type { Node } from "@tiptap/pm/model";
+import { resolveAnchor } from "@writer/core";
+import { sceneTextAt } from "./issue-marks.ts";
+import { editorScenes } from "./search.ts";
 
 /** Where a passage is (core's Passage.block): its block's text, which of the blocks reading the same, and the name and its sentence in it. */
 export interface PassagePlace {
@@ -74,6 +77,28 @@ export function passageRange(doc: Node, file: string, place: PassagePlace, what:
 /** Select a passage's sentence in the editor and bring it into view, with the focus. False if it isn't there any more. */
 export function selectPassage(editor: Editor, file: string, place: PassagePlace): boolean {
   const range = passageRange(editor.state.doc, file, place, "sentence");
+  if (!range) return false;
+  editor.chain().focus().setTextSelection({ from: range[0], to: range[1] }).scrollIntoView().run();
+  return true;
+}
+
+/**
+ * Where a quote kept from a piece (an entry's notes, #157) is in the editor now, found as an issue's
+ * passage is (resolveAnchor over the piece's text): undefined if the piece isn't in the editor or
+ * no longer reads close enough to it.
+ */
+export function quoteRange(editor: Editor, file: string, quote: string): [number, number] | undefined {
+  const scene = editorScenes(editor).get(file);
+  if (!scene) return undefined;
+  const { text, from, to } = sceneTextAt(scene.node, scene.contentStart);
+  const match = resolveAnchor(text, quote);
+  if (!match || match.to <= match.from) return undefined;
+  return [from[match.from]!, to[match.to - 1]!];
+}
+
+/** Select a quote kept from a piece and bring it into view, with the focus. False if it can't be found. */
+export function selectQuote(editor: Editor, file: string, quote: string): boolean {
+  const range = quoteRange(editor, file, quote);
   if (!range) return false;
   editor.chain().focus().setTextSelection({ from: range[0], to: range[1] }).scrollIntoView().run();
   return true;

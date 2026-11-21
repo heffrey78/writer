@@ -63,9 +63,10 @@ export function WritingBar({ editor, dictate, selection }: { editor: Editor | un
       <BarButton label="Undo" icon={Undo2} disabled={!live?.can().undo()} onPress={() => live?.commands.undo()} />
       <BarButton label="Redo" icon={Redo2} disabled={!live?.can().redo()} onPress={() => live?.commands.redo()} />
       <BarButton label="Mention" icon={AtSign} disabled={!live} onPress={() => live && mention(live)} />
+      {/* One in words; more as their icons, or they'd run off a phone's screen. */}
       {selected &&
         selection.map((a) => (
-          <BarButton key={a.label} label={a.label} icon={a.icon ?? MessageSquarePlus} onPress={a.run} wide />
+          <BarButton key={a.label} label={a.label} icon={a.icon ?? MessageSquarePlus} onPress={a.run} wide={selection.length === 1} />
         ))}
       {/* The keyboard put away, and the book's bar back (#100): the sign phones' keyboards use for it. */}
       <button

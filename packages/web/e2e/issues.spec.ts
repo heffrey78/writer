@@ -43,7 +43,9 @@ test("a local novel has no issues; put on GitHub, they appear in the same sessio
   const passage = page.getByRole("textbox", { name: "Chapter text" }).getByText(/the way you count stitches in a wound\./);
   await passage.click({ clickCount: 3 });
   await passage.click({ button: "right" });
-  await expect(page.getByRole("menu", { name: "Selected text" })).toHaveCount(0);
+  // (Selected words still go to an entry, #157.)
+  await expect(page.getByRole("menu", { name: "Selected text" }).getByRole("menuitem")).toHaveText(["Add to an entry…"]);
+  await page.keyboard.press("Escape");
   await page.keyboard.press("ControlOrMeta+k");
   await page.keyboard.type("raise an issue");
   await expect(page.getByRole("option", { name: /Raise an issue/ })).toHaveCount(0);

@@ -25,6 +25,7 @@ import { RelationshipArcs } from "./arcs.tsx";
 import { NotesAbout } from "../notes/notes-about.tsx";
 import { InTheStory } from "./strip.tsx";
 import { AppearsIn, usePassages } from "./appears-in.tsx";
+import { QuotesFrom } from "./quotes-from.tsx";
 import { TypeSections } from "./type-sections.tsx";
 import { mentionEntities, typeOf } from "./types.ts";
 
@@ -301,6 +302,7 @@ export function EntryPage({
         ) : (
           <p className="text-sm text-muted">Opening…</p>
         )}
+        <QuotesFrom novelId={novelId} novel={novel} body={file?.body ?? entity.body} />
       </section>
 
       {!tab && <EntryIssues novelId={novelId} novel={novel} entity={entity} />}

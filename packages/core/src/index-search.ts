@@ -26,9 +26,25 @@ export interface EntryMatch {
   rank: number;
 }
 
-/** Text as a search compares it: without accents and case. "Miréla" and "mirela" are the same. */
+const folds = new Map<string, string>();
+
+/**
+ * A character as a search compares it: through its capital to its small letter (so "ß" and "ss" are
+ * the same, and "ᾀ" and its capital "ἈΙ"), without accents, a final "ς" as "σ".
+ */
+function fold(ch: string): string {
+  let f = folds.get(ch);
+  if (f === undefined) folds.set(ch, (f = ch.toUpperCase().toLowerCase().normalize("NFD").replace(/\p{M}+/gu, "").replace(/ς/g, "σ")));
+  return f;
+}
+
+/**
+ * Text as a search compares it: without accents and case. "Miréla" and "mirela" are the same.
+ * Character by character, so a piece of text folds as it does within the whole (where a match is
+ * mapped back to what it matched); plain ASCII, most of a book, just in lower case.
+ */
 export function searchable(text: string): string {
-  return text.toLowerCase().normalize("NFD").replace(/\p{M}+/gu, "");
+  return text.replace(/[^\x00-\x7f]/gu, fold).toLowerCase();
 }
 
 /** A search's terms: its words, each to be found somewhere in an entry. None for an empty search. */

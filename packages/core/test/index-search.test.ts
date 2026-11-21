@@ -29,6 +29,16 @@ describe("searchEntries", () => {
     for (const q of ["Mirela", "mirela", "MIRÉLA", "Mirèla"]) expect(found(q)[0]).toEqual(["Mirela Kost", "name"]);
   });
 
+  it("finds a name typed in capitals that are longer than its letters, and a final sigma", () => {
+    // Found by the property below: "ᾀ" in capitals is "ἈΙ".
+    const greek = entity("A", ["ᾀ"]);
+    expect(matchEntry(greek, "ἈΙ")).toMatchObject({ where: "alias" });
+    expect(matchEntry(entity("Straße"), "STRASSE")).toMatchObject({ where: "name" });
+    expect(matchEntry(entity("Οδός"), "ΟΔΟΣ")).toMatchObject({ where: "name" });
+    const { text, at } = matchEntry({ ...entity("Zz"), summary: "Lives on Hauptstraße by the river." }, "strasse")!;
+    expect(text!.slice(...at!)).toBe("straße");
+  });
+
   it("needs every word somewhere in the entry, and says the best part holding the first", () => {
     expect(found("bridge engineer").map(([n]) => n)).toContain("Ada Varn");
     expect(found("engineer grey")).toEqual([["Ada Varn", "summary"]]);

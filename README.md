@@ -53,6 +53,7 @@ Examples here are from the sample novel, *The Bridge at Varn*. Unless it says ot
 - **Mentions.** Type `@` and a few letters to mention anything in the book's index. Hover over a mention (or press Alt+Enter) for a card showing who they are and how they relate to everyone else *at that point in the book*.
 - **A sidebar beside the text**: the piece the caret is in as a readable card, each detail edited in place, with what the rest of the book says about it ("8 h after “The Station”", "First appearance of Ben Varn"); its notes; everyone and everything in it, with their roles there, each opening in place; and any index entry as its profile. Ctrl+Shift+\\ hides and shows it.
 - **Quick entry.** Create a new entry straight from the `@` menu or the piece's card, without leaving the text.
+- **Add to an entry.** Select words you've just written and add them to an entry's notes, as a quote that leads back to its sentence, or as one of its fields (Ctrl+Shift+E, or from the right-click menu).
 - **Dictation.** Speak, and the words are written where the caret is. They're heard on the device by a speech model you download once, and audio never leaves it. English for now, in the Linux and Android apps ([#71](https://github.com/heffrey78/writer/issues/71)).
 - **Footnotes and pictures** in the text, kept in plain Markdown. Tables, headings and lists too.
 - **Spell check** that knows the names in your index, with a dictionary for each book.

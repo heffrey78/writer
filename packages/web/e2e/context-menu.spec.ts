@@ -49,8 +49,9 @@ test("in the text: Cut, Copy, Paste and Select all, then Back and Forward, in th
   for (let i = 0; i < "to check.".length; i++) await page.keyboard.press("Shift+ArrowLeft");
   await expect.poll(() => page.evaluate(() => getSelection()!.toString())).toBe("to check.");
   await rightClickSelection(page);
-  await expect(menu(page).getByRole("menuitem")).toHaveText([/^Cut/, /^Copy/, /^Paste/, /^Select all/, /^Back/, /^Forward/]);
-  await expect(menu(page).getByRole("separator")).toHaveCount(1);
+  // Selected words also go to an entry (#157), above the editing.
+  await expect(menu(page).getByRole("menuitem")).toHaveText(["Add to an entry…", /^Cut/, /^Copy/, /^Paste/, /^Select all/, /^Back/, /^Forward/]);
+  await expect(menu(page).getByRole("separator")).toHaveCount(2);
   await expect(item(page, "Paste")).not.toHaveAttribute("data-disabled");
   await axeWithMenu(page);
   await item(page, "Cut").click();

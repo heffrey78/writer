@@ -92,4 +92,4 @@ export { linkCommands, linkName, linkNameAtCaret, linkSuggestKey, LinkSuggestExt
 export { decoratePinned, PinnedLinesExtension, pinnedLinesKey, refreshPinnedLines, type PinnedLinesOptions } from "./pinned-lines.ts";
 export { IssueMarksExtension, issueMarksKey, ISSUE_MARKS_KEY, refreshIssueMarks, sceneText, sceneTextAt, type AnchoredIssue, type IssueMarksOptions } from "./issue-marks.ts";
 export { FootnotesExtension } from "./footnotes.ts";
-export { passageRange, selectPassage, type PassagePlace } from "./passage.ts";
+export { passageRange, quoteRange, selectPassage, selectQuote, type PassagePlace } from "./passage.ts";

@@ -1,4 +1,4 @@
-import type { Passage } from "@writer/core";
+import type { Passage, Piece } from "@writer/core";
 import type { PassagePlace } from "@writer/editor";
 import { create } from "zustand";
 
@@ -11,7 +11,9 @@ export interface PassageRequest {
   /** The piece's ID and file (a chapter's editor knows its pieces by file). */
   piece: string;
   file: string;
-  place: PassagePlace;
+  /** A passage, where it is (#153); or words quoted from the piece, found again (#157). */
+  place?: PassagePlace;
+  quote?: string;
 }
 
 export const usePassageRequest = create<{ request: PassageRequest | undefined; /** The pieces the writing view has open. */ showing: readonly string[] }>(() => ({
@@ -26,4 +28,10 @@ export const usePassageRequest = create<{ request: PassageRequest | undefined; /
 export function requestPassage(novelId: string, passage: Passage): string | undefined {
   usePassageRequest.setState({ request: { piece: passage.piece.id, file: passage.piece.file, place: passage.block } });
   return usePassageRequest.getState().showing.includes(passage.piece.id) ? undefined : `/novels/${novelId}/scene/${passage.piece.id}`;
+}
+
+/** As requestPassage, for words quoted from a piece in an entry's notes (#157): selected where they're found now. */
+export function requestQuote(novelId: string, piece: Piece, quote: string): string | undefined {
+  usePassageRequest.setState({ request: { piece: piece.id, file: piece.file, quote } });
+  return usePassageRequest.getState().showing.includes(piece.id) ? undefined : `/novels/${novelId}/scene/${piece.id}`;
 }

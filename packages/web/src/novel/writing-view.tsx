@@ -15,6 +15,7 @@ import {
   mentionAtCaret,
   pictureAt,
   selectPassage,
+  selectQuote,
   serializeProse,
   sessionCommands,
   setPicture,
@@ -30,7 +31,7 @@ import { ChapterEditor, FindReplace, SceneEditor, useWritingModes, WordCount, ty
 import type { Editor } from "@tiptap/core";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
-import { Plus } from "lucide-react";
+import { BookPlus, Plus } from "lucide-react";
 import { Button } from "../ui/button.tsx";
 import { create, useStore } from "zustand";
 import { joinSceneFile, splitSceneFile } from "@writer/editor";
@@ -70,6 +71,7 @@ import { cn } from "../ui/cn.ts";
 import { useBookBar } from "./bottom-bar.tsx";
 import { usePassageRequest } from "./go-to-passage.ts";
 import { HereTab } from "./here-tab.tsx";
+import { AddToEntryDialog, useAddToEntry } from "../bible/add-to-entry.tsx";
 
 interface Props {
   novelId: string;
@@ -125,7 +127,8 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
     if (!passage || !editor || editor.isDestroyed || !scenes.some((s) => s.id === passage.piece)) return;
     const select = () => {
       usePassageRequest.setState({ request: undefined });
-      if (!selectPassage(editor, passage.file, passage.place)) {
+      const found = passage.place ? selectPassage(editor, passage.file, passage.place) : passage.quote !== undefined && selectQuote(editor, passage.file, passage.quote);
+      if (!found) {
         useNotice.getState().show({ message: `That passage reads differently now: it may have been changed since. Here's the ${w.piece.one} it was in.` });
       }
     };
@@ -356,8 +359,32 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
     useIssuePanel.setState({ numbers: [], editor: undefined });
     useRaise.getState().open(passage, editor);
   };
+  // Words just written, into an entry (#157): its notes, or a field.
+  const addFromSelection = () => {
+    if (!editor || editor.isDestroyed) return;
+    const passage = selectedPassage(editor, novel);
+    if (!passage) {
+      useNotice.getState().show({ message: `Select the words to add to ${w.entity.a} first.` });
+      return;
+    }
+    useAddToEntry.getState().open(passage, editor);
+  };
+  const addLabel = `Add to ${w.entity.a}…`;
+  /** What selected words offer, wherever they're offered: the menu, the phone's toolbar, the writing bar. */
+  const onSelection = [...(repo ? [{ id: "raise-issue", label: "Raise an issue…", run: raiseFromSelection }] : []), { id: "add-to-entry", label: addLabel, icon: BookPlus, run: addFromSelection }];
   // On a phone, in Android's selection toolbar (#95).
-  useSelectionToolbar(repo ? [{ id: "raise-issue", label: "Raise an issue…", run: raiseFromSelection }] : []);
+  useSelectionToolbar(onSelection);
+  useEffect(() => {
+    // Ctrl+Shift+E (⌘⇧E), by the key's place: not Ctrl+Alt+E, which is AltGr+E (€) on many keyboards.
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || !e.shiftKey || e.altKey || e.code !== "KeyE") return;
+      if (!editor || editor.isDestroyed || !editor.view.hasFocus()) return;
+      e.preventDefault();
+      addFromSelection();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
   // Footnotes (#58), from the palette as by their keys: a new one where the caret is, or between a note and its place.
   useCommands(
     () =>
@@ -368,6 +395,10 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
           ]
         : [],
     [editor],
+  );
+  useCommands(
+    () => [{ id: "writing.addToEntry", title: `Add the selected words to ${w.entity.a}…`, group: "Writing", keys: "Mod-Shift-e", keywords: ["quote", "notes", "field", w.codex.one], run: addFromSelection }],
+    [editor, novel, w],
   );
   useCommands(
     () => (repo ? [{ id: "writing.raiseIssue", title: "Raise an issue about the selection…", group: "GitHub", keywords: ["note", "plot hole", "continuity", "research", "github"], run: raiseFromSelection }] : []),
@@ -519,10 +550,10 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
           // On a phone, a long-press is Android's: its own toolbar, with Raise an issue… added (#95).
           if (onAndroid) return;
           // On selected text in the editor, unless something there (the spelling menu) took the click.
-          if (!repo || !editor || editor.isDestroyed || e.defaultPrevented || !editor.view.dom.contains(e.target as Node)) return;
+          if (!editor || editor.isDestroyed || e.defaultPrevented || !editor.view.dom.contains(e.target as Node)) return;
           if (!selectedPassage(editor, novel)) return;
           // The desktop app's menu shows it with its own items.
-          if (appContextMenu()) return contributeMenuItems(e.nativeEvent, { items: [{ label: "Raise an issue…", run: raiseFromSelection }] });
+          if (appContextMenu()) return contributeMenuItems(e.nativeEvent, { items: onSelection.map(({ label, run }) => ({ label, run })) });
           e.preventDefault();
           setMenu({ x: e.clientX, y: e.clientY });
         }}
@@ -599,7 +630,7 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
           />
         )}
       </div>
-      <StatusBar novelId={novelId} workspace={workspace} editor={editor} selection={repo ? [{ label: "Raise an issue…", run: raiseFromSelection }] : []} />
+      <StatusBar novelId={novelId} workspace={workspace} editor={editor} selection={onSelection.map(({ label, icon, run }) => ({ label, ...(icon ? { icon } : {}), run }))} />
       </div>
       {raising || issueOpen ? (
         // An issue being raised or read takes the sidebar's place until it's closed: beside the text,
@@ -651,12 +682,16 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
             setMenu(undefined);
             if (back && editor && !editor.isDestroyed) editor.commands.focus(null, { scrollIntoView: false });
           }}
-          onRaise={() => {
-            setMenu(undefined);
-            raiseFromSelection();
-          }}
+          items={onSelection.map(({ label, run }) => ({
+            label,
+            run: () => {
+              setMenu(undefined);
+              run();
+            },
+          }))}
         />
       )}
+      <AddToEntryDialog novelId={novelId} novel={novel} workspace={workspace} />
       {pictureRequest && (
         <PictureInTextDialog
           novelId={novelId}
@@ -683,7 +718,7 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
 }
 
 /** What can be done with the selected text: a menu at the pointer, by keyboard too (Escape returns to the text). */
-function SelectionMenu({ at, onClose, onRaise }: { at: { x: number; y: number }; onClose: (back: boolean) => void; onRaise: () => void }) {
+function SelectionMenu({ at, onClose, items }: { at: { x: number; y: number }; onClose: (back: boolean) => void; items: { label: string; run: () => void }[] }) {
   const menu = useRef<HTMLDivElement>(null);
   const first = useRef<HTMLButtonElement>(null);
   useEffect(() => {
@@ -711,12 +746,28 @@ function SelectionMenu({ at, onClose, onRaise }: { at: { x: number; y: number };
           onClose(true);
         }
       }}
-      style={{ left: Math.min(at.x, window.innerWidth - 220), top: Math.min(at.y, window.innerHeight - 60) }}
+      style={{ left: Math.min(at.x, window.innerWidth - 220), top: Math.min(at.y, window.innerHeight - 20 - 36 * items.length) }}
       className="fixed z-50 grid min-w-48 rounded-md border border-rule bg-raised p-1 text-sm shadow-lg"
     >
-      <button ref={first} type="button" role="menuitem" onClick={onRaise} className="rounded px-2 py-1.5 text-left hover:bg-accent-soft focus:bg-accent-soft focus:outline-none">
-        Raise an issue…
-      </button>
+      {items.map((item, i) => (
+        <button
+          key={item.label}
+          ref={i === 0 ? first : undefined}
+          type="button"
+          role="menuitem"
+          onClick={item.run}
+          onKeyDown={(e) => {
+            // Up and down between the items, as a menu.
+            if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+            e.preventDefault();
+            const all = [...(menu.current?.querySelectorAll<HTMLElement>("[role=menuitem]") ?? [])];
+            all[(all.indexOf(e.currentTarget) + (e.key === "ArrowDown" ? 1 : all.length - 1)) % all.length]?.focus();
+          }}
+          className="rounded px-2 py-1.5 text-left hover:bg-accent-soft focus:bg-accent-soft focus:outline-none"
+        >
+          {item.label}
+        </button>
+      ))}
     </div>
   );
 }
