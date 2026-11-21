@@ -351,13 +351,18 @@ function moreWordsThan(text: string, n: number): boolean {
   return false;
 }
 
-/** The sentence holding [from, to), trimmed to about `words` words around it, with … where it was cut. */
-export function sentenceAround(text: string, [from, to]: [number, number], words = 30, starts = sentenceStarts(text)): { text: string; at: [number, number] } {
+/** Where the sentence holding [from, to) is in the text, up to the space after it. */
+function sentenceBounds(text: string, from: number, to: number, starts: number[]): [number, number] {
   let s = 0;
   for (const at of starts) if (at <= from) s = at;
   const next = starts.find((at) => at > from) ?? text.length;
   // A sentence that ends before the name does (a name across a full stop: "St. Ives") runs on to it.
-  const e = Math.max(next, to);
+  return [s, Math.max(next, to)];
+}
+
+/** The sentence holding [from, to), trimmed to about `words` words around it, with … where it was cut. */
+export function sentenceAround(text: string, [from, to]: [number, number], words = 30, starts = sentenceStarts(text)): { text: string; at: [number, number] } {
+  const [s, e] = sentenceBounds(text, from, to, starts);
   let start = s;
   let end = e;
   if (moreWordsThan(text.slice(s, e), words)) {
@@ -393,6 +398,12 @@ export interface Passage {
   raw?: [number, number];
   /** The piece's fields that name the entry (its roles there, by field key); none where it's only mentioned. */
   roles: string[];
+  /**
+   * Where it is in its block of prose: the block's text (as the editor's paragraph or heading reads,
+   * a picture or break one character), which of the piece's blocks with that text, the name's place
+   * in it, and its whole sentence's: what the writing view selects when the passage is opened.
+   */
+  block: { text: string; nth: number; at: [number, number]; sentence: [number, number] };
 }
 
 /** Each piece body's blocks, by its text: unchanged pieces keep theirs when the book is loaded again. */
@@ -430,16 +441,21 @@ export function passagesOf(book: Book, id: string): Passage[] {
     // Most pieces never name it: skip them before parsing.
     if (!piece.body.includes(`(#${id})`) && !terms.some((t) => piece.body.includes(t))) continue;
     const roles = Object.keys(piece.fields).filter((k) => fieldNames(piece.fields[k], id));
-    for (const b of blocksOf(piece)) {
-      if (!terms.some((t) => b.text.includes(t)) && !b.runs.some((r) => r.id === id)) continue;
+    const blocks = blocksOf(piece);
+    blocks.forEach((b, i) => {
+      if (!terms.some((t) => b.text.includes(t)) && !b.runs.some((r) => r.id === id)) return;
+      let nth: number | undefined;
       for (const hit of namesInBlock(piece.body, b, matcher)) {
         if (hit.id !== id) continue;
         let starts = startsCache.get(b);
         if (!starts) startsCache.set(b, (starts = sentenceStarts(b.text)));
         const { text, at } = sentenceAround(b.text, hit.at, 30, starts);
-        out.push({ piece, linked: hit.linked, text, at, ...(hit.raw ? { raw: hit.raw } : {}), roles });
+        nth ??= blocks.slice(0, i).filter((x) => x.text === b.text).length;
+        const [from, to] = sentenceBounds(b.text, hit.at[0], hit.at[1], starts);
+        const sentence: [number, number] = [from, from + b.text.slice(from, to).trimEnd().length];
+        out.push({ piece, linked: hit.linked, text, at, ...(hit.raw ? { raw: hit.raw } : {}), roles, block: { text: b.text, nth, at: hit.at, sentence } });
       }
-    }
+    });
   }
   return out;
 }

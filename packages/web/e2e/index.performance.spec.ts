@@ -8,11 +8,13 @@ import { expect, test, type App } from "./fixtures.ts";
 /**
  * The index (#134) on a long book with a large story bible: 500 entries beside a 200,000-word
  * manuscript. It opens in under a second, and each step of working in it answers within 100 ms:
- * a letter typed in its search, the next entry opened with j, a filter taken off. Runs alone, after
- * the other tests.
+ * a letter typed in its search, the next entry opened with j, a filter taken off. An entry's profile
+ * lists every passage naming its main character within 50 ms (#135). Runs alone, after the other tests.
  */
 
 const BUDGET = 100;
+const PASSAGES_BUDGET = 50;
+const ADA = "char_7f3k2q";
 /** An ID in the format's alphabet: char_000001, loc_000002… */
 const id = (prefix: string, n: number) => `${prefix}_${Array.from({ length: 6 }, (_, i) => ID_ALPHABET[Math.floor(n / 32 ** (5 - i)) % 32]).join("")}`;
 const OCCUPATIONS = ["Ferryman", "Toll keeper", "Clerk", "Engineer", "Baker", "Surveyor", "Teacher", "Fisher"];
@@ -132,7 +134,18 @@ test("the index of a 500-entry bible opens in under a second, and searching, ste
   const filtering = await timed(page, "Backspace", 1, '[aria-label="Remove the filter: Tag: river"]', "gone");
   const filtered = report("a filter taken off", filtering);
 
+  // Ada Varn's profile, in a fresh page: every passage of the 200,000 words naming her, worked out
+  // from nothing (as the profile times it).
+  await page.goto(new URL(`${new URL(page.url()).pathname.replace(/\/bible.*$/, "")}/bible/${ADA}`, page.url()).href);
+  await expect(page.getByRole("region", { name: /^Appears in · \d{3,}/ })).toBeVisible({ timeout: 15_000 });
+  const listing = await page.evaluate(
+    (id) => performance.getEntriesByName("passages").filter((m) => (m as PerformanceMeasure).detail === id).map((m) => m.duration),
+    ADA,
+  );
+  const passages = report("listing a main character's passages", listing.slice(0, 1));
+
   expect(typed).toBeLessThan(BUDGET);
   expect(stepped).toBeLessThan(BUDGET);
   expect(filtered).toBeLessThan(BUDGET);
+  expect(passages).toBeLessThan(PASSAGES_BUDGET);
 });

@@ -14,6 +14,7 @@ import {
   MENTION_INFO_KEYS,
   mentionAtCaret,
   pictureAt,
+  selectPassage,
   serializeProse,
   sessionCommands,
   setPicture,
@@ -68,6 +69,7 @@ import { useNarrow } from "./sidebar.tsx";
 import { useTextFocused, WritingBar, type BarAction } from "./writing-bar.tsx";
 import { cn } from "../ui/cn.ts";
 import { useBookBar } from "./bottom-bar.tsx";
+import { usePassageRequest } from "./go-to-passage.ts";
 
 interface Props {
   novelId: string;
@@ -112,6 +114,25 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
       if (useWritingEditor.getState().editor === editor) useWritingEditor.setState({ editor: undefined });
     };
   }, [editor]);
+  // A passage opened from an entry's profile (#153): its words selected once its piece is in the
+  // editor, after the editor's own autofocus (which a new editor applies just before "create").
+  const passage = useStore(usePassageRequest, (s) => s.request);
+  useEffect(() => {
+    usePassageRequest.setState({ showing: scenes.map((s) => s.id) });
+    return () => usePassageRequest.setState({ showing: [] });
+  }, [scenes]);
+  useEffect(() => {
+    if (!passage || !editor || editor.isDestroyed || !scenes.some((s) => s.id === passage.piece)) return;
+    const select = () => {
+      usePassageRequest.setState({ request: undefined });
+      if (!selectPassage(editor, passage.file, passage.place)) {
+        useNotice.getState().show({ message: `That passage reads differently now: it may have been changed since. Here's the ${w.piece.one} it was in.` });
+      }
+    };
+    if (editor.isInitialized) return select();
+    editor.on("create", select);
+    return () => void editor.off("create", select);
+  }, [passage, editor, scenes, w]);
   // Focus goes to the text when a chapter or scene is opened, not when it reloads (files renamed by a move).
   const viewId = "run" in view ? `run:${view.run.key}` : "scene" in view ? view.scene.id : view.chapter.id;
   const focusedView = useRef<string | undefined>(undefined);

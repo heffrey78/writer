@@ -24,6 +24,7 @@ import { AddButton, EditorButtons, EditorFrame, FieldRows, Lead, PencilButton, r
 import { RelationshipArcs } from "./arcs.tsx";
 import { NotesAbout } from "../notes/notes-about.tsx";
 import { InTheStory } from "./strip.tsx";
+import { AppearsIn, usePassages } from "./appears-in.tsx";
 import { TypeSections } from "./type-sections.tsx";
 import { mentionEntities, typeOf } from "./types.ts";
 
@@ -71,7 +72,10 @@ export function EntryPage({
     const f = novel.kind.fields.find((x) => x.key === link);
     return f ? roleOf(f) : link === "mention" ? "mentioned" : link;
   };
-  const ids = { notes: useId() };
+  const ids = { notes: useId(), parts: useId() };
+  const part = (name: string) => `${ids.parts}-${name}`;
+  const passages = usePassages(novel, entity.id);
+  const relationships = novel.relationships.filter((r) => r.from === entity.id || r.to === entity.id).length;
   const place = useInPlace(startEditing);
   const shape = shapeForType(entity.type);
   const picture = usePictureUrl(novelId, entity.image);
@@ -144,7 +148,7 @@ export function EntryPage({
   const Heading = embedded && !embedded.modal ? "h2" : "h1";
   return (
     <div className={embedded ? (tab ? "grid gap-4" : "grid gap-5") : "mx-auto grid w-full max-w-[calc(var(--ghw-prose-measure)+3rem)] gap-5 px-6 py-6"}>
-      <div className="flex flex-wrap items-start gap-4">
+      <div id={part("profile")} className="flex scroll-mt-12 flex-wrap items-start gap-4">
         {tab ? (
           picture && <Picture src={picture} alt={pictureAlt(shape, entity.name)} focus={entity.imageFocus} className={shape.key === "wide" ? "aspect-video w-32 shrink-0 rounded-md" : "h-[110px] w-[88px] shrink-0 rounded-md"} />
         ) : (
@@ -263,7 +267,20 @@ export function EntryPage({
         )}
       </div>
 
-      <section aria-labelledby={`${ids.notes}-h`} className="grid gap-1 border-t border-rule pt-4">
+      {!tab && (
+        <PartsStrip
+          label={`Parts of the ${vocabulary(novel.kind).entity.one}`}
+          parts={[
+            { id: part("profile"), label: "Profile" },
+            { id: part("notes"), label: "Notes" },
+            { id: part("story"), label: `In the ${vocabulary(novel.kind).subject}` },
+            { id: part("passages"), label: `Appears in · ${passages.length}` },
+            { id: part("relationships"), label: `Relationships · ${relationships}` },
+          ]}
+        />
+      )}
+
+      <section id={part("notes")} tabIndex={-1} aria-labelledby={`${ids.notes}-h`} className="grid scroll-mt-12 gap-1 border-t border-rule pt-4 outline-none">
         <h2 id={`${ids.notes}-h`} className="text-xs font-semibold tracking-wide text-muted uppercase">
           Notes
         </h2>
@@ -288,11 +305,12 @@ export function EntryPage({
 
       {!tab && <EntryIssues novelId={novelId} novel={novel} entity={entity} />}
 
-      <InTheStory novelId={novelId} novel={novel} entity={entity} compact={tab} />
+      <InTheStory novelId={novelId} novel={novel} entity={entity} compact={tab} id={part("story")} />
+      <AppearsIn novelId={novelId} novel={novel} entity={entity} passages={passages} compact={tab} id={part("passages")} />
       <NotesAbout novelId={novelId} novel={novel} id={entity.id} />
       {!tab && <TypeSections novelId={novelId} novel={novel} entity={entity} workspace={workspace} />}
 
-      <RelationshipArcs novelId={novelId} novel={novel} entity={entity} compact={tab} />
+      <RelationshipArcs novelId={novelId} novel={novel} entity={entity} compact={tab} id={part("relationships")} />
       {tab && (
         <Link to={`/novels/${novelId}/bible/${entity.id}`} className="justify-self-start text-sm text-accent underline decoration-accent/35 underline-offset-[3px] hover:decoration-accent">
           Open the full {vocabulary(novel.kind).entity.one}
@@ -327,6 +345,57 @@ export function EntryPage({
       </AlertDialog.Root>
       {remove.isError && <ErrorAlert title="Couldn't delete it">{remove.error.message}</ErrorAlert>}
     </div>
+  );
+}
+
+/**
+ * The profile's parts as a strip that stays at the top as it scrolls (mockup 1): each jumps to its
+ * part and takes the focus there, and the one being read is marked.
+ */
+function PartsStrip({ label, parts }: { label: string; parts: { id: string; label: string }[] }) {
+  const [reading, setReading] = useState(parts[0]?.id);
+  const key = parts.map((p) => p.id).join(" ");
+  useEffect(() => {
+    const showing = new Map<string, boolean>();
+    // A part is being read while it crosses the top half of the screen, under the strip.
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) showing.set(e.target.id, e.isIntersecting);
+        const first = parts.find((p) => showing.get(p.id));
+        if (first) setReading(first.id);
+      },
+      { rootMargin: "-48px 0px -50% 0px" },
+    );
+    for (const p of parts) {
+      const el = document.getElementById(p.id);
+      if (el) observer.observe(el);
+    }
+    return () => observer.disconnect();
+  }, [key]);
+  const go = (id: string) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.scrollIntoView({ block: "start", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+    el.focus({ preventScroll: true });
+    setReading(id);
+  };
+  return (
+    <nav aria-label={label} className="sticky top-0 z-10 -my-2 flex gap-1 overflow-x-auto border-b border-rule bg-paper py-1.5">
+      {parts.map((p) => (
+        <button
+          key={p.id}
+          type="button"
+          aria-current={reading === p.id ? "true" : undefined}
+          onClick={() => go(p.id)}
+          className={cn(
+            "shrink-0 rounded-md px-2.5 py-1 text-xs whitespace-nowrap focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none",
+            reading === p.id ? "bg-accent-soft font-medium text-accent" : "text-muted hover:bg-accent-soft/50 hover:text-ink",
+          )}
+        >
+          {p.label}
+        </button>
+      ))}
+    </nav>
   );
 }
 

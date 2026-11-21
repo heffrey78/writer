@@ -80,7 +80,7 @@ export function StripHeader({ presence }: { presence: EntryPresence }) {
 }
 
 /** Where an entry is across the book, and the facts that follow from it. */
-export function InTheStory({ novelId, novel, entity, compact }: { novelId: string; novel: Book; entity: Entity; compact?: boolean }) {
+export function InTheStory({ novelId, novel, entity, compact, id }: { novelId: string; novel: Book; entity: Entity; compact?: boolean; id?: string }) {
   const presence = useMemo(() => entryPresence(novel, entity.id), [novel, entity.id]);
   if (!presence) return null;
   const w = vocabulary(novel.kind);
@@ -89,7 +89,7 @@ export function InTheStory({ novelId, novel, entity, compact }: { novelId: strin
   const n = presence.scenes.length;
 
   return (
-    <ProfileSection title={`In the ${w.subject}`}>
+    <ProfileSection title={`In the ${w.subject}`} {...(id ? { id } : {})}>
       {n === 0 ? (
         <p className="text-sm text-muted">The book has no {w.piece.many} yet.</p>
       ) : (

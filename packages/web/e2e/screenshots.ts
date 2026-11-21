@@ -88,6 +88,8 @@ test("the story bible", async ({ page, app }) => {
   // The list beside Ada Varn (#134); then the gallery of cards, with nothing open.
   await page.getByRole("main").getByRole("link", { name: /^Ada Varn/ }).first().click();
   await expect(page.getByRole("heading", { level: 2, name: "Ada Varn" })).toBeVisible();
+  // Down to the passages that name her (#153).
+  await page.getByRole("navigation", { name: "Parts of the entry" }).getByRole("button", { name: /^Appears in/ }).click();
   await page.waitForTimeout(800);
   await shoot(page, "bible");
   await page.getByRole("button", { name: "Cards" }).click();

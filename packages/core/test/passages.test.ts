@@ -80,6 +80,20 @@ describe("passagesOf", () => {
     expect(body.slice(...p!.raw!)).toBe("Ben");
   });
 
+  it("says where each is in its block of prose, and which of the blocks reading the same it is", () => {
+    const book = withBody("Ben waits.\n\n> Ben waits.\n\nThen [Ben](#char_b3n0vs) *left*, and Ben slept.\n");
+    expect(passagesOf(book, BEN).map((p) => [p.block.text.slice(...p.block.at), p.block.nth])).toEqual([
+      ["Ben", 0],
+      ["Ben", 1],
+      ["Ben", 0],
+      ["Ben", 0],
+    ]);
+    const last = passagesOf(book, BEN).at(-1)!;
+    expect(last.block).toEqual({ text: "Then Ben left, and Ben slept.", nth: 0, at: [19, 22], sentence: [0, 29] });
+    const [two] = passagesOf(withBody("He waited. Then Ben left!  Night fell.\n"), BEN);
+    expect(two!.block.text.slice(...two!.block.sentence)).toBe("Then Ben left!");
+  });
+
   it("trims a long sentence to about thirty words around the name", () => {
     const long = `${"word ".repeat(40)}Ben ${"more ".repeat(40)}end.`;
     const [p] = passagesOf(withBody(`${long}\n`), BEN);

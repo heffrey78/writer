@@ -247,10 +247,10 @@ export function EditorButtons({ onSave, onCancel, saving, hint }: { onSave?: () 
 }
 
 /** A profile's section: a small capitals heading and what's under it. */
-export function ProfileSection({ title, children, className, action }: { title: string; children: ReactNode; className?: string; action?: ReactNode }) {
+export function ProfileSection({ title, children, className, action, id: sectionId }: { title: string; children: ReactNode; className?: string; action?: ReactNode; /** For the profile's parts strip to jump to. */ id?: string }) {
   const id = useId();
   return (
-    <section aria-labelledby={id} className={cn("grid gap-2 border-t border-rule pt-4", className)}>
+    <section id={sectionId} tabIndex={sectionId ? -1 : undefined} aria-labelledby={id} className={cn("grid scroll-mt-12 gap-2 border-t border-rule pt-4 outline-none", className)}>
       <div className="flex items-center gap-2">
         <h2 id={id} className="flex-1 text-xs font-semibold tracking-wide text-muted uppercase">
           {title}

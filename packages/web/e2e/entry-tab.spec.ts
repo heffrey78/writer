@@ -22,12 +22,23 @@ test("the Entry tab: a sheet to read, Back and Forward through names opened, a p
   await expect(ada.getByRole("region", { name: "Relationships" }).getByRole("list", { name: "All relationships" })).toBeVisible();
   await expect(ada.getByRole("region", { name: "Notes", exact: true })).toContainText("Voice: short sentences when she is angry");
   await expect(ada.getByRole("link", { name: "Open the full entry" })).toBeVisible();
+  // What the book has said of her up to the scene being written (#153); one selects its sentence in the chapter.
+  const appears = ada.getByRole("region", { name: "Appears in · 7" });
+  await expect(appears).toContainText("The latest up to “The Station”:");
+  const passages = appears.getByRole("list", { name: "Passages naming Ada Varn" }).getByRole("button");
+  await expect(passages).toHaveCount(1);
+  await expect(passages).toHaveAccessibleName(/^The Station, point of view: The train gave up the last of its heat/);
   await axe(page);
   await page.emulateMedia({ colorScheme: "dark" });
   await axe(page);
   await page.emulateMedia({ colorScheme: "light" });
   // Its notes are written on the sidebar's own ground, the caret in them or not (#127).
   await proseOnItsGround(page, ada.getByRole("textbox", { name: "Notes on Ada Varn" }), sidebar, ada.getByRole("button", { name: "Edit occupation" }));
+  const url = page.url();
+  await passages.click();
+  await expect(page.getByRole("textbox", { name: "Chapter text" })).toBeFocused();
+  await expect.poll(() => page.evaluate(() => getSelection()?.toString())).toBe("The train gave up the last of its heat as it pulled into Varn, and Ada was the only passenger who stood.");
+  expect(page.url()).toBe(url);
 
   // Another, then Back and Forward.
   await sceneTab.click();

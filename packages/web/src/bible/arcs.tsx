@@ -28,7 +28,7 @@ type Lane = { r: Relationship; start: number; end: number }[];
 
 const BORDER = { solid: "solid", dashed: "dashed", dotted: "dotted" } as const;
 
-export function RelationshipArcs({ novelId, novel, entity, compact }: { novelId: string; novel: Book; entity: Entity; compact?: boolean }) {
+export function RelationshipArcs({ novelId, novel, entity, compact, id }: { novelId: string; novel: Book; entity: Entity; compact?: boolean; id?: string }) {
   /** The name column: narrower in the sidebar. */
   const cols = compact ? "grid-cols-[4.5rem_minmax(0,1fr)]" : "grid-cols-[6.5rem_minmax(0,1fr)]";
   const queryClient = useQueryClient();
@@ -85,6 +85,7 @@ export function RelationshipArcs({ novelId, novel, entity, compact }: { novelId:
   return (
     <ProfileSection
       title="Relationships"
+      {...(id ? { id } : {})}
       action={
         <Button
           ref={addButton}

@@ -203,6 +203,48 @@ test("in the story: a strip of every scene, marking where the entry carries it, 
   await expect(page.getByRole("heading", { level: 1, name: "Mirela's Offer" })).toBeVisible();
 });
 
+test("an entry's profile lists every passage naming it, by scene and role; chips narrow them; a passage opens its scene with its sentence selected (#153)", async ({ page, app }) => {
+  await open(page, app);
+  await page.goto(`${app.url}${new URL(app.launchUrl).pathname.replace(/\/chapter.*$/, "")}/bible/char_b3n0vs/page`);
+  const part = page.getByRole("region", { name: "Appears in · 6" });
+  const passages = part.getByRole("list", { name: "Passages naming Ben Varn" }).getByRole("button");
+  // In reading order, each with its scene and his role there; the names written without a link say so.
+  await expect(passages).toHaveCount(6);
+  await expect(passages.first()).toHaveAccessibleName("Walking the Span, in the scene: Ben met her at the toll house with two coffees and a grin that was a size too large for him.");
+  await expect(passages.nth(3)).toHaveAccessibleName("The Flood, point of view, not linked: Ben was fourteen, and the river was louder than he had known a river could be.");
+  await expect(part.getByRole("listitem").filter({ hasText: /^Walking the Span/ }).first()).toContainText("Walking the Span · Arrival · in the scene");
+
+  // Narrowed to a role, or to the names not linked (as the editor underlines them), and back.
+  const chips = part.getByRole("group", { name: "Show" }).getByRole("button");
+  await expect(chips).toHaveText(["All · 6", "Point of view · 2", "In the scene · 3", "Mentioned · 1", "Not linked · 3"]);
+  await chips.filter({ hasText: "Not linked" }).click();
+  await expect(chips.filter({ hasText: "Not linked" })).toHaveAttribute("aria-pressed", "true");
+  await expect(passages).toHaveCount(3);
+  for (const p of await passages.all()) await expect(p).toHaveAccessibleName(/, not linked: /);
+  await chips.filter({ hasText: "Point of view" }).click();
+  await expect(passages).toHaveCount(2);
+  await chips.filter({ hasText: "All" }).click();
+  await expect(passages).toHaveCount(6);
+  await axe(page);
+  await page.emulateMedia({ colorScheme: "dark" });
+  await axe(page);
+  await page.emulateMedia({ colorScheme: "light" });
+
+  // The strip of the profile's parts jumps to one, and marks it.
+  const strip = page.getByRole("navigation", { name: "Parts of the entry" });
+  await expect(strip.getByRole("button")).toHaveText(["Profile", "Notes", "In the story", "Appears in · 6", "Relationships · 5"]);
+  await strip.getByRole("button", { name: "Appears in · 6" }).click();
+  await expect(part).toBeFocused();
+  await expect(strip.getByRole("button", { name: "Appears in · 6" })).toHaveAttribute("aria-current", "true");
+
+  // Enter on a passage: its scene, with the sentence selected and the caret in the text.
+  await passages.first().focus();
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(/\/scene\/sc_br1dg3$/);
+  await expect(page.getByRole("textbox", { name: "Scene text" })).toBeFocused();
+  await expect.poll(() => page.evaluate(() => getSelection()?.toString())).toBe("Ben met her at the toll house with two coffees and a grin that was a size too large for him.");
+});
+
 test("the bible as a gallery: cards with a summary, facts, a strip and a count; sorted four ways by keyboard", async ({ page, app }) => {
   const novel = await open(page, app);
   await palette(page, "story bible");
