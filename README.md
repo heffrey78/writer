@@ -51,7 +51,7 @@ Examples here are from the sample novel, *The Bridge at Varn*. Unless it says ot
 
 - **A distraction-free editor** for a single piece, or a whole chapter or month as one continuous text while each piece stays its own file. Focus mode, typewriter scrolling, word counts, and today's words against a daily goal.
 - **Mentions.** Type `@` and a few letters to mention anything in the book's index. Hover over a mention (or press Alt+Enter) for a card showing who they are and how they relate to everyone else *at that point in the book*.
-- **A sidebar beside the text**: the piece the caret is in as a readable card, each detail edited in place, with what the rest of the book says about it ("8 h after “The Station”", "First appearance of Ben Varn"); its notes; and any index entry as its profile. Ctrl+Shift+\\ hides and shows it.
+- **A sidebar beside the text**: the piece the caret is in as a readable card, each detail edited in place, with what the rest of the book says about it ("8 h after “The Station”", "First appearance of Ben Varn"); its notes; everyone and everything in it, with their roles there, each opening in place; and any index entry as its profile. Ctrl+Shift+\\ hides and shows it.
 - **Quick entry.** Create a new entry straight from the `@` menu or the piece's card, without leaving the text.
 - **Dictation.** Speak, and the words are written where the caret is. They're heard on the device by a speech model you download once, and audio never leaves it. English for now, in the Linux and Android apps ([#71](https://github.com/heffrey78/writer/issues/71)).
 - **Footnotes and pictures** in the text, kept in plain Markdown. Tables, headings and lists too.
@@ -60,12 +60,14 @@ Examples here are from the sample novel, *The Bridge at Varn*. Unless it says ot
 - **Find and replace** across the piece, the chapter or the whole book, with one Undo for everything.
 - **Autosave that doesn't lose words**, even if the app crashes, and conflicts shown side by side if a file changes elsewhere.
 
-![A mention card: Ada Varn, her details, and her relationships at "The Station"](docs/screenshots/mention-card.png)
-
 <table>
   <tr>
     <td><img src="docs/screenshots/scene-card.png" alt="The Scene card beside a chapter, with point of view and story time pinned under each scene's title"></td>
     <td><img src="docs/screenshots/entry-tab.png" alt="The Entry tab: Ada Varn's sheet beside the text"></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/mention-card.png" alt="A mention card: Ada Varn, her details, and her relationships at The Station"></td>
+    <td><img src="docs/screenshots/in-this-scene.png" alt="In this scene: everyone in The Station with their role there, Varn Station opened in place"></td>
   </tr>
 </table>
 
@@ -74,7 +76,7 @@ Examples here are from the sample novel, *The Bridge at Varn*. Unless it says ot
 ### Plan
 
 - **The book's structure** in a tree you can rearrange with the keyboard or by dragging, and an **outline** of every piece as a table or as index cards, filtered by what's in it. A novel's outline is also a drafting board, which can be mirrored on a GitHub Project.
-- **An index** of entries of your kind's types and types you invent, as a gallery of cards and a profile for each entry, read first and edited in place: where it is across the book, piece by piece, and its relationships as arcs that start and end at particular pieces, in colours that stay readable for colour-blind readers. The same relationships are drawn as a **relationship graph** with a slider to step through the book and watch alliances change.
+- **An index** of entries of your kind's types and types you invent, as a list beside each entry or a gallery of cards, searched and filtered by anything an entry says, and a profile for each entry, read first and edited in place: where it is across the book, piece by piece, every sentence that names it (each opening the text there), and its relationships as arcs that start and end at particular pieces, in colours that stay readable for colour-blind readers. The same relationships are drawn as a **relationship graph** with a slider to step through the book and watch alliances change.
 - **A map** of the book's elements against its pieces, exportable as SVG (and some as Mermaid): a novel's Story map, a Journal map, a Campaign map, a Book map. Which tabs it has depends on the kind:
   - **presence** of people, places and ideas in each piece (every kind);
   - a **timeline** setting when things happen against reading order, flashbacks and off-page events included (novel, journal and campaign);
@@ -84,7 +86,7 @@ Examples here are from the sample novel, *The Bridge at Varn*. Unless it says ot
 <table>
   <tr>
     <td><img src="docs/screenshots/gallery.png" alt="The story bible as a gallery of cards, each with a strip of the scenes the entry is in"></td>
-    <td><img src="docs/screenshots/bible.png" alt="Ada Varn's profile: her scenes in reading order and her relationships as arcs"></td>
+    <td><img src="docs/screenshots/bible.png" alt="The story bible's list beside Ada Varn's profile: every passage that names her, by scene and role"></td>
   </tr>
   <tr>
     <td><img src="docs/screenshots/outline-cards.png" alt="The outline as cards: scenes grouped by chapter"></td>

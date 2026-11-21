@@ -1,12 +1,12 @@
-import { axe, expect, proseOnItsGround, test } from "./fixtures.ts";
+import { axe, caretAtEnd, expect, proseOnItsGround, test } from "./fixtures.ts";
 
 test("the Entry tab: a sheet to read, Back and Forward through names opened, a pin to keep it, the form in place", async ({ page, app }) => {
   await app.restart(app.novelRepo("varn"));
   await page.goto(app.launchUrl);
   await expect(page.getByRole("textbox", { name: "Chapter text" })).toBeFocused();
   const sidebar = page.getByRole("complementary", { name: "Right sidebar" });
-  const sceneTab = sidebar.getByRole("tab", { name: "Scene" });
-  const entryTab = sidebar.getByRole("tab", { name: "Entry" });
+  const sceneTab = sidebar.getByRole("tab", { name: "Scene", exact: true });
+  const entryTab = sidebar.getByRole("tab", { name: "Entry", exact: true });
   const station = sidebar.getByRole("region", { name: "Details of “The Station”" });
 
   // A name on the Scene tab opens its sheet.
@@ -68,4 +68,55 @@ test("the Entry tab: a sheet to read, Back and Forward through names opened, a p
   await strip.getByRole("link", { name: "The Betrayal: point of view" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "The Betrayal" })).toBeVisible();
   await expect(ada.getByRole("region", { name: "At “The Betrayal”" })).toContainText("Rivals with Ben Varn");
+});
+
+test("In this scene: everyone and everything in the scene once, with its role and card, following the caret; one expands to its profile, Open goes to it (#149)", async ({ page, app }) => {
+  await app.restart(app.novelRepo("varn"));
+  await page.goto(app.launchUrl);
+  const text = page.getByRole("textbox", { name: "Chapter text" });
+  await expect(text).toBeFocused();
+  const sidebar = page.getByRole("complementary", { name: "Right sidebar" });
+  const tab = sidebar.getByRole("tab", { name: "In this scene" });
+
+  // A tab like the others: the arrows reach it.
+  await sidebar.getByRole("tab", { name: "Scene", exact: true }).click();
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("ArrowRight");
+  await expect(tab).toBeFocused();
+  await expect(tab).toHaveAttribute("aria-selected", "true");
+  const station = sidebar.getByRole("list", { name: "In “The Station”" }).getByRole("listitem");
+  await expect(station).toHaveText([/^AVAda Varnpoint of view · 31 · Structural engineer/, /^VSVarn Stationset here/, /^TSThe Saleplotline \(minor\) “First sign of the sale”/, /^IInheritancetheme \(faint\)/]);
+  await axe(page);
+  await page.emulateMedia({ colorScheme: "dark" });
+  await axe(page);
+  await page.emulateMedia({ colorScheme: "light" });
+
+  // The caret into the next scene: its people and places.
+  await caretAtEnd(page, text);
+  const span = sidebar.getByRole("list", { name: "In “Walking the Span”" });
+  await expect(span.getByRole("listitem")).toHaveCount(6);
+  await expect(span.getByRole("listitem").nth(1)).toContainText("Ben Varnpresent");
+
+  // One expands in place to its profile, by Enter; Open goes to it in the bible.
+  const ben = span.getByRole("button", { name: /^Ben Varn/ });
+  await ben.focus();
+  await page.keyboard.press("Enter");
+  await expect(ben).toHaveAttribute("aria-expanded", "true");
+  await expect(span.getByRole("heading", { name: "Ben Varn" })).toBeVisible();
+  await expect(span.getByRole("region", { name: /^Appears in/ })).toBeVisible();
+  await axe(page);
+  await page.keyboard.press("Enter");
+  await expect(ben).toHaveAttribute("aria-expanded", "false");
+  await span.getByRole("link", { name: "Open Ben Varn in the bible" }).click();
+  await expect(page).toHaveURL(/\/bible\/char_b3n0vs$/);
+  await expect(page.getByRole("heading", { level: 2, name: "Ben Varn" })).toBeVisible();
+
+  // From the palette.
+  await page.goBack();
+  await expect(text).toBeVisible();
+  await sidebar.getByRole("tab", { name: "Scene", exact: true }).click();
+  await page.keyboard.press("ControlOrMeta+k");
+  await page.keyboard.type("who's in this scene");
+  await page.keyboard.press("Enter");
+  await expect(tab).toHaveAttribute("aria-selected", "true");
 });

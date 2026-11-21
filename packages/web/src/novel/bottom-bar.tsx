@@ -118,7 +118,7 @@ export function MoreSheet({ novelId, novel, onGitHub }: { novelId: string; novel
           {items.length > 0 && (
             <section aria-label={heading} className="grid gap-2">
               <h2 className="text-base font-semibold">{heading}</h2>
-              <div className="grid grid-cols-3 gap-1.5">
+              <div className={cn("grid gap-1.5", items.length === 4 ? "grid-cols-2" : "grid-cols-3")}>
                 {items.map((item) => (
                   <button
                     key={item.id}

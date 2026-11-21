@@ -22,7 +22,7 @@ import { opened } from "./recent.ts";
 import { OpenParts, saveOpenParts } from "./profile.tsx";
 import { RelationshipTypes } from "./relationship-types.tsx";
 import { markWords } from "./strip.tsx";
-import { entriesByType } from "./types.ts";
+import { cardFacts, entriesByType, initials } from "./types.ts";
 
 /*
  * The index (the Story bible, a campaign's Codex, a journal's Index; heffrey78/gh-writer#162, #134): its
@@ -802,13 +802,7 @@ const EntryCard = memo(function EntryCard({
   const shape = shapeForType(entity.type);
   const count = presence?.count ?? 0;
   const n = presence?.scenes.length ?? 0;
-  const facts = [
-    ...Object.entries(entity.fields)
-      .slice(0, 2)
-      .map(([, v]) => (typeof v === "boolean" ? null : String(v)))
-      .filter(Boolean),
-    ...(entity.aliases.length ? [`also ${entity.aliases.join(", ")}`] : []),
-  ].slice(0, 2);
+  const facts = cardFacts(entity);
   return (
     <a
       href={href}
@@ -856,12 +850,3 @@ const EntryCard = memo(function EntryCard({
   );
 });
 
-/** "AV" for Ada Varn: a stand-in for a portrait. */
-function initials(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter((w) => /\p{L}/u.test(w))
-    .slice(0, 2)
-    .map((w) => [...w.replace(/^\P{L}+/u, "")][0]!.toUpperCase())
-    .join("");
-}

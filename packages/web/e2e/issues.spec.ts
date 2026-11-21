@@ -370,7 +370,7 @@ test("on a phone, an issue opens over the text; back from it, the scene's detail
 
   await page.getByRole("navigation", { name: "Book" }).getByRole("button", { name: "More" }).click();
   await page.getByRole("dialog", { name: /: more$/ }).getByRole("button", { name: "Details" }).click();
-  await expect(page.getByRole("tab", { name: "Scene", selected: true })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Scene", exact: true, selected: true })).toBeVisible();
   await axe(page);
   await page.keyboard.press("Escape");
 
@@ -379,7 +379,7 @@ test("on a phone, an issue opens over the text; back from it, the scene's detail
   await expect(panel).toBeVisible();
   await palette(page, "Show the scene's details");
   await expect(panel).toHaveCount(0);
-  await expect(page.getByRole("tab", { name: "Scene", selected: true })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Scene", exact: true, selected: true })).toBeVisible();
 });
 
 test("milestones: made, renamed, closed and reopened from the Issues view", async ({ page, app }) => {

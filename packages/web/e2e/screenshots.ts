@@ -44,6 +44,12 @@ test("the right sidebar: the Scene card with details pinned, and the Entry tab",
   await expect(page.getByRole("region", { name: "Ada Varn" })).toBeFocused();
   await page.getByRole("region", { name: "Ada Varn" }).evaluate((e) => (e as HTMLElement).blur());
   await shoot(page, "entry-tab");
+  // Everyone in the scene, one opened in place (#149).
+  await page.getByRole("tab", { name: "In this scene" }).click();
+  await page.getByRole("list", { name: "In “The Station”" }).getByRole("button", { name: /^Varn Station/ }).click();
+  await page.getByRole("list", { name: "In “The Station”" }).getByRole("button", { name: /^Varn Station/ }).blur();
+  await page.waitForTimeout(500);
+  await shoot(page, "in-this-scene");
 });
 
 test("planning views", async ({ page, app }) => {

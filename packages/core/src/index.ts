@@ -17,7 +17,7 @@ export { countText, countWords, markdownWords, proseText, wordList } from "./wor
 export { addDays, daysBetween, LONG, median, PACE_DAYS, projection, sceneWords, SHORT, streak, unbalanced, wordChange, writingDays, type CommitWords, type Projection, type Streak, type WritingDay } from "./stats.ts";
 export { merge2, merge3, resolveMerge, type MergeChunk, type MergeResult, type Resolution } from "./merge.ts";
 export { editFrontMatter, editYaml, numberedName, readFrontMatter, slugify, uniqueFileName, uniqueId, type YamlEdit, type YamlPath } from "./edit.ts";
-export { backlinks, mentionsOf, notesMentioning, notesOfScene, relationshipHistory, type Backlinks, type MentionedIn, type RelationshipSpan, type SceneLink } from "./queries.ts";
+export { backlinks, entriesInPiece, mentionsOf, notesMentioning, notesOfScene, relationshipHistory, type Backlinks, type InPiece, type MentionedIn, type RelationshipSpan, type SceneLink } from "./queries.ts";
 export { passageIssueBody, readAnchor, writeAnchor, type IssueAnchor, type PassageIssue } from "./issue-anchor.ts";
 export { resolveAnchor, type AnchorMatch, type AnchorOptions } from "./anchor-match.ts";
 export { issueKindOf, kindLabel, STOCK_LABELS, type IssueKind } from "./issue-kinds.ts";

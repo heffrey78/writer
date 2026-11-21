@@ -376,7 +376,15 @@ try {
   await expect(book.getByRole("link", { name: "Calendar" })).toHaveAttribute("aria-current", "page");
   await book.getByRole("link", { name: "Journal" }).click();
   await expect(page.getByRole("textbox", { name: /Entry text/ }).first()).toBeVisible();
-  step("the book's bar: away for the keyboard, back once it's hidden; More closed by Android's back; a page from it");
+  // Who's in the entry (#149), from More: the sidebar's tab, as a sheet.
+  await book.getByRole("button", { name: "More" }).click();
+  await more.getByRole("button", { name: "Who's in it" }).click();
+  const sheet = page.getByRole("complementary", { name: "Right sidebar" });
+  await expect(sheet.getByRole("tab", { name: "In this entry" })).toHaveAttribute("aria-selected", "true");
+  await expect(sheet.getByRole("tabpanel")).toBeVisible();
+  await sheet.getByRole("button", { name: "Hide the right sidebar" }).click();
+  await expect(sheet).toHaveCount(0);
+  step("the book's bar: away for the keyboard, back once it's hidden; More closed by Android's back; a page from it; who's in the entry from it");
 
   // A novel cloned from GitHub, opened; a change made elsewhere, taken by a sync.
   await page.goto("http://tauri.localhost/");

@@ -181,9 +181,9 @@ test("in a chapter, follows the scene the caret is in; steps to others; names op
 
   // A name opens its entry on the Entry tab.
   await row(bridge, "Point of view").getByRole("button", { name: "Ada Varn" }).click();
-  await expect(page.getByRole("tab", { name: "Entry" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("tab", { name: "Entry", exact: true })).toHaveAttribute("aria-selected", "true");
   await expect(page.getByRole("region", { name: "Ada Varn" })).toBeFocused();
-  await page.getByRole("tab", { name: "Scene" }).click();
+  await page.getByRole("tab", { name: "Scene", exact: true }).click();
   await expect(bridge).toBeVisible();
   // Remembered across a reload.
   await page.reload();

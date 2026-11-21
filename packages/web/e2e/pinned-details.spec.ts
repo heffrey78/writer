@@ -38,7 +38,7 @@ test("pinned details show under each scene's title, follow edits, are remembered
   await page.reload();
   await expect(text).toBeFocused();
   await page.keyboard.press("ControlOrMeta+Shift+Backslash");
-  await expect(page.getByRole("tab", { name: "Scene" })).toHaveCount(0);
+  await expect(page.getByRole("tab", { name: "Scene", exact: true })).toHaveCount(0);
   await expect(lines).toHaveText(["Ada Varn · Day 1, 09:30 · 20 min", "Ada Varn · Day 1, 17:40 · 40 min"]);
 
   // A single scene: under its heading.

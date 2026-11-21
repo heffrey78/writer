@@ -61,7 +61,7 @@ test("Alt+Enter beside a mention opens its card; Escape and the entry panel retu
   // On the right sidebar's Entry tab; Escape goes back to the text and leaves it there.
   const panel = page.getByRole("region", { name: "Ada Varn" });
   await expect(panel).toBeFocused();
-  await expect(page.getByRole("tab", { name: "Entry" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("tab", { name: "Entry", exact: true })).toHaveAttribute("aria-selected", "true");
   await expect(panel.getByRole("heading", { level: 2, name: "Ada Varn" })).toBeVisible();
   await expect(panel.getByRole("button", { name: "Edit summary" })).toBeVisible();
   await axe(page);

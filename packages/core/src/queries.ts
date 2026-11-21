@@ -1,6 +1,6 @@
-import { entryIds } from "./fields.ts";
+import { carryingField, entryIds, roleOf } from "./fields.ts";
 import { mentions, pieceById, type Note, type Book, type ModuleRecord, type Relationship, type Piece } from "./model.ts";
-import { recordType } from "./modules.ts";
+import { recordType, recordTypesOf } from "./modules.ts";
 
 /** How a scene refers to an entity: by a field of its kind, by key ("pov", "characters"), or a mention in its prose. */
 export type SceneLink = string;
@@ -118,4 +118,47 @@ export function notesOfScene(novel: Book, sceneId: string): Note[] {
   return novel.notes
     .filter((n) => n.scenes.includes(sceneId))
     .sort((a, b) => pinned(b) - pinned(a) || (b.created ?? "").localeCompare(a.created ?? "") || a.title.localeCompare(b.title));
+}
+
+/** An entry in a piece (or a module's record it mentions), with its strongest role there. */
+export interface InPiece {
+  id: string;
+  /** The field naming it ("pov", "locations"), or "mention" where the prose only mentions it. */
+  via: string;
+  /** Its role there, in the kind's words: "point of view", "set here", "mentioned". */
+  role: string;
+}
+
+/**
+ * Everyone and everything in a piece (#149), each once: the entries its fields name, with the
+ * field's role (the carrying field's, point of view, first), then those its prose mentions. In the
+ * bible's type order, then the order they come in; the modules' mentionable records (off-page
+ * events) after. IDs naming nothing in the book are left out.
+ */
+export function entriesInPiece(book: Book, pieceId: string): InPiece[] {
+  const piece = pieceById(book, pieceId);
+  if (!piece) return [];
+  const carrying = carryingField(book.kind);
+  const fields = carrying ? [carrying, ...book.kind.fields.filter((f) => f !== carrying)] : book.kind.fields;
+  const found = new Map<string, InPiece>();
+  for (const f of fields) for (const id of entryIds(f, piece.fields[f.key])) if (!found.has(id)) found.set(id, { id, via: f.key, role: roleOf(f) });
+  for (const m of mentions(piece.body)) if (!found.has(m.id)) found.set(m.id, { id: m.id, via: "mention", role: "mentioned" });
+
+  const types = book.entityTypes.length;
+  const records = recordTypesOf(book.kind).filter((t) => t.mentionable).map((t) => t.key);
+  const rank = (id: string): number | undefined => {
+    const entity = book.entities.find((e) => e.id === id);
+    if (entity) {
+      const t = book.entityTypes.findIndex((x) => x.key === entity.type);
+      return t < 0 ? types : t;
+    }
+    const record = book.moduleRecords.find((r) => r.id === id);
+    const r = record ? records.indexOf(record.type) : -1;
+    return r < 0 ? undefined : types + 1 + r;
+  };
+  const ranked = [...found.values()].flatMap((x, i) => {
+    const r = rank(x.id);
+    return r === undefined ? [] : [{ x, r, i }];
+  });
+  return ranked.sort((a, b) => a.r - b.r || a.i - b.i).map(({ x }) => x);
 }

@@ -123,11 +123,11 @@ test("on a phone, by touch: the shelf, a book, its bar and its pages, writing, t
   await fits(page);
   await audit(page);
   await more.getByRole("button", { name: "Details" }).tap();
-  await expect(page.getByRole("tab", { name: "Scene", selected: true })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Scene", exact: true, selected: true })).toBeVisible();
   await fits(page);
   await audit(page);
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("tab", { name: "Scene" })).toHaveCount(0);
+  await expect(page.getByRole("tab", { name: "Scene", exact: true })).toHaveCount(0);
 
   // The palette, from the ⋯ menu: a command tapped.
   await page.getByRole("banner").getByRole("button", { name: /^More/ }).tap();
@@ -156,7 +156,7 @@ test("on a phone, the right sidebar swipes closed: drawn far enough or flicked, 
   await app.restart(app.novelRepo("varn"));
   await launch(page, app);
   const sheet = page.getByRole("complementary", { name: "Right sidebar" });
-  const tab = page.getByRole("tab", { name: "Scene" });
+  const tab = page.getByRole("tab", { name: "Scene", exact: true });
   const open = async () => {
     await page.getByRole("navigation", { name: "Book" }).getByRole("button", { name: "More" }).tap();
     await page.getByRole("dialog", { name: /: more$/ }).getByRole("button", { name: "Details" }).tap();
@@ -209,7 +209,7 @@ test("on a phone, the right sidebar swipes closed: drawn far enough or flicked, 
   // On a wide screen the sidebar beside the text doesn't swipe.
   await page.setViewportSize({ width: 1280, height: 800 });
   await expect(sheet).toBeVisible();
-  await swipe((await sheet.getByRole("tab", { name: "Scene" }).boundingBox())!, 200, 0);
+  await swipe((await sheet.getByRole("tab", { name: "Scene", exact: true }).boundingBox())!, 200, 0);
   await expect(sheet).toBeVisible();
   await expect(sheet).toHaveCSS("transform", "none");
 });

@@ -23,3 +23,23 @@ export const matches = (entity: Entity, query: string) => matchEntry(entity, que
  * Core's, so the editor's underlines and an entry's passages (#135) name the same things.
  */
 export const mentionEntities = (novel: Book): MentionEntity[] => mentionTargets(novel);
+
+/** "AV" for Ada Varn: a stand-in for a portrait. */
+export function initials(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter((w) => /\p{L}/u.test(w))
+    .slice(0, 2)
+    .map((w) => [...w.replace(/^\P{L}+/u, "")][0]!.toUpperCase())
+    .join("");
+}
+
+/** What a card says of an entry at a glance: its first two fields' values, or its other names. */
+export function cardFacts(entity: Entity): string[] {
+  return [
+    ...Object.entries(entity.fields)
+      .slice(0, 2)
+      .flatMap(([, v]) => (typeof v === "boolean" || v === "" ? [] : [String(v)])),
+    ...(entity.aliases.length ? [`also ${entity.aliases.join(", ")}`] : []),
+  ].slice(0, 2);
+}

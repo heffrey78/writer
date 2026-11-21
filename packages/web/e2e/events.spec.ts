@@ -265,7 +265,7 @@ test("events where the story's facts show: @ mentions and their cards, profiles'
   await expect(page.getByRole("tab", { name: "Event" })).toHaveAttribute("aria-selected", "true");
 
   // The scene card says where the scene stands against the events around it.
-  await page.getByRole("tab", { name: "Scene" }).click();
+  await page.getByRole("tab", { name: "Scene", exact: true }).click();
   await expect(page.getByText("6 days after the off-page event “The plans are stolen”.")).toBeVisible();
 
   // A profile's Off the page line opens the event.

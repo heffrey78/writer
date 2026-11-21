@@ -6,8 +6,8 @@ test("the right sidebar: Scene and Entry tabs, Ctrl+Shift+\\, F6 and Escape, a s
   const text = page.getByRole("textbox", { name: "Chapter text" });
   await expect(text).toBeFocused();
   const sidebar = page.getByRole("complementary", { name: "Right sidebar" });
-  const sceneTab = sidebar.getByRole("tab", { name: "Scene" });
-  const entryTab = sidebar.getByRole("tab", { name: "Entry" });
+  const sceneTab = sidebar.getByRole("tab", { name: "Scene", exact: true });
+  const entryTab = sidebar.getByRole("tab", { name: "Entry", exact: true });
 
   // Open at first, on the scene the caret is in.
   await expect(sceneTab).toHaveAttribute("aria-selected", "true");
@@ -20,9 +20,11 @@ test("the right sidebar: Scene and Entry tabs, Ctrl+Shift+\\, F6 and Escape, a s
   // F6 into the sidebar and back to the text; the tabs by arrow keys; Escape back to the text.
   await page.keyboard.press("F6");
   await expect(sceneTab).toBeFocused();
-  // Scene, then the scene's notes (heffrey78/gh-writer#222), then Entry.
+  // Scene, then the scene's notes (heffrey78/gh-writer#222), who's in it (#149), then Entry.
   await page.keyboard.press("ArrowRight");
   await expect(sidebar.getByRole("tab", { name: "Notes" })).toBeFocused();
+  await page.keyboard.press("ArrowRight");
+  await expect(sidebar.getByRole("tab", { name: "In this scene" })).toBeFocused();
   await page.keyboard.press("ArrowRight");
   await expect(entryTab).toBeFocused();
   await expect(entryTab).toHaveAttribute("aria-selected", "true");
@@ -92,10 +94,10 @@ test("on a narrow window the sidebar is a sheet over the text", async ({ page, a
   // Not over the text until asked for.
   await expect(sidebar).toHaveCount(0);
   await page.keyboard.press("ControlOrMeta+Shift+Backslash");
-  await expect(sidebar.getByRole("tab", { name: "Scene" })).toBeVisible();
+  await expect(sidebar.getByRole("tab", { name: "Scene", exact: true })).toBeVisible();
   await expect(sidebar).toHaveCSS("position", "fixed");
   await axe(page);
-  await expect(sidebar.getByRole("tab", { name: "Scene" })).toBeFocused();
+  await expect(sidebar.getByRole("tab", { name: "Scene", exact: true })).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(sidebar).toHaveCount(0);
   await expect(text).toBeFocused();
