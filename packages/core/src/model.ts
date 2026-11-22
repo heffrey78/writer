@@ -93,6 +93,14 @@ export interface Piece {
 /** A value in an entry's `fields:`: text, a number, yes/no, or (format 3: an entries field) a list of IDs. */
 export type FieldValue = string | number | boolean | readonly string[];
 
+/** A field's new value from a piece on (D18, #140): `null` takes the field off from there. */
+export interface FieldChange {
+  field: string;
+  value: FieldValue | null;
+  /** The piece it holds from, inclusive. */
+  since: string;
+}
+
 export interface Entity {
   id: string;
   /** Entity type key, e.g. "character". */
@@ -106,6 +114,8 @@ export interface Entity {
   imageFocus?: [number, number];
   /** Its fields, by key: those its type declares and any of its own (D18). */
   fields: Record<string, FieldValue>;
+  /** Its fields' changes over the book (format 3), as its file lists them: `fields` is the start's. */
+  changes?: FieldChange[];
   tags: string[];
   body: string;
   bodyLine: number;

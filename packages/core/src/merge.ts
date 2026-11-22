@@ -351,9 +351,51 @@ function mergeFields(base: Field[], ours: Field[], theirs: Field[]): MergeChunk[
     if (ot === tt) chunks.push({ type: "same", text: ot ?? "" });
     else if (ot === bt) chunks.push({ type: "same", text: tt ?? "" });
     else if (tt === bt) chunks.push({ type: "same", text: ot ?? "" });
-    else chunks.push({ type: "conflict", base: bt ?? "", ours: ot ?? "", theirs: tt ?? "", field: key === "\0end" ? "comments" : key });
+    else {
+      // An entry's changes at pieces (D18): items added or removed on either side are all kept.
+      const merged = LIST_KEYS.has(key) ? mergeList(bt ?? "", ot ?? "", tt ?? "") : undefined;
+      chunks.push(merged !== undefined ? { type: "same", text: merged } : { type: "conflict", base: bt ?? "", ours: ot ?? "", theirs: tt ?? "", field: key === "\0end" ? "comments" : key });
+    }
   }
   return chunks;
+}
+
+/** Top-level keys holding a block list whose items are merged one by one: an entry's changes. */
+const LIST_KEYS = new Set(["changes"]);
+
+/** A block list field: its key line (with what comes before it), and its items, each a "- " line and the lines under it. */
+function listField(text: string): { head: string; items: string[] } | undefined {
+  if (!text) return { head: "", items: [] };
+  const ls = lines(text);
+  const at = ls.findIndex((l) => !/^[ \t]/.test(l) && KEY.test(l));
+  // A list written inline ("changes: [...]") or anything but a block list isn't merged item by item.
+  if (at < 0 || !/:[ \t]*(?:#.*)?\r?\n?$/.test(ls[at]!)) return undefined;
+  const items: string[] = [];
+  let indent: string | undefined;
+  for (const line of ls.slice(at + 1)) {
+    const item = /^([ \t]*)- /.exec(line);
+    if (item && (indent === undefined || item[1] === indent)) {
+      indent = item[1]!;
+      items.push(line);
+    } else if (items.length) items[items.length - 1] += line;
+    else return undefined;
+  }
+  return { head: ls.slice(0, at + 1).join(""), items };
+}
+
+/**
+ * Three-way merge of a block list, item by item: ours, less what theirs removed, then what theirs added.
+ * Undefined (a conflict) when the key's own line changed on both sides, or a side isn't a block list.
+ */
+function mergeList(base: string, ours: string, theirs: string): string | undefined {
+  const [b, o, t] = [listField(base), listField(ours), listField(theirs)];
+  if (!b || !o || !t) return undefined;
+  const head = o.head === t.head || t.head === b.head || !t.head ? o.head || t.head : o.head === b.head || !o.head ? t.head : undefined;
+  if (head === undefined) return undefined;
+  const kept = o.items.filter((i) => t.items.includes(i) || !b.items.includes(i));
+  const added = t.items.filter((i) => !o.items.includes(i) && !b.items.includes(i));
+  const items = [...kept, ...added];
+  return items.length ? head + items.join("") : "";
 }
 
 function byKey(fields: Field[]): Map<string, string> {

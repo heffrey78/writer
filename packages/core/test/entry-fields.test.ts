@@ -1,8 +1,9 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { backlinks, cardFields, editFrontMatter, entriesNamedBy, fieldLabel, fieldsOfType, fieldText, holdsValue, kindByKey, knownKinds, loadBook, memorySource, sharedFields, validate } from "../src/index.ts";
+import { backlinks, cardFields, editFrontMatter, entriesNamedBy, fieldLabel, fieldsAt, fieldsOfType, merge3, fieldText, holdsValue, kindByKey, knownKinds, loadBook, memorySource, sharedFields, validate } from "../src/index.ts";
 
 /** A type's fields (D18, #138): declared by the kind and the book, values in an entry's fields, checked alike everywhere. */
 
@@ -167,5 +168,84 @@ describe("the fields a type's entries already share (#164)", () => {
       { key: "rival", holds: "entry", type: "npc" },
       { key: "sworn", holds: "yes-no" },
     ]);
+  });
+});
+
+describe("a value that changes at a piece (#140, #165)", () => {
+  const ONE = "ses_0ne001", TWO = "ses_tw0002";
+  /** Voss with these fields and these lines under `changes:`. */
+  const changing = (fields: string, changes: string) => campaign({ [VOSS]: voss(fields).replace("---\n", "").replace(/\n---\n$/, `\nchanges:\n${changes}---\n`).replace(/^/, "---\n") });
+
+  it("reads the start's value before the piece it changes at, and the new one from there on", async () => {
+    const source = changing("  status: alive\n  location: loc_be1fry\n", `  - field: status\n    value: dead\n    since: ${TWO}\n  - field: location\n    value: null\n    since: ${ONE}\n`);
+    expect(await said(source)).toEqual([]);
+    const book = await loadBook(source);
+    const entry = book.entities.find((e) => e.id === "npc_v0ss01")!;
+    expect(fieldsAt(book, entry, ONE)).toEqual({ fields: { status: "alive" }, from: { location: ONE } });
+    expect(fieldsAt(book, entry, TWO)).toEqual({ fields: { status: "dead" }, from: { location: ONE, status: TWO } });
+    expect(fieldsAt(book, entry).fields).toEqual({ status: "dead" });
+    // The belfry is still named by Voss (at the start), and lists him.
+    expect(backlinks(book, "loc_be1fry").entries.map(({ entry }) => entry.name)).toEqual(["Voss"]);
+  });
+
+  it("reads as a brute-force reading does, over any changes", () => {
+    const pieces = ["p0", "p1", "p2", "p3", "p4"].map((id) => ({ id }));
+    const change = fc.record({ field: fc.constantFrom("a", "b"), value: fc.oneof(fc.constant(null), fc.integer({ min: 0, max: 9 })), since: fc.constantFrom("p0", "p1", "p2", "p3", "p4", "gone") });
+    fc.assert(
+      fc.property(fc.array(change, { maxLength: 8 }), fc.constantFrom(undefined, "p0", "p2", "p4"), (changes, at) => {
+        const entry = { id: "npc_aaaaaa", type: "npc", name: "X", aliases: [], fields: { a: 1 }, changes, tags: [], body: "", bodyLine: 1, file: "x.md" };
+        const got = fieldsAt({ pieces } as never, entry, at).fields;
+        const limit = at === undefined ? 4 : pieces.findIndex((p) => p.id === at);
+        const want: Record<string, unknown> = { a: 1 };
+        for (const key of ["a", "b"]) {
+          // The last change of the field at or before the piece, by piece, then as listed.
+          const last = changes
+            .map((c, i) => ({ c, i, at: pieces.findIndex((p) => p.id === c.since) }))
+            .filter((x) => x.c.field === key && x.at >= 0 && x.at <= limit)
+            .sort((x, y) => x.at - y.at || x.i - y.i)
+            .at(-1);
+          if (!last) continue;
+          if (last.c.value === null) delete want[key];
+          else want[key] = last.c.value;
+        }
+        expect(got).toEqual(want);
+      }),
+    );
+  });
+
+  it("reports a change from a piece there isn't, of a field that doesn't change, twice at a piece, or of a value its field doesn't hold", async () => {
+    const source = changing(
+      "  voice: low\n",
+      `  - field: voice\n    value: hoarse\n    since: ${ONE}\n  - field: status\n    value: drowned\n    since: ${TWO}\n  - field: status\n    value: dead\n    since: ${TWO}\n  - field: faction\n    value: fac_t1de00\n    since: ses_n0n3xx\n  - field: faction\n    value: npc_ma7ra1\n    since: npc_ma7ra1\n`,
+    );
+    expect((await said(source)).map(([code, , pointer]) => [code, pointer])).toEqual([
+      ["E_DANGLING_REF", "/changes/3/since"],
+      ["E_REF_TYPE", "/changes/4/since"],
+      ["E_REF_TYPE", "/changes/4/value"],
+      ["W_FIELD_CHANGE", "/changes/0/field"],
+      ["W_FIELD_VALUE", "/changes/1/value"],
+      ["W_FIELD_CHANGE", "/changes/2"],
+    ]);
+  });
+
+  it("is format 3's: a novel in format 2 refuses one", async () => {
+    const ada = "bible/characters/ada.md";
+    const source = memorySource({ ...NOVEL, [ada]: NOVEL[ada]!.replace("tags:", "changes:\n  - field: age\n    value: 32\n    since: sc_5tat1n\ntags:") });
+    expect((await said(source)).map(([code, , pointer]) => [code, pointer])).toEqual([["E_SCHEMA", "/changes"]]);
+    expect((await loadBook(source)).entities.find((e) => e.file === ada)!.changes).toBeUndefined();
+  });
+
+  it("merges: changes added on two devices are both kept, one removed on either is gone", () => {
+    const head = "---\nid: npc_v0ss01\nname: Voss\nchanges:\n";
+    const item = (n: number) => `  - field: status\n    value: v${n}\n    since: ${ONE}\n`;
+    fc.assert(
+      fc.property(fc.uniqueArray(fc.integer({ min: 0, max: 20 }), { maxLength: 6 }), fc.uniqueArray(fc.integer({ min: 21, max: 40 }), { maxLength: 3 }), fc.uniqueArray(fc.integer({ min: 41, max: 60 }), { maxLength: 3 }), fc.integer({ min: 0, max: 7 }), (base, ours, theirs, drop) => {
+        const file = (ns: number[]) => (ns.length ? `${head}${ns.map(item).join("")}---\n` : "---\nid: npc_v0ss01\nname: Voss\n---\n");
+        const theirsKept = base.filter((_, i) => i !== drop);
+        const r = merge3(file(base), file([...base, ...ours]), file([...theirsKept, ...theirs]));
+        expect(r.conflicts).toBe(0);
+        expect(r.text).toBe(file([...theirsKept, ...ours, ...theirs]));
+      }),
+    );
   });
 });

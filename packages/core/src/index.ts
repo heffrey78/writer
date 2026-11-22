@@ -1,5 +1,5 @@
 export * from "./ids.ts";
-export { cardFields, entriesNamedBy, entriesNaming, fieldLabel, fieldsOfType, fieldText, HOLDS, holdsText, holdsValue, idsIn, sharedFields } from "./entry-fields.ts";
+export { cardFields, entriesNamedBy, entriesNaming, fieldLabel, fieldsAt, fieldsOfType, fieldText, HOLDS, holdsText, holdsValue, idsIn, sharedFields, type FieldsAt } from "./entry-fields.ts";
 export * from "./types.ts";
 export * from "./model.ts";
 export { kindOf, loadBook } from "./load.ts";

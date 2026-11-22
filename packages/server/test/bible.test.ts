@@ -108,6 +108,18 @@ describe("entities", () => {
     expect((await valid()).entities.find((e) => e.id === ADA)!.fields["friends"]).toEqual([BEN]);
   });
 
+  it("writes a value that changes at a piece into the entry's file alone, in a book in format 3 (#165)", async () => {
+    const change = { field: "occupation", value: "Bridge keeper", since: "sc_5tat1n" };
+    await expect(bible.updateEntity(ADA, hash(ADA_FILE), { changes: [change] })).rejects.toMatchObject({ code: "NEEDS_MIGRATION" });
+    await bible.migrate(3);
+    await expect(bible.updateEntity(ADA, hash(ADA_FILE), { changes: [{ ...change, since: "sc_n0n3xx" }] })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    const before = read(ADA_FILE);
+    await bible.updateEntity(ADA, hash(ADA_FILE), { changes: [change] });
+    expect(changedInLastCommit()).toEqual([`M\t${ADA_FILE}`]);
+    expect(read(ADA_FILE)).toBe(before.replace("---\nLeft", "changes:\n  - field: occupation\n    value: Bridge keeper\n    since: sc_5tat1n\n---\nLeft"));
+    expect((await valid()).entities.find((e) => e.id === ADA)!.changes).toEqual([change]);
+  });
+
   it("refuses to delete an entity that's referred to, listing every reference, until confirmed", async () => {
     const head = gitIn(dir, "rev-parse", "HEAD").trim();
     const refusal = await bible.deleteEntity(ADA, hash(ADA_FILE)).catch((e: unknown) => e);

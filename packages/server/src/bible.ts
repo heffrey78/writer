@@ -5,6 +5,7 @@ import {
   HOLDS,
   typePlural,
   type EntryFieldDef,
+  type FieldChange,
   editYaml,
   mentionsOf,
   proseText,
@@ -39,10 +40,14 @@ import { bookSource, filesPort } from "./ports.ts";
  * which gh-writer reads. Written into a format 3 book, it goes with the book's tools brought up to date
  * (none when they are), so its validator reads it.
  */
-async function listWrites(root: string, novel: Book, fields: EntityFields["fields"]): Promise<FileWrite[]> {
+async function listWrites(root: string, novel: Book, fields: EntityFields["fields"], changes?: EntityFields["changes"]): Promise<FileWrite[]> {
   const list = Object.entries(fields ?? {}).find(([, v]) => Array.isArray(v));
-  if (!list) return [];
-  if (novel.manifest !== MANIFEST) throw new OperationError("NEEDS_MIGRATION", `“${list[0]}” holds a list, which this book's format can't keep: move it to the new format first.`);
+  if (!list && !changes?.length) return [];
+  if (novel.manifest !== MANIFEST) throw new OperationError("NEEDS_MIGRATION", list ? `“${list[0]}” holds a list, which this book's format can't keep: move it to the new format first.` : "A value that changes over the book needs the book in the new format: move it there first.");
+  for (const c of changes ?? []) {
+    if (!c || typeof c.field !== "string" || !/^[a-z][a-z0-9_]*$/.test(c.field)) throw new OperationError("BAD_REQUEST", "A change names a field by its key.");
+    if (!novel.allPieces.some((p) => p.id === c.since)) throw new OperationError("BAD_REQUEST", `A change holds from a ${vocabulary(novel.kind).piece.one} there is, not “${String(c.since)}”.`);
+  }
   return toolWrites(root);
 }
 
@@ -100,6 +105,8 @@ export interface EntityFields {
   image?: string | null;
   image_focus?: [number, number] | null;
   fields?: Record<string, string | number | boolean | readonly string[]>;
+  /** Its fields' values from pieces on (D18, format 3), the whole list; null removes it. */
+  changes?: FieldChange[] | null;
   tags?: string[];
 }
 
@@ -207,7 +214,7 @@ export class BibleOperations {
       const text = await this.#read(entity.file);
       if (hashText(text) !== base) throw new OperationError("STALE", `“${entity.name}” changed since it was read.`, { path: entity.file });
       if (changes.name !== undefined) required(changes.name, "name");
-      const tools = await listWrites(this.root, novel, changes.fields);
+      const tools = await listWrites(this.root, novel, changes.fields, changes.changes);
       const edits = Object.entries(changes).flatMap(([key, value]): YamlEdit[] =>
         value === null ? [{ path: [key], remove: true }] : key === "fields" ? fieldEdits(entity.fields, value as Record<string, unknown>) : [{ path: [key], value }],
       );

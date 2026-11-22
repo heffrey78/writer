@@ -3,7 +3,7 @@ import { HOLDS } from "./entry-fields.ts";
 import { kindByKey, knownKind, startLevels, V2_KIND, type BookKind, type LevelDef } from "./kinds.ts";
 import { recordTypesOf, withModules } from "./modules.ts";
 import { EVENT_FILES_FORMAT, MANIFEST, NOVEL_MANIFEST, readManifest, SCHEMA_VERSION } from "./manifest.ts";
-import type { Section, Entity, Book, ModuleRecord, Relationship, Piece, ThemeRef } from "./model.ts";
+import type { Section, Entity, FieldChange, Book, ModuleRecord, Relationship, Piece, ThemeRef } from "./model.ts";
 import { parseMarkdown, parseYaml } from "./parse.ts";
 import { checkSchema, type SchemaKind } from "./schemas.ts";
 import { joinPath, type FileSource } from "./source.ts";
@@ -350,6 +350,13 @@ export async function loadBook(source: FileSource, kind?: BookKind): Promise<Boo
         }
       }
     }
+    // A field's changes at pieces (D18): format 3's, like lists.
+    const changes = objList(d["changes"]).flatMap((c): FieldChange[] => {
+      const field = str(c["field"]), since = str(c["since"]), v = c["value"];
+      const value = v === null || typeof v === "string" || typeof v === "number" || typeof v === "boolean" ? v : Array.isArray(v) && v.every((x) => typeof x === "string") ? (v as string[]) : undefined;
+      return field && since && value !== undefined ? [{ field, value, since }] : [];
+    });
+    if (d["changes"] !== undefined && manifest?.file !== MANIFEST) diagnostics.push({ ...error("E_SCHEMA", file, "changes is a list of a field's values at pieces, which only a book in format 3 may have"), pointer: "/changes" });
     novel.entities.push({
       id: str(d["id"])!,
       type,
@@ -359,6 +366,7 @@ export async function loadBook(source: FileSource, kind?: BookKind): Promise<Boo
       image: str(d["image"]),
       imageFocus: focus(d["image_focus"]),
       fields,
+      ...(changes.length && manifest?.file === MANIFEST ? { changes } : {}),
       tags: strList(d["tags"]),
       body: md.body,
       bodyLine: md.bodyLine,

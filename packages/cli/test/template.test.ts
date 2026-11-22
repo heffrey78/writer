@@ -172,12 +172,13 @@ describe.each([
     const copy = join(tmp, "fields-campaign");
     cpSync(join(repo, sample), copy, { recursive: true });
     const voss = join(copy, "codex/npcs/voss.md");
-    writeFileSync(voss, readFileSync(voss, "utf8").replace("summary: Choirmaster of the Tide Choir.\n", "summary: Choirmaster of the Tide Choir.\nfields:\n  status: drowned\n  faction: npc_ma7ra1\n  allies: [fac_watch0]\n"));
+    writeFileSync(voss, readFileSync(voss, "utf8").replace("summary: Choirmaster of the Tide Choir.\n", "summary: Choirmaster of the Tide Choir.\nfields:\n  status: drowned\n  faction: npc_ma7ra1\n  allies: [fac_watch0]\nchanges:\n  - field: voice\n    value: hoarse\n    since: ses_tw0002\n"));
     appendFileSync(join(copy, "book.yaml"), "entity_fields:\n  faction:\n    - key: motto\n      holds: text\n");
     const r = node([join(dir, ".github/gh-writer/validate.mjs"), copy, "--json"]);
     const app = await validate(nodeSource(copy));
     expect(app.diagnostics.map((d) => [d.code, d.pointer])).toEqual([
       ["E_REF_TYPE", "/fields/faction"],
+      ["W_FIELD_CHANGE", "/changes/0/field"],
       ["W_FIELD_VALUE", "/fields/status"],
     ]);
     expect(JSON.parse(r.stdout).diagnostics).toEqual(app.diagnostics);

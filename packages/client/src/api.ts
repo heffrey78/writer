@@ -4,7 +4,7 @@
  */
 
 import type { Comparison, ParagraphDiff } from "@writer/core/compare";
-import type { EntryFieldDef, SeriesSlot, SidebarFile, WritingDay } from "@writer/core";
+import type { EntryFieldDef, FieldChange, SeriesSlot, SidebarFile, WritingDay } from "@writer/core";
 
 /** GET /stats: the open version's writing days, the manuscript's words now, and novel.yaml's target. */
 /** How a relationship type is drawn: a palette slot and a line. */
@@ -258,6 +258,8 @@ export interface EntityFields {
   image?: string | null;
   image_focus?: [number, number] | null;
   fields?: Record<string, string | number | boolean | readonly string[]>;
+  /** Its fields' values from pieces on (D18, format 3), the whole list; null removes it. */
+  changes?: FieldChange[] | null;
   tags?: string[];
 }
 

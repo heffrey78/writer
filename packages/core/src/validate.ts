@@ -39,6 +39,7 @@ export const RULES: Readonly<Record<string, Severity>> = {
   W_NOTE_PIN: "warning",
   W_SIDEBAR_UNKNOWN: "warning",
   W_FIELD_VALUE: "warning",
+  W_FIELD_CHANGE: "warning",
 };
 
 export interface ValidationResult {
@@ -186,6 +187,21 @@ export function validateBook(novel: Book): Diagnostic[] {
       if (Array.isArray(value)) value.forEach((id: string, i) => isId(id) && ref(id, allowed, e.file, `/fields/${key}/${i}`, name));
       else if (f?.holds === "entry" && typeof value === "string" && isId(value)) ref(value, allowed, e.file, `/fields/${key}`, name);
     }
+    // Its changes at pieces (#140): from a piece there is, of a field that changes, once per piece.
+    const at = new Set<string>();
+    (e.changes ?? []).forEach((c, i) => {
+      const where = `/changes/${i}`;
+      ref(c.since, [kind.piece.key], e.file, `${where}/since`, "changes.since");
+      const f = decls.get(c.field);
+      if (!f?.changes) push("warning", "W_FIELD_CHANGE", e.file, `${f ? fieldLabel(f) : `“${c.field}”`} changes at ${c.since}, but ${f ? "it isn't" : "the type doesn't declare it as"} a field that can change`, { pointer: `${where}/field` });
+      if (at.has(`${c.field}\0${c.since}`)) push("warning", "W_FIELD_CHANGE", e.file, `${c.field} changes twice at ${c.since}: the later one is read`, { pointer: where });
+      at.add(`${c.field}\0${c.since}`);
+      if (c.value === null) return;
+      if (f && !holdsValue(f, c.value)) push("warning", "W_FIELD_VALUE", e.file, `changes.${i}.value is ${JSON.stringify(c.value)}, but ${fieldLabel(f)} holds ${holdsText(f, typeLabel)}`, { pointer: `${where}/value` });
+      const allowed = f?.type ? [f.type] : ["*entity"];
+      if (Array.isArray(c.value)) c.value.forEach((id: string, j) => isId(id) && ref(id, allowed, e.file, `${where}/value/${j}`, `changes.${i}.value`));
+      else if (f?.holds === "entry" && typeof c.value === "string" && isId(c.value)) ref(c.value, allowed, e.file, `${where}/value`, `changes.${i}.value`);
+    });
   }
 
   // Bible entries: their fields, and mentions in notes.

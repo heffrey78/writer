@@ -1,5 +1,5 @@
 import { isId, type EntryFieldDef, type FieldHolds } from "./ids.ts";
-import type { Book, Entity, FieldValue } from "./model.ts";
+import type { Book, Entity, FieldChange, FieldValue } from "./model.ts";
 
 /*
  * An entry's fields as its type declares them (D18, #138): what each holds, the entries a value names,
@@ -30,11 +30,15 @@ export function idsIn(value: FieldValue | undefined): string[] {
   return Array.isArray(value) ? value.filter(isId) : [];
 }
 
-/** The entries an entry's declared fields name, field by field: its faction, its home, a source's author. */
+/**
+ * The entries an entry's declared fields name, field by field: its faction, its home, a source's author;
+ * at the start or from a piece on (its changes).
+ */
 export function entriesNamedBy(book: Pick<Book, "entityTypes">, entry: Entity): { field: EntryFieldDef; ids: string[] }[] {
   return fieldsOfType(book, entry.type).flatMap((f) => {
     if (f.holds !== "entry" && f.holds !== "entries") return [];
-    const ids = idsIn(entry.fields[f.key]);
+    const values = [entry.fields[f.key], ...(entry.changes ?? []).filter((c) => c.field === f.key).map((c) => c.value ?? undefined)];
+    const ids = [...new Set(values.flatMap(idsIn))];
     return ids.length ? [{ field: f, ids }] : [];
   });
 }
@@ -131,5 +135,36 @@ export function sharedFields(book: Pick<Book, "entities" | "entityTypes">, type:
       if (vs.some((v) => typeof v === "string" && (v.includes("\n") || v.length > 80))) return { key, holds: "long-text" };
       return { key, holds: "text" };
     });
+}
+
+/** An entry's fields at a piece (#140): each with the piece its value holds from, none for the start's. */
+export interface FieldsAt {
+  fields: Record<string, FieldValue>;
+  /** For each field a change set (or took off), the piece it holds from. */
+  from: Record<string, string>;
+}
+
+/**
+ * An entry's fields as they read at piece `at`: its `fields:` (the start's), then each change whose
+ * piece is at or before `at` in reading order, in that order (D18, #140). Without `at`, as they read at
+ * the end of the book: every change. A change naming a piece not in the reading order is skipped.
+ */
+export function fieldsAt(book: Pick<Book, "pieces">, entry: Entity, at?: string): FieldsAt {
+  const fields = { ...entry.fields };
+  const from: Record<string, string> = {};
+  if (!entry.changes?.length) return { fields, from };
+  const order = new Map(book.pieces.map((p, i) => [p.id, i]));
+  const limit = at === undefined ? Infinity : (order.get(at) ?? -1);
+  const applied = entry.changes
+    .map((c, i) => ({ c, i, at: order.get(c.since) }))
+    .filter((x): x is { c: FieldChange; i: number; at: number } => x.at !== undefined && x.at <= limit)
+    // In reading order; two at one piece, as the file lists them.
+    .sort((a, b) => a.at - b.at || a.i - b.i);
+  for (const { c } of applied) {
+    if (c.value === null) delete fields[c.field];
+    else fields[c.field] = c.value;
+    from[c.field] = c.since;
+  }
+  return { fields, from };
 }
 
