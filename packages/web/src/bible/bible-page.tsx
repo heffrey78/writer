@@ -1,12 +1,13 @@
 import { defaultEntrySort, entryPresences, filterEntries, matchEntry, piecesMatching, sortEntries, typePlural, vocabulary, word, type Book, type Entity, type EntryPresence, type EntrySort, type Vocabulary } from "@writer/core";
 import { findPanel } from "@writer/editor";
 import type { SpellService } from "@writer/editor/react";
-import { ChevronLeft, ChevronRight, Expand, LayoutGrid, List, PanelLeftClose, PanelLeftOpen, Plus, Search, Table2, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Expand, LayoutGrid, List, PanelLeftClose, PanelLeftOpen, Plus, Search, X } from "lucide-react";
 import { Fragment, memo, useCallback, useEffect, useId, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 import { create } from "zustand";
 import { useCommands } from "../commands.ts";
 import { moduleRecordTypes } from "../modules.tsx";
+import { NEW_TYPE } from "../novel/item-modals.tsx";
 import type { Workspace } from "../novel/workspace.ts";
 import { Button } from "../ui/button.tsx";
 import { cn } from "../ui/cn.ts";
@@ -142,8 +143,15 @@ export function BiblePage({
   const navigate = useNavigate();
   const [layout, setLayout] = useIndexLayout(novelId);
   const twoPanes = useTwoPanes();
-  /** A new entry (of a type, or chosen), in its modal over the index. */
-  const add = (type?: string) => void navigate(`/novels/${novelId}/bible/new${type ? `?type=${encodeURIComponent(type)}` : ""}`, { state: { fromGallery: true } });
+  /**
+   * A new entry (of a type, or chosen), in its modal over the index: the search and filters kept, so
+   * the list under it and beside the new entry is the one the writer was in.
+   */
+  const add = (type?: string) => {
+    const over = new URLSearchParams(params);
+    if (type) over.set(NEW_TYPE, type);
+    void navigate(`/novels/${novelId}/bible/new${over.size ? `?${over.toString()}` : ""}`, { state: { fromGallery: true } });
+  };
   const [addingType, setAddingType] = useState(false);
   const searchId = useId();
   const sortId = useId();
@@ -502,9 +510,6 @@ function ViewSwitch({ view, onChange }: { view: View; onChange: (v: View) => voi
           <o.icon className="size-3.5" aria-hidden /> {o.label}
         </button>
       ))}
-      <button type="button" disabled title="Coming next: every entry of a type in a table" className="flex cursor-not-allowed items-center gap-1 bg-raised px-2.5 py-1 text-muted">
-        <Table2 className="size-3.5" aria-hidden /> Table
-      </button>
     </div>
   );
 }

@@ -497,16 +497,31 @@ test("the index's search says where each entry matched, filters narrow it as chi
   await expect(page.getByRole("button", { name: "Remove the filter: Locations" })).toBeVisible();
   await expect(characters).toHaveCount(0);
 
-  // Not in the story yet: an entry no scene uses.
+  // A new entry made from the filtered index keeps the filter, under the modal and beside the entry once
+  // made; New offers the type filtered to.
+  await page.getByRole("button", { name: /^New (?!type$)/ }).first().click();
+  const naming = page.getByRole("dialog");
+  await expect(naming.getByRole("combobox", { name: "Type" })).toHaveValue("location");
+  await expect(page).toHaveURL(/\/bible\/new\?type=location$/);
+  await naming.getByRole("textbox", { name: "Name" }).fill("The Ferry Steps");
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("heading", { level: 2, name: "The Ferry Steps" })).toBeVisible();
+  await expect(page).toHaveURL(/\/bible\/[^/?]+\?type=location$/);
+  await expect(page.getByRole("button", { name: "Remove the filter: Locations" })).toBeVisible();
+  await expect(characters).toHaveCount(0);
+  await expect(locations.getByRole("link", { name: /^The Ferry Steps/ })).toBeVisible();
+
+  // Not in the story yet: an entry no scene uses. From the palette too, the filter is kept.
   await palette(page, "new location");
   await page.getByRole("dialog").getByRole("textbox", { name: "Name" }).fill("The Old Mill");
   await page.keyboard.press("Enter");
   await expect(page.getByRole("heading", { level: 2, name: "The Old Mill" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Remove the filter: Locations" })).toBeVisible();
   await page.getByRole("link", { name: "Close the entry" }).click();
   await page.getByRole("button", { name: "Filter", exact: true }).click();
   await adding.getByRole("combobox", { name: "By" }).selectOption("absent");
   await adding.getByRole("button", { name: "Add the filter" }).click();
-  await expect(locations.getByRole("link").locator("span.font-semibold:not([aria-hidden])")).toHaveText(["The Old Mill"]);
+  await expect(locations.getByRole("link").locator("span.font-semibold:not([aria-hidden])")).toHaveText(["The Ferry Steps", "The Old Mill"]);
 });
 
 test("the index by the keyboard alone: / searches, j and k open the next and previous, Enter into the entry and Escape out, e edits, n makes one, [ folds the list; each said (#134)", async ({ page, app }) => {

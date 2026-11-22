@@ -10,21 +10,29 @@ import type { useSpell } from "./spell.ts";
 import type { Workspace } from "./workspace.ts";
 
 /*
- * The modals over the galleries (heffrey78/gh-writer#233): /note/<id> over Notes; /note/new, /bible/new (?type=)
+ * The modals over the galleries (heffrey78/gh-writer#233): /note/<id> over Notes; /note/new, /bible/new (?new=)
  * and a module's /event/new make one, starting from its title. An entry or a record, once made, opens
  * beside the index's list (#134).
  */
 
+/** The type a new entry is to be (/bible/new?new=place): not `type`, which is the index's filter by type, kept under the modal. */
+export const NEW_TYPE = "new";
+
 type Props = { novelId: string; novel: Book; workspace: Workspace; spell: ReturnType<typeof useSpell> };
 
-/** Once made, the item in the same modal, the address naming it (in place of …/new). */
+/**
+ * Once made, the item in the same modal or beside the index's list, the address naming it (in place
+ * of …/new) and keeping the list's search and filters.
+ */
 function useMade(novelId: string, kind: string) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const state = useLocation().state as OverState;
+  const { state, search } = useLocation() as { state: OverState; search: string };
   return async (id: string) => {
     await queryClient.invalidateQueries({ queryKey: keys.novel(novelId) });
-    void navigate(`/novels/${novelId}/${kind}/${id}`, { replace: true, state: { ...state, focusProse: true } });
+    const kept = new URLSearchParams(search);
+    kept.delete(NEW_TYPE);
+    void navigate(`/novels/${novelId}/${kind}/${id}${kept.size ? `?${kept.toString()}` : ""}`, { replace: true, state: { ...state, focusProse: true } });
   };
 }
 
@@ -78,11 +86,16 @@ export const slug = (group: string) => group.toLowerCase().replace(/[^a-z0-9]+/g
 /** A new story bible entry over the index, by its type (unless the address names it) and name (heffrey78/gh-writer#237); then it opens beside the list. */
 export function EntryOver({ novelId, novel }: Props) {
   const [params] = useSearchParams();
-  const close = useCloseTo(`/novels/${novelId}/bible`);
+  const kept = new URLSearchParams(params);
+  kept.delete(NEW_TYPE);
+  const close = useCloseTo(`/novels/${novelId}/bible${kept.size ? `?${kept.toString()}` : ""}`);
   const made = useMade(novelId, "bible");
   const typeId = useId();
-  const asked = params.get("type") ?? undefined;
-  const [chosen, setChosen] = useState(novel.entityTypes.some((t) => t.key === asked) ? asked! : (novel.entityTypes[0]?.key ?? "character"));
+  const asked = params.get(NEW_TYPE) ?? undefined;
+  // Not named, the type the index is filtered to, when it's one.
+  const filtered = params.get("type")?.split(",").filter(Boolean) ?? [];
+  const known = (t: string | undefined) => novel.entityTypes.some((x) => x.key === t);
+  const [chosen, setChosen] = useState(known(asked) ? asked! : filtered.length === 1 && known(filtered[0]) ? filtered[0]! : (novel.entityTypes[0]?.key ?? "character"));
   const w = vocabulary(novel.kind);
   const label = (novel.entityTypes.find((t) => t.key === chosen)?.label ?? w.entity.one).toLowerCase();
   return (

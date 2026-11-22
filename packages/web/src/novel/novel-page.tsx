@@ -21,7 +21,7 @@ import { NotesLeftDialog } from "../notes/notes-left.tsx";
 import { useNewFormat } from "./new-format.tsx";
 import { convertedNotes, useConversions } from "./convert.tsx";
 import { BookKindContext, useWords } from "./kind.ts";
-import { EntryOver, NoteOver, RecordOver } from "./item-modals.tsx";
+import { EntryOver, NEW_TYPE, NoteOver, RecordOver } from "./item-modals.tsx";
 import { EntryPage } from "../bible/entry-page.tsx";
 import { cn } from "../ui/cn.ts";
 import { DraftsButton, useDrafts } from "./drafts.tsx";
@@ -69,7 +69,7 @@ const GraphPage = lazy(() => import("../graph/graph-page.tsx").then((m) => ({ de
 export function NovelPage() {
   const { novelId = "" } = useParams();
   // The open chapter or scene, for the tree.
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const current = /\/(chapter|scene)\/([^/]+)$/.exec(pathname)?.[2];
   const queryClient = useQueryClient();
   const novel = useQuery({ queryKey: keys.novel(novelId), queryFn: () => api.novel<Book>(novelId) });
@@ -182,6 +182,12 @@ export function NovelPage() {
   latest.current.navigate = (to) => void navigate(to);
   /** A new note, entry or module's record (an event), in its modal over its gallery (heffrey78/gh-writer#233): closed, back to the gallery if it was opened there. */
   const openNew = (path: string, gallery: string) => void navigate(`/novels/${novelId}/${path}`, { state: { fromGallery: pathname === `/novels/${novelId}/${gallery}` } });
+  // A new entry asked for over the index (or an entry beside its list) keeps the list's search and filters under it.
+  const newEntryPath = (type: string) => {
+    const over = new URLSearchParams(/^\/novels\/[^/]+\/bible(\/[^/]+)?$/.test(pathname) ? search : "");
+    over.set(NEW_TYPE, type);
+    return `bible/new?${over.toString()}`;
+  };
   // A new note, or a module's record (New off-page event), asked for from the palette, a gallery or the Timeline.
   useEffect(() => {
     if (!newNote) return;
@@ -238,7 +244,7 @@ export function NovelPage() {
       { id: "novel.notes", title: "Notes", group: "Go to", keywords: ["ideas", "brainstorm", "cards"], run: () => void navigate(`/novels/${novelId}/notes`) },
       { id: "novel.newNote", title: "New note", group: "Notes", keywords: ["idea", "brainstorm", "what if"], run: () => useNewNote.getState().set(true) },
       ...(model?.notes ?? []).map((n) => ({ id: `novel.note.${n.id}`, title: `Note: ${n.title}`, group: "Go to", keywords: n.tags, run: () => void navigate(`/novels/${novelId}/note/${n.id}`) })),
-      ...(model?.entityTypes ?? []).map((t) => ({ id: `novel.newEntry.${t.key}`, title: `New ${t.label.toLowerCase()}`, group: w?.codex.One ?? "Index", run: () => openNew(`bible/new?type=${encodeURIComponent(t.key)}`, "bible") })),
+      ...(model?.entityTypes ?? []).map((t) => ({ id: `novel.newEntry.${t.key}`, title: `New ${t.label.toLowerCase()}`, group: w?.codex.One ?? "Index", run: () => openNew(newEntryPath(t.key), "bible") })),
       ...(model?.entities ?? []).map((e) => ({
         id: `novel.entry.${e.id}`,
         title: `${model!.entityTypes.find((t) => t.key === e.type)?.label ?? e.type}: ${e.name}`,
