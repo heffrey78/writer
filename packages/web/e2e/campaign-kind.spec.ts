@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Page } from "@playwright/test";
@@ -127,4 +127,52 @@ test("an NPC's fields are ready; a faction picked from its list is written by it
   const named = page.getByRole("region", { name: "Named in their fields" });
   await expect(named.locator("dt")).toHaveText(["NPCs · Faction"]);
   await expect(named.getByRole("link", { name: "Orrin" })).toBeVisible();
+});
+
+test("the Fields dialog: a field added and moved by keyboard, one renamed with its values in every NPC, saved in one commit (#164)", async ({ page, app }) => {
+  const dir = app.bookRepo(sample, "campaign");
+  const voss = join(dir, "codex/npcs/voss.md");
+  writeFileSync(voss, readFileSync(voss, "utf8").replace("summary: Choirmaster of the Tide Choir.\n", "summary: Choirmaster of the Tide Choir.\nfields:\n  voice: low and slow\n"));
+  app.git(dir, "commit", "-qam", "Voss's voice");
+  await app.restart(dir);
+  await page.goto(app.launchUrl);
+  await expect(page.getByRole("textbox", { name: "Arc text" })).toBeFocused();
+  await palette(page, "codex");
+  await page.getByRole("button", { name: "Fields of NPCs" }).click();
+  const dialog = page.getByRole("dialog", { name: "Fields of NPCs" });
+  const fields = dialog.getByRole("list", { name: "Fields of NPCs" }).getByRole("listitem");
+  const names = () => fields.evaluateAll((items) => items.map((i) => i.getAttribute("aria-label")));
+  expect(await names()).toEqual(["Status", "Faction", "Disposition", "Location", "Voice"]);
+
+  // Added, its key following its label; moved up a place from the keyboard, said as it moves.
+  await dialog.getByRole("button", { name: "Add a field" }).click();
+  await expect(fields.last().getByRole("textbox", { name: "Label" })).toBeFocused();
+  await page.keyboard.type("Oath");
+  await expect(fields.last().getByRole("textbox", { name: "Key" })).toHaveValue("oath");
+  await page.keyboard.press("Alt+ArrowUp");
+  await expect(dialog.getByRole("status")).toHaveText("Oath moved to 5 of 6.");
+  expect(await names()).toEqual(["Status", "Faction", "Disposition", "Location", "Oath", "Voice"]);
+
+  // Voice renamed: offered to take Voss's value with it.
+  const voice = dialog.getByRole("listitem", { name: "Voice" });
+  await voice.getByRole("textbox", { name: "Key" }).fill("accent");
+  await voice.getByRole("textbox", { name: "Label" }).fill("Accent");
+  await expect(dialog.getByRole("checkbox", { name: "Rename “voice” to “accent” in 1 NPC" })).toBeChecked();
+  for (const colorScheme of ["light", "dark"] as const) {
+    await page.emulateMedia({ colorScheme });
+    await axe(page);
+  }
+  await page.emulateMedia({ colorScheme: "light" });
+  await dialog.getByRole("button", { name: "Save the fields" }).click();
+  await expect(dialog).toHaveCount(0);
+  expect(app.git(dir, "log", "-1", "--format=%s").trim()).toBe("Codex: the fields of NPCs, renaming “voice” in its entries");
+  const manifest = readFileSync(join(dir, "book.yaml"), "utf8");
+  expect([...manifest.slice(manifest.indexOf("entity_fields:")).matchAll(/- key: (\w+)/g)].map((m) => m[1])).toEqual(["status", "faction", "disposition", "location", "oath", "accent"]);
+  expect(readFileSync(voss, "utf8")).toContain("fields:\n  accent: low and slow\n");
+
+  // The profile reads the new list.
+  await palette(page, "npc: voss");
+  const profile = page.getByRole("region", { name: "Voss" });
+  await expect(profile.locator('dl[aria-label="Fields"]').first().locator("dt")).toHaveText(["Status", "Faction", "Disposition", "Location", "Oath", "Accent"]);
+  await expect(profile.getByRole("definition").filter({ hasText: "low and slow" })).toBeVisible();
 });

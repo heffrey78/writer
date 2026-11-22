@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { backlinks, cardFields, editFrontMatter, entriesNamedBy, fieldLabel, fieldsOfType, fieldText, holdsValue, kindByKey, knownKinds, loadBook, memorySource, validate } from "../src/index.ts";
+import { backlinks, cardFields, editFrontMatter, entriesNamedBy, fieldLabel, fieldsOfType, fieldText, holdsValue, kindByKey, knownKinds, loadBook, memorySource, sharedFields, validate } from "../src/index.ts";
 
 /** A type's fields (D18, #138): declared by the kind and the book, values in an entry's fields, checked alike everywhere. */
 
@@ -149,5 +149,23 @@ describe("a card", () => {
   it("shows the fields its type puts on cards", async () => {
     const book = await loadBook(campaign({ [VOSS]: voss("  voice: low\n  faction: fac_t1de00\n  status: alive\n") }));
     expect(cardFields(book, book.entities.find((e) => e.id === "npc_v0ss01")!)).toEqual(["alive", "The Tide Choir"]);
+  });
+});
+
+describe("the fields a type's entries already share (#164)", () => {
+  it("are the keys two or more share, with what their values seem to hold, less those listed", async () => {
+    const novel = await loadBook(memorySource(NOVEL));
+    // Age and occupation are the kind's already: three characters have each; eyes, only Ada.
+    expect(sharedFields(novel, "character")).toEqual([
+      { key: "age", holds: "number" },
+      { key: "occupation", holds: "text" },
+    ]);
+    expect(sharedFields(novel, "character", ["age", "occupation"])).toEqual([]);
+    const marta = "codex/npcs/marta.md";
+    const book = await loadBook(campaign({ [VOSS]: voss("  rival: npc_ma7ra1\n  sworn: true\n"), [marta]: CAMPAIGN[marta]!.replace(/\nname: (.*)\n/, "\nname: $1\nfields:\n  rival: npc_v0ss01\n  sworn: false\n") }));
+    expect(sharedFields(book, "npc")).toEqual([
+      { key: "rival", holds: "entry", type: "npc" },
+      { key: "sworn", holds: "yes-no" },
+    ]);
   });
 });

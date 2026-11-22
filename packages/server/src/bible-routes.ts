@@ -42,6 +42,7 @@ export async function body(c: Context): Promise<Record<string, unknown>> {
  * PUT   /:id/sidebar                           { sidebar: { groups?, hidden? } | null } → { commit, files }: the writer's arrangement of the sidebar in book.yaml, or the kind's again (#63)
  * POST  /:id/bible/entity-types                { key, prefix, label, folder?, color? }
  * PATCH /:id/bible/entity-types/:key           { label?, color? }
+ * PUT   /:id/bible/entity-types/:key/fields    { fields, renames? } → { commit }: a type's fields (D18), the whole list
  * POST  /:id/bible/relationship-types          { key, label, inverse_label?, symmetric?, from_types?, to_types? }
  * PATCH /:id/bible/relationship-types/:key     { …changes }
  * Refusals: 400 BAD_REQUEST, 404 NOT_FOUND, 409 STALE { path }, 409 REFERENCED { references }, 409 BLOCKED (no git identity), 409 NEEDS_MIGRATION.
@@ -111,6 +112,10 @@ export function bibleRoutes(routes: Hono<Env>): void {
   routes.post("/:id/bible/relationships/:rel/delete", async (c) => operation(c, () => bible(c).deleteRelationship(c.req.param("rel"))));
   routes.post("/:id/bible/entity-types", async (c) => operation(c, async () => bible(c).createEntityType((await body(c)) as never), 201));
   routes.patch("/:id/bible/entity-types/:key", async (c) => operation(c, async () => bible(c).updateEntityType(c.req.param("key"), (await body(c)) as never)));
+  routes.put("/:id/bible/entity-types/:key/fields", async (c) => {
+    const { fields, renames } = await body(c);
+    return operation(c, () => bible(c).setTypeFields(c.req.param("key"), fields as never, (renames ?? []) as never));
+  });
   routes.post("/:id/bible/relationship-types", async (c) => operation(c, async () => bible(c).createRelationshipType((await body(c)) as never), 201));
   routes.patch("/:id/bible/relationship-types/:key", async (c) => operation(c, async () => bible(c).updateRelationshipType(c.req.param("key"), (await body(c)) as never)));
 }

@@ -4,7 +4,7 @@
  */
 
 import type { Comparison, ParagraphDiff } from "@writer/core/compare";
-import type { SeriesSlot, SidebarFile, WritingDay } from "@writer/core";
+import type { EntryFieldDef, SeriesSlot, SidebarFile, WritingDay } from "@writer/core";
 
 /** GET /stats: the open version's writing days, the manuscript's words now, and novel.yaml's target. */
 /** How a relationship type is drawn: a palette slot and a line. */
@@ -778,6 +778,9 @@ function bibleApi(root: (novelId: string) => string, request: Request, upload: <
       call<OperationResult>("POST", novelId, "/entity-types", fields),
     updateEntityType: (novelId: string, key: string, changes: { label?: string; color?: string | null }) =>
       call<OperationResult>("PATCH", novelId, `/entity-types/${encodeURIComponent(key)}`, changes),
+    /** A type's fields, the whole list in order (D18); `renames` moves a field's values to its new key in every entry of the type. */
+    setTypeFields: (novelId: string, type: string, fields: EntryFieldDef[], renames: { from: string; to: string }[] = []) =>
+      call<OperationResult>("PUT", novelId, `/entity-types/${encodeURIComponent(type)}/fields`, { fields, renames }),
     createRelationshipType: (novelId: string, fields: { key: string; label: string; inverse_label?: string; symmetric?: boolean; from_types?: string[]; to_types?: string[]; style?: RelationshipTypeStyle }) =>
       call<OperationResult>("POST", novelId, "/relationship-types", fields),
     updateRelationshipType: (novelId: string, key: string, changes: { label?: string; inverse_label?: string; symmetric?: boolean; from_types?: string[]; to_types?: string[]; style?: RelationshipTypeStyle }) =>

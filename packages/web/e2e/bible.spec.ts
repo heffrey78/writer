@@ -605,3 +605,12 @@ test("the index by the keyboard alone: / searches, j and k open the next and pre
   await page.keyboard.press("Enter");
   await expect(page.getByRole("region", { name: "Ben Varn" })).toBeVisible();
 });
+
+test("a type's fields in a novel in gh-writer's format: the dialog asks to move it to the new format first (#164)", async ({ page, app }) => {
+  await open(page, app);
+  await palette(page, "fields of characters");
+  const dialog = page.getByRole("dialog", { name: "Fields of characters" });
+  await expect(dialog).toContainText("Move it to the new format first.");
+  await dialog.getByRole("button", { name: "Move to the new format…" }).click();
+  await expect(page.getByRole("alertdialog", { name: "Move this book to the new format?" })).toBeVisible();
+});

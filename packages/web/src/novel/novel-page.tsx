@@ -26,6 +26,7 @@ import { EntryPage } from "../bible/entry-page.tsx";
 import { cn } from "../ui/cn.ts";
 import { DraftsButton, useDrafts } from "./drafts.tsx";
 import { ArrangeSidebar } from "./arrange-sidebar.tsx";
+import { FieldsDialog, fieldsTitle, useFieldsDialog } from "../bible/fields-dialog.tsx";
 import { CompileDialog } from "./compile.tsx";
 import { ComparePage } from "./compare-page.tsx";
 import { StoryMapPage, storyMapTabs } from "./story-map.tsx";
@@ -244,6 +245,7 @@ export function NovelPage() {
       { id: "novel.notes", title: "Notes", group: "Go to", keywords: ["ideas", "brainstorm", "cards"], run: () => void navigate(`/novels/${novelId}/notes`) },
       { id: "novel.newNote", title: "New note", group: "Notes", keywords: ["idea", "brainstorm", "what if"], run: () => useNewNote.getState().set(true) },
       ...(model?.notes ?? []).map((n) => ({ id: `novel.note.${n.id}`, title: `Note: ${n.title}`, group: "Go to", keywords: n.tags, run: () => void navigate(`/novels/${novelId}/note/${n.id}`) })),
+      ...(model?.entityTypes ?? []).map((t) => ({ id: `novel.fields.${t.key}`, title: `${fieldsTitle(t)}…`, group: w?.codex.One ?? "Index", keywords: ["fields", "type", t.label], run: () => useFieldsDialog.getState().open(t.key) })),
       ...(model?.entityTypes ?? []).map((t) => ({ id: `novel.newEntry.${t.key}`, title: `New ${t.label.toLowerCase()}`, group: w?.codex.One ?? "Index", run: () => openNew(newEntryPath(t.key), "bible") })),
       ...(model?.entities ?? []).map((e) => ({
         id: `novel.entry.${e.id}`,
@@ -398,6 +400,7 @@ export function NovelPage() {
         {compiling && <CompileDialog novelId={novelId} novel={book} workspace={workspace} onClose={() => setCompiling(false)} />}
         <SaveConflicts novel={book} workspace={workspace} />
         <ArrangeSidebar novelId={novelId} novel={book} onGitHub={!!repo} onNewFormat={newFormat.commands[0]?.run} />
+        <FieldsDialog novelId={novelId} novel={book} onNewFormat={newFormat.commands[0]?.run} />
         {!focus && <BottomBar novelId={novelId} novel={book} onGitHub={!!repo} />}
         <MoreSheet novelId={novelId} novel={book} onGitHub={!!repo} />
         <ArrangeBar novelId={novelId} novel={book} onGitHub={!!repo} />

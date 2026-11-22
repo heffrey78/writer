@@ -1,13 +1,14 @@
 import { defaultEntrySort, entryPresences, filterEntries, matchEntry, piecesMatching, sortEntries, typePlural, vocabulary, word, type Book, type Entity, type EntryPresence, type EntrySort, type Vocabulary } from "@writer/core";
 import { findPanel } from "@writer/editor";
 import type { SpellService } from "@writer/editor/react";
-import { ChevronLeft, ChevronRight, Expand, LayoutGrid, List, PanelLeftClose, PanelLeftOpen, Plus, Search, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Expand, LayoutGrid, List, PanelLeftClose, PanelLeftOpen, Plus, Search, SlidersHorizontal, X } from "lucide-react";
 import { Fragment, memo, useCallback, useEffect, useId, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 import { create } from "zustand";
 import { useCommands } from "../commands.ts";
 import { moduleRecordTypes } from "../modules.tsx";
 import { NEW_TYPE } from "../novel/item-modals.tsx";
+import { fieldsTitle, useFieldsDialog } from "./fields-dialog.tsx";
 import type { Workspace } from "../novel/workspace.ts";
 import { Button } from "../ui/button.tsx";
 import { cn } from "../ui/cn.ts";
@@ -393,9 +394,14 @@ export function BiblePage({
               <h2 id={`type-${type.key}`} className="font-semibold">
                 {typePlural(type)} <span className="text-sm font-normal text-muted">{count}</span>
               </h2>
-              <Button size="sm" variant="ghost" onClick={() => add(type.key)} aria-label={`New ${type.label.toLowerCase()}`}>
-                <Plus className="size-4" aria-hidden /> New
-              </Button>
+              <div className="flex items-center gap-1">
+                <Button size="sm" variant="ghost" onClick={() => useFieldsDialog.getState().open(type.key)} aria-label={fieldsTitle(type)}>
+                  <SlidersHorizontal className="size-4" aria-hidden /> Fields
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => add(type.key)} aria-label={`New ${type.label.toLowerCase()}`}>
+                  <Plus className="size-4" aria-hidden /> New
+                </Button>
+              </div>
             </div>
             {shown.length ? (
               <ul className={view === "cards" ? cn("grid gap-3", selected ? "grid-cols-[repeat(auto-fill,minmax(15rem,1fr))]" : "sm:grid-cols-2 lg:grid-cols-3") : "grid gap-0.5"}>

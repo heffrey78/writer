@@ -102,3 +102,34 @@ export function holdsText(f: EntryFieldDef, typeLabel: (key: string) => string |
       return "text";
   }
 }
+
+/**
+ * The fields at least two of a type's entries share and `except` doesn't list, in the order they're
+ * first met, each with what its values seem to hold (#164): where a type's declarations can start from.
+ * Keys a declaration can't have ("Eye colour") are left out.
+ */
+export function sharedFields(book: Pick<Book, "entities" | "entityTypes">, type: string, except: readonly string[] = []): EntryFieldDef[] {
+  const values = new Map<string, FieldValue[]>();
+  for (const e of book.entities) {
+    if (e.type !== type) continue;
+    for (const [k, v] of Object.entries(e.fields)) values.set(k, [...(values.get(k) ?? []), v]);
+  }
+  const typeOf = (id: string) => book.entities.find((e) => e.id === id)?.type;
+  /** The one type every ID is of, if they're all of one. */
+  const oneType = (ids: string[]) => {
+    const types = new Set(ids.map(typeOf));
+    const [only] = types;
+    return types.size === 1 && only ? { type: only } : {};
+  };
+  return [...values]
+    .filter(([k, vs]) => vs.length >= 2 && !except.includes(k) && /^[a-z][a-z0-9_]*$/.test(k))
+    .map(([key, vs]): EntryFieldDef => {
+      if (vs.every((v) => typeof v === "number")) return { key, holds: "number" };
+      if (vs.every((v) => typeof v === "boolean")) return { key, holds: "yes-no" };
+      if (vs.every((v) => Array.isArray(v))) return { key, holds: "entries", ...oneType(vs.flat() as string[]) };
+      if (vs.every((v) => typeof v === "string" && isId(v))) return { key, holds: "entry", ...oneType(vs as string[]) };
+      if (vs.some((v) => typeof v === "string" && (v.includes("\n") || v.length > 80))) return { key, holds: "long-text" };
+      return { key, holds: "text" };
+    });
+}
+

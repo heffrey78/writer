@@ -174,6 +174,40 @@ describe("relationships", () => {
 });
 
 describe("types", () => {
+  it("sets a type's fields in book.yaml, renaming a field's values in its entries in the same commit (#164)", async () => {
+    await expect(bible.setTypeFields("character", [{ key: "age", holds: "number" }])).rejects.toMatchObject({ code: "NEEDS_MIGRATION" });
+    await bible.migrate(3);
+    const before = read("book.yaml");
+    await bible.setTypeFields(
+      "character",
+      [
+        { key: "age", holds: "number", card: true },
+        { key: "eye_colour", label: "Eye colour", holds: "text" },
+        { key: "home", holds: "entry", type: "location", changes: true },
+        { key: "mood", holds: "choice", options: ["calm", " calm", "", "fraught"] },
+      ],
+      [{ from: "eyes", to: "eye_colour" }],
+    );
+    expect(lastCommit()).toBe("Bible: the fields of Characters, renaming “eyes” in its entries");
+    expect(changedInLastCommit()).toEqual([`M\t${ADA_FILE}`, "M\tbook.yaml"]);
+    expect(read("book.yaml")).toBe(
+      `${before}entity_fields:\n  character:\n    - key: age\n      holds: number\n      card: true\n    - key: eye_colour\n      holds: text\n    - key: home\n      holds: entry\n      type: location\n      changes: true\n    - key: mood\n      holds: choice\n      options:\n        - calm\n        - fraught\n`,
+    );
+    expect(read(ADA_FILE)).toContain("fields:\n  age: 31\n  occupation: Structural engineer\n  eye_colour: grey\n");
+    const novel = await valid();
+    expect(novel.entityTypes.find((t) => t.key === "character")!.fields!.map((f) => f.key)).toEqual(["age", "eye_colour", "home", "mood"]);
+
+    // The book's own type keeps its list under its entry; a list that can't be is refused.
+    await bible.createEntityType({ key: "vehicle", prefix: "veh", label: "Vehicle" });
+    await bible.setTypeFields("vehicle", [{ key: "driver", holds: "entry", type: "character" }]);
+    expect(read("book.yaml")).toContain("    label: Vehicle\n    fields:\n      - key: driver\n        holds: entry\n        type: character\n");
+    await expect(bible.setTypeFields("vehicle", [{ key: "Driver", holds: "text" }])).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(bible.setTypeFields("vehicle", [{ key: "a", holds: "choice" }])).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(bible.setTypeFields("vehicle", [{ key: "a", holds: "entry", type: "ship" }])).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(bible.setTypeFields("vehicle", [{ key: "a", holds: "text" }, { key: "a", holds: "text" }])).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    clean();
+  });
+
   it("adds a custom entity type, then entries of it, without code changes", async () => {
     await bible.createEntityType({ key: "vehicle", prefix: "veh", label: "Vehicle", color: "17becf" });
     expect(lastCommit()).toBe("Bible: add the Vehicle type");

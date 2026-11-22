@@ -2,6 +2,9 @@ import {
   backlinks,
   editFrontMatter,
   fieldLabel,
+  HOLDS,
+  typePlural,
+  type EntryFieldDef,
   editYaml,
   mentionsOf,
   proseText,
@@ -55,10 +58,38 @@ function fieldEdits(before: Record<string, unknown>, after: Record<string, unkno
   const inOrder = kept.every((k, i) => k === was.filter((x) => now.includes(x))[i]) && now.slice(kept.length).every((k) => !was.includes(k)) && now.slice(0, kept.length).every((k) => was.includes(k));
   if (!inOrder) return [{ path: ["fields"], value: after }];
   const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+  // Set before removed, so fields: never empties on the way (it would be left as {} in flow style).
   return [
-    ...was.filter((k) => !now.includes(k)).map((k): YamlEdit => ({ path: ["fields", k], remove: true })),
     ...now.filter((k) => !same(before[k], after[k])).map((k): YamlEdit => ({ path: ["fields", k], value: after[k] })),
+    ...was.filter((k) => !now.includes(k)).map((k): YamlEdit => ({ path: ["fields", k], remove: true })),
   ];
+}
+
+/** A type's field declarations as the app sends them, checked and written plainly: only what each says. */
+function checkFieldList(novel: Book, fields: unknown): EntryFieldDef[] {
+  if (!Array.isArray(fields)) throw new OperationError("BAD_REQUEST", "A type's fields are a list.");
+  const seen = new Set<string>();
+  return fields.map((raw: unknown): EntryFieldDef => {
+    const f = (raw ?? {}) as Partial<EntryFieldDef>;
+    const key = typeof f.key === "string" ? f.key : "";
+    if (!/^[a-z][a-z0-9_]*$/.test(key)) throw new OperationError("BAD_REQUEST", `A field's key is lowercase letters, digits and _, starting with a letter: not “${key}”.`);
+    if (seen.has(key)) throw new OperationError("BAD_REQUEST", `There are two fields “${key}”.`);
+    seen.add(key);
+    if (!f.holds || !HOLDS.includes(f.holds)) throw new OperationError("BAD_REQUEST", `What “${key}” holds isn't one Writer knows.`);
+    const options = f.holds === "choice" ? [...new Set((f.options ?? []).map((o) => String(o).trim()).filter(Boolean))] : [];
+    if (f.holds === "choice" && !options.length) throw new OperationError("BAD_REQUEST", `“${key}” is a choice: it needs its options.`);
+    const entry = f.holds === "entry" || f.holds === "entries";
+    if (entry && f.type !== undefined && !novel.entityTypes.some((t) => t.key === f.type)) throw new OperationError("BAD_REQUEST", `No entity type “${f.type}”.`);
+    return {
+      key,
+      ...(typeof f.label === "string" && f.label.trim() && f.label.trim() !== fieldLabel({ key }) ? { label: f.label.trim() } : {}),
+      holds: f.holds,
+      ...(options.length ? { options } : {}),
+      ...(entry && f.type ? { type: f.type } : {}),
+      ...(f.card ? { card: true } : {}),
+      ...(f.changes ? { changes: true } : {}),
+    };
+  });
 }
 
 /** What an entity's front matter holds, apart from its ID. */
@@ -606,6 +637,36 @@ export class BibleOperations {
       if (index < 0) throw new OperationError("NOT_FOUND", `No custom entity type “${key}”.`);
       const content = editYaml(await this.#read(novel.manifest), editsAt(["entity_types", index], changes));
       return transaction(this.root, [{ path: novel.manifest, content }], `${codex(novel)}: edit the ${key} type`);
+    });
+  }
+
+  /**
+   * Set the fields a type declares (D18, #164), in order: the book's own type's under its entry in
+   * entity_types, a kind's type's under entity_fields, the whole list. `renames` moves a field's values
+   * to its new key in every entry of the type that has one, in place. One commit, with the book's tools
+   * brought up to date so its Action reads the declarations. A book in an older format is refused: it
+   * has no place for them.
+   */
+  setTypeFields(type: string, fields: EntryFieldDef[], renames: { from: string; to: string }[] = []): Promise<OperationResult> {
+    return this.#run(async (novel) => {
+      if (novel.manifest !== MANIFEST) throw new OperationError("NEEDS_MIGRATION", `A type's fields need the book in the new format, with its settings in ${MANIFEST}.`, { from: novel.config?.schema_version, to: SCHEMA_VERSION });
+      const def = novel.entityTypes.find((t) => t.key === type);
+      if (!def) throw new OperationError("NOT_FOUND", `No entity type “${type}”.`);
+      const list = checkFieldList(novel, fields);
+      const keys = new Set(list.map((f) => f.key));
+      for (const r of renames) if (!keys.has(r.to) || r.from === r.to) throw new OperationError("BAD_REQUEST", `“${r.from}” can only be renamed to one of the type's fields.`);
+      const at = def.builtin ? ["entity_fields", type] : ["entity_types", (novel.config?.entity_types ?? []).findIndex((t) => t.key === type), "fields"];
+      const writes: FileWrite[] = [{ path: novel.manifest, content: editYaml(await this.#read(novel.manifest), [{ path: at, value: list }]) }];
+      for (const entity of novel.entities.filter((e) => e.type === type)) {
+        const moves = renames.filter((r) => entity.fields[r.from] !== undefined && entity.fields[r.to] === undefined);
+        if (!moves.length) continue;
+        const renamed = Object.fromEntries(Object.entries(entity.fields).map(([k, v]) => [moves.find((r) => r.from === k)?.to ?? k, v]));
+        const text = await this.#read(entity.file);
+        writes.push({ path: entity.file, content: editFrontMatter(text, fieldEdits(entity.fields, renamed)), base: hashText(text) });
+      }
+      writes.push(...(await toolWrites(this.root)));
+      const renamedIn = writes.length > 1 && renames.length ? `, renaming ${renames.map((r) => `“${r.from}”`).join(", ")} in its entries` : "";
+      return transaction(this.root, writes, `${codex(novel)}: the fields of ${typePlural(def)}${renamedIn}`);
     });
   }
 
