@@ -1,4 +1,4 @@
-import { roleOf, typePlural, vocabulary, type Book, type EntryFilters } from "@writer/core";
+import { fieldText, roleOf, typePlural, vocabulary, type Book, type EntryFilters } from "@writer/core";
 import { Plus, X } from "lucide-react";
 import { Popover } from "radix-ui";
 import { useId, useState, type KeyboardEvent } from "react";
@@ -58,7 +58,7 @@ export function FilterBar({ novel, filters, onChange }: { novel: Book; filters: 
     const rest = (filters.tags ?? []).filter((x) => x !== t).join(",");
     chips.push({ key: `tag:${t}`, label: `Tag: ${t}`, remove: { tag: rest || undefined } });
   }
-  if (filters.field) chips.push({ key: "field", label: `${sentence(filters.field.key.replace(/_/g, " "))}: ${filters.field.value}`, remove: { field: undefined, value: undefined } });
+  if (filters.field) chips.push({ key: "field", label: `${sentence(filters.field.key.replace(/_/g, " "))}: ${fieldText(novel, filters.field.value)}`, remove: { field: undefined, value: undefined } });
   if (filters.in) {
     const s = novel.allSections.find((x) => x.id === filters.in);
     chips.push({ key: "in", label: `In “${s?.title || filters.in}”`, remove: { in: undefined } });
@@ -106,7 +106,8 @@ function AddFilter({ novel, filters, onAdd }: { novel: Book; filters: EntryFilte
   const ids = { kind: useId(), value: useId(), fieldValue: useId(), heading: useId() };
   const tags = [...new Set(novel.entities.flatMap((e) => e.tags))].sort((a, b) => a.localeCompare(b));
   const fieldKeys = [...new Set(novel.entities.flatMap((e) => Object.keys(e.fields)))].sort((a, b) => a.localeCompare(b));
-  const fieldValues = (key: string) => [...new Set(novel.entities.flatMap((e) => (e.fields[key] === undefined ? [] : [String(e.fields[key])])))].sort((a, b) => a.localeCompare(b));
+  // Each entry a list names is a value of its own; an entry's ID reads as its name.
+  const fieldValues = (key: string) => [...new Set(novel.entities.flatMap((e) => { const v = e.fields[key]; return v === undefined ? [] : Array.isArray(v) ? v : [String(v)]; }))].sort((a, b) => fieldText(novel, a).localeCompare(fieldText(novel, b)));
   const roles = roleFields(novel);
 
   const kinds: { key: Kind; label: string; options: { value: string; label: string }[] }[] = [
@@ -184,7 +185,7 @@ function AddFilter({ novel, filters, onAdd }: { novel: Book; filters: EntryFilte
                 <select id={ids.fieldValue} value={chosenValue} onChange={(e) => setFieldValue(e.target.value)} className={select}>
                   {values.map((v) => (
                     <option key={v} value={v}>
-                      {v}
+                      {fieldText(novel, v)}
                     </option>
                   ))}
                 </select>

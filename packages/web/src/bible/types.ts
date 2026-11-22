@@ -1,4 +1,4 @@
-import { matchEntry, mentionTargets, type Entity, type Book } from "@writer/core";
+import { cardFields, matchEntry, mentionTargets, type Entity, type Book } from "@writer/core";
 import type { MentionEntity } from "@writer/editor";
 
 /** A type's name for a list of its entries: "Characters". */
@@ -15,7 +15,7 @@ export function entriesByType(novel: Book): { type: Book["entityTypes"][number];
 }
 
 /** Whether an entry matches a search: by anything it says (its name, other names, summary, fields, tags or notes; #134). */
-export const matches = (entity: Entity, query: string) => matchEntry(entity, query) !== undefined;
+export const matches = (entity: Entity, query: string, book?: Pick<Book, "entities">) => matchEntry(entity, query, { book }) !== undefined;
 
 /**
  * Every entry, for @ suggestions: by type in the bible's order, then by name; then the modules'
@@ -34,12 +34,13 @@ export function initials(name: string): string {
     .join("");
 }
 
-/** What a card says of an entry at a glance: its first two fields' values, or its other names. */
-export function cardFacts(entity: Entity): string[] {
+/**
+ * What a card says of an entry at a glance: the values of the fields its type shows on cards (D18), else
+ * its first two fields', or its other names. An entry it names reads as that entry's name.
+ */
+export function cardFacts(entity: Entity, book: Pick<Book, "entities" | "entityTypes">): string[] {
   return [
-    ...Object.entries(entity.fields)
-      .slice(0, 2)
-      .flatMap(([, v]) => (typeof v === "boolean" || v === "" ? [] : [String(v)])),
+    ...cardFields(book, entity),
     ...(entity.aliases.length ? [`also ${entity.aliases.join(", ")}`] : []),
   ].slice(0, 2);
 }

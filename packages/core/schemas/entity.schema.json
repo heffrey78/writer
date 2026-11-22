@@ -17,8 +17,11 @@
       "maxItems": 2
     },
     "fields": {
+      "description": "Its fields, by key: text, a number or yes/no; in a format 3 book, a list of IDs too (an entries field).",
       "type": "object",
-      "additionalProperties": { "type": ["string", "number", "boolean"] }
+      "additionalProperties": {
+        "anyOf": [{ "type": ["string", "number", "boolean"] }, { "$ref": "common.schema.json#/$defs/idList" }]
+      }
     },
     "tags": { "$ref": "common.schema.json#/$defs/tags" }
   },

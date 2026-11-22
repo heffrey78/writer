@@ -5,6 +5,7 @@ import { toString } from "mdast-util-to-string";
 import { gfm } from "micromark-extension-gfm";
 import { chapterTitle, describeRelationship } from "./diagrams.ts";
 import { entryIds, fieldName, itemsOf, itemText } from "./fields.ts";
+import { fieldText } from "./entry-fields.ts";
 import type { FieldDef } from "./kinds.ts";
 import { pieceSections, sectionById, type Section, type Entity, type Book, type ModuleRecord, type Relationship, type Piece } from "./model.ts";
 import { recordTypesOf } from "./modules.ts";
@@ -308,7 +309,7 @@ function compareEntries(before: Book, after: Book): EntryComparison[] {
       field("Name", x?.name, y?.name, both),
       field("Other names", x?.aliases.join(", "), y?.aliases.join(", "), both),
       field("Summary", x?.summary, y?.summary, both),
-      ...keys.map((k) => field(k, x?.fields[k]?.toString(), y?.fields[k]?.toString(), both)),
+      ...keys.map((k) => field(k, x?.fields[k] === undefined ? undefined : fieldText(before, x.fields[k]), y?.fields[k] === undefined ? undefined : fieldText(after, y.fields[k]), both)),
       field("Tags", x?.tags.join(", "), y?.tags.join(", "), both),
       field("Image", x?.image, y?.image, both),
       field("Notes", x?.body.trim(), y?.body.trim(), both),

@@ -97,6 +97,32 @@ function pieceSchema(kind: BookKind): object {
   return { $schema: scene.$schema, $id: scene.$id, title: scene.title, type: "object", properties, required: ["id", "title"], additionalProperties: false };
 }
 
+/**
+ * A type's field declarations (D18), in order: a key, what it holds (a choice with its options), an
+ * entry type for an entry field to name, whether it shows on cards and whether it changes at a piece.
+ */
+const FIELD_LIST = {
+  type: "array",
+  items: {
+    type: "object",
+    properties: {
+      key: { type: "string", pattern: "^[a-z][a-z0-9_]*$" },
+      label: ref("nonEmptyText"),
+      holds: { enum: ["text", "long-text", "number", "yes-no", "choice", "entry", "entries", "time"] },
+      options: { type: "array", items: ref("nonEmptyText"), minItems: 1, uniqueItems: true },
+      type: { type: "string", pattern: "^[a-z][a-z0-9_]*$" },
+      card: { type: "boolean" },
+      changes: { type: "boolean" },
+    },
+    required: ["key", "holds"],
+    additionalProperties: false,
+    allOf: [
+      { if: { properties: { holds: { const: "choice" } } }, then: { required: ["options"] }, else: { not: { required: ["options"] } } },
+      { if: { properties: { holds: { enum: ["entry", "entries"] } } }, then: {}, else: { not: { required: ["type"] } } },
+    ],
+  },
+};
+
 /** A page's or a group's key in the sidebar's arrangement. */
 const SIDEBAR_KEY = { type: "string", pattern: "^[a-z][a-z0-9-]*$" };
 
@@ -107,11 +133,21 @@ const SIDEBAR_KEY = { type: "string", pattern: "^[a-z][a-z0-9-]*$" };
 function bookSchema(): object {
   const keys = { type: "array", items: SIDEBAR_KEY, uniqueItems: true };
   const sidebar = { type: "object", properties: { groups: { type: "object", additionalProperties: keys }, hidden: keys, bar: keys }, additionalProperties: false };
+  // A type's fields (D18): on the book's own types, and, by type key, for its kind's.
+  const entityTypes = novel.properties.entity_types;
+  const ownType = { ...entityTypes.items, properties: { ...entityTypes.items.properties, fields: FIELD_LIST } };
   return {
     ...novel,
     $id: `${BASE}book.schema.json`,
     title: "book.yaml",
-    properties: { ...novel.properties, schema_version: { type: "integer", minimum: 3 }, kind: ref("nonEmptyText"), sidebar },
+    properties: {
+      ...novel.properties,
+      schema_version: { type: "integer", minimum: 3 },
+      kind: ref("nonEmptyText"),
+      sidebar,
+      entity_types: { ...entityTypes, items: ownType },
+      entity_fields: { type: "object", propertyNames: { pattern: "^[a-z][a-z0-9_]*$" }, additionalProperties: FIELD_LIST },
+    },
     required: [...novel.required, "kind"],
   };
 }

@@ -159,7 +159,7 @@ export function MentionCard({ novelId, novel }: { novelId: string; novel: Book }
       ) : (
         <>
           {entity.summary && <Lead size="card">{entity.summary}</Lead>}
-          {fields.length > 0 && <FieldRows fields={fields} compact />}
+          {fields.length > 0 && <FieldRows fields={fields} compact names={novel} />}
           {card.scene && (
             <section aria-label={`Relationships at “${card.scene.title}”`} className="grid gap-1 border-t border-rule pt-2">
               <p className="text-xs text-muted">At “{card.scene.title}”</p>

@@ -174,7 +174,7 @@ export function BiblePage({
       entriesByType(novel).map((g) => ({
         type: g.type.key,
         count: g.entries.length,
-        shown: sortEntries(novel, filterEntries(novel, g.entries.filter((e) => matchEntry(e, query)), filters, presences), sort, presences).map((e) => e.id),
+        shown: sortEntries(novel, filterEntries(novel, g.entries.filter((e) => matchEntry(e, query, { book: novel })), filters, presences), sort, presences).map((e) => e.id),
       })),
     [query, sort, ids, filterKey], // eslint-disable-line react-hooks/exhaustive-deps
   );
@@ -222,7 +222,7 @@ export function BiblePage({
   const versions = useImageVersions(novelId);
   const pictureOf = (e: Entity) => (e.image ? imageUrl(novelId, e.image, versions[e.image]) : undefined);
   const marksByType = useMemo(() => new Map(novel.entityTypes.map((t) => [t.key, markWords(novel.kind, t.key, w)])), [novel, w]);
-  const matches = useMemo(() => new Map(query ? novel.entities.map((e) => [e.id, matchEntry(e, query, { around: 3 })]) : []), [novel, query]);
+  const matches = useMemo(() => new Map(query ? novel.entities.map((e) => [e.id, matchEntry(e, query, { around: 3, book: novel })]) : []), [novel, query]);
   const latest = useRef({ go, selectedId: undefined as string | undefined, entryHref });
   const onOpen = useCallback((to: string, e?: MouseEvent) => latest.current.go(to, e), []);
   const onEnter = useCallback((id: string) => {
@@ -402,7 +402,7 @@ export function BiblePage({
                 {shown.slice(0, Math.max(0, limit - before[g]!)).map((e) => (
                   <li key={e.id} className="grid" data-entry={e.id}>
                     {view === "cards" ? (
-                      <EntryCard entity={e} presence={presences.get(e.id)} href={entryHref(e.id)} current={e.id === selectedId} onOpen={onOpen} url={pictureOf(e)} marks={marksByType.get(e.type)!} w={w} />
+                      <EntryCard entity={e} presence={presences.get(e.id)} href={entryHref(e.id)} current={e.id === selectedId} onOpen={onOpen} url={pictureOf(e)} marks={marksByType.get(e.type)!} w={w} book={novel} />
                     ) : (
                       <EntryRow entity={e} presence={presences.get(e.id)} href={entryHref(e.id)} current={e.id === selectedId} onOpen={onOpen} onEnter={onEnter} match={matches.get(e.id)} url={pictureOf(e)} marks={marksByType.get(e.type)!} w={w} />
                     )}
@@ -794,6 +794,7 @@ const EntryCard = memo(function EntryCard({
   url,
   marks: words,
   w,
+  book,
 }: {
   entity: Entity;
   presence: EntryPresence | undefined;
@@ -803,11 +804,13 @@ const EntryCard = memo(function EntryCard({
   url: string | undefined;
   marks: Marks;
   w: Vocabulary;
+  /** For the facts on the card: the type's fields, and the names of entries they name. */
+  book: Book;
 }) {
   const shape = shapeForType(entity.type);
   const count = presence?.count ?? 0;
   const n = presence?.scenes.length ?? 0;
-  const facts = cardFacts(entity);
+  const facts = cardFacts(entity, book);
   return (
     <a
       href={href}

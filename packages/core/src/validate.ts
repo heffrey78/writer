@@ -1,4 +1,5 @@
-import { idPrefix, RECORD_PREFIXES } from "./ids.ts";
+import { fieldLabel, holdsText, holdsValue } from "./entry-fields.ts";
+import { idPrefix, isId, RECORD_PREFIXES, type EntryFieldDef } from "./ids.ts";
 import type { FieldDef } from "./kinds.ts";
 import { loadBook } from "./load.ts";
 import { moduleDiagnostics, recordTypesOf } from "./modules.ts";
@@ -37,6 +38,7 @@ export const RULES: Readonly<Record<string, Severity>> = {
   W_IMAGE_OUTSIDE: "warning",
   W_NOTE_PIN: "warning",
   W_SIDEBAR_UNKNOWN: "warning",
+  W_FIELD_VALUE: "warning",
 };
 
 export interface ValidationResult {
@@ -146,8 +148,49 @@ export function validateBook(novel: Book): Diagnostic[] {
     }
   }
 
-  // Bible entries: mentions in notes.
+  // A type's field declarations (D18): each key once, and an entry field naming a type there is.
+  const declared = (t: (typeof novel.entityTypes)[number]): string | undefined => {
+    if (!t.builtin) {
+      const i = (novel.config?.entity_types ?? []).findIndex((x) => x?.key === t.key);
+      return i < 0 ? undefined : `/entity_types/${i}/fields`;
+    }
+    return novel.config?.entity_fields?.[t.key] !== undefined ? `/entity_fields/${t.key}` : undefined;
+  };
+  for (const t of novel.entityTypes) {
+    const at = declared(t);
+    // The kind's own defaults are its data, checked by its tests; only what the book declares is reported here.
+    if (at === undefined) continue;
+    const seen = new Set<string>();
+    (t.fields ?? []).forEach((f, j) => {
+      if (seen.has(f.key)) push("error", "E_SCHEMA", novel.manifest, `${t.label} has two fields “${f.key}”`, { pointer: `${at}/${j}` });
+      seen.add(f.key);
+      if (f.type !== undefined && !typeByKey.has(f.type)) push("error", "E_ENTITY_TYPE", novel.manifest, `${t.label}'s field “${f.key}” names entries of a type there isn't, “${f.type}”`, { pointer: `${at}/${j}/type` });
+    });
+  }
+
+  /**
+   * An entry's fields (D18): an entry its declared fields name exists and is of the field's type; a list
+   * of IDs names entries that exist; a value not what its field holds is a warning, so a hand edit never
+   * stops a book opening.
+   */
+  const typeLabel = (key: string) => typeByKey.get(key)?.label;
+  function entryFields(e: (typeof novel.entities)[number]) {
+    const decls = new Map<string, EntryFieldDef>((typeByKey.get(e.type)?.fields ?? []).map((f) => [f.key, f]));
+    for (const [key, value] of Object.entries(e.fields)) {
+      const f = decls.get(key);
+      const name = `fields.${key}`;
+      if (f && !holdsValue(f, value)) {
+        push("warning", "W_FIELD_VALUE", e.file, `${name} is ${JSON.stringify(value)}, but ${fieldLabel(f)} holds ${holdsText(f, typeLabel)}`, { pointer: `/fields/${key}` });
+      }
+      const allowed = f?.type ? [f.type] : ["*entity"];
+      if (Array.isArray(value)) value.forEach((id: string, i) => isId(id) && ref(id, allowed, e.file, `/fields/${key}/${i}`, name));
+      else if (f?.holds === "entry" && typeof value === "string" && isId(value)) ref(value, allowed, e.file, `/fields/${key}`, name);
+    }
+  }
+
+  // Bible entries: their fields, and mentions in notes.
   for (const e of novel.entities) {
+    entryFields(e);
     for (const m of mentions(e.body)) ref(m.id, MENTIONABLE, e.file, "", `Mention "${m.text}"`, e.bodyLine + m.line - 1);
     for (const p of pictures(e.body)) outsideImages(p, e.file, e.bodyLine);
   }

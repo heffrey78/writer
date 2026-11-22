@@ -5,6 +5,8 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, describe, expect, it } from "vitest";
 import { parse } from "yaml";
+import { nodeSource } from "@writer/core/node";
+import { validate } from "@writer/core";
 import { runCompile } from "../src/compile-command.ts";
 
 const repo = fileURLToPath(new URL("../../../", import.meta.url));
@@ -163,6 +165,22 @@ describe.each([
     const r = node([join(tools, "validate.mjs"), dir]);
     expect(r.status, r.stdout).toBe(0);
     expect(r.stdout).toContain("0 errors, 0 warnings");
+  });
+
+  it("and its vendored validator reads a type's fields as the app does (D18)", async () => {
+    if (kind !== "campaign") return;
+    const copy = join(tmp, "fields-campaign");
+    cpSync(join(repo, sample), copy, { recursive: true });
+    const voss = join(copy, "codex/npcs/voss.md");
+    writeFileSync(voss, readFileSync(voss, "utf8").replace("summary: Choirmaster of the Tide Choir.\n", "summary: Choirmaster of the Tide Choir.\nfields:\n  status: drowned\n  faction: npc_ma7ra1\n  allies: [fac_watch0]\n"));
+    appendFileSync(join(copy, "book.yaml"), "entity_fields:\n  faction:\n    - key: motto\n      holds: text\n");
+    const r = node([join(dir, ".github/gh-writer/validate.mjs"), copy, "--json"]);
+    const app = await validate(nodeSource(copy));
+    expect(app.diagnostics.map((d) => [d.code, d.pointer])).toEqual([
+      ["E_REF_TYPE", "/fields/faction"],
+      ["W_FIELD_VALUE", "/fields/status"],
+    ]);
+    expect(JSON.parse(r.stdout).diagnostics).toEqual(app.diagnostics);
   });
 
   it("and its sample book's snapshots are current", () => {

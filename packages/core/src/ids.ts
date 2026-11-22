@@ -12,6 +12,26 @@ export const RECORD_PREFIXES = {
   note: "note",
 } as const;
 
+/** What an entry's field holds (D18): its value in `fields:` is text, a number, yes/no, one of its options, an entry's ID, a list of IDs or a time. */
+export type FieldHolds = "text" | "long-text" | "number" | "yes-no" | "choice" | "entry" | "entries" | "time";
+
+/**
+ * A field a type declares for its entries (D18, #138): the key in an entry's `fields:`, what it holds,
+ * whether it shows on cards and whether its value can change at a piece.
+ */
+export interface EntryFieldDef {
+  key: string;
+  /** Default: the key in words ("kind_of_place" → "Kind of place"). */
+  label?: string;
+  holds: FieldHolds;
+  /** A choice's options, in order. */
+  options?: readonly string[];
+  /** The entry type an entry or entries field names; none, any entry of the book's. */
+  type?: string;
+  card?: boolean;
+  changes?: boolean;
+}
+
 export interface EntityTypeDef {
   key: string;
   prefix: string;
@@ -25,6 +45,8 @@ export interface EntityTypeDef {
   is?: "person" | "place";
   /** Prefixes its entries' IDs may still have from before the book was of its kind: a journal's people, once a novel's characters (char). */
   formerPrefixes?: readonly string[];
+  /** Its entries' fields, in order (D18): the kind's defaults for a built-in type, unless the book declares its own. */
+  fields?: readonly EntryFieldDef[];
 }
 
 /** Prefixes a book's own entry types may not use: its kind's (former ones too), its modules' records' and every kind's records'. */

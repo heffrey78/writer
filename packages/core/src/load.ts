@@ -1,4 +1,5 @@
-import { reservedPrefixes, type EntityTypeDef } from "./ids.ts";
+import { reservedPrefixes, type EntityTypeDef, type EntryFieldDef } from "./ids.ts";
+import { HOLDS } from "./entry-fields.ts";
 import { kindByKey, knownKind, startLevels, V2_KIND, type BookKind, type LevelDef } from "./kinds.ts";
 import { recordTypesOf, withModules } from "./modules.ts";
 import { EVENT_FILES_FORMAT, MANIFEST, NOVEL_MANIFEST, readManifest, SCHEMA_VERSION } from "./manifest.ts";
@@ -93,6 +94,16 @@ export async function loadBook(source: FileSource, kind?: BookKind): Promise<Boo
   } else {
     novel.config = config as unknown as NovelFile;
     novel.entityTypes = entityTypes(config["entity_types"], diagnostics, bookKind, file);
+    // A built-in type's fields, declared for this book (format 3: book.yaml's schema has it), in place of its kind's.
+    if (isObject(config["entity_fields"])) {
+      for (const [key, list] of Object.entries(config["entity_fields"])) {
+        const i = novel.entityTypes.findIndex((t) => t.key === key && t.builtin);
+        if (i < 0) {
+          const own = novel.entityTypes.some((t) => t.key === key);
+          diagnostics.push({ ...error("E_ENTITY_TYPE", file, own ? `“${key}” is the book's own type: its fields go under entity_types` : `entity_fields names “${key}”, which isn't one of the ${bookKind.label.toLowerCase()}'s types`), pointer: `/entity_fields/${key}` });
+        } else novel.entityTypes[i] = { ...novel.entityTypes[i]!, fields: fieldDecls(list) };
+      }
+    }
     novel.relationshipTypes = objList(config["relationship_types"]).filter((t) => str(t["key"])) as unknown as RelationshipTypeFile[];
   }
 
@@ -332,6 +343,11 @@ export async function loadBook(source: FileSource, kind?: BookKind): Promise<Boo
     if (isObject(d["fields"])) {
       for (const [k, v] of Object.entries(d["fields"])) {
         if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") fields[k] = v;
+        // A list of IDs (an entries field) is format 3's; the schema reports anything else.
+        else if (Array.isArray(v) && v.every((x) => typeof x === "string")) {
+          if (manifest?.file === MANIFEST) fields[k] = v as string[];
+          else diagnostics.push({ ...error("E_SCHEMA", file, `fields.${k} is a list, which only a book in format 3 may have`), pointer: `/fields/${k}` });
+        }
       }
     }
     novel.entities.push({
@@ -395,9 +411,30 @@ function entityTypes(raw: unknown, diagnostics: Diagnostic[], kind: BookKind, fi
       diagnostics.push({ ...error("E_ENTITY_TYPE", file, `Entity type ${clash} is reserved or already used`), pointer: `/entity_types/${i}` });
       return;
     }
-    types.push({ key, prefix, folder, label: str(t["label"]) ?? key, color: str(t["color"]), builtin: false });
+    types.push({ key, prefix, folder, label: str(t["label"]) ?? key, color: str(t["color"]), builtin: false, ...(t["fields"] !== undefined ? { fields: fieldDecls(t["fields"]) } : {}) });
   });
   return types;
+}
+
+/** A list of field declarations (D18), as far as each is well formed: the schema reports the rest. */
+function fieldDecls(raw: unknown): EntryFieldDef[] {
+  return objList(raw).flatMap((d): EntryFieldDef[] => {
+    const key = str(d["key"]);
+    const holds = HOLDS.find((h) => h === d["holds"]);
+    if (!key || !holds) return [];
+    const label = str(d["label"]), type = str(d["type"]);
+    return [
+      {
+        key,
+        holds,
+        ...(label ? { label } : {}),
+        ...(Array.isArray(d["options"]) ? { options: strList(d["options"]) } : {}),
+        ...(type ? { type } : {}),
+        ...(d["card"] === true ? { card: true } : {}),
+        ...(d["changes"] === true ? { changes: true } : {}),
+      },
+    ];
+  });
 }
 
 function error(code: string, file: string, message: string): Diagnostic {

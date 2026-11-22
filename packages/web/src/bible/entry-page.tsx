@@ -1,6 +1,6 @@
 import type { EntityFields, Reference } from "@writer/client";
 import { referenceText } from "./references.ts";
-import { entityOfLabel, roleOf, vocabulary, type Entity, type Book, type Relationship } from "@writer/core";
+import { entityOfLabel, roleOf, vocabulary, type Entity, type Book, type FieldValue, type Relationship } from "@writer/core";
 import { useGitHubRepo } from "../github/repo.ts";
 import { EntryIssues } from "../issues/entry-issues.tsx";
 import { useIssueList } from "../issues/use-issues.ts";
@@ -30,7 +30,6 @@ import { TypeSections } from "./type-sections.tsx";
 import { mentionEntities, typeOf } from "./types.ts";
 
 
-type FieldValue = string | number | boolean;
 
 /**
  * A bible entry as a profile (heffrey78/gh-writer#158), read first: its type, tags, name and other names, a portrait,
@@ -252,8 +251,9 @@ export function EntryPage({
                 <FieldEditor place={place} name={key} value={value} others={fields.map(([k]) => k).filter((k) => k !== key)} onSave={(to) => change({ fields: withField(i, to) })} />
               ) : (
                 <>
-                  <span className="flex-1">{readField(value)}</span>
-                  <PencilButton place={place} part={`field:${key}`} label={key.replace(/_/g, " ")} />
+                  <span className="flex-1">{readField(value, novel)}</span>
+                  {/* A list of entries is edited from its picker (#163), not as a line of text. */}
+                  {!Array.isArray(value) && <PencilButton place={place} part={`field:${key}`} label={key.replace(/_/g, " ")} />}
                 </>
               )
             }

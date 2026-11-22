@@ -4,7 +4,7 @@ name: The Natural History of Selborne
 aliases: [Selborne]
 summary: Letters to Thomas Pennant and Daines Barrington on the natural history of a Hampshire parish.
 fields:
-  author: Gilbert White
+  author: per_wh1te0
   year: 1789
   place: London
 ---

@@ -27,10 +27,25 @@ export const nonfiction: BookKind = {
   },
   folders: { content: "text", codex: "index", notes: "notes" },
   entityTypes: [
-    { key: "source", prefix: "src", folder: "sources", label: "Source", color: "8c564b", builtin: true },
-    { key: "person", prefix: "per", folder: "people", label: "Person", plural: "People", color: "1f77b4", builtin: true, is: "person" },
+    {
+      key: "source",
+      prefix: "src",
+      folder: "sources",
+      label: "Source",
+      color: "8c564b",
+      builtin: true,
+      // The citations module's details (author, year, publisher, place, url); an author written as text still cites.
+      fields: [
+        { key: "author", holds: "entry", type: "person", card: true },
+        { key: "year", holds: "number", card: true },
+        { key: "publisher", holds: "text" },
+        { key: "place", holds: "text" },
+        { key: "url", label: "URL", holds: "text" },
+      ],
+    },
+    { key: "person", prefix: "per", folder: "people", label: "Person", plural: "People", color: "1f77b4", builtin: true, is: "person", fields: [{ key: "role", holds: "text", card: true }] },
     { key: "concept", prefix: "con", folder: "concepts", label: "Concept", color: "9467bd", builtin: true },
-    { key: "claim", prefix: "clm", folder: "claims", label: "Claim", color: "d62728", builtin: true },
+    { key: "claim", prefix: "clm", folder: "claims", label: "Claim", color: "d62728", builtin: true, fields: [{ key: "status", holds: "choice", options: ["supported", "disputed", "unchecked"], card: true }] },
   ],
   statuses: [
     { key: "outline", label: "Outline", description: "Its points, not yet written out", color: "GRAY" },

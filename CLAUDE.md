@@ -14,7 +14,7 @@ The plan lives in this repository's issues (see *Project tracking*); `get_status
 4. The Journal kind, the first proof of the base (#5). Done.
 5. Roadmap: Non-fiction (#7) and Android (#8, D16 #12) are done. Campaign (#6) is built and waits on its game master. Dictation (#71–#76, D17 #77) works on Linux and Android; Windows and macOS wait on signed apps (#74). Other languages (#92) are a draft.
 
-D13–D15 are accepted (2026-10-18), D16 (2026-10-21, amended from its spike: docs/architecture/d16-spike.md), D17 (2026-10-24; its spike, #78, amends it with the engine and model) and D19 (2026-11-22: "Not a name here" kept in files of the index's own). D18 is proposed. Don't build on a proposed decision as if it were settled, and point it out when work depends on one.
+D13–D15 are accepted (2026-10-18), D16 (2026-10-21, amended from its spike: docs/architecture/d16-spike.md), D17 (2026-10-24; its spike, #78, amends it with the engine and model), and D18 and D19 (2026-11-22: a type's fields declared in the manifest, values in an entry's `fields:`, changes in its file; "Not a name here" kept in files of the index's own). Don't build on a proposed decision as if it were settled, and point it out when work depends on one.
 
 ## gh-writer is the reference
 

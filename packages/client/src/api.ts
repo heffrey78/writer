@@ -257,7 +257,7 @@ export interface EntityFields {
   summary?: string | null;
   image?: string | null;
   image_focus?: [number, number] | null;
-  fields?: Record<string, string | number | boolean>;
+  fields?: Record<string, string | number | boolean | readonly string[]>;
   tags?: string[];
 }
 
@@ -285,7 +285,8 @@ export interface RelationshipFields {
 export type Reference =
   | { kind: "scene"; id: string; title: string; via: string[] }
   | { kind: "relationship"; id: string; type: string; other: string }
-  | { kind: "entity"; id: string; title: string }
+  /** An entry naming it in one of its fields (D18): `field` is that field's label. */
+  | { kind: "entity"; id: string; title: string; field?: string }
   | { kind: "note"; id: string; title: string }
   /** A module's record, by its type's key: an off-page event, "event". */
   | { kind: string & {}; id: string; title: string };

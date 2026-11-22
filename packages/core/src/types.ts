@@ -1,4 +1,5 @@
 import type { SidebarFile } from "./sidebar.ts";
+import type { EntryFieldDef } from "./ids.ts";
 
 // File shapes of the v1 novel repository format, mirroring packages/core/schemas.
 // Keep these in sync with the JSON Schemas; test/schemas.test.ts checks the examples.
@@ -20,6 +21,8 @@ export interface NovelFile {
   /** The length to reach, by when, and the words a day aimed for. */
   target?: { words?: number; date?: string; daily?: number };
   entity_types?: CustomEntityTypeFile[];
+  /** Format 3: the fields of the kind's types, by type key, in place of the kind's (D18). */
+  entity_fields?: Record<string, EntryFieldDef[]>;
   relationship_types?: RelationshipTypeFile[];
   calendar?: { start?: string };
   /** How long a plotline may go unmentioned before the swimlanes show a gap. */
@@ -34,6 +37,8 @@ export interface CustomEntityTypeFile {
   folder: string;
   label?: string;
   color?: string;
+  /** Format 3: its entries' fields, in order (D18). */
+  fields?: EntryFieldDef[];
 }
 
 export interface RelationshipTypeFile {
@@ -99,7 +104,8 @@ export interface EntityFrontMatter {
   image?: string;
   /** Where thumbnails of the image centre: x and y, fractions of its width and height. */
   image_focus?: [number, number];
-  fields?: Record<string, string | number | boolean>;
+  /** A list of IDs (an entries field) in a format 3 book only (D18). */
+  fields?: Record<string, string | number | boolean | string[]>;
   tags?: string[];
 }
 

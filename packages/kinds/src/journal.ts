@@ -26,7 +26,22 @@ export const journal: BookKind = {
   },
   folders: { content: "entries", codex: "index", notes: "notes" },
   entityTypes: [
-    { key: "person", prefix: "per", folder: "people", label: "Person", plural: "People", color: "1f77b4", builtin: true, is: "person", formerPrefixes: ["char"] },
+    {
+      key: "person",
+      prefix: "per",
+      folder: "people",
+      label: "Person",
+      plural: "People",
+      color: "1f77b4",
+      builtin: true,
+      is: "person",
+      formerPrefixes: ["char"],
+      fields: [
+        { key: "how_we_met", label: "How we met", holds: "long-text" },
+        { key: "birthday", holds: "time", card: true },
+        { key: "home", holds: "entry", type: "place", card: true, changes: true },
+      ],
+    },
     { key: "place", prefix: "pl", folder: "places", label: "Place", color: "2ca02c", builtin: true, is: "place", formerPrefixes: ["loc"] },
     { key: "event", prefix: "ev", folder: "events", label: "Event", color: "ff7f0e", builtin: true },
     { key: "value", prefix: "val", folder: "values", label: "Value", color: "9467bd", builtin: true, formerPrefixes: ["theme"] },

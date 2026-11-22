@@ -2,6 +2,7 @@ import type { EntryPresence } from "./entry-presence.ts";
 import type { BookKind } from "./kinds.ts";
 import type { Book, Entity, Piece } from "./model.ts";
 import { proseText } from "./words.ts";
+import { fieldText } from "./entry-fields.ts";
 
 /*
  * Finding entries in the index (#134): by anything an entry says, saying where each matched, and
@@ -68,12 +69,12 @@ interface Part {
   long?: boolean;
 }
 
-function parts(entity: Entity): Part[] {
+function parts(entity: Entity, book: Pick<Book, "entities"> | undefined): Part[] {
   return [
     { where: "name", text: entity.name },
     ...entity.aliases.map((a): Part => ({ where: "alias", text: a })),
     ...(entity.summary ? [{ where: "summary", text: entity.summary, long: true } as Part] : []),
-    ...Object.entries(entity.fields).map(([k, v]): Part => ({ where: "field", text: `${k.replace(/_/g, " ")}: ${String(v)}` })),
+    ...Object.entries(entity.fields).map(([k, v]): Part => ({ where: "field", text: `${k.replace(/_/g, " ")}: ${fieldText(book ?? { entities: [] }, v)}` })),
     ...entity.tags.map((t): Part => ({ where: "tag", text: t })),
     ...(entity.body.trim() ? [{ where: "notes", text: notesText(entity.body), long: true } as Part] : []),
   ];
@@ -124,12 +125,13 @@ function excerpt(text: string, [start, end]: [number, number], words = 8): { tex
 /** Each entry's parts and their folded text, worked out once per entry as loaded: a search runs on every keystroke. */
 const partsCache = new WeakMap<Entity, { all: Part[]; folded: string[] }>();
 
-export function matchEntry(entity: Entity, query: string, { around = 8 }: { around?: number } = {}): EntryMatch | undefined {
+/** `book` reads a field naming an entry by that entry's name: an NPC is found by its faction's. */
+export function matchEntry(entity: Entity, query: string, { around = 8, book }: { around?: number; book?: Pick<Book, "entities"> } = {}): EntryMatch | undefined {
   const terms = searchTerms(query);
   if (!terms.length) return { entity, where: "name", rank: 0 };
   let cached = partsCache.get(entity);
   if (!cached) {
-    const all = parts(entity);
+    const all = parts(entity, book);
     partsCache.set(entity, (cached = { all, folded: all.map((p) => searchable(p.text)) }));
   }
   const { all, folded } = cached;
@@ -194,7 +196,9 @@ export function filterEntries(book: Book, entities: readonly Entity[], filters: 
     }
     if (filters.field) {
       const v = e.fields[filters.field.key];
-      if (v === undefined || searchable(String(v)) !== searchable(filters.field.value.trim())) return false;
+      const wanted = searchable(filters.field.value.trim());
+      // A list (an entries field) matches when any of its entries is the one wanted.
+      if (v === undefined || !(Array.isArray(v) ? v : [v]).some((x) => searchable(String(x)) === wanted)) return false;
     }
     const p = presences.get(e.id);
     if (filters.absent && (p?.count ?? 0) > 0) return false;

@@ -1,6 +1,7 @@
 import {
   backlinks,
   editFrontMatter,
+  fieldLabel,
   editYaml,
   mentionsOf,
   proseText,
@@ -26,9 +27,21 @@ import {
 import { parse, stringify } from "yaml";
 import { hashText, IMAGES_DIR, MAX_IMAGE_BYTES, sniffImage } from "./files.ts";
 import type { ManuscriptOperations } from "./manuscript.ts";
-import { migrateNovel, migrationWrites, overlay } from "./migrate.ts";
+import { migrateNovel, migrationWrites, overlay, toolWrites } from "./migrate.ts";
 import { OperationError, transaction, type FileWrite, type OperationResult } from "./operations.ts";
 import { bookSource, filesPort } from "./ports.ts";
+
+/**
+ * A list in an entry's fields (an entries field, D18) is format 3's: never written into a gh-writer novel,
+ * which gh-writer reads. Written into a format 3 book, it goes with the book's tools brought up to date
+ * (none when they are), so its validator reads it.
+ */
+async function listWrites(root: string, novel: Book, fields: EntityFields["fields"]): Promise<FileWrite[]> {
+  const list = Object.entries(fields ?? {}).find(([, v]) => Array.isArray(v));
+  if (!list) return [];
+  if (novel.manifest !== MANIFEST) throw new OperationError("NEEDS_MIGRATION", `“${list[0]}” holds a list, which this book's format can't keep: move it to the new format first.`);
+  return toolWrites(root);
+}
 
 /** What an entity's front matter holds, apart from its ID. */
 export interface EntityFields {
@@ -37,7 +50,7 @@ export interface EntityFields {
   summary?: string | null;
   image?: string | null;
   image_focus?: [number, number] | null;
-  fields?: Record<string, string | number | boolean>;
+  fields?: Record<string, string | number | boolean | readonly string[]>;
   tags?: string[];
 }
 
@@ -119,6 +132,7 @@ export class BibleOperations {
       const def = novel.entityTypes.find((t) => t.key === type);
       if (!def) throw new OperationError("BAD_REQUEST", `No entity type “${type}”.`);
       const name = required(fields.name, "name");
+      const tools = await listWrites(this.root, novel, fields.fields);
       const ids = new Set(indexById(novel).keys());
       if (wanted !== undefined) {
         const made = novel.entities.find((e) => e.id === wanted);
@@ -131,7 +145,7 @@ export class BibleOperations {
       const file = `${folder}/${uniqueFileName(slugify(name), ".md", taken)}`;
       const front = stringify({ id, ...clean({ ...fields, name }) }, { lineWidth: 0 });
       const content = `---\n${front}---\n${notes ? `\n${notes.trimEnd()}\n` : ""}`;
-      const result = await transaction(this.root, [{ path: file, content, base: null }], `${codex(novel)}: add ${name}`);
+      const result = await transaction(this.root, [{ path: file, content, base: null }, ...tools], `${codex(novel)}: add ${name}`);
       return { ...result, id, file };
     });
   }
@@ -144,6 +158,7 @@ export class BibleOperations {
       const text = await this.#read(entity.file);
       if (hashText(text) !== base) throw new OperationError("STALE", `“${entity.name}” changed since it was read.`, { path: entity.file });
       if (changes.name !== undefined) required(changes.name, "name");
+      const tools = await listWrites(this.root, novel, changes.fields);
       const edits = Object.entries(changes).map(([key, value]) => (value === null ? { path: [key], remove: true as const } : { path: [key], value }));
       const content = editFrontMatter(text, edits);
       let file = entity.file;
@@ -158,6 +173,7 @@ export class BibleOperations {
         }
       }
       if (!writes.length) writes.push({ path: entity.file, content, base });
+      writes.push(...tools);
       const message = changes.name && changes.name !== entity.name ? `${codex(novel)}: rename ${entity.name} to ${changes.name}` : `${codex(novel)}: edit ${entity.name}`;
       return { ...(await transaction(this.root, writes, message)), file };
     });
@@ -176,6 +192,7 @@ export class BibleOperations {
         ...links.scenes.map((s) => ({ kind: "scene", id: s.scene.id, title: s.scene.title, via: s.via })),
         ...links.relationships.map((r) => ({ kind: "relationship", id: r.id, type: r.type, other: r.from === id ? r.to : r.from })),
         ...links.records.map((r) => ({ kind: r.type, id: r.id, title: r.title })),
+        ...links.entries.map(({ entry, field }) => ({ kind: "entity", id: entry.id, title: entry.name, field: fieldLabel(field) })),
         ...mentionsOf(novel, id).filter((r) => r.kind === "note"),
       ];
       if (references.length && !confirm) {

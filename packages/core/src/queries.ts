@@ -1,5 +1,7 @@
+import { entriesNaming } from "./entry-fields.ts";
 import { carryingField, entryIds, roleOf } from "./fields.ts";
-import { mentions, pieceById, type Note, type Book, type ModuleRecord, type Relationship, type Piece } from "./model.ts";
+import type { EntryFieldDef } from "./ids.ts";
+import { mentions, pieceById, type Note, type Book, type Entity, type ModuleRecord, type Relationship, type Piece } from "./model.ts";
 import { recordType, recordTypesOf } from "./modules.ts";
 
 /** How a scene refers to an entity: by a field of its kind, by key ("pov", "characters"), or a mention in its prose. */
@@ -12,6 +14,8 @@ export interface Backlinks {
   relationships: Relationship[];
   /** The modules' records that name it in their fields: off-page events it's part of. */
   records: ModuleRecord[];
+  /** Entries whose declared fields name it (D18): the NPCs of a faction, the people living in a place. */
+  entries: { entry: Entity; field: EntryFieldDef }[];
 }
 
 /** Everywhere an entity is referred to: scene front matter, mentions in prose, relationships, the modules' records. */
@@ -27,6 +31,7 @@ export function backlinks(novel: Book, id: string): Backlinks {
     scenes,
     relationships: novel.relationships.filter((r) => r.from === id || r.to === id),
     records: recordsNaming(novel, id),
+    entries: entriesNaming(novel, id),
   };
 }
 

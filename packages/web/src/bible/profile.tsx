@@ -1,3 +1,4 @@
+import { fieldText, type Book, type FieldValue } from "@writer/core";
 import { Pencil, Plus } from "lucide-react";
 import { createContext, useContext, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { Button } from "../ui/button.tsx";
@@ -267,18 +268,19 @@ export function Lead({ children, size = "page" }: { children: ReactNode; size?: 
   return <p className={cn("font-prose leading-normal", size === "page" ? "text-lg" : size === "tab" ? "text-base" : "text-[15px]")}>{children}</p>;
 }
 
-/** An entry's fields as rows of name and value; `value` can put an editor (or pencil) in a row. */
-export function FieldRows({ fields, value, compact }: { fields: [string, string | number | boolean][]; value?: (key: string, v: string | number | boolean, i: number) => ReactNode; compact?: boolean }) {
+/** An entry's fields as rows of name and value; `value` can put an editor (or pencil) in a row, and `names` reads an entry's ID as its name. */
+export function FieldRows({ fields, value, compact, names }: { fields: [string, FieldValue][]; value?: (key: string, v: FieldValue, i: number) => ReactNode; compact?: boolean; names?: Pick<Book, "entities"> }) {
   return (
     <dl aria-label="Fields" className="grid gap-0.5">
       {fields.map(([key, v], i) => (
         <div key={key} className={cn("group -mx-1.5 flex items-baseline gap-2.5 rounded-md px-1.5", compact ? "py-0.5" : "py-1")}>
           <dt className={cn("shrink-0 text-[13px] text-muted capitalize", compact ? "w-24" : "w-32")}>{key.replace(/_/g, " ")}</dt>
-          <dd className="flex min-w-0 flex-1 items-baseline gap-1">{value ? value(key, v, i) : <span className="flex-1">{readField(v)}</span>}</dd>
+          <dd className="flex min-w-0 flex-1 items-baseline gap-1">{value ? value(key, v, i) : <span className="flex-1">{readField(v, names)}</span>}</dd>
         </div>
       ))}
     </dl>
   );
 }
 
-export const readField = (v: string | number | boolean) => (typeof v === "boolean" ? (v ? "Yes" : "No") : String(v));
+/** A field's value as it reads: Yes or No, and, given the book, an entry's ID (or a list of them) as names. */
+export const readField = (v: FieldValue, names?: Pick<Book, "entities">) => fieldText(names ?? { entities: [] }, v);

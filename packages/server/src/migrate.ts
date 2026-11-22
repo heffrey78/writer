@@ -51,8 +51,11 @@ export function overlay(base: FileSource, writes: FileWrite[]): FileSource {
   };
 }
 
-/** The template's tools that differ from the novel's, for a novel that carries tools at all. */
-async function toolWrites(root: string, templateDir: string): Promise<FileWrite[]> {
+/**
+ * The template's tools that differ from the novel's, for a novel that carries tools at all: written by a
+ * migration, and before a book's first field declaration or list of entries (D18), so its Action reads them.
+ */
+export async function toolWrites(root: string, templateDir = templateOf("novel")): Promise<FileWrite[]> {
   const files = filesPort();
   const theirs = await filesUnder(files.join(root, TOOLS_DIR));
   if (!theirs.length) return [];

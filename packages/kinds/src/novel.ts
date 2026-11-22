@@ -23,8 +23,35 @@ export const novel: BookKind = {
   // On a phone, after the manuscript: its outline, the notes and the story bible.
   bar: ["outline", "notes", "index"],
   entityTypes: [
-    { key: "character", prefix: "char", folder: "characters", label: "Character", color: "1f77b4", builtin: true, is: "person" },
-    { key: "location", prefix: "loc", folder: "locations", label: "Location", color: "2ca02c", builtin: true, is: "place" },
+    {
+      key: "character",
+      prefix: "char",
+      folder: "characters",
+      label: "Character",
+      color: "1f77b4",
+      builtin: true,
+      is: "person",
+      fields: [
+        { key: "age", holds: "number", card: true },
+        { key: "occupation", holds: "text", card: true },
+        { key: "appearance", holds: "long-text" },
+        { key: "wants", holds: "long-text" },
+        { key: "fears", holds: "long-text" },
+      ],
+    },
+    {
+      key: "location",
+      prefix: "loc",
+      folder: "locations",
+      label: "Location",
+      color: "2ca02c",
+      builtin: true,
+      is: "place",
+      fields: [
+        { key: "region", holds: "text", card: true },
+        { key: "kind_of_place", holds: "text", card: true },
+      ],
+    },
     { key: "theme", prefix: "theme", folder: "themes", label: "Theme", color: "9467bd", builtin: true },
   ],
   statuses: [

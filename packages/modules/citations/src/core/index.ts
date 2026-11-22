@@ -1,4 +1,4 @@
-import { defineModule, entriesOf, type Book, type BookModule, type Entity, type Matter, type Piece, type Run } from "@writer/core";
+import { defineModule, entriesOf, fieldText, type Book, type BookModule, type Entity, type Matter, type Piece, type Run } from "@writer/core";
 
 /*
  * Citations (D14, #59): a book's sources, cited from its footnotes. A source is an index entry of the
@@ -27,11 +27,14 @@ export interface SourceDetails {
   url?: string;
 }
 
-/** A source's details from its entry: its name, aliases and fields. */
-export function sourceDetails(entity: Entity): SourceDetails {
+/**
+ * A source's details from its entry: its name, aliases and fields. An author named as a person in the
+ * index (D18) reads as that person's name; written as text, as written.
+ */
+export function sourceDetails(entity: Entity, book: Pick<Book, "entities"> = { entities: [] }): SourceDetails {
   const field = (key: string) => {
     const found = Object.entries(entity.fields).find(([k]) => k.toLowerCase() === key);
-    const value = found ? String(found[1]).trim() : "";
+    const value = found ? fieldText(book, found[1], " and ").trim() : "";
     return value || undefined;
   };
   const details: SourceDetails = { title: entity.name, shortTitle: entity.aliases[0] ?? entity.name };
@@ -60,14 +63,14 @@ function inverted(author: string): string {
 }
 
 /** How a source reads where a note cites it: "Darwin, Vegetable Mould", or its short title alone. */
-export function shortCitation(entity: Entity): string {
-  const d = sourceDetails(entity);
+export function shortCitation(entity: Entity, book?: Pick<Book, "entities">): string {
+  const d = sourceDetails(entity, book);
   return d.author ? `${surname(d.author)}, ${d.shortTitle}` : d.shortTitle;
 }
 
 /** A source's line in the bibliography, its title in italics: "Darwin, Charles. *Title*. London: John Murray, 1881. https://…" */
-export function bibliographyEntry(entity: Entity): Run[] {
-  const d = sourceDetails(entity);
+export function bibliographyEntry(entity: Entity, book?: Pick<Book, "entities">): Run[] {
+  const d = sourceDetails(entity, book);
   const end = (s: string) => (/[.!?]$/.test(s) ? s : `${s}.`);
   const imprint = [d.place && d.publisher ? `${d.place}: ${d.publisher}` : (d.publisher ?? d.place), d.year].filter(Boolean).join(", ");
   const runs: Run[] = [];
@@ -87,18 +90,18 @@ export function bibliography(book: Book, drawn: { pieces: readonly Piece[]; ment
   const sources = book.entities.filter((e) => e.type === SOURCE && ids.has(e.id));
   if (!sources.length) return [];
   const key = (e: Entity) => {
-    const d = sourceDetails(e);
+    const d = sourceDetails(e, book);
     return `${(d.author ? surname(d.author) : d.title).toLowerCase()}\u0000${d.title.toLowerCase()}`;
   };
   sources.sort((a, b) => (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0));
-  return [{ title: "Bibliography", blocks: sources.map((e) => ({ kind: "paragraph" as const, runs: bibliographyEntry(e) })) }];
+  return [{ title: "Bibliography", blocks: sources.map((e) => ({ kind: "paragraph" as const, runs: bibliographyEntry(e, book) })) }];
 }
 
 export const citations: BookModule = defineModule({
   id: "citations",
   label: "Citations",
   compile: {
-    noteMention: (_, entity) => (entity.type === SOURCE ? shortCitation(entity) : undefined),
+    noteMention: (book, entity) => (entity.type === SOURCE ? shortCitation(entity, book) : undefined),
     back: bibliography,
   },
 });

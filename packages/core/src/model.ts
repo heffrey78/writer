@@ -90,6 +90,9 @@ export interface Piece {
   file: string;
 }
 
+/** A value in an entry's `fields:`: text, a number, yes/no, or (format 3: an entries field) a list of IDs. */
+export type FieldValue = string | number | boolean | readonly string[];
+
 export interface Entity {
   id: string;
   /** Entity type key, e.g. "character". */
@@ -101,7 +104,8 @@ export interface Entity {
   image?: string;
   /** Where thumbnails of the picture centre: x and y, fractions of its width and height. */
   imageFocus?: [number, number];
-  fields: Record<string, string | number | boolean>;
+  /** Its fields, by key: those its type declares and any of its own (D18). */
+  fields: Record<string, FieldValue>;
   tags: string[];
   body: string;
   bodyLine: number;

@@ -1,0 +1,104 @@
+import { isId, type EntryFieldDef, type FieldHolds } from "./ids.ts";
+import type { Book, Entity, FieldValue } from "./model.ts";
+
+/*
+ * An entry's fields as its type declares them (D18, #138): what each holds, the entries a value names,
+ * and how a value reads. Fields an entry has that its type doesn't declare are read as before: a
+ * string, a number or yes/no (or, in a format 3 book, a list of IDs).
+ */
+
+export type { FieldValue };
+
+/** What a field may hold, in the order a type's Fields dialog offers them. */
+export const HOLDS: readonly FieldHolds[] = ["text", "long-text", "number", "yes-no", "choice", "entry", "entries", "time"];
+
+/** A field's label: its own, else its key in words ("kind_of_place" → "Kind of place"). */
+export function fieldLabel(f: Pick<EntryFieldDef, "key" | "label">): string {
+  if (f.label) return f.label;
+  const words = f.key.replace(/_/g, " ");
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/** The fields a type declares, in order: the book's, else its kind's; none for a type that has none. */
+export function fieldsOfType(book: Pick<Book, "entityTypes">, type: string): readonly EntryFieldDef[] {
+  return book.entityTypes.find((t) => t.key === type)?.fields ?? [];
+}
+
+/** The entries a value names, as a field holding entries reads it: one ID, or a list of them. */
+export function idsIn(value: FieldValue | undefined): string[] {
+  if (typeof value === "string") return isId(value) ? [value] : [];
+  return Array.isArray(value) ? value.filter(isId) : [];
+}
+
+/** The entries an entry's declared fields name, field by field: its faction, its home, a source's author. */
+export function entriesNamedBy(book: Pick<Book, "entityTypes">, entry: Entity): { field: EntryFieldDef; ids: string[] }[] {
+  return fieldsOfType(book, entry.type).flatMap((f) => {
+    if (f.holds !== "entry" && f.holds !== "entries") return [];
+    const ids = idsIn(entry.fields[f.key]);
+    return ids.length ? [{ field: f, ids }] : [];
+  });
+}
+
+/** The entries whose declared fields name `id`, with which field: who lives at a place, whose faction it is. */
+export function entriesNaming(book: Pick<Book, "entityTypes" | "entities">, id: string): { entry: Entity; field: EntryFieldDef }[] {
+  return book.entities.flatMap((entry) => entriesNamedBy(book, entry).flatMap(({ field, ids }) => (ids.includes(id) ? [{ entry, field }] : [])));
+}
+
+/** How a value reads: an entry's ID as its name, a list as names joined, yes/no as Yes or No. */
+export function fieldText(book: Pick<Book, "entities">, value: FieldValue, join = ", "): string {
+  const name = (v: string) => (isId(v) ? (book.entities.find((e) => e.id === v)?.name ?? v) : v);
+  if (Array.isArray(value)) return value.map(name).join(join);
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  return typeof value === "string" ? name(value) : String(value);
+}
+
+/**
+ * What a card says of an entry's fields at a glance, as text: the values of those its type shows on
+ * cards, else of its first two; none that's empty or yes/no.
+ */
+export function cardFields(book: Pick<Book, "entities" | "entityTypes">, entity: Entity): string[] {
+  const onCards = fieldsOfType(book, entity.type).filter((f) => f.card);
+  const values = onCards.length ? onCards.flatMap((f) => (entity.fields[f.key] === undefined ? [] : [entity.fields[f.key]!])) : Object.values(entity.fields).slice(0, 2);
+  return values.flatMap((v) => (typeof v === "boolean" || v === "" || (Array.isArray(v) && !v.length) ? [] : [fieldText(book, v)])).slice(0, 2);
+}
+
+/** Whether a value is what its field holds; a choice's, one of its options. (Whether a named entry exists is a reference's check.) */
+export function holdsValue(f: EntryFieldDef, value: FieldValue): boolean {
+  switch (f.holds) {
+    case "number":
+      return typeof value === "number";
+    case "yes-no":
+      return typeof value === "boolean";
+    case "choice":
+      return typeof value === "string" && (f.options ?? []).includes(value);
+    case "entry":
+      return typeof value === "string" && isId(value);
+    case "entries":
+      return Array.isArray(value) && value.every(isId);
+    default:
+      return typeof value === "string";
+  }
+}
+
+/** What a field holds, in words, for a message: "a number", "one of alive, dead, missing or unknown", "a faction". */
+export function holdsText(f: EntryFieldDef, typeLabel: (key: string) => string | undefined): string {
+  const of = f.type ? typeLabel(f.type)?.toLowerCase() : undefined;
+  switch (f.holds) {
+    case "number":
+      return "a number";
+    case "yes-no":
+      return "yes or no (true or false)";
+    case "choice": {
+      const o = f.options ?? [];
+      return o.length > 1 ? `one of ${o.slice(0, -1).join(", ")} or ${o.at(-1)}` : `“${o[0] ?? ""}”`;
+    }
+    case "entry":
+      return of ? `the ID of ${/^[aeiou]/.test(of) ? "an" : "a"} ${of}` : "an entry's ID";
+    case "entries":
+      return of ? `a list of IDs of ${of} entries` : "a list of entries' IDs";
+    case "time":
+      return "a time, as text";
+    default:
+      return "text";
+  }
+}
