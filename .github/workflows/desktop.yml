@@ -266,7 +266,7 @@ jobs:
   test-builds:
     name: The "Desktop (test builds)" pre-release
     if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
-    needs: [windows, macos]
+    needs: [smoke-deb, smoke-arch, windows, macos]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -281,10 +281,16 @@ jobs:
         run: |
           cp artifacts/windows/*-setup.exe writer-windows-setup.exe
           cp artifacts/macos/*.dmg writer-macos-apple-silicon.dmg
+          cp artifacts/deb/*.deb writer-linux-amd64.deb
+          cp artifacts/arch/*.pkg.tar.zst writer-arch-x86_64.pkg.tar.zst
           gh api -X PATCH "repos/$GH_REPO/git/refs/tags/desktop-test-builds" -f sha="$GITHUB_SHA" -F force=true > /dev/null 2>&1 \
             || gh api "repos/$GH_REPO/git/refs" -f ref=refs/tags/desktop-test-builds -f sha="$GITHUB_SHA" > /dev/null
           cat > notes.md <<NOTES
-          Unsigned test builds of Writer's desktop app, from ${GITHUB_SHA::7}, built and smoke-tested on GitHub's Windows and Apple-silicon Mac runners. Not for everyone yet: signing comes with #88 and #89.
+          Unsigned test builds of Writer's desktop app, from ${GITHUB_SHA::7}, built and smoke-tested on GitHub's Linux, Windows and Apple-silicon Mac runners. Not for everyone yet: signing comes with #88 and #89.
+
+          **Ubuntu, Debian and others with .deb** (writer-linux-amd64.deb): \`sudo apt install ./writer-linux-amd64.deb\`. Ubuntu 22.04 or newer.
+
+          **Arch and its derivatives** (writer-arch-x86_64.pkg.tar.zst): \`sudo pacman -U writer-arch-x86_64.pkg.tar.zst\`.
 
           **Windows** (writer-windows-setup.exe): SmartScreen warns about an unknown publisher. Choose More info, then Run anyway. It installs for you alone, with nothing else needed.
 
@@ -297,7 +303,7 @@ jobs:
           else
             gh release create desktop-test-builds --prerelease --verify-tag --title "Desktop (test builds)" --notes-file notes.md
           fi
-          gh release upload desktop-test-builds writer-windows-setup.exe writer-macos-apple-silicon.dmg --clobber
+          gh release upload desktop-test-builds writer-linux-amd64.deb writer-arch-x86_64.pkg.tar.zst writer-windows-setup.exe writer-macos-apple-silicon.dmg --clobber
 
   release:
     name: Draft the release
