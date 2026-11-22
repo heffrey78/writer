@@ -22,6 +22,7 @@ import { Picture, PictureSlot, usePictureUrl } from "./picture.tsx";
 import { pictureAlt, shapeForType } from "./pictures.ts";
 import { AddButton, Lead, PencilButton, TextEditor, useInPlace } from "./profile.tsx";
 import { EntryFields, NamedBy } from "./entry-fields.tsx";
+import { useCurrentScene } from "../novel/current.ts";
 import { RelationshipArcs } from "./arcs.tsx";
 import { NotesAbout } from "../notes/notes-about.tsx";
 import { InTheStory } from "./strip.tsx";
@@ -78,6 +79,13 @@ export function EntryPage({
   const passages = usePassages(novel, entity.id);
   const relationships = novel.relationships.filter((r) => r.from === entity.id || r.to === entity.id).length;
   const place = useInPlace(startEditing);
+  // Read at one piece (#140): its fields and its relationships as they are there. Beside the text, the
+  // piece being written; in the index, the whole book.
+  const writing = useCurrentScene((s) => s.scene?.id);
+  const [readAt, setReadAt] = useState<string | undefined>(() => (tab ? writing : undefined));
+  useEffect(() => {
+    if (tab && writing) setReadAt(writing);
+  }, [tab, writing]);
   const shape = shapeForType(entity.type);
   const picture = usePictureUrl(novelId, entity.image);
 
@@ -233,7 +241,7 @@ export function EntryPage({
         </AddButton>
       )}
 
-      <EntryFields novelId={novelId} novel={novel} entity={entity} place={place} change={(fields) => change({ fields })} compact={tab} />
+      <EntryFields novelId={novelId} novel={novel} entity={entity} place={place} save={change} compact={tab} at={readAt} onAt={setReadAt} />
       <NamedBy novelId={novelId} novel={novel} entity={entity} compact={tab} />
 
       {!tab && (
@@ -280,7 +288,7 @@ export function EntryPage({
       <NotesAbout novelId={novelId} novel={novel} id={entity.id} />
       {!tab && <TypeSections novelId={novelId} novel={novel} entity={entity} workspace={workspace} />}
 
-      <RelationshipArcs novelId={novelId} novel={novel} entity={entity} compact={tab} id={part("relationships")} />
+      <RelationshipArcs novelId={novelId} novel={novel} entity={entity} compact={tab} id={part("relationships")} readAt={readAt} onReadAt={setReadAt} />
       {tab && (
         <Link to={`/novels/${novelId}/bible/${entity.id}`} className="justify-self-start text-sm text-accent underline decoration-accent/35 underline-offset-[3px] hover:decoration-accent">
           Open the full {vocabulary(novel.kind).entity.one}

@@ -38,9 +38,9 @@ export function initials(name: string): string {
  * What a card says of an entry at a glance: the values of the fields its type shows on cards (D18), else
  * its first two fields', or its other names. An entry it names reads as that entry's name.
  */
-export function cardFacts(entity: Entity, book: Pick<Book, "entities" | "entityTypes">): string[] {
+export function cardFacts(entity: Entity, book: Pick<Book, "entities" | "entityTypes" | "pieces">, at?: string): string[] {
   return [
-    ...cardFields(book, entity),
+    ...cardFields(book, entity, at),
     ...(entity.aliases.length ? [`also ${entity.aliases.join(", ")}`] : []),
   ].slice(0, 2);
 }

@@ -1,4 +1,4 @@
-import { carryingField, entryPresence, recordTypesOf, roleOf, vocabulary, type BookKind, type Entity, type EntryPresence, type Book, type PresenceMark, type Vocabulary } from "@writer/core";
+import { carryingField, entryPresence, fieldLabel, fieldsAt, fieldsOfType, fieldText, recordTypesOf, roleOf, vocabulary, type BookKind, type Entity, type EntryPresence, type Book, type PresenceMark, type Vocabulary } from "@writer/core";
 import { useMemo, type CSSProperties, type ReactNode } from "react";
 import { Link } from "react-router";
 import { cn } from "../ui/cn.ts";
@@ -79,6 +79,27 @@ export function StripHeader({ presence }: { presence: EntryPresence }) {
   );
 }
 
+/**
+ * An entry's changing fields across the strip's pieces (#140): for each its type marks as changing that
+ * changes, or has a value, its runs of one value, as the fields read at each piece.
+ */
+function valueLanes(novel: Book, entity: Entity, presence: EntryPresence) {
+  const changing = fieldsOfType(novel, entity.type).filter((f) => f.changes && (entity.fields[f.key] !== undefined || entity.changes?.some((c) => c.field === f.key)));
+  if (!changing.length) return [];
+  const at = presence.scenes.map(({ scene }) => fieldsAt(novel, entity, scene.id).fields);
+  return changing.map((f) => {
+    const spans: { start: number; span: number; text: string }[] = [];
+    at.forEach((fields, i) => {
+      const v = fields[f.key];
+      const text = v === undefined ? "" : fieldText(novel, v);
+      const last = spans.at(-1);
+      if (last && last.text === text) last.span++;
+      else spans.push({ start: i, span: 1, text });
+    });
+    return { key: f.key, label: fieldLabel(f), spans };
+  });
+}
+
 /** Where an entry is across the book, and the facts that follow from it. */
 export function InTheStory({ novelId, novel, entity, compact, id }: { novelId: string; novel: Book; entity: Entity; compact?: boolean; id?: string }) {
   const presence = useMemo(() => entryPresence(novel, entity.id), [novel, entity.id]);
@@ -87,6 +108,7 @@ export function InTheStory({ novelId, novel, entity, compact, id }: { novelId: s
   const words = markWords(novel.kind, entity.type, w);
   const said = (mark: PresenceMark) => (mark === "absent" ? "not there" : words[mark] ?? words.present);
   const n = presence.scenes.length;
+  const lanes = valueLanes(novel, entity, presence);
 
   return (
     <ProfileSection title={`In the ${w.subject}`} {...(id ? { id } : {})}>
@@ -114,6 +136,30 @@ export function InTheStory({ novelId, novel, entity, compact, id }: { novelId: s
               })}
             </ol>
           </StripRow>
+          {/* Each changing field's values across the same pieces (#140), said in words for a screen reader. */}
+          {lanes.map((lane) => (
+            <StripRow key={lane.key} label={lane.label} columns={n} decorative>
+              {lane.spans.map((s) => (
+                <span
+                  key={s.start}
+                  title={s.text ? `${lane.label}: ${s.text}` : undefined}
+                  style={{ gridColumn: `${s.start + 1} / span ${s.span}` }}
+                  className={cn("truncate rounded-sm px-1 text-[11px] leading-4", s.text ? "bg-accent-soft text-ink" : "border border-dashed border-rule")}
+                >
+                  {s.text}
+                </span>
+              ))}
+            </StripRow>
+          ))}
+          {lanes.length > 0 && (
+            <ul aria-label="How its fields change" className="sr-only">
+              {lanes.map((lane) => (
+                <li key={lane.key}>
+                  {lane.label}: {lane.spans.map((s, i) => `${s.text || "nothing"} ${i === 0 ? "from the start" : `from “${presence.scenes[s.start]!.scene.title}”`}`).join(", ")}
+                </li>
+              ))}
+            </ul>
+          )}
           <span />
           <ul aria-label="Key" className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
             {(["carries", "present", "mentioned", "absent"] as const)

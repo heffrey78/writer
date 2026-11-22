@@ -28,7 +28,24 @@ type Lane = { r: Relationship; start: number; end: number }[];
 
 const BORDER = { solid: "solid", dashed: "dashed", dotted: "dotted" } as const;
 
-export function RelationshipArcs({ novelId, novel, entity, compact, id }: { novelId: string; novel: Book; entity: Entity; compact?: boolean; id?: string }) {
+export function RelationshipArcs({
+  novelId,
+  novel,
+  entity,
+  compact,
+  id,
+  readAt,
+  onReadAt,
+}: {
+  novelId: string;
+  novel: Book;
+  entity: Entity;
+  compact?: boolean;
+  id?: string;
+  /** The piece the whole profile is read at (#140): the marker follows it, and moving the marker reads the profile there. */
+  readAt?: string | undefined;
+  onReadAt?: (piece: string) => void;
+}) {
   /** The name column: narrower in the sidebar. */
   const cols = compact ? "grid-cols-[4.5rem_minmax(0,1fr)]" : "grid-cols-[6.5rem_minmax(0,1fr)]";
   const queryClient = useQueryClient();
@@ -41,6 +58,10 @@ export function RelationshipArcs({ novelId, novel, entity, compact, id }: { nove
     const i = novel.pieces.findIndex((s) => s.id === current?.id);
     if (i >= 0) setAt(i);
   }, [current?.id, novel]);
+  useEffect(() => {
+    const i = novel.pieces.findIndex((s) => s.id === readAt);
+    if (i >= 0) setAt(i);
+  }, [readAt, novel]);
   const [dialog, setDialog] = useState<{ kind: "add" } | { kind: "change" | "end" | "remove"; relationship: Relationship }>();
   // Focus goes back where the dialog was opened from: the relationship's bar, or Add a relationship when
   // the bar is gone (removed, or redrawn as a change split it). The dialogs have no trigger to go back to.
@@ -172,7 +193,10 @@ export function RelationshipArcs({ novelId, novel, entity, compact, id }: { nove
               <div role="radiogroup" aria-label={`Read the relationships at ${vocabulary(novel.kind).piece.a}`} className="grid gap-[3px]" style={{ gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))` }}>
                   {presence.scenes.map(({ scene: s }, i) => (
                     <label key={s.id} title={s.title} className={cn("flex cursor-pointer justify-center rounded-sm text-[11px] leading-4 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent", i === at ? "text-ink" : "text-rule hover:text-muted")}>
-                      <input type="radio" name={markerName} checked={i === at} onChange={() => setAt(i)} className="sr-only" />
+                      <input type="radio" name={markerName} checked={i === at} onChange={() => {
+                        setAt(i);
+                        onReadAt?.(s.id);
+                      }} className="sr-only" />
                       <span aria-hidden>▲</span>
                       <span className="sr-only">{s.title}</span>
                     </label>

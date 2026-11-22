@@ -1,4 +1,4 @@
-import { relationshipsAt, vocabulary, word, type Book, type Piece } from "@writer/core";
+import { fieldsAt, relationshipsAt, vocabulary, word, type Book, type Piece } from "@writer/core";
 import type { MentionTarget } from "@writer/editor";
 import type { Editor } from "@tiptap/core";
 import { X } from "lucide-react";
@@ -116,7 +116,8 @@ export function MentionCard({ novelId, novel }: { novelId: string; novel: Book }
   if (!card) return null;
   const type = entity && typeOf(novel, entity);
   const relationships = entity && card.scene ? relationshipsAt(novel, card.scene.id).filter((r) => r.from === entity.id || r.to === entity.id) : [];
-  const fields = entity ? Object.entries(entity.fields).slice(0, FIELDS) : [];
+  // As the entry is at the piece the card is in (#140): never a fact from later in the book.
+  const fields = entity ? Object.entries(fieldsAt(novel, entity, card.scene?.id).fields).slice(0, FIELDS) : [];
 
   return (
     <div

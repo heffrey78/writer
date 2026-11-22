@@ -228,6 +228,18 @@ describe("a value that changes at a piece (#140, #165)", () => {
     ]);
   });
 
+  it("reads a journal person's home at an entry by the entries' dates, their reading order", async () => {
+    const JOURNAL = files(sample("journal"));
+    const mira = Object.keys(JOURNAL).find((f) => f.startsWith("index/people/") && JOURNAL[f]!.includes("id: per_m1ra00"))!;
+    const source = memorySource({ ...JOURNAL, [mira]: JOURNAL[mira]!.replace(/\n---\n/, "\nfields:\n  home: pl_5p1t00\nchanges:\n  - field: home\n    value: pl_51v1ce\n    since: ent_03ctb0\n---\n") });
+    expect(await said(source)).toEqual([]);
+    const book = await loadBook(source);
+    const entry = book.entities.find((e) => e.id === "per_m1ra00")!;
+    const home = (at: string) => fieldText(book, fieldsAt(book, entry, at).fields["home"]!);
+    expect(book.pieces.map((p) => p.id)).toEqual(["ent_28sep0", "ent_30sep0", "ent_01ctb0", "ent_03ctb0", "ent_04ctb0"]);
+    expect(["ent_28sep0", "ent_01ctb0", "ent_03ctb0", "ent_04ctb0"].map(home)).toEqual(["The North Spit", "The North Spit", "The Old Sluice", "The Old Sluice"]);
+  });
+
   it("is format 3's: a novel in format 2 refuses one", async () => {
     const ada = "bible/characters/ada.md";
     const source = memorySource({ ...NOVEL, [ada]: NOVEL[ada]!.replace("tags:", "changes:\n  - field: age\n    value: 32\n    since: sc_5tat1n\ntags:") });

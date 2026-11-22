@@ -1,4 +1,4 @@
-import { entriesNaming, fieldLabel, fieldsOfType, fieldText, typePlural, uniqueId, vocabulary, type Book, type Entity, type EntryFieldDef, type FieldValue } from "@writer/core";
+import { entriesNaming, fieldLabel, fieldsAt, fieldsOfType, fieldText, typePlural, uniqueId, vocabulary, type Book, type Entity, type EntryFieldDef, type FieldChange, type FieldValue } from "@writer/core";
 import { X } from "lucide-react";
 import { useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { Link } from "react-router";
@@ -22,13 +22,37 @@ interface Props {
   novel: Book;
   entity: Entity;
   place: InPlace;
-  /** Save the entry's fields as they are to be: resolves once saved, throws to say why it couldn't be. */
-  change: (fields: Fields) => Promise<unknown>;
+  /** Save the entry's fields, or its changes at pieces, as they are to be: resolves once saved, throws to say why it couldn't be. */
+  save: (changes: { fields?: Fields; changes?: FieldChange[] | null }) => Promise<unknown>;
   compact?: boolean;
+  /** The piece the profile is read at (#140), or none: the whole book, each field's latest value. */
+  at: string | undefined;
+  onAt: (at: string | undefined) => void;
 }
 
-export function EntryFields({ novelId, novel, entity, place, change, compact }: Props) {
+export function EntryFields({ novelId, novel, entity, place, save, compact, at, onAt }: Props) {
+  const change = (fields: Fields) => save({ fields });
+  const w = vocabulary(novel.kind);
+  const readAtId = useId();
   const declared = fieldsOfType(novel, entity.type);
+  const reading = fieldsAt(novel, entity, at);
+  const changes = entity.changes ?? [];
+  const order = new Map(novel.pieces.map((p, i) => [p.id, i]));
+  const title = (id: string) => novel.allPieces.find((p) => p.id === id)?.title ?? id;
+  /** A field's changes in reading order (those from a piece not in it last). */
+  const changesOf = (key: string) => changes.filter((c) => c.field === key).sort((a, b) => (order.get(a.since) ?? Infinity) - (order.get(b.since) ?? Infinity));
+  /**
+   * A changing field's new value, as the profile is read: at a piece, from that piece on; over the whole
+   * book, its latest (its last change's, or the start's when it has none). Other fields, the start's.
+   */
+  const setValue = (f: EntryFieldDef, v: FieldValue | undefined) => {
+    if (!f.changes) return change(withValue(f.key, v));
+    if (at !== undefined) return save({ changes: [...changes.filter((c) => !(c.field === f.key && c.since === at)), { field: f.key, value: v ?? null, since: at }] });
+    const last = changesOf(f.key).at(-1);
+    if (!last) return change(withValue(f.key, v));
+    return save({ changes: changes.map((c) => (c === last ? { ...c, value: v ?? null } : c)) });
+  };
+  const changing = declared.some((f) => f.changes) || changes.length > 0;
   const own = Object.entries(entity.fields).filter(([k]) => !declared.some((f) => f.key === k));
   const keys = [...declared.map((f) => f.key), ...own.map(([k]) => k)];
   /** The fields with `key` set to `value`, or taken off (undefined); a new key goes last, as in the file. */
@@ -50,27 +74,69 @@ export function EntryFields({ novelId, novel, entity, place, change, compact }: 
 
   return (
     <div className="grid gap-1">
+      {changing && (
+        <div className="flex flex-wrap items-center gap-2 pb-1">
+          <label htmlFor={readAtId} className="text-[13px] text-muted">
+            Read at
+          </label>
+          <select id={readAtId} value={at ?? ""} onChange={(e) => onAt(e.target.value || undefined)} className="h-7 max-w-full min-w-0 rounded-md border border-rule bg-raised px-1.5 text-[13px]">
+            <option value="">The whole {w.book.one}: the latest</option>
+            {novel.pieces.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.title || `Untitled ${w.piece.one}`}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
       {declared.length > 0 && (
         <dl aria-label="Fields" className="grid gap-0.5">
           {declared.map((f) => {
-            const value = entity.fields[f.key];
+            const value = reading.fields[f.key];
+            const from = reading.from[f.key];
             const part = `field:${f.key}`;
             const label = fieldLabel(f);
+            const history = at === undefined ? changesOf(f.key) : [];
+            const hint = !f.changes ? undefined : at !== undefined ? `From “${title(at)}” on` : history.length ? `Its latest value, from “${title(history.at(-1)!.since)}”` : `From the start of the ${w.book.one}`;
             return (
               <div key={f.key} className={cn("group -mx-1.5 flex items-baseline gap-2.5 rounded-md px-1.5", compact ? "py-0.5" : "py-1")}>
                 <dt className={cn("shrink-0 text-[13px] text-muted", compact ? "w-24" : "w-32")}>{label}</dt>
-                <dd className="flex min-w-0 flex-1 items-baseline gap-1">
-                  {place.editing === part ? (
-                    <ValueEditor novelId={novelId} novel={novel} self={entity.id} place={place} field={f} value={value} onSave={(v) => change(withValue(f.key, v))} />
-                  ) : value === undefined ? (
-                    <button ref={place.trigger(part)} type="button" onClick={() => place.start(part)} aria-label={`Add ${label.toLowerCase()}`} className="rounded px-1 text-[13px] text-muted hover:bg-paper hover:text-ink">
-                      Add…
-                    </button>
-                  ) : (
-                    <>
-                      <span className="min-w-0 flex-1 break-words whitespace-pre-line">{shown(novelId, novel, f, value)}</span>
-                      <PencilButton place={place} part={part} label={label.toLowerCase()} />
-                    </>
+                <dd className="grid min-w-0 flex-1 gap-0.5">
+                  <div className="flex min-w-0 items-baseline gap-1">
+                    {place.editing === part ? (
+                      <ValueEditor novelId={novelId} novel={novel} self={entity.id} place={place} field={f} value={value} hint={hint} onSave={(v) => setValue(f, v)} />
+                    ) : value === undefined ? (
+                      <button ref={place.trigger(part)} type="button" onClick={() => place.start(part)} aria-label={`Add ${label.toLowerCase()}`} className="rounded px-1 text-[13px] text-muted hover:bg-paper hover:text-ink">
+                        Add…
+                      </button>
+                    ) : (
+                      <>
+                        <span className="min-w-0 flex-1 break-words whitespace-pre-line">
+                          {shown(novelId, novel, f, value)}
+                          {from && <span className="text-[13px] text-muted"> · from “{title(from)}”</span>}
+                        </span>
+                        <PencilButton place={place} part={part} label={label.toLowerCase()} />
+                      </>
+                    )}
+                  </div>
+                  {history.length > 0 && place.editing !== part && (
+                    <ul aria-label={`Changes of ${label.toLowerCase()}`} className="grid gap-0.5 text-[13px] text-muted">
+                      {history.map((c) => (
+                        <li key={`${c.since}:${String(c.value)}`} className="flex items-center gap-1">
+                          <span className="min-w-0 flex-1">
+                            From “{title(c.since)}”: {c.value === null ? "nothing" : readField(c.value, novel)}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => void save({ changes: changes.filter((x) => x !== c) })}
+                            aria-label={`Remove the change of ${label.toLowerCase()} at “${title(c.since)}”`}
+                            className="rounded p-0.5 hover:bg-paper hover:text-ink"
+                          >
+                            <X className="size-3.5" aria-hidden />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
                   )}
                 </dd>
               </div>
@@ -153,6 +219,7 @@ function ValueEditor({
   place,
   field: f,
   value,
+  hint,
   onSave,
 }: {
   novelId: string;
@@ -162,6 +229,8 @@ function ValueEditor({
   place: InPlace;
   field: EntryFieldDef;
   value: FieldValue | undefined;
+  /** Where the value holds from, for a field that changes: "From “The Betrayal” on". */
+  hint?: string | undefined;
   onSave: (value: FieldValue | undefined) => Promise<unknown>;
 }) {
   const id = useId();
@@ -289,6 +358,7 @@ function ValueEditor({
   return (
     <EditorFrame place={place} className="flex-1" save={save}>
       {control}
+      {hint && <p className="text-xs text-muted">{hint}</p>}
       {problem && (
         <p id={`${id}-problem`} className="text-xs text-danger">
           {problem}

@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Page } from "@playwright/test";
-import { axe, expect, openView, palette, test, type App } from "./fixtures.ts";
+import { axe, expect, inPiece, openView, palette, test, type App } from "./fixtures.ts";
 
 /**
  * The Campaign kind on screen (#41): the sample campaign's arc and sessions, its codex of NPCs,
@@ -175,4 +175,56 @@ test("the Fields dialog: a field added and moved by keyboard, one renamed with i
   const profile = page.getByRole("region", { name: "Voss" });
   await expect(profile.locator('dl[aria-label="Fields"]').first().locator("dt")).toHaveText(["Status", "Faction", "Disposition", "Location", "Oath", "Accent"]);
   await expect(profile.getByRole("definition").filter({ hasText: "low and slow" })).toBeVisible();
+});
+
+test("a value that changes at a session: set from the profile read there, read at each session on the profile, the mention card and the Scene tab, drawn across the campaign (#140)", async ({ page, app }) => {
+  const dir = app.bookRepo(sample, "campaign");
+  const file = join(dir, "codex/npcs/marta.md");
+  writeFileSync(file, readFileSync(file, "utf8").replace("in her sleep.\n", "in her sleep.\nfields:\n  status: alive\n"));
+  app.git(dir, "commit", "-qam", "Marta is alive");
+  const before = readFileSync(file, "utf8");
+  await app.restart(dir);
+  await page.goto(app.launchUrl);
+  await expect(page.getByRole("textbox", { name: "Arc text" })).toBeFocused();
+
+  // Read at Session 2, her status set: from there on.
+  await palette(page, "npc: marta");
+  const profile = page.getByRole("region", { name: "Marta Hollin" });
+  const status = profile.locator('dl[aria-label="Fields"]').first().getByRole("definition").first();
+  const readAt = profile.getByRole("combobox", { name: "Read at" });
+  await readAt.selectOption({ label: "Session 2" });
+  await profile.getByRole("button", { name: "Edit status" }).click();
+  await expect(profile.getByText("From “Session 2” on")).toBeVisible();
+  await profile.getByRole("combobox", { name: "Status" }).selectOption("missing");
+  await page.keyboard.press("Enter");
+  await expect(status).toHaveText(/^missing · from “Session 2”/);
+  await expect.poll(() => readFileSync(file, "utf8")).toBe(before.replace("---\n", "").replace(/\n---\n/, "\nchanges:\n  - field: status\n    value: missing\n    since: ses_tw0002\n---\n").replace(/^/, "---\n"));
+
+  // Read at Session 1, the start's; over the whole campaign, the latest, with its change listed and drawn.
+  await readAt.selectOption({ label: "Session 1" });
+  await expect(status).toHaveText(/^alive/);
+  await readAt.selectOption({ label: "The whole campaign: the latest" });
+  await expect(status).toHaveText(/^missing · from “Session 2”/);
+  await expect(profile.getByRole("list", { name: "Changes of status" })).toHaveText(/From “Session 2”: missing/);
+  await expect(profile.getByRole("list", { name: "How its fields change" })).toHaveText("Status: alive from the start, missing from “Session 2”");
+  for (const colorScheme of ["light", "dark"] as const) {
+    await page.emulateMedia({ colorScheme });
+    await axe(page);
+  }
+  await page.emulateMedia({ colorScheme: "light" });
+
+  // Beside each session's text, as she is there: on the Scene tab's card and the mention card.
+  const tree = page.getByRole("tree");
+  const sidebar = page.getByRole("complementary", { name: "Right sidebar" });
+  const mention = page.locator('.ghw-mention[data-mention="npc_ma7ra1"]').first();
+  for (const [session, said] of [["Session 1", "alive"], ["Session 2", "missing"]] as const) {
+    await tree.getByRole("treeitem", { name: new RegExp(`^${session}`) }).first().click();
+    await expect(page.getByRole("heading", { level: 1, name: session })).toBeVisible();
+    await expect(inPiece(sidebar, "Marta Hollin")).toContainText(said);
+    await mention.hover();
+    const card = page.getByRole("dialog", { name: "Marta Hollin" });
+    await expect(card).toContainText(`status${said}`);
+    await page.mouse.move(5, 5);
+    await expect(card).toHaveCount(0);
+  }
 });

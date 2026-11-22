@@ -171,7 +171,8 @@ function PieceCard({
   const value = field ? piece.fields[field.key] : undefined;
   const listed = field && Array.isArray(value) ? value.find((v) => entryIds(field, [v])[0] === item.id) : undefined;
   const role = item.role + (field && listed !== undefined ? itemText(field, listed) : "");
-  const facts = entity ? cardFacts(entity, novel) : [];
+  // As the entry is at this piece (#140): a fact that changes later in the book isn't told early.
+  const facts = entity ? cardFacts(entity, novel, piece.id) : [];
   const tool = "shrink-0 rounded p-1 text-muted hover:bg-accent-soft hover:text-ink focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none";
 
   return (

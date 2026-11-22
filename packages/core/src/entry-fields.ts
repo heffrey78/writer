@@ -58,11 +58,12 @@ export function fieldText(book: Pick<Book, "entities">, value: FieldValue, join 
 
 /**
  * What a card says of an entry's fields at a glance, as text: the values of those its type shows on
- * cards, else of its first two; none that's empty or yes/no.
+ * cards, else of its first two; none that's empty or yes/no. Read at piece `at` (#140), or at the end.
  */
-export function cardFields(book: Pick<Book, "entities" | "entityTypes">, entity: Entity): string[] {
+export function cardFields(book: Pick<Book, "entities" | "entityTypes" | "pieces">, entity: Entity, at?: string): string[] {
+  const fields = fieldsAt(book, entity, at).fields;
   const onCards = fieldsOfType(book, entity.type).filter((f) => f.card);
-  const values = onCards.length ? onCards.flatMap((f) => (entity.fields[f.key] === undefined ? [] : [entity.fields[f.key]!])) : Object.values(entity.fields).slice(0, 2);
+  const values = onCards.length ? onCards.flatMap((f) => (fields[f.key] === undefined ? [] : [fields[f.key]!])) : Object.values(fields).slice(0, 2);
   return values.flatMap((v) => (typeof v === "boolean" || v === "" || (Array.isArray(v) && !v.length) ? [] : [fieldText(book, v)])).slice(0, 2);
 }
 
