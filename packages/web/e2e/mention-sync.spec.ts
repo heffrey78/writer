@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { axe, expect, palette, selectionSettled, test } from "./fixtures.ts";
+import { axe, expect, inPiece, palette, selectionSettled, test } from "./fixtures.ts";
 
 const STATION = "manuscript/01-return/01-arrival/01-the-station.md";
 
@@ -28,7 +28,7 @@ test("a new mention lists its character or place in the scene; removing one stic
   // Taken off in the details panel, he stays off; the mention stays too.
   await palette(page, "show the scene's details");
   const panel = page.getByRole("region", { name: "Details of “The Station”" });
-  await panel.getByRole("button", { name: "Edit characters" }).click();
+  await inPiece(panel, "Ben Varn").getByRole("button", { name: "Edit characters" }).click();
   await panel.getByRole("button", { name: "Remove “Ben Varn”" }).click();
   await expect.poll(read).toContain("characters: [char_7f3k2q]\n");
   await text.getByText(/Ben waved\./).click();

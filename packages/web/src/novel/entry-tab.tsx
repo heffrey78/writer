@@ -75,7 +75,7 @@ export function EntryTab({
   // the Notes tab (heffrey78/gh-writer#222).
   const record = id && !entity ? novel.moduleRecords.find((r) => r.id === id) : undefined;
   const recordType = record && moduleRecordType(novel.kind, record.type);
-  // Pinned (#156): kept first in the In this scene tab, in every piece.
+  // Pinned (#156): kept first in the piece's tab, in every piece.
   const pins = usePinnedEntries(novelId);
   const shownName = entity?.name ?? record?.title;
   const isPinned = id !== undefined && pins.includes(id);

@@ -51,7 +51,7 @@ Examples here are from the sample novel, *The Bridge at Varn*. Unless it says ot
 
 - **A distraction-free editor** for a single piece, or a whole chapter or month as one continuous text while each piece stays its own file. Focus mode, typewriter scrolling, word counts, and today's words against a daily goal.
 - **Mentions.** Type `@` and a few letters to mention anything in the book's index. Hover over a mention (or press Alt+Enter) for a card showing who they are and how they relate to everyone else *at that point in the book*.
-- **A sidebar beside the text**: the piece the caret is in as a readable card, each detail edited in place, with what the rest of the book says about it ("8 h after “The Station”", "First appearance of Ben Varn"); its notes; everyone and everything in it, with their roles there, each opening in place; and any index entry as its profile. Ctrl+Shift+\\ hides and shows it.
+- **A sidebar beside the text**: the piece the caret is in as a readable card, each detail edited in place, with everyone and everything in it as cards showing their roles there, and what the rest of the book says about it ("8 h after “The Station”", "First appearance of Ben Varn"); its notes; and any index entry as its profile. Ctrl+Shift+\\ hides and shows it.
 - **Quick entry.** Create a new entry straight from the `@` menu or the piece's card, without leaving the text.
 - **Add to an entry.** Select words you've just written and add them to an entry's notes, as a quote that leads back to its sentence, or as one of its fields (Ctrl+Shift+E, or from the right-click menu).
 - **Dictation.** Speak, and the words are written where the caret is. They're heard on the device by a speech model you download once, and audio never leaves it. English for now, in the Linux and Android apps ([#71](https://github.com/heffrey78/writer/issues/71)).
@@ -63,16 +63,14 @@ Examples here are from the sample novel, *The Bridge at Varn*. Unless it says ot
 
 <table>
   <tr>
-    <td><img src="docs/screenshots/scene-card.png" alt="The Scene card beside a chapter, with point of view and story time pinned under each scene's title"></td>
+    <td><img src="docs/screenshots/scene-card.png" alt="The Scene card beside a chapter: its details, everyone in The Station with their role there, and point of view and story time pinned under each scene's title"></td>
     <td><img src="docs/screenshots/entry-tab.png" alt="The Entry tab: Ada Varn's sheet beside the text"></td>
   </tr>
   <tr>
     <td><img src="docs/screenshots/mention-card.png" alt="A mention card: Ada Varn, her details, and her relationships at The Station"></td>
-    <td><img src="docs/screenshots/in-this-scene.png" alt="In this scene: everyone in The Station with their role there, Varn Station opened in place"></td>
+    <td><img src="docs/screenshots/progress.png" alt="Progress: the book against its target, today's words and streak, and the words per day"></td>
   </tr>
 </table>
-
-![Progress: the book against its target, today's words and streak, and the words per day](docs/screenshots/progress.png)
 
 ### Plan
 

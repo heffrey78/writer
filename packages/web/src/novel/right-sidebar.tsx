@@ -1,18 +1,18 @@
-import { BookOpen, FileText, PanelRightClose, PanelRightOpen, StickyNote, Users } from "lucide-react";
+import { BookOpen, FileText, PanelRightClose, PanelRightOpen, StickyNote } from "lucide-react";
 import { useEffect, useRef, useSyncExternalStore, type KeyboardEvent, type ReactNode } from "react";
 import { create } from "zustand";
 import { cn } from "../ui/cn.ts";
 import { useSwipeClose } from "../ui/sheet-swipe.ts";
 
 /*
- * The right sidebar (heffrey78/gh-writer#149): the scene the caret is in (its details, its notes, and
- * everyone in it: #149 here), and a story bible entry, as tabs beside the text. Ctrl+Shift+\ (⌘⇧\ on a Mac) opens and closes it; closed, it's a strip of icons at the
+ * The right sidebar (heffrey78/gh-writer#149): the scene the caret is in (its details with everyone
+ * in it, #160, and its notes), and a story bible entry, as tabs beside the text. Ctrl+Shift+\ (⌘⇧\ on a Mac) opens and closes it; closed, it's a strip of icons at the
  * right edge, as the left sidebar is. Open or closed, its tab and its width are remembered in this
  * browser. On a narrow window it's a sheet over the text, shown only when asked for, that swipes
  * closed (#109).
  */
 
-export type SidebarTab = "scene" | "notes" | "here" | "entry";
+export type SidebarTab = "scene" | "notes" | "entry";
 
 const KEY = "ghw.rightSidebar";
 export const MIN_WIDTH = 280;
@@ -31,7 +31,7 @@ function load(): Saved {
     if (!saved) return fallback;
     return {
       open: saved.open ?? fallback.open,
-      tab: saved.tab === "entry" || saved.tab === "notes" || saved.tab === "here" ? saved.tab : "scene",
+      tab: saved.tab === "entry" || saved.tab === "notes" ? saved.tab : "scene",
       width: Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, Number(saved.width) || fallback.width)),
     };
   } catch {
@@ -85,7 +85,6 @@ const ARIA_KEYS = MAC ? "Meta+Shift+\\" : "Control+Shift+\\";
 const TABS: { key: SidebarTab; label: string; icon: typeof FileText }[] = [
   { key: "scene", label: "Scene", icon: FileText },
   { key: "notes", label: "Notes", icon: StickyNote },
-  { key: "here", label: "In this scene", icon: Users },
   { key: "entry", label: "Entry", icon: BookOpen },
 ];
 
@@ -112,7 +111,7 @@ export function RightSidebar({ content, toText, labels = {} }: { content: Record
   const backdrop = useRef<HTMLButtonElement>(null);
   // On a narrow window, swiped back toward the right edge, the sheet closes as its button closes it (#109).
   const swipe = useSwipeClose({ sheet: aside, backdrop, onClose: () => useRightSidebar.setState({ sheet: false }) });
-  const tabs = useRef<Record<SidebarTab, HTMLButtonElement | null>>({ scene: null, notes: null, here: null, entry: null });
+  const tabs = useRef<Record<SidebarTab, HTMLButtonElement | null>>({ scene: null, notes: null, entry: null });
 
   // Ctrl+Shift+\ anywhere in the novel (the key by its place: Shift+\ types "|" on most keyboards);
   // F6 moves between the text and the sidebar.

@@ -1,7 +1,7 @@
 import { create } from "zustand";
 
 /*
- * Entries pinned beside the text (#156): kept first in the In this scene tab in every piece until
+ * Entries pinned beside the text (#156): kept first in the piece's tab (In this scene) in every piece until
  * unpinned, as the antagonist through a confrontation chapter. Kept on this device, per book, as the
  * sidebar's own state is.
  */

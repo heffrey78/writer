@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { axe, expect, test } from "./fixtures.ts";
+import { axe, editField, expect, test } from "./fixtures.ts";
 
 const STATION = "manuscript/01-return/01-arrival/01-the-station.md";
 
@@ -18,7 +18,10 @@ test("pinned details show under each scene's title, follow edits, are remembered
 
   // Pinned from the card: a line under every scene's title, in the card's order.
   await card.getByRole("button", { name: "Pin when under the scene titles" }).click();
+  // An entry field's, from its editor over who's in it (#160).
+  await editField(card, "Point of view");
   await card.getByRole("button", { name: "Pin point of view under the scene titles" }).click();
+  await card.getByRole("button", { name: "Done" }).click();
   await expect(card.getByRole("button", { name: "Pin when under the scene titles" })).toHaveAttribute("aria-pressed", "true");
   await expect(lines).toHaveText(["Ada Varn · Day 1, 09:10 · 20 min", "Ada Varn · Day 1, 17:40 · 40 min"]);
   await expect(card).toContainText("Pinned under each scene's title: point of view, when.");
@@ -51,7 +54,9 @@ test("pinned details show under each scene's title, follow edits, are remembered
   const span = page.getByRole("region", { name: "Details of “Walking the Span”" });
   await span.getByRole("button", { name: "Pin when under the scene titles" }).click();
   await expect(lines).toHaveText(["Ada Varn"]);
+  await editField(span, "Point of view");
   await span.getByRole("button", { name: "Pin point of view under the scene titles" }).click();
+  await span.getByRole("button", { name: "Done" }).click();
   await expect(span).not.toContainText("Pinned under each scene's title");
   await expect(lines).toHaveCount(0);
 });

@@ -378,3 +378,12 @@ export async function palette(page: Page, query: string) {
   await page.keyboard.press("Enter");
   await expect(dialog).toHaveCount(0);
 }
+
+/** Who's in a piece, on its card in the right sidebar (#160): one entry's card, by its name. */
+export const inPiece = (panel: Locator, name: string) => panel.getByRole("listitem").filter({ has: panel.page().getByRole("button", { name: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`) }) });
+
+/** A piece's entry field (Characters, Where), opened for editing from Add… over who's in it (#160). */
+export async function editField(panel: Locator, label: string) {
+  await panel.getByRole("button", { name: /^Add to this / }).click();
+  await panel.page().getByRole("menuitem", { name: label, exact: true }).click();
+}

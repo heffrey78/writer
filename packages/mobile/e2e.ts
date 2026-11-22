@@ -385,12 +385,12 @@ try {
   await book.getByRole("button", { name: "More" }).click();
   const more = page.getByRole("dialog", { name: "Days: more" });
   await expect(more.getByRole("region", { name: "This entry" })).toBeVisible();
-  // Who's in the entry (#149), from More: the sidebar's tab, as a sheet. While the keyboard's away:
+  // Who's in the entry (#149), from More: on the entry's tab (#160), as a sheet. While the keyboard's away:
   // back on the journal's page, the caret goes to today's entry and the keyboard (and the bar) come and go.
-  await more.getByRole("button", { name: "Who's in it" }).click();
+  await more.getByRole("button", { name: "Details" }).click();
   const sheet = page.getByRole("complementary", { name: "Right sidebar" });
-  await expect(sheet.getByRole("tab", { name: "In this entry" })).toHaveAttribute("aria-selected", "true");
-  await expect(sheet.getByRole("tabpanel")).toBeVisible();
+  await expect(sheet.getByRole("tab").first()).toHaveAttribute("aria-selected", "true");
+  await expect(sheet.getByRole("heading", { name: /^In this entry · / })).toBeVisible();
   await sheet.getByRole("button", { name: "Hide the right sidebar" }).click();
   await expect(sheet).toHaveCount(0);
   await book.getByRole("button", { name: "More" }).click();

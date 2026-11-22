@@ -12,7 +12,7 @@ test("the Entry tab: a sheet to read, Back and Forward through names opened, a p
   const station = sidebar.getByRole("region", { name: "Details of “The Station”" });
 
   // A name on the Scene tab opens its sheet.
-  await station.getByRole("button", { name: "Ada Varn" }).first().click();
+  await station.getByRole("button", { name: /^Ada Varn/ }).click();
   const ada = sidebar.getByRole("region", { name: "Ada Varn" });
   await expect(ada).toBeFocused();
   await expect(entryTab).toHaveAttribute("aria-selected", "true");
@@ -44,7 +44,7 @@ test("the Entry tab: a sheet to read, Back and Forward through names opened, a p
 
   // Another, then Back and Forward.
   await sceneTab.click();
-  await station.getByRole("button", { name: "Varn Station" }).click();
+  await station.getByRole("button", { name: /^Varn Station/ }).click();
   const place = sidebar.getByRole("region", { name: "Varn Station" });
   await expect(place).toBeFocused();
   await place.getByRole("button", { name: "Previous entry" }).click();
@@ -56,7 +56,7 @@ test("the Entry tab: a sheet to read, Back and Forward through names opened, a p
   // Nothing holds the tab (heffrey78/gh-writer#222): a name opened elsewhere replaces what's there, and there's no pin.
   await expect(place.getByRole("button", { name: /^Keep this/ })).toHaveCount(0);
   await sceneTab.click();
-  await station.getByRole("button", { name: "Ada Varn" }).first().click();
+  await station.getByRole("button", { name: /^Ada Varn/ }).click();
   await expect(ada).toBeFocused();
 
   // Edited in place, as on its page.
@@ -72,22 +72,20 @@ test("the Entry tab: a sheet to read, Back and Forward through names opened, a p
   await expect(ada.getByRole("region", { name: "At “The Betrayal”" })).toContainText("Rivals with Ben Varn");
 });
 
-test("In this scene: everyone and everything in the scene once, with its role and card, following the caret; one expands to its profile, Open goes to it (#149)", async ({ page, app }) => {
+test("In this scene, on the Scene tab: everyone and everything in the scene once, with its role and card, following the caret; a card opens its entry (#149, #160)", async ({ page, app }) => {
   await app.restart(app.novelRepo("varn"));
   await page.goto(app.launchUrl);
   const text = page.getByRole("textbox", { name: "Chapter text" });
   await expect(text).toBeFocused();
   const sidebar = page.getByRole("complementary", { name: "Right sidebar" });
-  const tab = sidebar.getByRole("tab", { name: "In this scene" });
+  const scene = sidebar.getByRole("tab", { name: "Scene", exact: true });
 
-  // A tab like the others: the arrows reach it.
-  await sidebar.getByRole("tab", { name: "Scene", exact: true }).click();
-  await page.keyboard.press("ArrowRight");
-  await page.keyboard.press("ArrowRight");
-  await expect(tab).toBeFocused();
-  await expect(tab).toHaveAttribute("aria-selected", "true");
+  // One tab for the scene: its details and who's in it, not a tab for each.
+  await expect(sidebar.getByRole("tab")).toHaveText(["Scene", "Notes", "Entry"]);
+  await expect(scene).toHaveAttribute("aria-selected", "true");
   const station = sidebar.getByRole("list", { name: "In “The Station”" }).getByRole("listitem");
   await expect(station).toHaveText([/^AVAda Varnpoint of view · 31 · Structural engineer/, /^VSVarn Stationset here/, /^TSThe Saleplotline \(minor\) “First sign of the sale”/, /^IInheritancetheme \(faint\)/]);
+  await expect(sidebar.getByRole("heading", { name: "In this scene · 4" })).toBeVisible();
   await axe(page);
   await page.emulateMedia({ colorScheme: "dark" });
   await axe(page);
@@ -99,31 +97,21 @@ test("In this scene: everyone and everything in the scene once, with its role an
   await expect(span.getByRole("listitem")).toHaveCount(6);
   await expect(span.getByRole("listitem").nth(1)).toContainText("Ben Varnpresent");
 
-  // One expands in place to its profile, by Enter; Open goes to it in the bible.
-  const ben = span.getByRole("button", { name: /^Ben Varn/ });
-  await ben.focus();
+  // A card opens its entry on the Entry tab, by Enter.
+  await span.getByRole("button", { name: /^Ben Varn/ }).focus();
   await page.keyboard.press("Enter");
-  await expect(ben).toHaveAttribute("aria-expanded", "true");
-  await expect(span.getByRole("heading", { name: "Ben Varn" })).toBeVisible();
-  await expect(span.getByRole("region", { name: /^Appears in/ })).toBeVisible();
-  await axe(page);
-  await page.keyboard.press("Enter");
-  await expect(ben).toHaveAttribute("aria-expanded", "false");
-  await span.getByRole("link", { name: "Open Ben Varn in the bible" }).click();
-  await expect(page).toHaveURL(/\/bible\/char_b3n0vs$/);
-  await expect(page.getByRole("heading", { level: 2, name: "Ben Varn" })).toBeVisible();
+  await expect(sidebar.getByRole("tab", { name: "Entry", exact: true })).toHaveAttribute("aria-selected", "true");
+  await expect(sidebar.getByRole("region", { name: "Ben Varn" })).toBeFocused();
 
-  // From the palette.
-  await page.goBack();
-  await expect(text).toBeVisible();
-  await sidebar.getByRole("tab", { name: "Scene", exact: true }).click();
+  // From the palette, by who's in it.
   await page.keyboard.press("ControlOrMeta+k");
-  await page.keyboard.type("who's in this scene");
+  await page.keyboard.type("who's in it");
   await page.keyboard.press("Enter");
-  await expect(tab).toHaveAttribute("aria-selected", "true");
+  await expect(scene).toHaveAttribute("aria-selected", "true");
+  await expect(span).toBeVisible();
 });
 
-test("entries pinned beside the text stay first in every scene and after a reload; a name written without a link here is linked from the tab (#156)", async ({ page, app }) => {
+test("entries pinned beside the text stay first in every scene and after a reload; a name written without a link here is linked from the Scene tab (#156, #160)", async ({ page, app }) => {
   const dir = app.novelRepo("varn");
   await app.restart(dir);
   const STATION = "manuscript/01-return/01-arrival/01-the-station.md";
@@ -132,7 +120,7 @@ test("entries pinned beside the text stay first in every scene and after a reloa
   const text = page.getByRole("textbox", { name: "Chapter text" });
   await expect(text).toBeFocused();
   const sidebar = page.getByRole("complementary", { name: "Right sidebar" });
-  const tab = sidebar.getByRole("tab", { name: "In this scene" });
+  const tab = sidebar.getByRole("tab", { name: "Scene", exact: true });
   await tab.click();
   const pinned = sidebar.getByRole("list", { name: "Pinned" });
 
@@ -151,8 +139,7 @@ test("entries pinned beside the text stay first in every scene and after a reloa
   await page.emulateMedia({ colorScheme: "light" });
 
   // And from the Entry tab: kept after a reload, in the order pinned.
-  await sidebar.getByRole("tab", { name: "Scene", exact: true }).click();
-  await sidebar.getByRole("region", { name: "Details of “Walking the Span”" }).getByRole("button", { name: "Ben Varn" }).first().click();
+  await sidebar.getByRole("region", { name: "Details of “Walking the Span”" }).getByRole("button", { name: /^Ben Varn/ }).click();
   await sidebar.getByRole("button", { name: "Pin Ben Varn beside the text" }).click();
   await page.reload();
   await expect(text).toBeVisible();

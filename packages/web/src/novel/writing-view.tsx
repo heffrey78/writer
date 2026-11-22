@@ -70,7 +70,6 @@ import { useTextFocused, WritingBar, type BarAction } from "./writing-bar.tsx";
 import { cn } from "../ui/cn.ts";
 import { useBookBar } from "./bottom-bar.tsx";
 import { usePassageRequest } from "./go-to-passage.ts";
-import { HereTab } from "./here-tab.tsx";
 import { AddToEntryDialog, useAddToEntry } from "../bible/add-to-entry.tsx";
 
 interface Props {
@@ -244,7 +243,6 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
       [
         { id: "writing.sceneTab", label: `Show the ${w.piece.one}'s details`, short: "Details", run: reveal(() => showTab("scene")) },
         { id: "writing.notesTab", label: `Show the ${w.piece.one}'s notes`, short: "Its notes", run: reveal(() => showTab("notes")) },
-        { id: "writing.hereTab", label: `Show who's in this ${w.piece.one}`, short: "Who's in it", run: reveal(() => showTab("here")) },
         { id: "writing.entryTab", label: `Show the open ${w.entity.one}`, short: `The open ${w.entity.one}`, run: reveal(() => showTab("entry")) },
       ],
       `This ${w.piece.one}`,
@@ -262,10 +260,9 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
         // Over an issue being read, the sidebar comes back on its last tab rather than toggling.
         run: () => (useIssuePanel.getState().numbers.length ? reveal(() => sidebar.show(useRightSidebar.getState().tab))() : sidebar.toggle()),
       },
-      { id: "writing.sceneTab", title: `Show the ${w.piece.one}'s details`, group: "Writing", keywords: ["sidebar", "panel"], run: reveal(() => sidebar.show("scene")) },
+      { id: "writing.sceneTab", title: `Show the ${w.piece.one}'s details`, group: "Writing", keywords: ["sidebar", "panel", `who's in it`, w.entity.many], run: reveal(() => sidebar.show("scene")) },
       { id: "writing.entryTab", title: `Show the open ${w.entity.one}`, group: "Writing", keywords: ["sidebar", w.codex.one, "panel"], run: reveal(() => sidebar.show("entry")) },
       { id: "writing.notesTab", title: `Show the ${w.piece.one}'s notes`, group: "Writing", keywords: ["sidebar", "panel", "sticky"], run: reveal(() => sidebar.show("notes")) },
-      { id: "writing.hereTab", title: `Show who's in this ${w.piece.one}`, group: "Writing", keywords: ["sidebar", "panel", w.codex.one, w.entity.many], run: reveal(() => sidebar.show("here")) },
       {
         id: "writing.newSceneNote",
         title: `New note on this ${w.piece.one}`,
@@ -643,11 +640,12 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
         !focusMode && (
           <RightSidebar
             toText={toText}
-            labels={{ scene: w.piece.One, here: `In this ${w.piece.one}`, entry: recordShown ? word(recordShown.noun).Short : w.entity.One }}
+            labels={{ scene: w.piece.One, entry: recordShown ? word(recordShown.noun).Short : w.entity.One }}
             content={{
               scene: detailsScene ? (
                 <SceneDetails
                   key={detailsScene.file}
+                  novelId={novelId}
                   novel={novel}
                   workspace={workspace}
                   path={detailsScene.file}
@@ -664,11 +662,6 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
                 <SceneNotes key={detailsScene.id} novelId={novelId} novel={novel} workspace={workspace} scene={detailsScene} spell={spell} />
               ) : (
                 <p className="p-4 text-sm text-muted">{loaded ? `${w.piece.A}’s notes show here once the ${w.level(pieceLevel(novel)).one} has one.` : "Opening…"}</p>
-              ),
-              here: detailsScene ? (
-                <HereTab key={detailsScene.id} novelId={novelId} novel={novel} workspace={workspace} spell={spell} piece={detailsScene} />
-              ) : (
-                <p className="p-4 text-sm text-muted">{loaded ? `Who's in ${w.piece.a} shows here once the ${w.level(pieceLevel(novel)).one} has one.` : "Opening…"}</p>
               ),
               entry: <EntryTab novelId={novelId} novel={novel} workspace={workspace} spell={spell} />,
             }}

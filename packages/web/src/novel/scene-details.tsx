@@ -13,6 +13,7 @@ import { Button } from "../ui/button.tsx";
 import { cn } from "../ui/cn.ts";
 import { Picker, type PickerItem, type PickerProps } from "../ui/picker.tsx";
 import { useEntryPanel } from "./entry-tab.tsx";
+import { InThisPiece } from "./in-this-piece.tsx";
 import { useNotice } from "./notice.tsx";
 import type { Workspace } from "./workspace.ts";
 import { useWords } from "./kind.ts";
@@ -108,6 +109,7 @@ export function pinnedLine(novel: Book, fm: Record<string, unknown>, keys: reado
  * autosaves and merges like typing).
  */
 export function SceneDetails({
+  novelId,
   novel,
   workspace,
   path,
@@ -117,6 +119,7 @@ export function SceneDetails({
   issues,
   onOpenIssue,
 }: {
+  novelId: string;
   novel: Book;
   workspace: Workspace;
   path: string;
@@ -138,6 +141,9 @@ export function SceneDetails({
   const pencils = useRef(new Map<string, HTMLButtonElement | null>());
   const editor = useRef<HTMLDivElement>(null);
   const returnTo = useRef<string | null>(null);
+  // What opened the editor, for the focus to go back to: a card's pencil, or a row's.
+  const opener = useRef<HTMLElement | null>(null);
+  const adding = useRef<HTMLButtonElement>(null);
   // The Add… menu opens inside the card's landmark, not at the end of the page.
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
 
@@ -149,11 +155,18 @@ export function SceneDetails({
     if (editing) {
       editor.current?.querySelector<HTMLElement>("input, textarea, select, button")?.focus();
     } else if (returnTo.current) {
-      pencils.current.get(returnTo.current)?.focus();
+      const back = opener.current;
+      // Not the menu item that opened it, gone with its menu, nor the page.
+      if (back && back.isConnected && back !== document.body) back.focus();
+      else (pencils.current.get(returnTo.current) ?? adding.current)?.focus();
       returnTo.current = null;
+      opener.current = null;
     }
   }, [editing]);
-  const start = (key: string) => setEditing(key);
+  const start = (key: string) => {
+    opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setEditing(key);
+  };
   const done = () => {
     returnTo.current = editing;
     setEditing(null);
@@ -203,6 +216,11 @@ export function SceneDetails({
   const next = chapter && at >= 0 ? chapter.childIds[at + 1] : undefined;
   // What the rest of the book says about it: worked out again when the book is, not as it's typed.
   const facts = useMemo(() => (scene ? sceneFacts(novel, scene.id) : []), [novel, scene?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  // The piece as it is in the workspace: who's in it shows as they're added, and its names as they're typed.
+  const live = useMemo(
+    () => scene && file && { ...scene, body: file.body, fields: { ...scene.fields, ...Object.fromEntries(novel.kind.fields.map((f) => [f.key, fm[f.key]])) } },
+    [scene, file?.body, fm, novel.kind], // eslint-disable-line react-hooks/exhaustive-deps
+  );
 
   if (!file) return null;
   const tags = Array.isArray(fm.tags) ? (fm.tags as string[]) : [];
@@ -224,7 +242,7 @@ export function SceneDetails({
   );
 
   /** Each row: its key, label, whether it has anything, how it reads and how it's edited. */
-  type Row = { key: string; label: string; filled: boolean; view: ReactNode; edit: ReactNode; plain?: boolean };
+  type Row = { key: string; label: string; filled: boolean; view: ReactNode; edit: ReactNode; plain?: boolean; entry?: boolean };
   /** A list field's rows: one, or (the book's own types) one for each type. */
   const fieldRows = (f: FieldDef): Row[] => {
     const t = f.type;
@@ -235,6 +253,7 @@ export function SceneDetails({
         {
           key: f.key,
           label: f.label,
+          entry: true,
           filled: !!id,
           view: id && link(id),
           edit: <Picker label={f.label} items={ofType(t.entityType)} value={id || undefined} onChange={(v) => set(f.key, v)} placeholder={`No ${f.label.toLowerCase()}`} allowNone {...making(t.entityType)} />,
@@ -271,6 +290,7 @@ export function SceneDetails({
         return {
           key: `type:${type.key}`,
           label,
+          entry: true,
           filled: chosen.length > 0,
           view: names(chosen.map((c) => c.id)),
           edit: (
@@ -290,6 +310,7 @@ export function SceneDetails({
         {
           key: f.key,
           label: f.label,
+          entry: true,
           filled: chosen.length > 0,
           view: names(chosen),
           edit: (
@@ -320,6 +341,7 @@ export function SceneDetails({
       {
         key: f.key,
         label: f.label,
+        entry: true,
         filled: items.length > 0,
         view: items.map((r, i) => {
           const item: Record<string, unknown> = typeof r === "string" ? {} : r;
@@ -390,8 +412,16 @@ export function SceneDetails({
       ),
     },
   ];
-  const shown = rows.filter((r) => r.filled || r.key === editing);
-  const empty = rows.filter((r) => !r.filled && r.key !== editing);
+  // Entry fields show as the cards of who's in it; the rest (when, tags) as rows.
+  const shown = rows.filter((r) => !r.entry && (r.filled || r.key === editing));
+  const empty = rows.filter((r) => !r.entry && !r.filled && r.key !== editing);
+  const entryRows = rows.filter((r) => r.entry);
+  const editingEntry = entryRows.find((r) => r.key === editing);
+  /** The row that edits the field naming an entry: an own type's, for the book's own types. */
+  const rowFor = (via: string, id: string) => {
+    if (novel.kind.fields.find((f) => f.key === via)?.type.kind !== "own-entities") return via;
+    return `type:${novel.entities.find((e) => e.id === id)?.type ?? novel.entityTypes.find((t) => id.startsWith(`${t.prefix}_`))?.key}`;
+  };
 
   /** The editor of a row, in place: Escape (unless something in it took the key) or Done returns to the row. */
   const editorOf = (body: ReactNode) => (
@@ -533,6 +563,58 @@ export function SceneDetails({
             </DropdownMenu.Content>
           </DropdownMenu.Portal>
         </DropdownMenu.Root>
+      )}
+
+      {live && (
+        <InThisPiece
+          novelId={novelId}
+          novel={novel}
+          workspace={workspace}
+          piece={live}
+          onEdit={(via, id) => start(rowFor(via, id))}
+          editing={
+            editingEntry &&
+            editorOf(
+              <>
+                {editingEntry.edit}
+                <button
+                  type="button"
+                  onClick={() => pins.toggle(editingEntry.key)}
+                  aria-pressed={pins.keys.includes(editingEntry.key)}
+                  className="flex items-center gap-1.5 justify-self-start rounded px-1.5 py-1 text-xs text-muted hover:bg-paper hover:text-ink"
+                >
+                  <Pin className="size-3.5" fill={pins.keys.includes(editingEntry.key) ? "currentColor" : "none"} aria-hidden />
+                  Pin {editingEntry.label.toLowerCase()} under the {w.piece.one} titles
+                </button>
+              </>,
+            )
+          }
+          add={
+            entryRows.length > 0 && (
+              <DropdownMenu.Root modal={false}>
+                <DropdownMenu.Trigger asChild>
+                  <button
+                    ref={adding}
+                    type="button"
+                    aria-label={`Add to this ${w.piece.one}…`}
+                    className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[13px] text-muted hover:bg-paper hover:text-ink"
+                  >
+                    <Plus className="size-3.5" aria-hidden /> Add…
+                  </button>
+                </DropdownMenu.Trigger>
+                <DropdownMenu.Portal container={anchor}>
+                  <DropdownMenu.Content align="end" sideOffset={4} className="z-50 min-w-44 rounded-md border border-rule bg-raised p-1 shadow-lg">
+                    {entryRows.map((r) => (
+                      <DropdownMenu.Item key={r.key} className={MENU_ITEM} onSelect={() => start(r.key)}>
+                        {r.label}
+                      </DropdownMenu.Item>
+                    ))}
+                  </DropdownMenu.Content>
+                </DropdownMenu.Portal>
+              </DropdownMenu.Root>
+            )
+          }
+        />
       )}
 
       {facts.length > 0 && (

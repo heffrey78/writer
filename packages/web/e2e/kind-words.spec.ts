@@ -74,10 +74,10 @@ for (const [name, map] of [
     await clean(page, "a piece");
     await page.getByRole("tab", { name: "Notes" }).click();
     await clean(page, "a piece's notes");
-    // Who's in it (#149), in the kind's words: "In this session".
-    const here = page.getByRole("tab", { name: /^In this / });
-    if (name === "campaign") await expect(here).toHaveText("In this session");
-    await here.click();
+    // Who's in it (#149), on the piece's own tab (#160), in the kind's words: "In this session".
+    await page.getByRole("tablist", { name: "Right sidebar tabs" }).getByRole("tab").first().click();
+    const here = page.getByRole("heading", { name: /^In this / });
+    if (name === "campaign") await expect(here).toHaveText(/^In this session · /);
     await clean(page, "who's in a piece");
 
     // Every command the palette offers.

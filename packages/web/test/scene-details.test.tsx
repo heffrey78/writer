@@ -50,7 +50,7 @@ function card(b: Book, ws: ReturnType<typeof workspace>) {
   render(
     <QueryClientProvider client={new QueryClient()}>
       <MemoryRouter>
-        <SceneDetails novel={b} workspace={ws as unknown as Workspace} path={DAY} title="Monday" />
+        <SceneDetails novelId="year" novel={b} workspace={ws as unknown as Workspace} path={DAY} title="Monday" />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -59,20 +59,31 @@ function card(b: Book, ws: ReturnType<typeof workspace>) {
 afterEach(cleanup);
 
 describe("the Scene card of a kind's own field", () => {
-  it("has a row for the field, with its names, and none of the novel's", async () => {
+  it("lists the field's names as cards with its role, not as a row, and none of the novel's", async () => {
     card(await book(), workspace());
     const details = screen.getByRole("region", { name: "Details of “Monday”" });
-    expect([...details.querySelectorAll("dt")].map((dt) => dt.textContent)).toEqual(["People"]);
-    expect(details.querySelector("dd")!.textContent).toContain("Ada, Bo");
+    expect(details.querySelectorAll("dt")).toHaveLength(0);
+    const here = screen.getByRole("list", { name: "In “Monday”" });
+    expect([...here.querySelectorAll("li")].map((li) => li.textContent)).toEqual(["AAdapeople", "BBopeople"]);
+    expect(screen.getByRole("heading", { name: "In this day · 2" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Edit point of view" })).toBeNull();
   });
 
-  it("edits the field's list in place", async () => {
+  it("edits the field's list in place from a card's pencil", async () => {
     const ws = workspace();
     card(await book(), ws);
-    fireEvent.click(screen.getByRole("button", { name: "Edit people" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Edit people" })[0]!);
     fireEvent.click(screen.getByRole("button", { name: "Remove “Bo”" }));
     expect(ws.editFrontMatter).toHaveBeenCalledWith(DAY, [{ path: ["people", 1], remove: true }]);
+  });
+
+  it("shows who's added before the book is read again", async () => {
+    const b = await book();
+    const ws = workspace();
+    card(b, ws);
+    const added = lines("---", "id: day_000001", "title: Monday", "people: [char_000001]", "---", "Words.");
+    ws.store.setState({ files: { [DAY]: { path: DAY, ...splitSceneFile(added), disk: text, hash: "h" } } });
+    expect(await screen.findByRole("heading", { name: "In this day · 1" })).toBeTruthy();
   });
 
   it("reads the field for a pinned line", async () => {

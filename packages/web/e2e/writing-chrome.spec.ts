@@ -25,9 +25,9 @@ test("the length of what's open by its title, a scene's on its card, the session
   await expect(header).toHaveText("Words 235");
 
   // The card's pencils and pins: out of the way until their row is pointed at.
-  const pencil = span.getByRole("button", { name: "Edit where" });
+  const pencil = span.getByRole("button", { name: "Edit when" });
   await expect(pencil).toHaveCSS("opacity", "0");
-  await span.getByText("Where", { exact: true }).hover();
+  await span.getByText("When", { exact: true }).hover();
   await expect(pencil).toHaveCSS("opacity", "1");
   for (const colorScheme of ["light", "dark"] as const) {
     await page.emulateMedia({ colorScheme });

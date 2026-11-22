@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url";
 import type { Page } from "@playwright/test";
-import { expect, test, type App } from "./fixtures.ts";
+import { editField, expect, test, type App } from "./fixtures.ts";
 
 const out = (name: string) => fileURLToPath(new URL(`../../../docs/screenshots/${name}.png`, import.meta.url));
 
@@ -32,24 +32,20 @@ test("the writing view, light and dark, with a mention card", async ({ page, app
   await shoot(page, "writing-dark");
 });
 
-test("the right sidebar: the Scene card with details pinned, and the Entry tab", async ({ page, app }) => {
+test("the right sidebar: the Scene card with details pinned and who's in it, and the Entry tab", async ({ page, app }) => {
   await open(page, app);
   const card = page.getByRole("region", { name: "Details of “The Station”" });
+  await editField(card, "Point of view");
   await card.getByRole("button", { name: "Pin point of view under the scene titles" }).click();
+  await card.getByRole("button", { name: "Done" }).click();
   await card.getByRole("button", { name: "Pin when under the scene titles" }).click();
   await expect(page.locator(".ghw-pinned")).toHaveCount(2);
   await card.getByRole("heading", { level: 2 }).click();
   await shoot(page, "scene-card");
-  await card.getByRole("button", { name: "Ada Varn" }).first().click();
+  await card.getByRole("button", { name: /^Ada Varn/ }).click();
   await expect(page.getByRole("region", { name: "Ada Varn" })).toBeFocused();
   await page.getByRole("region", { name: "Ada Varn" }).evaluate((e) => (e as HTMLElement).blur());
   await shoot(page, "entry-tab");
-  // Everyone in the scene, one opened in place (#149).
-  await page.getByRole("tab", { name: "In this scene" }).click();
-  await page.getByRole("list", { name: "In “The Station”" }).getByRole("button", { name: /^Varn Station/ }).click();
-  await page.getByRole("list", { name: "In “The Station”" }).getByRole("button", { name: /^Varn Station/ }).blur();
-  await page.waitForTimeout(500);
-  await shoot(page, "in-this-scene");
 });
 
 test("planning views", async ({ page, app }) => {

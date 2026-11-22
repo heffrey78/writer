@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Locator, Page } from "@playwright/test";
-import { axe, expect, palette, test, type App } from "./fixtures.ts";
+import { axe, editField, expect, inPiece, palette, test, type App } from "./fixtures.ts";
 
 const BETRAYAL = "manuscript/02-the-sale/01-night-crossing/01-the-betrayal.md";
 const STATION = "manuscript/01-return/01-arrival/01-the-station.md";
@@ -38,15 +38,18 @@ test("edits every detail of a scene, changing only those lines of its front matt
   await page.emulateMedia({ colorScheme: "dark" });
   await axe(page);
 
-  // Read as a card: the scene's place, its synopsis, status and a row for each detail it has.
+  // Read as a card: the scene's place, its synopsis, status, a row for each detail that isn't an
+  // entry, and everyone and everything in it as cards, each with its role there (#160).
   await expect(panel.getByRole("heading", { level: 2, name: "The Betrayal" })).toBeVisible();
   await expect(panel).toContainText("Night Crossing · scene 1 of");
   await expect(panel).toContainText("On the bridge at dusk, Ada learns Ben sold the plans to Mirela.");
   await expect(panel.getByRole("img", { name: "Status: revised" })).toBeVisible();
-  await expect(panel.locator("dt")).toHaveText(["Point of view", "Where", "Characters", "When", "Plotlines", "Artifacts", "Themes"]);
+  await expect(panel.locator("dt")).toHaveText(["When"]);
   await expect(row(panel, "When")).toHaveText("Day 3, 18:30 · 45 min");
-  await expect(row(panel, "Plotlines")).toHaveText("The Sale (major) “The plans have been sold”, Ben's Debt (major) “Ben confesses the debt”");
-  await expect(row(panel, "Themes")).toHaveText("Trust (strong), Inheritance (medium)");
+  await expect(inPiece(panel, "The Sale")).toContainText("plotline (major) “The plans have been sold”");
+  await expect(inPiece(panel, "Ben's Debt")).toContainText("plotline (major) “Ben confesses the debt”");
+  await expect(inPiece(panel, "Trust")).toContainText("theme (strong)");
+  await expect(inPiece(panel, "Inheritance")).toContainText("theme (medium)");
 
   // Each row edited in place from its pencil; Enter saves a single field and returns to the row.
   await panel.getByRole("button", { name: "Edit synopsis" }).click();
@@ -68,27 +71,34 @@ test("edits every detail of a scene, changing only those lines of its front matt
   await page.keyboard.press("Escape");
   await expect(panel.getByRole("img", { name: "Status: drafted" })).toBeVisible();
 
-  await panel.getByRole("button", { name: "Edit point of view" }).click();
+  // A card's pencil edits the field that names it here; Done returns to that pencil.
+  const pencil = inPiece(panel, "Ada Varn").getByRole("button", { name: "Edit point of view" });
+  await pencil.click();
   await pick(page, /^Point of view/, "ben");
   await expect(panel.getByRole("button", { name: /^Point of view/ })).toHaveAccessibleName("Point of view Ben Varn");
   await panel.getByRole("button", { name: "Done" }).click();
-  await expect(row(panel, "Point of view")).toHaveText("Ben Varn");
+  await expect(inPiece(panel, "Ben Varn")).toContainText("point of view");
+  await expect(inPiece(panel, "Ada Varn")).toContainText("present");
+  await expect(inPiece(panel, "Ada Varn").getByRole("button", { name: "Edit characters" })).toBeFocused();
 
-  await panel.getByRole("button", { name: "Edit characters" }).click();
+  // Any entry field from Add… over the cards: what's added shows at once.
+  await editField(panel, "Characters");
   await pick(page, /^Add to characters/, "kost"); // by alias
   await panel.getByRole("button", { name: "Done" }).click();
-  await panel.getByRole("button", { name: "Edit where" }).click();
+  await expect(inPiece(panel, "Mirela Kost")).toContainText("present");
+  await expect(panel.getByRole("button", { name: "Add to this scene…" })).toBeFocused();
+  await editField(panel, "Where");
   await pick(page, /^Add to locations/, "the station");
   await panel.getByRole("button", { name: "Remove “The Varn Bridge”" }).click();
   await panel.getByRole("button", { name: "Done" }).click();
-  await expect(row(panel, "Where")).toHaveText("Varn Station");
+  await expect(inPiece(panel, "Varn Station")).toContainText("set here");
 
-  await panel.getByRole("button", { name: "Edit plotlines" }).click();
+  await editField(panel, "Plotlines");
   await panel.getByRole("textbox", { name: "Beat of “The Sale”" }).fill("Ben has sold the plans");
   await page.keyboard.press("Tab");
   await panel.getByRole("combobox", { name: "Weight of “Ben's Debt”" }).selectOption("minor");
   await panel.getByRole("button", { name: "Done" }).click();
-  await panel.getByRole("button", { name: "Edit themes" }).click();
+  await editField(panel, "Themes");
   await panel.getByRole("combobox", { name: "Strength of “Inheritance”" }).selectOption("1");
   await panel.getByRole("button", { name: "Done" }).click();
 
@@ -109,7 +119,7 @@ test("edits every detail of a scene, changing only those lines of its front matt
   await expect(row(panel, "When")).toHaveText("Day 4, 19:00 · 1 h");
 
   // A detail it hasn't yet: behind Add….
-  await panel.getByRole("button", { name: "Add…" }).click();
+  await panel.getByRole("button", { name: "Add…", exact: true }).click();
   await page.getByRole("menuitem", { name: "Tags" }).click();
   await panel.getByRole("textbox", { name: "Tags" }).fill("turning point, night");
   await page.keyboard.press("Enter");
@@ -151,7 +161,7 @@ test("edits every detail of a scene, changing only those lines of its front matt
       ].join("\n"),
     );
   expect(body(novel.read(BETRAYAL))).toBe(body(before));
-  await expect(row(panel, "Characters")).toHaveText("Ada Varn, Ben Varn, Mirela Kost");
+  for (const name of ["Ada Varn", "Ben Varn", "Mirela Kost"]) await expect(inPiece(panel, name)).toHaveCount(1);
 
   await palette(page, "hide the right sidebar");
   await expect(panel).toHaveCount(0);
@@ -180,7 +190,7 @@ test("in a chapter, follows the scene the caret is in; steps to others; names op
   await expect(bridge).toBeVisible();
 
   // A name opens its entry on the Entry tab.
-  await row(bridge, "Point of view").getByRole("button", { name: "Ada Varn" }).click();
+  await inPiece(bridge, "Ada Varn").getByRole("button", { name: /^Ada Varn/ }).click();
   await expect(page.getByRole("tab", { name: "Entry", exact: true })).toHaveAttribute("aria-selected", "true");
   await expect(page.getByRole("region", { name: "Ada Varn" })).toBeFocused();
   await page.getByRole("tab", { name: "Scene", exact: true }).click();
@@ -199,7 +209,7 @@ test("makes a new entry from a picker, and lists custom types in groups of their
   const url = page.url();
 
   // Someone new, from the characters picker: made, and in the scene at once.
-  await panel.getByRole("button", { name: "Edit characters" }).click();
+  await editField(panel, "Characters");
   await panel.getByRole("button", { name: /^Add to characters/ }).click();
   await page.keyboard.type("Lena Dray");
   await expect(page.getByRole("option", { name: "New character “Lena Dray”" })).toBeVisible();
@@ -212,10 +222,10 @@ test("makes a new entry from a picker, and lists custom types in groups of their
   expect(page.url()).toBe(url);
 
   await panel.getByRole("button", { name: "Done" }).click();
-  await expect(row(panel, "Characters")).toContainText("Lena Dray");
+  await expect(inPiece(panel, "Lena Dray")).toContainText("present");
 
-  // Artifacts: a row of their own, kept in the scene's entities.
-  await panel.getByRole("button", { name: "Edit artifacts" }).click();
+  // Artifacts: a field of their own, kept in the scene's entities.
+  await editField(panel, "Artifacts");
   const artifacts = panel.getByRole("group", { name: "Artifacts" });
   await expect(artifacts).toContainText("The Original Plans");
   await artifacts.getByRole("button", { name: "Remove “The Original Plans”" }).click();
@@ -232,7 +242,7 @@ test("makes a new entry from a picker, and lists custom types in groups of their
   await axe(page);
 });
 
-test("lists the built-in details first, then custom types by name", async ({ page, app }) => {
+test("lists the built-in fields first, then custom types by name", async ({ page, app }) => {
   await open(page, app);
   const id = new URL(page.url()).pathname.split("/")[2]!;
   // From the page, as the app asks: the engine may be in it (#51).
@@ -245,15 +255,14 @@ test("lists the built-in details first, then custom types by name", async ({ pag
   await expect(page.getByRole("textbox", { name: "Chapter text" })).toBeFocused();
   await palette(page, "show the scene's details");
   const panel = page.getByRole("region", { name: /^Details of/ });
-  // The rows it has, then the ones behind Add…: each in the same order.
-  const order = ["Point of view", "Where", "Characters", "When", "Plotlines", "Artifacts", "Prizes", "Themes", "Tags"];
+  // Every entry field behind Add… over who's in it, in the card's order; the other details as rows
+  // or behind their own Add….
+  await panel.getByRole("button", { name: "Add to this scene…" }).click();
+  await expect(page.getByRole("menu", { name: "Add to this scene…" }).getByRole("menuitem")).toHaveText(["Point of view", "Where", "Characters", "Plotlines", "Artifacts", "Prizes", "Themes"]);
+  await page.keyboard.press("Escape");
   const rows = await panel.locator("dt").allTextContents();
-  await panel.getByRole("button", { name: "Add…" }).click();
-  const menu = page.getByRole("menu", { name: "Add…" });
-  await expect(menu.getByRole("menuitem", { name: "Prizes" })).toBeVisible();
-  const empty = await menu.getByRole("menuitem").allTextContents();
-  expect(rows).toEqual(order.filter((l) => rows.includes(l)));
-  expect(empty).toEqual(order.filter((l) => empty.includes(l)));
-  expect([...rows, ...empty].sort()).toEqual([...order].sort());
+  await panel.getByRole("button", { name: "Add…", exact: true }).click();
+  const empty = await page.getByRole("menu", { name: "Add…" }).getByRole("menuitem").allTextContents();
+  expect([...rows, ...empty]).toEqual(["When", "Tags"]);
   await axe(page);
 });
