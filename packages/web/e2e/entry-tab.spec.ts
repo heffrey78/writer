@@ -61,7 +61,7 @@ test("the Entry tab: a sheet to read, Back and Forward through names opened, a p
 
   // Edited in place, as on its page.
   await ada.getByRole("button", { name: "Edit occupation" }).click();
-  await expect(ada.getByRole("textbox", { name: "Field name" })).toBeFocused();
+  await expect(ada.getByRole("textbox", { name: "Occupation" })).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(ada.getByRole("button", { name: "Edit occupation" })).toBeFocused();
   await expect(ada.getByRole("heading", { level: 2, name: "Ada Varn" })).toBeVisible();

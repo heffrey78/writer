@@ -40,10 +40,13 @@ test("adds a character, fills in the details and notes, all saved to its file", 
   await page.getByRole("button", { name: "Add a summary" }).click();
   await page.keyboard.type("Ada's aunt, who never left.");
   await page.keyboard.press("Enter");
-  await page.getByRole("button", { name: "Add a field" }).click();
-  await page.getByRole("textbox", { name: "Field name" }).fill("age");
-  await page.getByRole("textbox", { name: "Value" }).fill("67");
+  // A character's fields are ready (#138): Age, a number, filled from its Add….
+  await expect(page.getByRole("region", { name: "Ilse Varn" }).locator('dl[aria-label="Fields"]').first().locator("dt")).toHaveText(["Age", "Occupation", "Appearance", "Wants", "Fears"]);
+  await page.getByRole("button", { name: "Add age" }).click();
+  await expect(page.getByRole("textbox", { name: "Age" })).toBeFocused();
+  await page.keyboard.type("67");
   await page.keyboard.press("Enter");
+  await expect(page.getByRole("button", { name: "Edit age" })).toBeFocused();
   await expect(page.getByRole("definition").filter({ hasText: "67" })).toBeVisible();
   await page.getByRole("button", { name: "Add tags" }).click();
   await page.keyboard.type("family, Varn");
@@ -51,7 +54,7 @@ test("adds a character, fills in the details and notes, all saved to its file", 
   await expect.poll(() => novel.read(file)).toMatch(/tags:\n {2}- family\n {2}- Varn\n/);
   expect(novel.read(file)).toContain("summary: Ada's aunt, who never left.");
   expect(novel.read(file)).toMatch(/aliases:\n {2}- Ilse\n {2}- the Aunt\n/);
-  expect(novel.read(file)).toMatch(/fields:\n {2}age: "67"\n/);
+  expect(novel.read(file)).toMatch(/fields:\n {2}age: 67\n/);
   expect(novel.read(file)).toMatch(/tags:\n {2}- family\n {2}- Varn\n/);
   expect(novel.lastCommit()).toBe("Bible: edit Ilse Varn");
 
@@ -62,13 +65,24 @@ test("adds a character, fills in the details and notes, all saved to its file", 
   await expect(page.getByRole("button", { name: "Edit summary" })).toBeFocused();
   await expect(page.getByRole("region", { name: "Ilse Varn" }).getByText("Ada's aunt, who never left.", { exact: true })).toBeVisible();
 
-  // A field renamed and changed, another added and removed.
-  await page.getByRole("button", { name: "Edit age" }).click();
+  // A field of its own, under Other: added, renamed and changed, another refused and it removed.
+  await page.getByRole("button", { name: "Add a field" }).click();
+  await page.getByRole("textbox", { name: "Field name" }).fill("nickname");
+  await page.getByRole("textbox", { name: "Value" }).fill("Ils");
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("heading", { name: "Other" })).toBeVisible();
+  await expect.poll(() => novel.read(file)).toMatch(/fields:\n {2}age: 67\n {2}nickname: Ils\n/);
+  await page.getByRole("button", { name: "Edit nickname" }).click();
   await page.getByRole("textbox", { name: "Field name" }).fill("born");
   await page.getByRole("textbox", { name: "Value" }).fill("1958");
   await page.keyboard.press("Enter");
-  await expect.poll(() => novel.read(file)).toMatch(/fields:\n {2}born: "1958"\n/);
+  await expect.poll(() => novel.read(file)).toMatch(/fields:\n {2}age: 67\n {2}born: "1958"\n/);
   await expect(page.getByRole("button", { name: "Edit born" })).toBeFocused();
+  await page.getByRole("button", { name: "Add a field" }).click();
+  await page.getByRole("textbox", { name: "Field name" }).fill("occupation");
+  await page.keyboard.press("Enter");
+  await expect(page.getByText("There's already a field “occupation”.")).toBeVisible();
+  await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Add a field" }).click();
   await page.getByRole("textbox", { name: "Field name" }).fill("born");
   await page.keyboard.press("Enter");

@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Page } from "@playwright/test";
 import { axe, expect, openView, palette, test, type App } from "./fixtures.ts";
@@ -72,4 +74,57 @@ test("its outline adds a session in place, in a game master's words (#117)", asy
   await page.keyboard.press("Enter");
   await expect(page.getByRole("link", { name: "The next session" })).toBeVisible();
   await expect(page.getByRole("button", { name: "New arc" })).toBeVisible();
+});
+
+test("an NPC's fields are ready; a faction picked from its list is written by its ID, a new location made from the picker, and the faction lists the NPC (#138)", async ({ page, app }) => {
+  const dir = app.bookRepo(sample, "campaign");
+  await app.restart(dir);
+  await page.goto(app.launchUrl);
+  await expect(page.getByRole("textbox", { name: "Arc text" })).toBeFocused();
+  const read = (path: string) => readFileSync(join(dir, path), "utf8");
+
+  await palette(page, "new npc");
+  await page.getByRole("dialog").getByRole("textbox", { name: "Name" }).fill("Orrin");
+  await page.keyboard.press("Enter");
+  const profile = page.getByRole("region", { name: "Orrin" });
+  await expect(profile.getByRole("heading", { level: 2, name: "Orrin" })).toBeVisible();
+  await expect(profile.locator('dl[aria-label="Fields"]').first().locator("dt")).toHaveText(["Status", "Faction", "Disposition", "Location", "Voice"]);
+  // Nothing written until a field is filled.
+  const file = "codex/npcs/orrin.md";
+  expect(read(file)).not.toContain("fields:");
+
+  // Faction from its picker: chosen by typing, saved at once, its ID and nothing else written.
+  await page.getByRole("button", { name: "Add faction" }).click();
+  await expect(page.getByRole("button", { name: /^Faction/ })).toBeFocused();
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("tide");
+  await page.keyboard.press("Enter");
+  await expect(profile.getByRole("link", { name: "The Tide Choir" })).toBeVisible();
+  await expect.poll(() => read(file)).toMatch(/^---\nid: npc_[0-9a-z]{6}\nname: Orrin\nfields:\n {2}faction: fac_t1de00\n---\n$/);
+  await expect(page.getByRole("button", { name: "Edit faction" })).toBeFocused();
+
+  // Status, one of its options; a location that isn't in the codex yet, made from the picker.
+  await page.getByRole("button", { name: "Add status" }).click();
+  await page.getByRole("combobox", { name: "Status" }).selectOption("missing");
+  await page.keyboard.press("Enter");
+  await expect.poll(() => read(file)).toContain("  status: missing\n");
+  await page.getByRole("button", { name: "Add location" }).click();
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("The Lighthouse");
+  await page.getByRole("option", { name: "New location “The Lighthouse”" }).click();
+  await expect(profile.getByRole("link", { name: "The Lighthouse" })).toBeVisible();
+  await expect.poll(() => read(file)).toMatch(/ {2}location: loc_[0-9a-z]{6}\n/);
+  const location = /location: (loc_[0-9a-z]{6})/.exec(read(file))![1]!;
+  expect(read("codex/locations/the-lighthouse.md")).toContain(`id: ${location}\nname: The Lighthouse\n`);
+  for (const colorScheme of ["light", "dark"] as const) {
+    await page.emulateMedia({ colorScheme });
+    await axe(page);
+  }
+  await page.emulateMedia({ colorScheme: "light" });
+
+  // The faction names Orrin among its NPCs, as a link to him.
+  await profile.getByRole("link", { name: "The Tide Choir" }).click();
+  const named = page.getByRole("region", { name: "Named in their fields" });
+  await expect(named.locator("dt")).toHaveText(["NPCs · Faction"]);
+  await expect(named.getByRole("link", { name: "Orrin" })).toBeVisible();
 });

@@ -43,6 +43,24 @@ async function listWrites(root: string, novel: Book, fields: EntityFields["field
   return toolWrites(root);
 }
 
+/**
+ * An entry's fields changed from `before` to `after`, as edits of the keys that changed alone, so the
+ * rest of `fields:` (its comments, its layout, its order) stays byte for byte. Fields renamed or
+ * reordered are written whole, in their new order.
+ */
+function fieldEdits(before: Record<string, unknown>, after: Record<string, unknown>): YamlEdit[] {
+  const was = Object.keys(before), now = Object.keys(after);
+  if (!now.length) return was.length ? [{ path: ["fields"], remove: true }] : [];
+  const kept = now.filter((k) => was.includes(k));
+  const inOrder = kept.every((k, i) => k === was.filter((x) => now.includes(x))[i]) && now.slice(kept.length).every((k) => !was.includes(k)) && now.slice(0, kept.length).every((k) => was.includes(k));
+  if (!inOrder) return [{ path: ["fields"], value: after }];
+  const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+  return [
+    ...was.filter((k) => !now.includes(k)).map((k): YamlEdit => ({ path: ["fields", k], remove: true })),
+    ...now.filter((k) => !same(before[k], after[k])).map((k): YamlEdit => ({ path: ["fields", k], value: after[k] })),
+  ];
+}
+
 /** What an entity's front matter holds, apart from its ID. */
 export interface EntityFields {
   name?: string;
@@ -159,7 +177,9 @@ export class BibleOperations {
       if (hashText(text) !== base) throw new OperationError("STALE", `“${entity.name}” changed since it was read.`, { path: entity.file });
       if (changes.name !== undefined) required(changes.name, "name");
       const tools = await listWrites(this.root, novel, changes.fields);
-      const edits = Object.entries(changes).map(([key, value]) => (value === null ? { path: [key], remove: true as const } : { path: [key], value }));
+      const edits = Object.entries(changes).flatMap(([key, value]): YamlEdit[] =>
+        value === null ? [{ path: [key], remove: true }] : key === "fields" ? fieldEdits(entity.fields, value as Record<string, unknown>) : [{ path: [key], value }],
+      );
       const content = editFrontMatter(text, edits);
       let file = entity.file;
       const writes: FileWrite[] = [];

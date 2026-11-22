@@ -1,15 +1,15 @@
 import type { EntityFields, Reference } from "@writer/client";
 import { referenceText } from "./references.ts";
-import { entityOfLabel, roleOf, vocabulary, type Entity, type Book, type FieldValue, type Relationship } from "@writer/core";
+import { entityOfLabel, roleOf, vocabulary, type Entity, type Book, type Relationship } from "@writer/core";
 import { useGitHubRepo } from "../github/repo.ts";
 import { EntryIssues } from "../issues/entry-issues.tsx";
 import { useIssueList } from "../issues/use-issues.ts";
 import { useNotice } from "../novel/notice.tsx";
 import { SceneEditor, type SpellService } from "@writer/editor/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Trash2, X } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { AlertDialog } from "radix-ui";
-import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { useStore } from "zustand";
 import { imageUrl } from "@writer/client";
@@ -20,7 +20,8 @@ import { Button } from "../ui/button.tsx";
 import { cn } from "../ui/cn.ts";
 import { Picture, PictureSlot, usePictureUrl } from "./picture.tsx";
 import { pictureAlt, shapeForType } from "./pictures.ts";
-import { AddButton, EditorButtons, EditorFrame, FieldRows, Lead, PencilButton, readField, TextEditor, useInPlace, type InPlace } from "./profile.tsx";
+import { AddButton, Lead, PencilButton, TextEditor, useInPlace } from "./profile.tsx";
+import { EntryFields, NamedBy } from "./entry-fields.tsx";
 import { RelationshipArcs } from "./arcs.tsx";
 import { NotesAbout } from "../notes/notes-about.tsx";
 import { InTheStory } from "./strip.tsx";
@@ -136,15 +137,6 @@ export function EntryPage({
     },
   });
 
-  const fields = Object.entries(entity.fields);
-  /** The fields with one changed, added (`at` past the end) or removed (`to` undefined), in their order. */
-  const withField = (at: number, to: [string, FieldValue] | undefined) => {
-    const next = [...fields];
-    if (to === undefined) next.splice(at, 1);
-    else next.splice(at, 1, to);
-    return Object.fromEntries(next);
-  };
-
   const Heading = embedded && !embedded.modal ? "h2" : "h1";
   return (
     <div className={embedded ? (tab ? "grid gap-4" : "grid gap-5") : "mx-auto grid w-full max-w-[calc(var(--ghw-prose-measure)+3rem)] gap-5 px-6 py-6"}>
@@ -241,32 +233,8 @@ export function EntryPage({
         </AddButton>
       )}
 
-      <div className="grid gap-1">
-        {fields.length > 0 && (
-          <FieldRows
-            fields={fields}
-            compact={tab}
-            value={(key, value, i) =>
-              place.editing === `field:${key}` ? (
-                <FieldEditor place={place} name={key} value={value} others={fields.map(([k]) => k).filter((k) => k !== key)} onSave={(to) => change({ fields: withField(i, to) })} />
-              ) : (
-                <>
-                  <span className="flex-1">{readField(value, novel)}</span>
-                  {/* A list of entries is edited from its picker (#163), not as a line of text. */}
-                  {!Array.isArray(value) && <PencilButton place={place} part={`field:${key}`} label={key.replace(/_/g, " ")} />}
-                </>
-              )
-            }
-          />
-        )}
-        {place.editing === "field:" ? (
-          <FieldEditor place={place} name="" value="" others={fields.map(([k]) => k)} onSave={(to) => change({ fields: withField(fields.length, to) })} />
-        ) : (
-          <AddButton place={place} part="field:">
-            Add a field
-          </AddButton>
-        )}
-      </div>
+      <EntryFields novelId={novelId} novel={novel} entity={entity} place={place} change={(fields) => change({ fields })} compact={tab} />
+      <NamedBy novelId={novelId} novel={novel} entity={entity} compact={tab} />
 
       {!tab && (
         <PartsStrip
@@ -398,90 +366,6 @@ function PartsStrip({ label, parts }: { label: string; parts: { id: string; labe
         </button>
       ))}
     </nav>
-  );
-}
-
-/**
- * A field edited in place: its name and value (a number stays a number, true/false a checkbox), saved
- * together; Remove takes it off. A name another field has is refused.
- */
-function FieldEditor({
-  place,
-  name,
-  value,
-  others,
-  onSave,
-}: {
-  place: InPlace;
-  name: string;
-  value: FieldValue;
-  others: string[];
-  onSave: (to: [string, FieldValue] | undefined) => Promise<unknown>;
-}) {
-  const [key, setKey] = useState(name);
-  const [text, setText] = useState(String(value));
-  const [problem, setProblem] = useState<string>();
-  const [saving, setSaving] = useState(false);
-  const isNew = name === "";
-  const run = async (to: [string, FieldValue] | undefined) => {
-    setSaving(true);
-    try {
-      await onSave(to);
-      // Back to the field under its name now, or, removed, to "+ Add a field".
-      place.done(to ? `field:${to[0]}` : "field:");
-      return true;
-    } catch (e) {
-      setProblem(e instanceof Error ? e.message : String(e));
-      return false;
-    } finally {
-      setSaving(false);
-    }
-  };
-  const save = async () => {
-    const k = key.trim();
-    // A new field left with nothing in it is no field.
-    if (isNew && !k && !text.trim()) return (place.done(), true);
-    if (!k) return (setProblem("A field needs a name."), false);
-    if (others.includes(k)) return (setProblem(`There's already a field “${k}”.`), false);
-    const v: FieldValue = typeof value === "boolean" ? text === "true" : typeof value === "number" && text.trim() !== "" && !Number.isNaN(Number(text)) ? Number(text) : text.trim();
-    if (k === name && v === value) return (place.done(), true);
-    return run([k, v]);
-  };
-  const enter = (e: KeyboardEvent) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      void save();
-    }
-  };
-  return (
-    <EditorFrame place={place} className="flex-1" save={save}>
-      <div className="grid gap-2 sm:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-        <label className="grid gap-1 text-xs font-medium">
-          Field name
-          <input value={key} onChange={(e) => setKey(e.target.value)} onKeyDown={enter} className="h-8 w-full min-w-0 rounded-md border border-rule bg-raised px-2 text-sm font-normal" />
-        </label>
-        {typeof value === "boolean" ? (
-          <label className="flex items-center gap-2 self-end pb-1.5 text-sm">
-            <input type="checkbox" checked={text === "true"} onChange={(e) => setText(String(e.target.checked))} />
-            {key || "Value"}
-          </label>
-        ) : (
-          <label className="grid gap-1 text-xs font-medium">
-            Value
-            <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={enter} inputMode={typeof value === "number" ? "decimal" : undefined} className="h-8 w-full min-w-0 rounded-md border border-rule bg-raised px-2 text-sm font-normal" />
-          </label>
-        )}
-      </div>
-      {problem && <p className="text-xs text-danger">{problem}</p>}
-      <div className="flex flex-wrap items-center gap-2">
-        <EditorButtons onSave={() => void save()} onCancel={() => place.done()} saving={saving} hint="Enter saves · Esc cancels" />
-        {!isNew && (
-          <Button size="sm" variant="ghost" onClick={() => void run(undefined)} disabled={saving}>
-            <X className="size-4" aria-hidden /> Remove the field
-          </Button>
-        )}
-      </div>
-    </EditorFrame>
   );
 }
 

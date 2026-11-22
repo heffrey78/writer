@@ -89,6 +89,25 @@ describe("entities", () => {
     await expect(bible.updateEntity(ADA, hash(ADA_FILE), { name: " " })).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 
+  it("writes only the fields that changed, keeping the rest of fields: as it was (#163)", async () => {
+    writeFileSync(join(dir, ADA_FILE), read(ADA_FILE).replace("  age: 31\n", "  # at the start of the book\n  age: 31\n"));
+    gitIn(dir, "commit", "-qam", "A comment");
+    const before = read(ADA_FILE);
+    await bible.updateEntity(ADA, hash(ADA_FILE), { fields: { age: 31, occupation: "Engineer", eyes: "grey", home: "loc_h0me5t" } });
+    expect(read(ADA_FILE)).toBe(before.replace("  occupation: Structural engineer\n  eyes: grey\n", "  occupation: Engineer\n  eyes: grey\n  home: loc_h0me5t\n"));
+    await bible.updateEntity(ADA, hash(ADA_FILE), { fields: { age: 31, eyes: "grey", home: "loc_h0me5t" } });
+    expect(read(ADA_FILE)).toContain("fields:\n  # at the start of the book\n  age: 31\n  eyes: grey\n  home: loc_h0me5t\n");
+  });
+
+  it("never writes a list of entries into a novel in format 2, which gh-writer reads (D18)", async () => {
+    await expect(bible.updateEntity(ADA, hash(ADA_FILE), { fields: { friends: [BEN] } })).rejects.toMatchObject({ code: "NEEDS_MIGRATION" });
+    clean();
+    await bible.migrate(3);
+    await bible.updateEntity(ADA, hash(ADA_FILE), { fields: { age: 31, occupation: "Structural engineer", eyes: "grey", friends: [BEN] } });
+    expect(read(ADA_FILE)).toContain(`  eyes: grey\n  friends:\n    - ${BEN}\n`);
+    expect((await valid()).entities.find((e) => e.id === ADA)!.fields["friends"]).toEqual([BEN]);
+  });
+
   it("refuses to delete an entity that's referred to, listing every reference, until confirmed", async () => {
     const head = gitIn(dir, "rev-parse", "HEAD").trim();
     const refusal = await bible.deleteEntity(ADA, hash(ADA_FILE)).catch((e: unknown) => e);
