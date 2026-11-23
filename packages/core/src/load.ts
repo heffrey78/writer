@@ -4,6 +4,7 @@ import { kindByKey, knownKind, startLevels, V2_KIND, type BookKind, type LevelDe
 import { recordTypesOf, withModules } from "./modules.ts";
 import { EVENT_FILES_FORMAT, MANIFEST, NOVEL_MANIFEST, readManifest, SCHEMA_VERSION } from "./manifest.ts";
 import type { Section, Entity, FieldChange, Book, ModuleRecord, Relationship, Piece, ThemeRef } from "./model.ts";
+import { judgementFiles, readDifferent, readNotNames } from "./judgements.ts";
 import { parseMarkdown, parseYaml } from "./parse.ts";
 import { checkSchema, type SchemaKind } from "./schemas.ts";
 import { joinPath, type FileSource } from "./source.ts";
@@ -53,6 +54,8 @@ export async function loadBook(source: FileSource, kind?: BookKind): Promise<Boo
     moduleRecords: [],
     notes: [],
     layouts: {},
+    notNames: [],
+    different: [],
     diagnostics,
   };
 
@@ -110,6 +113,21 @@ export async function loadBook(source: FileSource, kind?: BookKind): Promise<Boo
   await loadManuscript();
   await loadBible();
   await loadNotes();
+
+  // The index's judgements (D19): read leniently, a line that isn't one skipped with a warning.
+  const judgements = judgementFiles(bookKind);
+  const notNames = await source.read(judgements.notNames);
+  if (notNames !== undefined) {
+    const read = readNotNames(notNames, judgements.notNames);
+    novel.notNames = read.items;
+    diagnostics.push(...read.diagnostics);
+  }
+  const different = await source.read(judgements.different);
+  if (different !== undefined) {
+    const read = readDifferent(different, judgements.different);
+    novel.different = read.items;
+    diagnostics.push(...read.diagnostics);
+  }
 
   const layouts = await yamlFile("diagrams/layouts.yaml", "layouts");
   if (layouts && isObject(layouts["layouts"])) novel.layouts = layouts["layouts"] as Book["layouts"];

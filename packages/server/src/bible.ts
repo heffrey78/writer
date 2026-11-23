@@ -24,13 +24,24 @@ import {
   vocabulary,
   type Book,
   type Entity,
+  type NotName,
+  DIFFERENT_HEADER,
+  differentLine,
+  judgedDifferent,
+  judgementFiles,
+  NOT_NAMES_HEADER,
+  notNameLine,
+  pair,
+  readDifferent,
+  readNotNames,
+  unionLines,
   type Relationship,
   type SeriesSlot,
   type SidebarFile,
   type YamlEdit,
 } from "@writer/core";
 import { parse, stringify } from "yaml";
-import { hashText, IMAGES_DIR, MAX_IMAGE_BYTES, sniffImage } from "./files.ts";
+import { GITATTRIBUTES, hashText, IMAGES_DIR, MAX_IMAGE_BYTES, sniffImage } from "./files.ts";
 import type { ManuscriptOperations } from "./manuscript.ts";
 import { migrateNovel, migrationWrites, overlay, toolWrites } from "./migrate.ts";
 import { OperationError, transaction, type FileWrite, type OperationResult } from "./operations.ts";
@@ -773,6 +784,94 @@ export class BibleOperations {
       const content = editYaml(await this.#read(novel.manifest), [...editsAt(["relationship_types", index], rest), ...styleEdits]);
       return transaction(this.root, [{ path: novel.manifest, content }], `${codex(novel)}: edit the “${key}” relationship`);
     });
+  }
+
+  // ——— The index's judgements (D19) ———
+
+  /**
+   * Keep that a word in a piece isn't the entry it looks like ("Not a name here"): a line added to the
+   * index's not-names.yaml (made, with its header, if there's none), and the book's .gitattributes told
+   * to merge that file line by line. Asked again, nothing changes.
+   */
+  notAName(judgement: NotName): Promise<OperationResult> {
+    return this.#run(async (novel) => {
+      const entry = novel.entities.find((e) => e.id === judgement?.entry);
+      const piece = novel.allPieces.find((p) => p.id === judgement?.piece);
+      if (!entry || !piece) throw new OperationError("BAD_REQUEST", "A word that isn't a name is in a piece there is, and looks like an entry there is.");
+      const n: NotName = { entry: entry.id, piece: piece.id, sentence: String(judgement.sentence ?? ""), nth: judgement.nth };
+      if (!n.sentence.trim() || !Number.isInteger(n.nth) || n.nth < 0) throw new OperationError("BAD_REQUEST", "A word that isn't a name is found by its sentence and which time the name comes in it.");
+      if (novel.notNames.some((x) => x.entry === n.entry && x.piece === n.piece && x.sentence === n.sentence && x.nth === n.nth)) return { commit: null, files: [] };
+      const file = judgementFiles(novel.kind).notNames;
+      const message = `${codex(novel)}: a word in “${piece.title || vocabulary(novel.kind).piece.one}” isn't ${entry.name}`;
+      return transaction(this.root, [await this.#addLine(file, NOT_NAMES_HEADER, notNameLine(n)), ...(await this.#unionWrites(novel))], message);
+    });
+  }
+
+  /** It's a name there after all: the judgement's line taken out. */
+  forgetNotAName(judgement: NotName): Promise<OperationResult> {
+    return this.#run(async (novel) => {
+      const file = judgementFiles(novel.kind).notNames;
+      const write = await this.#removeLines(file, (line) => {
+        const n = readNotNames(line, file).items[0];
+        return !!n && n.entry === judgement?.entry && n.piece === judgement.piece && n.sentence === judgement.sentence && n.nth === judgement.nth;
+      });
+      const name = novel.entities.find((e) => e.id === judgement?.entry)?.name ?? "it";
+      return write ? transaction(this.root, [write], `${codex(novel)}: offer ${name} there again`) : { commit: null, files: [] };
+    });
+  }
+
+  /** Keep that two entries of a type look alike but aren't the same ("They're different"): a line in the index's different.yaml. */
+  areDifferent(a: string, b: string): Promise<OperationResult> {
+    return this.#run(async (novel) => {
+      const [x, y] = [novel.entities.find((e) => e.id === a), novel.entities.find((e) => e.id === b)];
+      if (!x || !y || x === y) throw new OperationError("BAD_REQUEST", "They're different: two entries there are.");
+      if (judgedDifferent(novel, a, b)) return { commit: null, files: [] };
+      const file = judgementFiles(novel.kind).different;
+      return transaction(this.root, [await this.#addLine(file, DIFFERENT_HEADER, differentLine([a, b])), ...(await this.#unionWrites(novel))], `${codex(novel)}: ${x.name} and ${y.name} are different`);
+    });
+  }
+
+  /** They might be the same after all: the pair's line taken out. */
+  forgetDifferent(a: string, b: string): Promise<OperationResult> {
+    return this.#run(async (novel) => {
+      const file = judgementFiles(novel.kind).different;
+      const [x, y] = pair(a, b);
+      const write = await this.#removeLines(file, (line) => {
+        const p = readDifferent(line, file).items[0];
+        return !!p && p[0] === x && p[1] === y;
+      });
+      const name = (id: string) => novel.entities.find((e) => e.id === id)?.name ?? id;
+      return write ? transaction(this.root, [write], `${codex(novel)}: ${name(a)} and ${name(b)} might be the same`) : { commit: null, files: [] };
+    });
+  }
+
+  /** `file` with `line` added at its end (made with `header` if it isn't there), checked against what was read. */
+  async #addLine(file: string, header: string, line: string): Promise<FileWrite> {
+    const bytes = await filesPort().read(filesPort().join(this.root, file));
+    if (bytes === undefined) return { path: file, content: header + line, base: null };
+    const text = new TextDecoder().decode(bytes);
+    return { path: file, content: `${text}${text && !text.endsWith("\n") ? "\n" : ""}${line}`, base: hashText(bytes) };
+  }
+
+  /** `file` without the lines `drop` says to take out, or undefined if none is there. */
+  async #removeLines(file: string, drop: (line: string) => boolean): Promise<FileWrite | undefined> {
+    const bytes = await filesPort().read(filesPort().join(this.root, file));
+    if (bytes === undefined) return undefined;
+    const text = new TextDecoder().decode(bytes);
+    const lines = text.split(/(?<=\n)/);
+    const kept = lines.filter((l) => !(l.trim().startsWith("- ") && drop(l)));
+    return kept.length === lines.length ? undefined : { path: file, content: kept.join(""), base: hashText(bytes) };
+  }
+
+  /** The book's .gitattributes with the judgements' files merged line by line (git's union driver), if it doesn't say so yet. */
+  async #unionWrites(novel: Book): Promise<FileWrite[]> {
+    const bytes = await filesPort().read(filesPort().join(this.root, GITATTRIBUTES));
+    const text = bytes === undefined ? "" : new TextDecoder().decode(bytes);
+    const have = new Set(text.split(/\r?\n/).map((l) => l.trim()));
+    const missing = unionLines(novel.kind).filter((l) => !have.has(l));
+    if (!missing.length) return [];
+    const content = `${text}${text && !text.endsWith("\n") ? "\n" : ""}${missing.join("\n")}\n`;
+    return [{ path: GITATTRIBUTES, content, base: bytes === undefined ? null : hashText(bytes), tool: true }];
   }
 
   // ——— Helpers ———

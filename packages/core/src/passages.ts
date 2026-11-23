@@ -4,8 +4,10 @@ import { gfmFromMarkdown } from "mdast-util-gfm";
 import { toString } from "mdast-util-to-string";
 import { gfm } from "micromark-extension-gfm";
 import { recordTypesOf } from "./modules.ts";
+import { resolveAnchor } from "./anchor-match.ts";
 import { fieldNames } from "./index-search.ts";
-import type { Book, Piece } from "./model.ts";
+import { notNamesIn } from "./judgements.ts";
+import type { Book, NotName, Piece } from "./model.ts";
 
 /*
  * What the book says about an entry (#135): every passage that mentions it, linked or written as
@@ -404,6 +406,69 @@ export interface Passage {
    * in it, and its whole sentence's: what the writing view selects when the passage is opened.
    */
   block: { text: string; nth: number; at: [number, number]; sentence: [number, number] };
+  /** For a name written as plain words: what "Not a name here" keeps of it (D19), its sentence and which plain occurrence of the entry in it. */
+  notName?: { sentence: string; nth: number };
+}
+
+/** A name written as plain words in a block of prose: where, and what it names. */
+export interface PlainName {
+  id: string;
+  at: readonly [number, number];
+}
+
+/**
+ * Each plain name's sentence in the block (trimmed, as a passage gives it) and which plain occurrence
+ * of its entry it is in that sentence: what "Not a name here" is kept by, and found again by.
+ */
+export function plainSentences(text: string, hits: readonly PlainName[], starts = sentenceStarts(text)): { sentence: [number, number]; nth: number }[] {
+  const bounds = hits.map((h) => {
+    const [from, to] = sentenceBounds(text, h.at[0], h.at[1], starts);
+    return [from, from + text.slice(from, to).trimEnd().length] as [number, number];
+  });
+  return hits.map((h, i) => ({ sentence: bounds[i]!, nth: hits.slice(0, i).filter((g, j) => g.id === h.id && bounds[j]![0] === bounds[i]![0]).length }));
+}
+
+const spaced = (s: string) => s.replace(/\s+/g, " ").trim();
+
+/**
+ * The one rule for "Not a name here" (D19), shared by an entry's passages, a piece's names not linked
+ * and the editor's underlines: which of a block's plain names a judgement about its piece dismisses.
+ * A judgement holds for the occurrence it counted (`nth`) of its entry in its sentence, found by the
+ * sentence's words, or, edited a little since, by resolveAnchor; a sentence rewritten past that leaves
+ * it dormant, and the name is offered again.
+ */
+export function dismissedIn(text: string, hits: readonly PlainName[], judgements: readonly Pick<NotName, "entry" | "sentence" | "nth">[], starts?: number[]): Set<number> {
+  const out = new Set<number>();
+  if (!judgements.length || !hits.length) return out;
+  const where = plainSentences(text, hits, starts);
+  for (const j of judgements) {
+    const candidates = hits.flatMap((h, i) => (h.id === j.entry && where[i]!.nth === j.nth ? [i] : []));
+    if (!candidates.length) continue;
+    const sentence = spaced(j.sentence);
+    let found = candidates.find((i) => spaced(text.slice(...where[i]!.sentence)) === sentence);
+    if (found === undefined) {
+      const near = resolveAnchor(text, j.sentence);
+      if (near) found = candidates.find((i) => where[i]!.sentence[0] < near.to && where[i]!.sentence[1] > near.from);
+    }
+    if (found !== undefined) out.add(found);
+  }
+  return out;
+}
+
+/** A block's names, less the plain ones its piece's judgements dismiss. */
+function namesKept(book: Book, piece: Piece, markdown: string, b: Block, matcher: NameMatcher | undefined): NameHit[] {
+  const hits = namesInBlock(markdown, b, matcher);
+  const judgements = notNamesIn(book, piece.id);
+  if (!judgements.length) return hits;
+  const plain = hits.filter((h) => !h.linked);
+  const dismissed = dismissedIn(b.text, plain, judgements, starts(b));
+  return dismissed.size ? hits.filter((h) => h.linked || !dismissed.has(plain.indexOf(h))) : hits;
+}
+
+function starts(b: Block): number[] {
+  let at = startsCache.get(b);
+  if (!at) startsCache.set(b, (at = sentenceStarts(b.text)));
+  return at;
 }
 
 /** Each piece body's blocks, by its text: unchanged pieces keep theirs when the book is loaded again. */
@@ -444,23 +509,29 @@ export function passagesOf(book: Book, id: string): Passage[] {
     const blocks = blocksOf(piece);
     blocks.forEach((b, i) => {
       if (!terms.some((t) => b.text.includes(t)) && !b.runs.some((r) => r.id === id)) return;
-      for (const hit of namesInBlock(piece.body, b, matcher)) if (hit.id === id) out.push(passage(piece, blocks, i, hit, roles));
+      const hits = namesKept(book, piece, piece.body, b, matcher);
+      for (const hit of hits) if (hit.id === id) out.push(passage(piece, blocks, i, hit, roles, hits));
     });
   }
   return out;
 }
 
-/** A name found in a piece's `i`th block, as a passage: its sentence, and where it is. */
-function passage(piece: Piece, blocks: Block[], i: number, hit: NameHit, roles: string[]): Passage {
+/** A name found in a piece's `i`th block (among the block's `hits`), as a passage: its sentence, and where it is. */
+function passage(piece: Piece, blocks: Block[], i: number, hit: NameHit, roles: string[], hits: NameHit[]): Passage {
   const b = blocks[i]!;
-  let starts = startsCache.get(b);
-  if (!starts) startsCache.set(b, (starts = sentenceStarts(b.text)));
-  const { text, at } = sentenceAround(b.text, hit.at, 30, starts);
+  const at0 = starts(b);
+  const { text, at } = sentenceAround(b.text, hit.at, 30, at0);
   let nth = 0;
   for (let j = 0; j < i; j++) if (blocks[j]!.text === b.text) nth++;
-  const [from, to] = sentenceBounds(b.text, hit.at[0], hit.at[1], starts);
+  const [from, to] = sentenceBounds(b.text, hit.at[0], hit.at[1], at0);
   const sentence: [number, number] = [from, from + b.text.slice(from, to).trimEnd().length];
-  return { piece, linked: hit.linked, text, at, ...(hit.raw ? { raw: hit.raw } : {}), roles, block: { text: b.text, nth, at: hit.at, sentence } };
+  let notName: Passage["notName"];
+  if (!hit.linked) {
+    const plain = hits.filter((h) => !h.linked);
+    const k = plain.indexOf(hit);
+    notName = { sentence: b.text.slice(...sentence), nth: plainSentences(b.text, plain, at0)[k]!.nth };
+  }
+  return { piece, linked: hit.linked, text, at, ...(hit.raw ? { raw: hit.raw } : {}), roles, block: { text: b.text, nth, at: hit.at, sentence }, ...(notName ? { notName } : {}) };
 }
 
 /**
@@ -473,10 +544,11 @@ export function namesNotLinkedIn(book: Book, piece: Piece): { id: string; passag
   const byId = new Map<string, Passage[]>();
   const blocks = blocksOf(piece);
   blocks.forEach((b, i) => {
-    for (const hit of namesInBlock(piece.body, b, matcher)) {
+    const hits = namesKept(book, piece, piece.body, b, matcher);
+    for (const hit of hits) {
       if (hit.linked) continue;
       const roles = Object.keys(piece.fields).filter((k) => fieldNames(piece.fields[k], hit.id));
-      byId.set(hit.id, [...(byId.get(hit.id) ?? []), passage(piece, blocks, i, hit, roles)]);
+      byId.set(hit.id, [...(byId.get(hit.id) ?? []), passage(piece, blocks, i, hit, roles, hits)]);
     }
   });
   return [...byId].map(([id, passages]) => ({ id, passages }));

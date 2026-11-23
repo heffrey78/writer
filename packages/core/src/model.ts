@@ -38,6 +38,10 @@ export interface Book {
   layouts: Record<string, { nodes: Record<string, { x: number; y: number }> }>;
   /** compile.yaml, if there is one. */
   compile?: CompileFile;
+  /** Words in pieces that look like an entry's name but aren't it there ("Not a name here", D19): the index's not-names.yaml. */
+  notNames: NotName[];
+  /** Entries that look alike but aren't the same ("They're different", D19), each pair in order: the index's different.yaml. */
+  different: [string, string][];
   /** Diagnostics found while loading (parse, schema and structure problems). */
   diagnostics: Diagnostic[];
 }
@@ -309,4 +313,15 @@ export function mentions(body: string): Mention[] {
     for (const m of lineText.matchAll(MENTION)) out.push({ text: m[1]!, id: m[2]!, line: i + 1 });
   });
   return out;
+}
+
+/**
+ * A word in a piece that looks like an entry's name but isn't it there (D19): the sentence it's in, as
+ * core's passages give it, and which plain occurrence of the entry's names in that sentence (from 0).
+ */
+export interface NotName {
+  entry: string;
+  piece: string;
+  sentence: string;
+  nth: number;
 }

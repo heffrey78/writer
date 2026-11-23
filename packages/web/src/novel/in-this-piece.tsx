@@ -1,8 +1,9 @@
 import { entriesInPiece, entryIds, itemText, namesNotLinkedIn, vocabulary, type Book, type InPiece, type Passage, type Piece } from "@writer/core";
 import { linkName, passageRange } from "@writer/editor";
-import { Pencil, Pin, PinOff } from "lucide-react";
+import { Pencil, Pin, PinOff, X } from "lucide-react";
 import { useDeferredValue, useId, useMemo, useState, type ReactNode } from "react";
 import { linkPassage } from "../bible/link-passage.ts";
+import { judgementOf, useNotAName } from "../bible/not-names.ts";
 import { setPinned, usePinnedEntries } from "../bible/pins.ts";
 import { Picture, usePictureUrl } from "../bible/picture.tsx";
 import { shapeForType } from "../bible/pictures.ts";
@@ -86,7 +87,7 @@ export function InThisPiece({ novelId, novel, workspace, piece, editing, onEdit,
           </ul>
         )
       )}
-      <NotLinkedHere novel={novel} workspace={workspace} piece={piece} onLinked={setSaid} />
+      <NotLinkedHere novelId={novelId} novel={novel} workspace={workspace} piece={piece} onLinked={setSaid} />
     </section>
   );
 }
@@ -96,7 +97,8 @@ export function InThisPiece({ novelId, novel, workspace, piece, editing, onEdit,
  * one linked selects its first in the text and makes it a mention there, as Alt+Enter does (or, the
  * piece not in the editor, in its file, as from an entry's profile).
  */
-function NotLinkedHere({ novel, workspace, piece, onLinked }: { novel: Book; workspace: Workspace; piece: Piece; onLinked: (said: string) => void }) {
+function NotLinkedHere({ novelId, novel, workspace, piece, onLinked }: { novelId: string; novel: Book; workspace: Workspace; piece: Piece; onLinked: (said: string) => void }) {
+  const notAName = useNotAName(novelId, novel);
   // After the keystroke, not in its way: a 10,000-word piece takes a few milliseconds to read.
   const later = useDeferredValue(piece);
   const names = useMemo(() => namesNotLinkedIn(novel, later), [novel, later]);
@@ -123,7 +125,7 @@ function NotLinkedHere({ novel, workspace, piece, onLinked }: { novel: Book; wor
         {names.map(({ id, passages }) => {
           const words = passages[0]!.text.slice(...passages[0]!.at);
           return (
-            <li key={id}>
+            <li key={id} className="flex items-center">
               <button
                 type="button"
                 onClick={() => void link(id, passages[0]!)}
@@ -134,6 +136,17 @@ function NotLinkedHere({ novel, workspace, piece, onLinked }: { novel: Book; wor
                 {words}
                 {words !== nameOf(id) && <span className="text-muted"> → {nameOf(id)}</span>} · {passages.length}
               </button>
+              {judgementOf(passages[0]!, id) && (
+                <button
+                  type="button"
+                  onClick={() => void notAName(judgementOf(passages[0]!, id)!, words)}
+                  aria-label={`The first “${words}” isn't ${nameOf(id)}: not a name here`}
+                  title={`Not a name here: the first “${words}” isn't ${nameOf(id)}`}
+                  className="-ml-0.5 rounded-full p-1 text-muted hover:bg-panel hover:text-ink focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+                >
+                  <X className="size-3" aria-hidden />
+                </button>
+              )}
             </li>
           );
         })}

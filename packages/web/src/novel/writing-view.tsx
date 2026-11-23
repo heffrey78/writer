@@ -46,6 +46,7 @@ import { IssuePanel, useIssuePanel } from "../issues/issue-panel.tsx";
 import { useIssueList } from "../issues/use-issues.ts";
 import { useQuickEntry } from "../bible/quick-entry.ts";
 import { mentionEntities } from "../bible/types.ts";
+import { editorNotNames, useNotAName } from "../bible/not-names.ts";
 import { useCurrentScene } from "./current.ts";
 import { EntryTab, useEntryPanel } from "./entry-tab.tsx";
 import { useBookKind, useWords } from "./kind.ts";
@@ -107,6 +108,11 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
   // In a run, the piece the caret is in, or was last in.
   const [runPiece, setRunPiece] = useState<Piece>();
   const entities = useMemo(() => mentionEntities(novel), [novel]);
+  // Words that aren't the entry they look like (D19): not underlined, and kept from the text.
+  const notAName = useNotAName(novelId, novel);
+  const keepNotAName = useRef(notAName);
+  keepNotAName.current = notAName;
+  const notNames = useMemo(() => editorNotNames(novel, (j, words) => void keepNotAName.current(j, words)), [novel.notNames, novel.allPieces]); // eslint-disable-line react-hooks/exhaustive-deps
   const newEntry = useQuickEntry(novel, entries);
   useEffect(() => {
     if (!editor) return;
@@ -601,6 +607,7 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
             autofocus={autofocus}
             entities={entities}
             newEntry={newEntry}
+            notNames={notNames}
             issueMarks={issueMarks}
             onMention={onMention}
             pictureUrl={pictureUrl}
@@ -619,6 +626,7 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
             autofocus={autofocus}
             entities={entities}
             newEntry={newEntry}
+            notNames={notNames}
             issueMarks={issueMarks}
             onMention={onMention}
             pictureUrl={pictureUrl}

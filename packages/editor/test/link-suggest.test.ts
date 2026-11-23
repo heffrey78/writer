@@ -4,7 +4,8 @@ import { Editor } from "@tiptap/core";
 import { nameMatcher, namesInBlock, proseBlocks } from "@writer/core";
 import fc from "fast-check";
 import { afterEach, beforeEach, expect, test } from "vitest";
-import { getMarkdown, linkNameAtCaret, linkSuggestKey, LinkSuggestExtension, loadMarkdown, proseContent, writingModes, type MentionEntity } from "../src/index.ts";
+import { getMarkdown, linkNameAtCaret, linkSuggestKey, LinkSuggestExtension, loadMarkdown, notANameAtCaret, proseContent, writingModes, type MentionEntity } from "../src/index.ts";
+import type { NotName } from "@writer/core";
 
 const entities: MentionEntity[] = [
   { id: "char_7f3k2q", name: "Ada Varn", aliases: ["Ada"], type: "Character" },
@@ -103,4 +104,27 @@ test("agrees with core on random prose of names, words, emphasis and links", () 
     }),
     { numRuns: 60 },
   );
+});
+
+test("leaves a word judged not a name here un-underlined, by core's one rule, and keeps a new judgement from the caret (D19)", () => {
+  const ADA = "char_7f3k2q";
+  const kept: NotName[] = [];
+  let judgements: NotName[] = [{ entry: ADA, piece: "sc_aaaaaa", sentence: "Then Ada went, and Ada came back.", nth: 1 }];
+  editor = new Editor({
+    element: document.body.appendChild(document.createElement("div")),
+    extensions: [...proseContent, LinkSuggestExtension.configure({ entities: () => entities, notNames: () => judgements, piece: () => "sc_aaaaaa", onNotName: (j) => void kept.push(j) })],
+  });
+  loadMarkdown(editor, "Ada said so. Then Ada went, and Ada came back.\n");
+  const at = (n: number) => (linkSuggestKey.getState(editor.state)?.find() ?? []).map((d) => d.from)[n]!;
+  expect(suggested()).toEqual(["Ada", "Ada"]);
+  // Another piece's judgement doesn't hold here.
+  judgements = [{ ...judgements[0]!, piece: "sc_zzzzzz" }];
+  editor.view.dispatch(editor.state.tr.setMeta(linkSuggestKey, true));
+  expect(suggested()).toEqual(["Ada", "Ada", "Ada"]);
+  editor.commands.setTextSelection(at(1) + 1);
+  expect(notANameAtCaret(editor)).toBe(true);
+  expect(kept).toEqual([{ entry: ADA, piece: "sc_aaaaaa", sentence: "Then Ada went, and Ada came back.", nth: 0 }]);
+  editor.commands.setTextSelection(2);
+  expect(notANameAtCaret(editor)).toBe(true);
+  expect(kept[1]).toEqual({ entry: ADA, piece: "sc_aaaaaa", sentence: "Ada said so.", nth: 0 });
 });

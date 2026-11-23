@@ -28,6 +28,7 @@ export { sceneFacts } from "./facts.ts";
 export { LEGACY_COLOURS, nextSeriesSlot, relationshipStyle, SERIES, seriesHex, seriesSlot, type RelationshipLine, type SeriesColour, type SeriesSlot } from "./palette.ts";
 export { entryPresence, entryPresences, type EntryPresence, type PresenceMark } from "./entry-presence.ts";
 export { defaultEntrySort, fieldNames, filterEntries, matchEntry, piecesInSection, piecesMatching, searchable, searchEntries, searchTerms, sortEntries, type EntryFilters, type EntryMatch, type EntryMatchWhere, type EntrySort } from "./index-search.ts";
-export { bookNameMatcher, mentionTargets, nameMatcher, namesInBlock, namesNotLinkedIn, passagesOf, proseBlocks, sentenceAround, sentenceStarts, type NameHit, type NameMatcher, type NameTarget, type Passage } from "./passages.ts";
+export { bookNameMatcher, dismissedIn, mentionTargets, nameMatcher, namesInBlock, namesNotLinkedIn, passagesOf, plainSentences, proseBlocks, sentenceAround, sentenceStarts, type NameHit, type NameMatcher, type NameTarget, type Passage, type PlainName } from "./passages.ts";
+export { DIFFERENT_FILE, DIFFERENT_HEADER, differentLine, judgedDifferent, judgementFiles, NOT_NAMES_FILE, NOT_NAMES_HEADER, notNameLine, notNamesIn, pair, readDifferent, readNotNames, unionLines } from "./judgements.ts";
 export { locationProfile, tally, themeProfile, type LocationProfile, type Tally, type ThemeProfile } from "./entry-profile.ts";
 export { appendQuote, quotesIn, type KeptQuote } from "./quotes.ts";

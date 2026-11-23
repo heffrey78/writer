@@ -1,2 +1,5 @@
 .github/gh-writer/*.mjs linguist-generated=true
 .github/gh-writer/fonts/*.ttf binary
+# Two devices' judgements (Not a name here, They're different) merge line by line.
+codex/not-names.yaml merge=union
+codex/different.yaml merge=union

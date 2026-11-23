@@ -4,7 +4,7 @@
  */
 
 import type { Comparison, ParagraphDiff } from "@writer/core/compare";
-import type { EntryFieldDef, FieldChange, SeriesSlot, SidebarFile, WritingDay } from "@writer/core";
+import type { EntryFieldDef, FieldChange, NotName, SeriesSlot, SidebarFile, WritingDay } from "@writer/core";
 
 /** GET /stats: the open version's writing days, the manuscript's words now, and novel.yaml's target. */
 /** How a relationship type is drawn: a palette slot and a line. */
@@ -765,6 +765,12 @@ function bibleApi(root: (novelId: string) => string, request: Request, upload: <
       call<OperationResult & { ids: string[] }>("POST", novelId, "/relationships/add", { relationships }),
     /** Put a change the app just made back as it was: its files as before `commit`, one commit; STALE if any changed since. */
     undo: (novelId: string, commit: string, files: string[]) => call<OperationResult>("POST", novelId, "/undo", { commit, files }),
+    /** "Not a name here" (D19): a word in a piece that looks like an entry's name but isn't it there. */
+    notAName: (novelId: string, judgement: NotName) => call<OperationResult>("POST", novelId, "/not-names", judgement),
+    forgetNotAName: (novelId: string, judgement: NotName) => call<OperationResult>("POST", novelId, "/not-names/delete", judgement),
+    /** "They're different" (D19): two entries that look alike but aren't the same. */
+    areDifferent: (novelId: string, a: string, b: string) => call<OperationResult>("POST", novelId, "/different", { a, b }),
+    forgetDifferent: (novelId: string, a: string, b: string) => call<OperationResult>("POST", novelId, "/different/delete", { a, b }),
     /** Refused (not thrown) when something refers to it: the references come back; pass confirm to delete anyway. */
     deleteEntity: async (novelId: string, id: string, base: string, confirm = false): Promise<DeleteResult> => {
       const { status, data } = await request<OperationResult & { references?: Reference[] }>(

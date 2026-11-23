@@ -6,6 +6,7 @@ import { useCurrentScene } from "../novel/current.ts";
 import { useNotice } from "../novel/notice.tsx";
 import type { Workspace } from "../novel/workspace.ts";
 import { linkPassage } from "./link-passage.ts";
+import { judgementOf, useNotAName } from "./not-names.ts";
 import { cn } from "../ui/cn.ts";
 import { ProfileSection } from "./profile.tsx";
 import { markWords } from "./strip.tsx";
@@ -64,6 +65,7 @@ export function AppearsIn({
   // Linked from here, until the book is read again with the mention in it.
   const [linked, setLinked] = useState<ReadonlySet<Passage>>(new Set());
   const show = useNotice((n) => n.show);
+  const notAName = useNotAName(novelId, novel);
   // The book isn't read again for a change to a piece's words alone: what's linked from here counts at once.
   const isLinked = (p: Passage) => p.linked || linked.has(p);
   const open = (p: Passage) => {
@@ -212,6 +214,17 @@ export function AppearsIn({
                               className="mt-0.5 shrink-0 rounded-md border border-warn/50 px-2 py-0.5 text-xs text-warn hover:bg-warn-soft focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
                             >
                               Link it
+                            </button>
+                          )}
+                          {!linkedHere && judgementOf(p, entity.id) && (
+                            <button
+                              type="button"
+                              onClick={() => void notAName(judgementOf(p, entity.id)!, p.text.slice(...p.at))}
+                              aria-label={`“${p.text.slice(...p.at)}” in “${g.piece.title}” isn't ${entity.name}: not a name here`}
+                              title="Not a name here: stop offering it for linking"
+                              className="mt-0.5 shrink-0 rounded-md border border-rule px-2 py-0.5 text-xs text-muted hover:bg-panel hover:text-ink focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+                            >
+                              Not a name here
                             </button>
                           )}
                         </li>

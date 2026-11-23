@@ -193,3 +193,46 @@ test("the same scene edited on two machines ends in a resolvable conflict, never
   expect(execFileSync("node", [cli, "validate", here], { encoding: "utf8", env: { ...process.env, FORCE_COLOR: "0" } })).toContain("0 errors");
   expect(app.git(remote, "rev-list", "--merges", "--count", "main").trim()).toBe("1");
 });
+
+test("Not a name here kept on two machines, each about another word, holds on both once they sync: the file merges line by line (#171, D19)", async ({ page, app, context }) => {
+  test.setTimeout(90_000);
+  const { remote, here, other } = machines(app);
+  await app.restart(here);
+  const machineB = await app.serveAnother([other], { WRITER_CONFIG_DIR: join(app.home, "config-b") });
+  const pageB = await context.newPage();
+  await openNovel(page, app.launchUrl);
+  await openNovel(pageB, machineB.launchUrl);
+  const profile = (p: Page) => p.goto(`${new URL(p.url()).origin}${new URL(p.url()).pathname.replace(/\/chapter.*$/, "")}/bible/char_b3n0vs/page`);
+  const notLinked = (p: Page) => p.getByRole("region", { name: /^Appears in/ }).getByRole("group", { name: "Show" }).getByRole("button", { name: /^Not linked/ });
+
+  // A: the Ben in Ben's Ledger isn't him. B: the first Ben in The Flood isn't either.
+  await profile(page);
+  await page.getByRole("button", { name: "“Ben” in “Ben's Ledger” isn't Ben Varn: not a name here" }).click();
+  await expect(notLinked(page)).toHaveText("Not linked · 2");
+  await profile(pageB);
+  await pageB.getByRole("button", { name: "“Ben” in “The Flood” isn't Ben Varn: not a name here" }).first().click();
+  await expect(notLinked(pageB)).toHaveText("Not linked · 2");
+
+  // Both sync; neither meets a conflict. (Each sync waited for on the remote: the badge said Synced before it.)
+  const NOT_NAMES = "bible/not-names.yaml";
+  const onRemote = () => app.git(remote, "log", "--format=%s", "main");
+  await palette(page, "sync now");
+  await expect.poll(onRemote, { timeout: 15_000 }).toContain("“Ben's Ledger”");
+  await palette(pageB, "sync now");
+  await expect.poll(onRemote, { timeout: 15_000 }).toContain("“The Flood”");
+  await expect(badge(pageB)).toHaveAccessibleName("Sync: Synced");
+  await palette(page, "sync now");
+  await expect.poll(() => read(here, NOT_NAMES), { timeout: 15_000 }).toContain("piece: sc_f100d0");
+  await expect(badge(page)).toHaveAccessibleName("Sync: Synced");
+  const final = app.git(remote, "show", `main:${NOT_NAMES}`);
+  expect(final.match(/^- /gm)).toHaveLength(2);
+  expect(final).toContain("piece: sc_1edger");
+  expect(final).toContain("piece: sc_f100d0");
+  expect(read(here, NOT_NAMES)).toBe(final);
+  expect(read(other, NOT_NAMES)).toBe(final);
+  // On both, both hold.
+  for (const p of [page, pageB]) {
+    await p.reload();
+    await expect(notLinked(p)).toHaveText("Not linked · 1");
+  }
+});

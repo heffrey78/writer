@@ -93,12 +93,16 @@ export const TOOLS_DIR = ".github/gh-writer";
 /** Where a book's GitHub workflows are: its kind's template's, which a conversion to another kind replaces. */
 export const WORKFLOWS_DIR = ".github/workflows";
 
+/** The book's .gitattributes: written by the app only to add lines it needs (the judgements' union merge, D19). */
+export const GITATTRIBUTES = ".gitattributes";
+
 /**
  * Check that a path is one of the book's generated files, and return its full path: its vendored tools,
- * its template's workflows, or a diagram snapshot (diagrams/*.svg). Only migrations and conversions
- * write these.
+ * its template's workflows, a diagram snapshot (diagrams/*.svg), or .gitattributes. Only migrations,
+ * conversions and the lines the judgements need write these.
  */
 export async function writableToolPath(root: string, path: string): Promise<string> {
+  if (path === GITATTRIBUTES) return resolveChecked(root, path);
   const dir = [TOOLS_DIR, WORKFLOWS_DIR].find((d) => path.startsWith(`${d}/`)) ?? (/^diagrams\/[^/]+\.svg$/.test(path) ? "diagrams" : undefined);
   if (!dir) throw new FileError("NOT_WRITABLE", `Not one of the book's tools: "${path}"`);
   checkPath(path.slice(dir.length + 1));

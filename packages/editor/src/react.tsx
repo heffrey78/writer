@@ -15,7 +15,8 @@ import { SearchHighlightExtension } from "./search.ts";
 import { SelectFocusExtension } from "./select-focus.ts";
 import { IssueMarksExtension, refreshIssueMarks, type AnchoredIssue } from "./issue-marks.ts";
 import { PinnedLinesExtension, refreshPinnedLines } from "./pinned-lines.ts";
-import { LinkSuggestExtension } from "./link-suggest.ts";
+import { LinkSuggestExtension, linkSuggestKey } from "./link-suggest.ts";
+import type { NotName } from "@writer/core";
 import { MentionInfoExtension, type MentionTarget } from "./mention-info.ts";
 import { PicturesExtension, type PictureCallbacks } from "./pictures.ts";
 import { TrailingParagraphExtension } from "./trailing.ts";
@@ -55,6 +56,8 @@ export interface SceneEditorProps {
   issueMarks?: IssueMarksProps;
   /** A mention was hovered, or Alt+Enter pressed beside one: for a card about its entity. */
   onMention?: MentionCallbacks;
+  /** Words that aren't the entry they look like (D19): not underlined, and how to keep another. */
+  notNames?: NotNamesProps;
   /** Where a picture in the text loads from, given its repository path (images/…): the app's server. */
   pictureUrl?: (path: string) => string | undefined;
   /** Image files dropped or pasted in, and a picture to change: for the app to ask about and save. */
@@ -146,10 +149,19 @@ export interface NewEntryProps {
   ask?: (type: string) => Promise<string | undefined>;
 }
 
-/** @ suggestions and link suggestions over the latest `entities` and `newEntry` props, as extensions are set up once. */
-function useMentionExtension(entities: readonly MentionEntity[] | undefined, newEntry: NewEntryProps | undefined) {
-  const latest = useRef({ entities, newEntry });
-  latest.current = { entities, newEntry };
+export interface NotNamesProps {
+  /** The "Not a name here" judgements about the pieces shown (D19): those words aren't underlined. */
+  judgements: readonly NotName[];
+  /** Keep a new one, from "Not a name here" on the underlined word at the caret. */
+  onNotName: (judgement: NotName) => void;
+}
+
+const NO_JUDGEMENTS: readonly NotName[] = [];
+
+/** @ suggestions and link suggestions over the latest `entities`, `newEntry` and `notNames` props, as extensions are set up once. */
+function useMentionExtension(entities: readonly MentionEntity[] | undefined, newEntry: NewEntryProps | undefined, notNames?: NotNamesProps, piece?: string) {
+  const latest = useRef({ entities, newEntry, notNames, piece });
+  latest.current = { entities, newEntry, notNames, piece };
   const read = () => latest.current.entities ?? [];
   return [
     MentionSuggestExtension.configure({
@@ -159,8 +171,21 @@ function useMentionExtension(entities: readonly MentionEntity[] | undefined, new
       // Set up once, like the editor's extensions: "New <type>…" right after @ only if the app can ask.
       ...(newEntry?.ask ? { askName: (type: string) => latest.current.newEntry?.ask?.(type) ?? Promise.resolve(undefined) } : {}),
     }),
-    LinkSuggestExtension.configure({ entities: read }),
+    LinkSuggestExtension.configure({
+      entities: read,
+      notNames: () => latest.current.notNames?.judgements ?? NO_JUDGEMENTS,
+      piece: () => latest.current.piece,
+      onNotName: (j) => latest.current.notNames?.onNotName(j),
+    }),
   ];
+}
+
+/** Underline again when the judgements change (not on every render). */
+function useNotNamesRefresh(editor: Editor | null, notNames: NotNamesProps | undefined) {
+  const judgements = notNames?.judgements;
+  useEffect(() => {
+    if (editor && !editor.isDestroyed) editor.view.dispatch(editor.state.tr.setMeta(linkSuggestKey, true));
+  }, [editor, judgements]);
 }
 
 /** A WYSIWYG editor for one scene's prose. */
@@ -184,12 +209,13 @@ export function SceneEditor({
   newEntry,
   issueMarks,
   onMention,
+  notNames,
   pictureUrl,
   pictures,
 }: SceneEditorProps) {
   const picturesExtension = usePicturesExtension(pictures);
   const spellExtension = useSpellExtension(spell);
-  const mentionExtension = useMentionExtension(entities, newEntry);
+  const mentionExtension = useMentionExtension(entities, newEntry, notNames, sceneId);
   const issueMarksExtension = useIssueMarksExtension(issueMarks);
   const mentionInfo = useMentionInfoExtension(onMention);
   const callbacks = useRef({ onChange, onReady });
@@ -260,6 +286,7 @@ export function SceneEditor({
   }, [editor, markdown]);
 
   useIssueMarksRefresh(editor, issueMarks);
+  useNotNamesRefresh(editor, notNames);
   useFlushOnLeave(flush, editor);
 
   return <EditorContent editor={editor} className={className} />;
@@ -325,6 +352,8 @@ export interface ChapterEditorProps {
   issueMarks?: IssueMarksProps;
   /** A mention was hovered, or Alt+Enter pressed beside one: for a card about its entity. */
   onMention?: MentionCallbacks;
+  /** Words that aren't the entry they look like (D19): not underlined, and how to keep another. */
+  notNames?: NotNamesProps;
   /** A line of pinned details under each scene's title, by scene ID; display only. */
   pinned?: Readonly<Record<string, string>>;
   /** Where a picture in the text loads from, given its repository path (images/…): the app's server. */
@@ -351,6 +380,7 @@ export function ChapterEditor({
   newEntry,
   issueMarks,
   onMention,
+  notNames,
   pinned,
   pictureUrl,
   pictures,
@@ -360,7 +390,7 @@ export function ChapterEditor({
   const latestPinned = useRef(pinned);
   latestPinned.current = pinned;
   const pinnedLines = useRef(PinnedLinesExtension.configure({ lines: () => latestPinned.current ?? {} })).current;
-  const mentionExtension = useMentionExtension(entities, newEntry);
+  const mentionExtension = useMentionExtension(entities, newEntry, notNames);
   const issueMarksExtension = useIssueMarksExtension(issueMarks);
   const mentionInfo = useMentionInfoExtension(onMention);
   const callbacks = useRef({ onChange, onReady });
@@ -444,6 +474,7 @@ export function ChapterEditor({
   }, [editor, scenes]);
 
   useIssueMarksRefresh(editor, issueMarks);
+  useNotNamesRefresh(editor, notNames);
   const pinnedKey = JSON.stringify(pinned ?? {});
   useEffect(() => {
     if (editor) refreshPinnedLines(editor);

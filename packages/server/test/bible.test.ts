@@ -225,6 +225,65 @@ describe("many entries at once (#167)", () => {
   });
 });
 
+describe("the index's judgements (D19, #171)", () => {
+  const PIECE = "sc_5tat1n";
+  const judgement = { entry: ADA, piece: PIECE, sentence: "Ada said she would go.", nth: 0 };
+
+  it("keeps Not a name here as a line of not-names.yaml, with .gitattributes merging it line by line, in one commit", async () => {
+    const { files } = await bible.notAName(judgement);
+    expect(files.sort()).toEqual([".gitattributes", "bible/not-names.yaml"]);
+    expect(read("bible/not-names.yaml")).toBe(`# Words that look like an entry's name but aren't it here (Not a name here). One per line; kept by Writer.\n- { entry: ${ADA}, piece: ${PIECE}, sentence: "Ada said she would go.", nth: 0 }\n`);
+    expect(read(".gitattributes")).toContain("bible/not-names.yaml merge=union\nbible/different.yaml merge=union\n");
+    expect(lastCommit()).toMatch(/^Bible: a word in “.+” isn't Ada Varn$/);
+    clean();
+    expect((await valid()).notNames).toEqual([judgement]);
+    // Asked again: nothing. Another: a line added, .gitattributes left alone.
+    expect(await bible.notAName(judgement)).toEqual({ commit: null, files: [] });
+    const second = await bible.notAName({ ...judgement, nth: 1 });
+    expect(second.files).toEqual(["bible/not-names.yaml"]);
+    expect(read("bible/not-names.yaml").trimEnd().split("\n")).toHaveLength(3);
+    // A name there again: its line out, the other kept.
+    await bible.forgetNotAName(judgement);
+    expect((await model()).notNames).toEqual([{ ...judgement, nth: 1 }]);
+    expect(lastCommit()).toBe("Bible: offer Ada Varn there again");
+    await expect(bible.notAName({ ...judgement, entry: "char_zzzzzz" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(bible.notAName({ ...judgement, nth: -1 })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+
+  it("keeps They're different as a pair, either way round, and forgets it", async () => {
+    await bible.areDifferent(BEN, ADA);
+    expect(read("bible/different.yaml")).toContain(`- [${ADA}, ${BEN}]\n`);
+    expect(lastCommit()).toBe("Bible: Ben Varn and Ada Varn are different");
+    expect(await bible.areDifferent(ADA, BEN)).toEqual({ commit: null, files: [] });
+    await bible.forgetDifferent(ADA, BEN);
+    expect((await model()).different).toEqual([]);
+    clean();
+  });
+
+  it("adds to a .gitattributes the book has, and to a judgements file edited by hand", async () => {
+    writeFileSync(join(dir, ".gitattributes"), "*.md text");
+    writeFileSync(join(dir, "bible/not-names.yaml"), "# mine\n- { entry: char_7f3k2q, piece: sc_5tat1n, sentence: \"Other.\", nth: 0 }");
+    gitIn(dir, "add", "-A");
+    gitIn(dir, "commit", "-qm", "By hand");
+    await bible.notAName(judgement);
+    expect(read(".gitattributes")).toBe("*.md text\nbible/not-names.yaml merge=union\nbible/different.yaml merge=union\n");
+    expect(read("bible/not-names.yaml")).toBe(`# mine\n- { entry: char_7f3k2q, piece: sc_5tat1n, sentence: "Other.", nth: 0 }\n- { entry: ${ADA}, piece: ${PIECE}, sentence: "Ada said she would go.", nth: 0 }\n`);
+  });
+
+  it("merges two devices' judgements without a conflict", async () => {
+    await bible.notAName(judgement);
+    const base = gitIn(dir, "rev-parse", "HEAD").trim();
+    await bible.notAName({ ...judgement, sentence: "Another sentence.", nth: 0 });
+    const ours = gitIn(dir, "rev-parse", "HEAD").trim();
+    gitIn(dir, "checkout", "-q", "-b", "theirs", base);
+    await bible.notAName({ ...judgement, sentence: "A third one.", nth: 0 });
+    gitIn(dir, "checkout", "-q", "main");
+    gitIn(dir, "merge", "-q", "--no-edit", "theirs");
+    expect(gitIn(dir, "rev-parse", "HEAD^1").trim()).toBe(ours);
+    expect((await valid()).notNames.map((n) => n.sentence).sort()).toEqual(["A third one.", "Ada said she would go.", "Another sentence."]);
+  });
+});
+
 describe("relationships", () => {
   it("adds, changes at a scene, ends and removes a relationship", async () => {
     const before = (await model()).relationships.length;

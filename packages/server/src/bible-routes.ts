@@ -30,6 +30,10 @@ export async function body(c: Context): Promise<Record<string, unknown>> {
  * POST  /:id/bible/entities/edit               { edits: [{ id, base, changes }] } → { commit, files }: many entries, one commit
  * POST  /:id/bible/relationships/add           { relationships: [{ from, to, type, … }] } → { ids, commit }: several, one commit
  * POST  /:id/bible/undo                        { commit, files } → { commit, files }: that commit's files as they were before it, or 409 STALE
+ * POST  /:id/bible/not-names                   { entry, piece, sentence, nth } → { commit }: "Not a name here" kept (D19)
+ * POST  /:id/bible/not-names/delete            { entry, piece, sentence, nth } → { commit }: a name there again
+ * POST  /:id/bible/different                   { a, b } → { commit }: "They're different" kept (D19)
+ * POST  /:id/bible/different/delete            { a, b } → { commit }
  * POST  /:id/bible/relationships               { from, to, type, since?, until?, note? } → 201 { id, commit }
  * PATCH /:id/bible/relationships/:rel          { changes }
  * POST  /:id/bible/relationships/:rel/change   { at, type?, note? } → { id, commit }
@@ -76,6 +80,16 @@ export function bibleRoutes(routes: Hono<Env>): void {
   routes.post("/:id/bible/undo", async (c) => {
     const { commit, files } = await body(c);
     return operation(c, () => bible(c).undo(String(commit ?? ""), files as never));
+  });
+  routes.post("/:id/bible/not-names", async (c) => operation(c, async () => bible(c).notAName((await body(c)) as never)));
+  routes.post("/:id/bible/not-names/delete", async (c) => operation(c, async () => bible(c).forgetNotAName((await body(c)) as never)));
+  routes.post("/:id/bible/different", async (c) => {
+    const { a, b } = await body(c);
+    return operation(c, () => bible(c).areDifferent(String(a ?? ""), String(b ?? "")));
+  });
+  routes.post("/:id/bible/different/delete", async (c) => {
+    const { a, b } = await body(c);
+    return operation(c, () => bible(c).forgetDifferent(String(a ?? ""), String(b ?? "")));
   });
   routes.post("/:id/bible/entities/:entity/delete", async (c) => {
     const { base, confirm } = await body(c);

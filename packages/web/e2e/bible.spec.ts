@@ -222,7 +222,7 @@ test("an entry's profile lists every passage naming it, by scene and role; chips
   await page.goto(`${app.url}${new URL(app.launchUrl).pathname.replace(/\/chapter.*$/, "")}/bible/char_b3n0vs/page`);
   const part = page.getByRole("region", { name: "Appears in · 6" });
   // Each passage, without its Link it (#154).
-  const passages = part.getByRole("list", { name: "Passages naming Ben Varn" }).getByRole("button").filter({ hasNotText: /^Link it$/ });
+  const passages = part.getByRole("list", { name: "Passages naming Ben Varn" }).getByRole("button").filter({ hasNotText: /^(Link it|Not a name here)$/ });
   // In reading order, each with its scene and his role there; the names written without a link say so.
   await expect(passages).toHaveCount(6);
   await expect(passages.first()).toHaveAccessibleName("Walking the Span, in the scene: Ben met her at the toll house with two coffees and a grin that was a size too large for him.");
@@ -767,4 +767,59 @@ test("rows of the table chosen and changed together in one commit, undone as one
   expect(copied.split("\n")[0]).toBe("Name\tAge\tOccupation\tAppearance\tWants\tFears\tScenes\tFirst seen\tTags");
   expect(copied.split("\n")[1]).toMatch(/^Ada Varn\t31\tStructural engineer\t\t\t\t\d+\tThe Station\t.*family$/);
   expect(copied.split("\n")).toHaveLength(4);
+});
+
+test("Not a name here, from an entry's profile, a scene's Not linked here and the text: kept in the index's own file, never offered there again, and undone (#171, D19)", async ({ page, app }) => {
+  const { read, lastCommit } = await open(page, app);
+  const book = new URL(app.launchUrl).pathname.replace(/\/chapter.*$/, "");
+  await page.goto(`${app.url}${book}/bible/char_b3n0vs/page`);
+  const part = page.getByRole("region", { name: /^Appears in/ });
+  const notLinked = part.getByRole("group", { name: "Show" }).getByRole("button", { name: /^Not linked/ });
+  await expect(notLinked).toHaveText("Not linked · 3");
+
+  // From the profile: the word in Ben's Ledger isn't him there. It's kept, one line, and merges line by line.
+  await part.getByRole("button", { name: "“Ben” in “Ben's Ledger” isn't Ben Varn: not a name here" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "“Ben” in “Ben's Ledger” isn't Ben Varn" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Appears in · 5" })).toBeVisible();
+  await expect(notLinked).toHaveText("Not linked · 2");
+  expect(read("bible/not-names.yaml")).toContain('- { entry: char_b3n0vs, piece: sc_1edger, sentence: "The ledger was where their mother had kept the egg money, behind the loose board under the stairs, which meant Ben had wanted it found by someone, someday.", nth: 0 }\n');
+  expect(read(".gitattributes")).toContain("bible/not-names.yaml merge=union\n");
+  expect(lastCommit()).toBe("Bible: a word in “Ben's Ledger” isn't Ben Varn");
+  await axe(page);
+  await page.emulateMedia({ colorScheme: "dark" });
+  await axe(page);
+  await page.emulateMedia({ colorScheme: "light" });
+
+  // Undo: offered again.
+  await page.getByRole("status").getByRole("button", { name: "Undo" }).click();
+  await expect(notLinked).toHaveText("Not linked · 3");
+  expect(read("bible/not-names.yaml")).not.toContain("sc_1edger");
+  await part.getByRole("button", { name: "“Ben” in “Ben's Ledger” isn't Ben Varn: not a name here" }).click();
+  await expect(notLinked).toHaveText("Not linked · 2");
+
+  // The text doesn't underline it either.
+  await page.goto(`${app.url}${book}/scene/sc_1edger`);
+  const text = page.getByRole("textbox", { name: "Scene text" });
+  await expect(text).toBeFocused();
+  await palette(page, "suggest links");
+  await expect(text.locator(".ghw-unlinked").first()).toBeVisible();
+  await expect(text.locator(".ghw-unlinked", { hasText: /^Ben$/ })).toHaveCount(0);
+
+  // In The Flood, from the scene's Not linked here: the first of two.
+  await page.goto(`${app.url}${book}/scene/sc_f100d0`);
+  await expect(text).toBeFocused();
+  await expect(text.locator(".ghw-unlinked", { hasText: /^Ben$/ })).toHaveCount(2);
+  const sidebar = page.getByRole("complementary", { name: "Right sidebar" });
+  await expect(sidebar.getByRole("button", { name: /^Link “Ben” to Ben Varn: 2 not linked/ })).toBeVisible();
+  await sidebar.getByRole("button", { name: "The first “Ben” isn't Ben Varn: not a name here" }).click();
+  await expect(sidebar.getByRole("button", { name: /^Link “Ben” to Ben Varn: 1 not linked/ })).toBeVisible();
+  await expect(text.locator(".ghw-unlinked", { hasText: /^Ben$/ })).toHaveCount(1);
+
+  // And from the text: the caret on the other, then Not a name here from the palette.
+  await text.locator(".ghw-unlinked", { hasText: /^Ben$/ }).click();
+  await palette(page, "not a name here");
+  await expect(text.locator(".ghw-unlinked", { hasText: /^Ben$/ })).toHaveCount(0);
+  await expect(sidebar.getByRole("button", { name: /^Link “Ben” to Ben Varn/ })).toHaveCount(0);
+  expect(read("bible/not-names.yaml").match(/^- /gm)).toHaveLength(3);
+  expect(read("bible/not-names.yaml")).toContain('sentence: "Nobody gave Ben anything to hold.", nth: 0 }');
 });
