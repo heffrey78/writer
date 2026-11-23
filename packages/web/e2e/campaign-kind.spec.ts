@@ -228,3 +228,58 @@ test("a value that changes at a session: set from the profile read there, read a
     await expect(card).toHaveCount(0);
   }
 });
+
+test("Quick look: any NPC over the session with one key, its card at a glance, and Escape back to the caret; Enter pins it beside the text (#141, #174)", async ({ page, app }) => {
+  await open(page, app);
+  await page.goto(`${app.url}${new URL(app.launchUrl).pathname.replace(/\/chapter.*$/, "")}/scene/ses_tw0002`);
+  const text = page.getByRole("textbox", { name: "Session text" });
+  await expect(text).toBeFocused();
+  // The caret somewhere in the middle of the session, as a game master's would be.
+  await text.locator("p").first().click();
+  await page.keyboard.press("End");
+  await page.keyboard.type(" Rolls for");
+  const caret = () => page.evaluate(() => {
+    const s = getSelection()!;
+    return { node: s.focusNode?.textContent?.slice(-20), at: s.focusOffset };
+  });
+  const before = await caret();
+
+  await page.keyboard.press("Control+;");
+  const look = page.getByRole("dialog", { name: "Quick look" });
+  await expect(look.getByRole("combobox")).toBeFocused();
+  await page.keyboard.type("vos");
+  await expect(look.getByRole("option").first()).toHaveText(/^Voss/);
+  const glance = look.getByRole("article", { name: "Voss" });
+  await expect(glance).toContainText("Choirmaster of the Tide Choir.");
+  await expect(glance).toContainText("NPC");
+  for (const colorScheme of ["light", "dark"] as const) {
+    await page.emulateMedia({ colorScheme });
+    await axe(page);
+  }
+  await page.emulateMedia({ colorScheme: "light" });
+
+  // Escape: back to the caret, as it was, and typing goes on there.
+  await page.keyboard.press("Escape");
+  await expect(look).toBeHidden();
+  await expect(text).toBeFocused();
+  expect(await caret()).toEqual(before);
+  await page.keyboard.type(" initiative.");
+  await expect(text.locator("p").first()).toContainText("Rolls for initiative.");
+
+  // Enter pins the one found beside the text; from the palette too.
+  await palette(page, "quick look");
+  await expect(look.getByRole("combobox")).toBeFocused();
+  await page.keyboard.type("choir");
+  await expect(look.getByRole("option").first()).toHaveText(/^The Tide Choir/);
+  await page.keyboard.press("Enter");
+  await expect(look).toBeHidden();
+  await expect(text).toBeFocused();
+  const sidebar = page.getByRole("complementary", { name: "Right sidebar" });
+  await expect(sidebar.getByRole("list", { name: "Pinned" })).toContainText("The Tide Choir");
+
+  // Ctrl+Enter opens it in the codex.
+  await page.keyboard.press("Control+;");
+  await page.keyboard.type("voss");
+  await page.keyboard.press("Control+Enter");
+  await expect(page).toHaveURL(/\/bible\/npc_v0ss01$/);
+});

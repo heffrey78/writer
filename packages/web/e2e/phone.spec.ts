@@ -583,3 +583,18 @@ test("on a phone, a short scene's bar sits on the bottom bar, and on the keyboar
   const writing = page.getByRole("toolbar", { name: "Writing" });
   await expect.poll(async () => Math.abs((await writing.locator("..").boundingBox())!.y + (await writing.locator("..").boundingBox())!.height - Math.round(size.height * 0.6))).toBeLessThanOrEqual(2);
 });
+
+test("on a phone, Quick look is in More and fills the screen (#141, #174)", async ({ page, app }) => {
+  await app.restart(app.novelRepo("varn"));
+  await launch(page, app);
+  await page.getByRole("navigation", { name: "Book" }).getByRole("button", { name: "More" }).tap();
+  await page.getByRole("dialog", { name: /: more$/ }).getByRole("button", { name: "Quick look…" }).tap();
+  const look = page.getByRole("dialog", { name: "Quick look" });
+  await expect(look).toBeVisible();
+  const box = (await look.boundingBox())!;
+  expect([box.x, box.y, box.width]).toEqual([0, 0, viewport.width]);
+  await page.keyboard.type("ada");
+  await expect(look.getByRole("article", { name: "Ada Varn" })).toContainText("Bridge engineer");
+  await fits(page);
+  await audit(page);
+});

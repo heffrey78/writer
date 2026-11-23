@@ -1,6 +1,7 @@
 import { barPages, vocabulary, type Book, type SidebarFile } from "@writer/core";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowDown, ArrowUp, Command, History, LayoutGrid, ListOrdered, MinusCircle, PenLine, PlusCircle } from "lucide-react";
+import { ArrowDown, ArrowUp, Command, History, LayoutGrid, ListOrdered, MinusCircle, PenLine, PlusCircle, Search } from "lucide-react";
+import { openQuickLook } from "../bible/quick-look.tsx";
 import { Dialog } from "radix-ui";
 import { useEffect, useState } from "react";
 import { NavLink, useLocation } from "react-router";
@@ -153,6 +154,16 @@ export function MoreSheet({ novelId, novel, onGitHub }: { novelId: string; novel
               ),
           )}
           <div className="grid border-t border-rule pt-1">
+            <button
+              type="button"
+              onClick={() => {
+                close();
+                openQuickLook();
+              }}
+              className="flex min-h-12 items-center gap-3 text-sm"
+            >
+              <Search className="size-5 text-muted" aria-hidden /> Quick look…
+            </button>
             <button
               type="button"
               onClick={() => {
