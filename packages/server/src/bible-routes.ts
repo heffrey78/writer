@@ -27,6 +27,9 @@ export async function body(c: Context): Promise<Record<string, unknown>> {
  * POST  /:id/bible/entities                    { type, name, …fields, notes?, id? } → 201 { id, file, commit }
  * PATCH /:id/bible/entities/:entity            { base, changes } → { file, commit }
  * POST  /:id/bible/entities/:entity/delete     { base, confirm? } → { commit }, or 409 REFERENCED { references }
+ * POST  /:id/bible/entities/edit               { edits: [{ id, base, changes }] } → { commit, files }: many entries, one commit
+ * POST  /:id/bible/relationships/add           { relationships: [{ from, to, type, … }] } → { ids, commit }: several, one commit
+ * POST  /:id/bible/undo                        { commit, files } → { commit, files }: that commit's files as they were before it, or 409 STALE
  * POST  /:id/bible/relationships               { from, to, type, since?, until?, note? } → 201 { id, commit }
  * PATCH /:id/bible/relationships/:rel          { changes }
  * POST  /:id/bible/relationships/:rel/change   { at, type?, note? } → { id, commit }
@@ -61,6 +64,18 @@ export function bibleRoutes(routes: Hono<Env>): void {
       if ((changes as { name?: unknown } | undefined)?.name !== undefined) void c.var.ws.issues?.refresh().catch(() => {});
       return result;
     });
+  });
+  routes.post("/:id/bible/entities/edit", async (c) => {
+    const { edits } = await body(c);
+    return operation(c, () => bible(c).editEntries(edits as never));
+  });
+  routes.post("/:id/bible/relationships/add", async (c) => {
+    const { relationships } = await body(c);
+    return operation(c, () => bible(c).addRelationships(relationships as never), 201);
+  });
+  routes.post("/:id/bible/undo", async (c) => {
+    const { commit, files } = await body(c);
+    return operation(c, () => bible(c).undo(String(commit ?? ""), files as never));
   });
   routes.post("/:id/bible/entities/:entity/delete", async (c) => {
     const { base, confirm } = await body(c);

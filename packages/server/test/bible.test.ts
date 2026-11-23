@@ -143,6 +143,88 @@ describe("entities", () => {
   });
 });
 
+describe("many entries at once (#167)", () => {
+  const BEN_FILE = "bible/characters/ben.md";
+
+  it("sets a field on several entries in one commit, named for it, and undoes it byte for byte", async () => {
+    writeFileSync(join(dir, ADA_FILE), read(ADA_FILE).replace("  age: 31\n", "  # at the start of the book\n  age: 31\n"));
+    gitIn(dir, "commit", "-qam", "A comment");
+    const [ada, ben] = [read(ADA_FILE), read(BEN_FILE)];
+    const novel = await model();
+    const fields = (id: string) => novel.entities.find((e) => e.id === id)!.fields;
+    const { commit, files } = await bible.editEntries([
+      { id: ADA, base: hash(ADA_FILE), changes: { fields: { ...fields(ADA), eyes: "green" } } },
+      { id: BEN, base: hash(BEN_FILE), changes: { fields: { ...fields(BEN), eyes: "brown" } } },
+    ]);
+    expect(lastCommit()).toBe("Bible: set Eyes on Ada Varn and Ben Varn");
+    expect(changedInLastCommit()).toEqual([`M\t${ADA_FILE}`, `M\t${BEN_FILE}`]);
+    expect(read(ADA_FILE)).toBe(ada.replace("eyes: grey", "eyes: green"));
+    expect(read(BEN_FILE)).toBe(ben.replace("  occupation: Toll keeper\n", "  occupation: Toll keeper\n  eyes: brown\n"));
+    clean();
+
+    await bible.undo(commit!, files);
+    expect(lastCommit()).toBe("Undo “Bible: set Eyes on Ada Varn and Ben Varn”");
+    expect([read(ADA_FILE), read(BEN_FILE)]).toEqual([ada, ben]);
+    clean();
+    await valid();
+  });
+
+  it("names a tag added to each, and a field cleared on each", async () => {
+    const novel = await model();
+    const entry = (id: string) => novel.entities.find((e) => e.id === id)!;
+    await bible.editEntries([ADA, BEN].map((id) => ({ id, base: hash(id === ADA ? ADA_FILE : BEN_FILE), changes: { tags: [...entry(id).tags, "family"] } })));
+    expect(lastCommit()).toBe("Bible: tag Ada Varn and Ben Varn “family”");
+    await bible.editEntries([ADA, BEN].map((id) => {
+      const { occupation: _, ...rest } = entry(id).fields;
+      return { id, base: hash(id === ADA ? ADA_FILE : BEN_FILE), changes: { fields: rest } };
+    }));
+    expect(lastCommit()).toBe("Bible: clear Occupation on Ada Varn and Ben Varn");
+    expect((await valid()).entities.filter((e) => e.id === ADA || e.id === BEN).map((e) => e.fields["occupation"])).toEqual([undefined, undefined]);
+  });
+
+  it("changes none of them when one changed since it was read", async () => {
+    const stale = hash(BEN_FILE);
+    writeFileSync(join(dir, BEN_FILE), read(BEN_FILE).replace("Toll keeper", "Ferryman"));
+    gitIn(dir, "commit", "-qam", "Elsewhere");
+    const ada = read(ADA_FILE);
+    await expect(bible.editEntries([
+      { id: ADA, base: hash(ADA_FILE), changes: { summary: "Changed." } },
+      { id: BEN, base: stale, changes: { summary: "Changed." } },
+    ])).rejects.toMatchObject({ code: "STALE", details: { path: BEN_FILE } });
+    expect(read(ADA_FILE)).toBe(ada);
+    clean();
+    await expect(bible.editEntries([])).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(bible.editEntries([{ id: ADA, base: hash(ADA_FILE), changes: {} }, { id: ADA, base: hash(ADA_FILE), changes: {} }])).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+
+  it("won't undo a change once its files have changed again", async () => {
+    const { commit, files } = await bible.editEntries([{ id: ADA, base: hash(ADA_FILE), changes: { summary: "First." } }]);
+    await bible.updateEntity(ADA, hash(ADA_FILE), { summary: "Second." });
+    await expect(bible.undo(commit!, files)).rejects.toMatchObject({ code: "STALE", details: { path: ADA_FILE } });
+    expect(read(ADA_FILE)).toContain("summary: Second.");
+    await expect(bible.undo("0".repeat(40), files)).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("undoes a new entry by removing its file", async () => {
+    const { commit, files, file } = await bible.createEntity("location", { name: "The Weir" });
+    await bible.undo(commit!, files);
+    expect(existsSync(join(dir, file))).toBe(false);
+    clean();
+  });
+
+  it("adds a relationship from each of several entries in one commit", async () => {
+    const before = read("bible/relationships.yaml");
+    const { ids, commit, files } = await bible.addRelationships([{ from: ADA, to: "char_m1re1a", type: "rivals" }, { from: BEN, to: "char_m1re1a", type: "rivals" }]);
+    expect(ids).toHaveLength(2);
+    expect(lastCommit()).toBe("Bible: add 2 “rivals” relationships");
+    const novel = await valid();
+    expect(ids.map((id) => novel.relationships.find((r) => r.id === id)?.from)).toEqual([ADA, BEN]);
+    await expect(bible.addRelationships([{ from: ADA, to: BEN, type: "rivals" }, { from: ADA, to: BEN, type: "nope" }])).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await bible.undo(commit!, files);
+    expect(read("bible/relationships.yaml")).toBe(before);
+  });
+});
+
 describe("relationships", () => {
   it("adds, changes at a scene, ends and removes a relationship", async () => {
     const before = (await model()).relationships.length;
@@ -320,6 +402,13 @@ describe("through the server", () => {
       expect((await call("POST", `/relationships/${relId}/end`, { at: "sc_f100d0" })).status).toBe(200);
       expect((await call("POST", "/relationships", { from: ADA, to: BEN, type: "nope" })).status).toBe(400);
       expect((await call("POST", "/relationships/rel_zzzzzz/delete")).status).toBe(404);
+      const many = await call("POST", "/entities/edit", { edits: [{ id, base: hash(file), changes: { tags: ["bridge"] } }, { id: "loc_we1r00", base: hash("bible/locations/the-weir.md"), changes: { tags: ["bridge"] } }] });
+      expect(many.status).toBe(200);
+      const done = JSON.parse(many.body) as { commit: string; files: string[] };
+      expect(done.files).toHaveLength(2);
+      expect((await call("POST", "/undo", done)).status).toBe(200);
+      expect(JSON.parse((await call("POST", "/undo", done)).body)).toMatchObject({ code: "STALE" });
+      expect((await call("POST", "/relationships/add", { relationships: [{ from: ADA, to: BEN, type: "allies" }] })).status).toBe(201);
     } finally {
       await server.close();
     }

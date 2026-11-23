@@ -758,6 +758,13 @@ function bibleApi(root: (novelId: string) => string, request: Request, upload: <
       call<OperationResult & { id: string; file: string }>("POST", novelId, "/entities", { type, ...fields, ...(notes ? { notes } : {}), ...(id ? { id } : {}) }),
     updateEntity: (novelId: string, id: string, base: string, changes: EntityFields) =>
       call<OperationResult & { file: string }>("PATCH", novelId, `/entities/${encodeURIComponent(id)}`, { base, changes }),
+    /** Many entries changed in one commit: each checked against its file's hash. */
+    editEntries: (novelId: string, edits: { id: string; base: string; changes: EntityFields }[]) => call<OperationResult>("POST", novelId, "/entities/edit", { edits }),
+    /** Several relationships added in one commit. */
+    addRelationships: (novelId: string, relationships: (RelationshipFields & { from: string; to: string; type: string })[]) =>
+      call<OperationResult & { ids: string[] }>("POST", novelId, "/relationships/add", { relationships }),
+    /** Put a change the app just made back as it was: its files as before `commit`, one commit; STALE if any changed since. */
+    undo: (novelId: string, commit: string, files: string[]) => call<OperationResult>("POST", novelId, "/undo", { commit, files }),
     /** Refused (not thrown) when something refers to it: the references come back; pass confirm to delete anyway. */
     deleteEntity: async (novelId: string, id: string, base: string, confirm = false): Promise<DeleteResult> => {
       const { status, data } = await request<OperationResult & { references?: Reference[] }>(

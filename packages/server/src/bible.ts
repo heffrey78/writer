@@ -23,6 +23,7 @@ import {
   uniqueId,
   vocabulary,
   type Book,
+  type Entity,
   type Relationship,
   type SeriesSlot,
   type SidebarFile,
@@ -33,7 +34,7 @@ import { hashText, IMAGES_DIR, MAX_IMAGE_BYTES, sniffImage } from "./files.ts";
 import type { ManuscriptOperations } from "./manuscript.ts";
 import { migrateNovel, migrationWrites, overlay, toolWrites } from "./migrate.ts";
 import { OperationError, transaction, type FileWrite, type OperationResult } from "./operations.ts";
-import { bookSource, filesPort } from "./ports.ts";
+import { bookSource, filesPort, gitPort } from "./ports.ts";
 
 /**
  * A list in an entry's fields (an entries field, D18) is format 3's: never written into a gh-writer novel,
@@ -211,30 +212,52 @@ export class BibleOperations {
     return this.#run(async (novel) => {
       const entity = novel.entities.find((e) => e.id === id);
       if (!entity) throw new OperationError("NOT_FOUND", `No entity “${id}”.`);
-      const text = await this.#read(entity.file);
-      if (hashText(text) !== base) throw new OperationError("STALE", `“${entity.name}” changed since it was read.`, { path: entity.file });
-      if (changes.name !== undefined) required(changes.name, "name");
-      const tools = await listWrites(this.root, novel, changes.fields, changes.changes);
-      const edits = Object.entries(changes).flatMap(([key, value]): YamlEdit[] =>
-        value === null ? [{ path: [key], remove: true }] : key === "fields" ? fieldEdits(entity.fields, value as Record<string, unknown>) : [{ path: [key], value }],
-      );
-      const content = editFrontMatter(text, edits);
-      let file = entity.file;
-      const writes: FileWrite[] = [];
-      if (changes.name && changes.name !== entity.name) {
-        const folder = entity.file.slice(0, entity.file.lastIndexOf("/"));
-        const taken = new Set(novel.entities.filter((e) => e.file.startsWith(`${folder}/`) && e.id !== id).map((e) => e.file.slice(folder.length + 1)));
-        const renamed = `${folder}/${uniqueFileName(slugify(changes.name), ".md", taken)}`;
-        if (renamed !== entity.file) {
-          file = renamed;
-          writes.push({ path: entity.file, content: null, base }, { path: renamed, content, base: null });
-        }
-      }
-      if (!writes.length) writes.push({ path: entity.file, content, base });
-      writes.push(...tools);
+      const { writes, file } = await this.#entityWrites(novel, entity, base, changes);
+      writes.push(...(await listWrites(this.root, novel, changes.fields, changes.changes)));
       const message = changes.name && changes.name !== entity.name ? `${codex(novel)}: rename ${entity.name} to ${changes.name}` : `${codex(novel)}: edit ${entity.name}`;
       return { ...(await transaction(this.root, writes, message)), file };
     });
+  }
+
+  /**
+   * Change many entries at once (the index's table: a tag added to each, a field set on each), every
+   * file checked against its base and written in one commit, named for what changed and on whom.
+   */
+  editEntries(edits: { id: string; base: string; changes: EntityFields }[]): Promise<OperationResult> {
+    return this.#run(async (novel) => {
+      if (!Array.isArray(edits) || !edits.length) throw new OperationError("BAD_REQUEST", "Nothing to change.");
+      const writes: FileWrite[] = [];
+      const entries: Entity[] = [];
+      for (const edit of edits) {
+        const entity = novel.entities.find((e) => e.id === edit?.id);
+        if (!entity) throw new OperationError("NOT_FOUND", `No entity “${String(edit?.id)}”.`);
+        if (entries.includes(entity)) throw new OperationError("BAD_REQUEST", `“${entity.name}” is changed twice.`);
+        entries.push(entity);
+        writes.push(...(await this.#entityWrites(novel, entity, String(edit.base ?? ""), edit.changes ?? {})).writes);
+      }
+      // The book's tools once, however many entries hold a list.
+      const lists = edits.find((e) => Object.values(e.changes?.fields ?? {}).some(Array.isArray) || e.changes?.changes?.length);
+      if (lists) writes.push(...(await listWrites(this.root, novel, lists.changes.fields, lists.changes.changes)));
+      return transaction(this.root, writes, `${codex(novel)}: ${describeEdits(novel, edits, entries)}`);
+    });
+  }
+
+  /** An entity's file with `changes` made, moved to match a new name; checked against `base`. */
+  async #entityWrites(novel: Book, entity: Entity, base: string, changes: EntityFields): Promise<{ writes: FileWrite[]; file: string }> {
+    const text = await this.#read(entity.file);
+    if (hashText(text) !== base) throw new OperationError("STALE", `“${entity.name}” changed since it was read.`, { path: entity.file });
+    if (changes.name !== undefined) required(changes.name, "name");
+    const edits = Object.entries(changes).flatMap(([key, value]): YamlEdit[] =>
+      value === null ? [{ path: [key], remove: true }] : key === "fields" ? fieldEdits(entity.fields, value as Record<string, unknown>) : [{ path: [key], value }],
+    );
+    const content = editFrontMatter(text, edits);
+    if (changes.name && changes.name !== entity.name) {
+      const folder = entity.file.slice(0, entity.file.lastIndexOf("/"));
+      const taken = new Set(novel.entities.filter((e) => e.file.startsWith(`${folder}/`) && e.id !== entity.id).map((e) => e.file.slice(folder.length + 1)));
+      const renamed = `${folder}/${uniqueFileName(slugify(changes.name), ".md", taken)}`;
+      if (renamed !== entity.file) return { writes: [{ path: entity.file, content: null, base }, { path: renamed, content, base: null }], file: renamed };
+    }
+    return { writes: [{ path: entity.file, content, base }], file: entity.file };
   }
 
   /**
@@ -331,6 +354,52 @@ export class BibleOperations {
       const content = await this.#appendRelationship(novel, record);
       const result = await transaction(this.root, [{ path: relationshipsFile(novel), content }], `${codex(novel)}: ${this.#describe(novel, fields)}`);
       return { ...result, id };
+    });
+  }
+
+  /** Add several relationships (one of a type from each of many entries, say), in one commit. */
+  addRelationships(records: (RelationshipFields & { from: string; to: string; type: string })[]): Promise<OperationResult & { ids: string[] }> {
+    return this.#run(async (novel) => {
+      if (!Array.isArray(records) || !records.length) throw new OperationError("BAD_REQUEST", "Nothing to add.");
+      const taken = new Set(indexById(novel).keys());
+      const ids: string[] = [];
+      let content: string | undefined;
+      for (const fields of records) {
+        this.#checkRelationship(novel, fields ?? {});
+        const id = uniqueId(RECORD_PREFIXES.relationship, taken);
+        taken.add(id);
+        ids.push(id);
+        content = await this.#appendRelationship(novel, { id, ...clean(fields) }, content);
+      }
+      const first = records[0]!;
+      const message = records.length === 1 ? this.#describe(novel, first) : `${records.length} “${first.type}” relationships`;
+      return { ...(await transaction(this.root, [{ path: relationshipsFile(novel), content: content! }], `${codex(novel)}: add ${message}`)), ids };
+    });
+  }
+
+  /**
+   * Undo `commit` (one of the app's own, just made): each of its `files` put back as it was before it,
+   * byte for byte, in one commit. Refused if any of them has changed since the commit, so nothing
+   * written after it is lost.
+   */
+  undo(commit: string, files: string[]): Promise<OperationResult> {
+    return this.#exclusive(async () => {
+      const git = gitPort();
+      const info = await git.commitInfo(this.root, commit).catch(() => null);
+      const parent = info?.parents[0];
+      if (!info || !parent) throw new OperationError("NOT_FOUND", "There's nothing to undo there.");
+      if (!Array.isArray(files) || !files.length) throw new OperationError("BAD_REQUEST", "Nothing to undo.");
+      const writes: FileWrite[] = [];
+      for (const path of files) {
+        if (typeof path !== "string") throw new OperationError("BAD_REQUEST", "A file is named by its path.");
+        const [after, before] = [await git.readFile(this.root, commit, path), await git.readFile(this.root, parent, path)];
+        const now = await filesPort().read(filesPort().join(this.root, path));
+        if (!sameBytes(now ?? null, after)) throw new OperationError("STALE", `“${path}” changed since, so it wasn't undone.`, { path });
+        // Text as text (written back as the same bytes), a picture as its bytes.
+        writes.push({ path, content: before === null ? null : path.startsWith(`${IMAGES_DIR}/`) ? before : new TextDecoder("utf-8", { ignoreBOM: true }).decode(before) });
+      }
+      const subject = info.message.split("\n")[0]!.trim();
+      return transaction(this.root, writes, `Undo “${subject}”`);
     });
   }
 
@@ -825,4 +894,38 @@ function nullsToUndefined(fields: RelationshipFields): RelationshipFields {
 
 function editsAt(path: (string | number)[], changes: Record<string, unknown>) {
   return Object.entries(changes).map(([key, value]) => (value === null ? { path: [...path, key], remove: true as const } : { path: [...path, key], value }));
+}
+
+function sameBytes(a: Uint8Array | null, b: Uint8Array | null): boolean {
+  if (a === null || b === null) return a === b;
+  return a.byteLength === b.byteLength && a.every((x, i) => x === b[i]);
+}
+
+/** A batch of edits in the writer's words: "set Eyes on Ada Varn and Ben Varn", "tag 5 characters “pov”", "edit Ada Varn and Ben Varn". */
+function describeEdits(novel: Book, edits: { changes: EntityFields }[], entries: Entity[]): string {
+  const types = new Set(entries.map((e) => e.type));
+  const type = types.size === 1 ? novel.entityTypes.find((t) => types.has(t.key)) : undefined;
+  const whom =
+    entries.length <= 3
+      ? entries.map((e) => e.name).join(entries.length === 2 ? " and " : ", ").replace(/, ([^,]*)$/, " and $1")
+      : `${entries.length} ${type ? typePlural(type).toLowerCase() : vocabulary(novel.kind).entity.many}`;
+  const only = (key: keyof EntityFields) => edits.every((e) => Object.keys(e.changes).length === 1 && e.changes[key] !== undefined);
+  if (only("tags")) {
+    const added = edits.map((e, i) => (e.changes.tags ?? []).filter((t) => !entries[i]!.tags.includes(t)));
+    const tag = added[0]?.length === 1 && added.every((a) => a.length <= 1 && (!a.length || a[0] === added[0]![0])) ? added[0]![0] : undefined;
+    if (tag) return `tag ${whom} “${tag}”`;
+  }
+  if (only("fields")) {
+    const keysChanged = edits.map((e, i) => {
+      const before = entries[i]!.fields, after = e.changes.fields ?? {};
+      return [...new Set([...Object.keys(before), ...Object.keys(after)])].filter((k) => JSON.stringify(before[k]) !== JSON.stringify(after[k]));
+    });
+    const key = keysChanged[0]?.length === 1 && keysChanged.every((k) => k.length <= 1 && (!k.length || k[0] === keysChanged[0]![0])) ? keysChanged[0]![0] : undefined;
+    if (key) {
+      const def = novel.entityTypes.find((t) => types.has(t.key))?.fields?.find((f) => f.key === key);
+      const label = fieldLabel(def ?? { key });
+      return edits.every((e) => (e.changes.fields ?? {})[key] === undefined) ? `clear ${label} on ${whom}` : `set ${label} on ${whom}`;
+    }
+  }
+  return `edit ${whom}`;
 }
