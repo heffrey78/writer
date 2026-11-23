@@ -2,10 +2,11 @@ import { defaultEntrySort, entryPresences, filterEntries, matchEntry, piecesMatc
 import { findPanel } from "@writer/editor";
 import type { SpellService } from "@writer/editor/react";
 import { ChevronLeft, ChevronRight, Expand, LayoutGrid, List, PanelLeftClose, PanelLeftOpen, Plus, Search, SlidersHorizontal, Sparkles, Table2, X } from "lucide-react";
-import { Fragment, memo, useCallback, useEffect, useId, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
-import { Link, useLocation, useNavigate } from "react-router";
+import { Fragment, memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
+import { Link, useLocation, useNavigate, useNavigationType } from "react-router";
 import { create } from "zustand";
 import { useCommands } from "../commands.ts";
+import { useNarrow } from "../narrow.ts";
 import { moduleRecordTypes } from "../modules.tsx";
 import { NEW_TYPE } from "../novel/item-modals.tsx";
 import { fieldsTitle, useFieldsDialog } from "./fields-dialog.tsx";
@@ -18,7 +19,7 @@ import { EntryPage } from "./entry-page.tsx";
 import { imageUrl } from "@writer/client";
 import { Picture, useImageVersions } from "./picture.tsx";
 import { pictureAlt, shapeForType } from "./pictures.ts";
-import { anyFilter, FilterBar, FILTER_KEYS, filtersOf } from "./filters.tsx";
+import { anyFilter, FilterBar, FILTER_KEYS, filtersOf, TypeChips } from "./filters.tsx";
 import { NewTypeDialog } from "./new-entry.tsx";
 import { opened } from "./recent.ts";
 import { OpenParts, saveOpenParts } from "./profile.tsx";
@@ -33,7 +34,7 @@ import { cardFacts, entriesByType, initials } from "./types.ts";
  * beside the list, so moving to the next is one step and the list keeps its place. The list is a List
  * of rows or the Cards of the gallery; the kind's modules add their records after the entries (off-page
  * events), opening beside it too. In a window too narrow for both, the list and the entry are one
- * screen each.
+ * screen each, and back from the entry the list is where it was (#175).
  */
 
 const sorts = (w: Vocabulary): { key: EntrySort; label: string }[] => [
@@ -42,6 +43,9 @@ const sorts = (w: Vocabulary): { key: EntrySort; label: string }[] => [
   { key: "name", label: "Name" },
   { key: "most", label: `Most ${w.piece.many}` },
 ];
+
+/** A control a finger can hit on a phone: 44 px at the least. */
+const TOUCH = "max-md:h-11 max-md:px-3.5";
 
 const MARK = { carries: "bg-accent", present: "bg-accent/40", mentioned: "bg-accent/15", absent: "bg-rule/60" } as const;
 
@@ -107,6 +111,21 @@ function typing(target: EventTarget | null): boolean {
 /** Wide enough for the list and an entry side by side. */
 const TWO_PANES = "(min-width: 70rem)";
 
+/**
+ * Where the list was, shown alone, as an entry was opened from it: back from the entry (Android's back,
+ * the browser's, or the entry's own way back), the list is there again, its row in focus (#175).
+ */
+const listPlace = new Map<string, { search: string; top: number; id: string | undefined }>();
+
+/** What scrolls the list: the page's own pane on a wider window, the page itself on a phone. */
+function scrollerOf(el: Element): Element {
+  for (let at = el.parentElement; at; at = at.parentElement) {
+    const y = getComputedStyle(at).overflowY;
+    if ((y === "auto" || y === "scroll") && at.scrollHeight > at.clientHeight) return at;
+  }
+  return document.scrollingElement ?? document.documentElement;
+}
+
 function useTwoPanes(): boolean {
   const [wide, setWide] = useState(() => typeof matchMedia !== "function" || matchMedia(TWO_PANES).matches);
   useEffect(() => {
@@ -138,13 +157,17 @@ export function BiblePage({
   const w = vocabulary(novel.kind);
   // Answering at once, the address following: typed fast, a search keeps every letter.
   const [params, setParamsTo] = useViewParams();
-  const { hash } = useLocation();
+  const { hash, state: arrived } = useLocation();
+  const navigationType = useNavigationType();
   // The search, sort and filters, carried to an entry's address and back.
   const search = params.toString() ? `?${params.toString()}` : "";
   const query = params.get("q") ?? "";
   const navigate = useNavigate();
   const [layout, setLayout] = useIndexLayout(novelId);
   const twoPanes = useTwoPanes();
+  // On a phone the Table has no room: the List in its place (the Table is offered from a tablet's width).
+  const narrow = useNarrow();
+  const view: View = narrow && layout.view === "table" ? "list" : layout.view;
   /**
    * A new entry (of a type, or chosen), in its modal over the index: the search and filters kept, so
    * the list under it and beside the new entry is the one the writer was in.
@@ -193,7 +216,7 @@ export function BiblePage({
   // A long list is drawn a stretch at a time: the first rows at once, the rest in the moments after,
   // so a search, a sort or a filter answers within a frame or two however long the bible is. The open
   // entry's row is always among those drawn.
-  const orderKey = `${query}|${sort}|${ids}|${filterKey}|${layout.view}`;
+  const orderKey = `${query}|${sort}|${ids}|${filterKey}|${view}`;
   const [progress, setProgress] = useState({ key: orderKey, limit: STRETCH });
   const drawn = progress.key === orderKey ? progress.limit : STRETCH;
   useEffect(() => {
@@ -214,10 +237,17 @@ export function BiblePage({
 
   // The parts of the entry beside the list open for editing: saved before another entry is opened.
   const parts = useMemo(() => new Set<() => Promise<boolean>>(), []);
-  const go = async (to: string, e?: MouseEvent) => {
+  const go = async (to: string, e?: MouseEvent, state?: object) => {
     if (e && (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0)) return; // a new tab or window: as the browser does
     e?.preventDefault();
-    if (await saveOpenParts(parts)) void navigate(to);
+    if (await saveOpenParts(parts)) void navigate(to, state ? { state } : undefined);
+  };
+  // The list on its own (one pane, or the gallery with nothing open): where it is, kept as an entry opens.
+  const listAlone = !selected && (!twoPanes || view !== "list");
+  const remember = (to: string) => {
+    if (!listAlone || !list.current) return;
+    const id = /\/bible\/([^/?#]+)/.exec(to)?.[1];
+    listPlace.set(novelId, { search, top: scrollerOf(list.current).scrollTop, id: id && decodeURIComponent(id) });
   };
   const entryHref = (id: string) => `/novels/${novelId}/bible/${id}${search}`;
   // What every row needs, worked out once for the list (a long book's has hundreds of rows): the
@@ -227,17 +257,25 @@ export function BiblePage({
   const pictureOf = (e: Entity) => (e.image ? imageUrl(novelId, e.image, versions[e.image]) : undefined);
   const marksByType = useMemo(() => new Map(novel.entityTypes.map((t) => [t.key, markWords(novel.kind, t.key, w)])), [novel, w]);
   const matches = useMemo(() => new Map(query ? novel.entities.map((e) => [e.id, matchEntry(e, query, { around: 3, book: novel })]) : []), [novel, query]);
-  const latest = useRef({ go, selectedId: undefined as string | undefined, entryHref });
-  const onOpen = useCallback((to: string, e?: MouseEvent) => latest.current.go(to, e), []);
+  const latest = useRef({ go, remember, listAlone, selectedId: undefined as string | undefined, entryHref });
+  const onOpen = useCallback((to: string, e?: MouseEvent) => {
+    const { go, remember, listAlone } = latest.current;
+    remember(to);
+    return go(to, e, listAlone ? { fromList: true } : undefined);
+  }, []);
   const onEnter = useCallback((id: string) => {
-    const { selectedId, entryHref } = latest.current;
-    if (id === selectedId) document.getElementById(PANE_ID)?.focus();
-    else void navigate(entryHref(id), { state: { focusEntry: true } });
+    const { selectedId, entryHref, remember, listAlone } = latest.current;
+    if (id === selectedId) return void document.getElementById(PANE_ID)?.focus();
+    remember(entryHref(id));
+    void navigate(entryHref(id), { state: { focusEntry: true, ...(listAlone ? { fromList: true } : {}) } });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const selectedId = selected && "entry" in selected ? selected.entry : selected?.record.id;
-  latest.current = { go, selectedId, entryHref };
+  latest.current = { go, remember, listAlone, selectedId, entryHref };
   const list = useRef<HTMLDivElement>(null);
+  // Back to the list from the entry opened from it: the list scrolled where it was, the entry's row in focus.
+  const backTo = listAlone && (navigationType === "POP" || (arrived as { back?: boolean } | null)?.back) ? listPlace.get(novelId) : undefined;
+  const place = backTo?.search === search ? backTo : undefined;
   // The one open, in view in the list; and arriving at a group (the book pane's Off the page links to #off-the-page), that group.
   useEffect(() => {
     if (selectedId) list.current?.querySelector(`[data-entry="${CSS.escape(selectedId)}"]`)?.scrollIntoView({ block: "nearest" });
@@ -246,9 +284,8 @@ export function BiblePage({
     if (hash) document.getElementById(hash.slice(1))?.scrollIntoView();
   }, [hash]);
 
-  const view: View = layout.view;
-  // How many rows to draw now, and how many come before each group's.
-  const limit = Math.max(drawn, listed.findIndex((e) => e.id === selectedId) + 1 + STRETCH / 4);
+  // How many rows to draw now (the open entry's, or the one come back from, among them), and how many come before each group's.
+  const limit = Math.max(drawn, listed.findIndex((e) => e.id === (selectedId ?? place?.id)) + 1 + STRETCH / 4);
   const before = groups.map((_, i) => groups.slice(0, i).reduce((n, x) => n + x.shown.length, 0));
 
   // The keyboard (#134): j and k (and the arrows in the list) open the next and previous entry in the
@@ -280,6 +317,11 @@ export function BiblePage({
     const button = (here && pane?.contains(here) ? here : null) ?? pane?.querySelector<HTMLElement>('button[aria-label="Edit summary"]') ?? [...(pane?.querySelectorAll<HTMLElement>("button") ?? [])].find((b) => b.textContent?.trim() === "Add a summary");
     button?.click();
   };
+  useLayoutEffect(() => {
+    if (!place || !list.current) return;
+    scrollerOf(list.current).scrollTop = place.top;
+    if (place.id) rowLink(place.id)?.focus({ preventScroll: true });
+  }, [listAlone]); // eslint-disable-line react-hooks/exhaustive-deps
   const keys = useRef({ stepTo, newOfType, toggleList, editPart, selectedId });
   keys.current = { stepTo, newOfType, toggleList, editPart, selectedId };
   useEffect(() => {
@@ -332,13 +374,13 @@ export function BiblePage({
         <h1 className="text-xl font-semibold">{w.codex.One}</h1>
         <div className="flex flex-wrap gap-2">
 
-          <Button size="sm" variant="ghost" onClick={() => void navigate(`/novels/${novelId}/bible/tidy`)}>
+          <Button size="sm" variant="ghost" onClick={() => void navigate(`/novels/${novelId}/bible/tidy`)} className={TOUCH}>
             <Sparkles className="size-4" aria-hidden /> Tidy up
           </Button>
-          <Button size="sm" onClick={() => setAddingType(true)}>
+          <Button size="sm" onClick={() => setAddingType(true)} className={TOUCH}>
             New type
           </Button>
-          <Button size="sm" variant="primary" onClick={() => add()}>
+          <Button size="sm" variant="primary" onClick={() => add()} className={TOUCH}>
             <Plus className="size-4" aria-hidden /> New {w.entity.one}
           </Button>
           {twoPanes && (view === "list" || selected) && (
@@ -353,7 +395,7 @@ export function BiblePage({
           <label htmlFor={searchId} className="sr-only">
             Search the {w.codex.short}
           </label>
-          <Search className="pointer-events-none absolute top-2.5 left-3 size-4 text-muted" aria-hidden />
+          <Search className="pointer-events-none absolute top-2.5 left-3 size-4 text-muted max-md:top-3.5" aria-hidden />
           <input
             ref={searchRef}
             id={searchId}
@@ -368,15 +410,17 @@ export function BiblePage({
               e.preventDefault();
               keys.current.stepTo("first");
             }}
-            className="h-9 w-full rounded-md border border-rule bg-raised pr-3 pl-9 text-sm"
+            className="h-9 w-full rounded-md border border-rule bg-raised pr-3 pl-9 text-sm max-md:h-11 max-md:text-base"
           />
         </div>
-        <FilterBar novel={novel} filters={filters} onChange={setParamsTo} />
+        {/* On a phone the types are a row of their own, scrolling sideways; the other filters under Filter. */}
+        {narrow && <TypeChips novel={novel} filters={filters} onChange={setParamsTo} />}
+        <FilterBar novel={novel} filters={filters} onChange={setParamsTo} types={!narrow} />
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <ViewSwitch view={view} onChange={(v) => setLayout({ view: v })} />
+          <ViewSwitch view={view} onChange={(v) => setLayout({ view: v })} table={!narrow} />
           <label htmlFor={sortId} className="flex items-center gap-2 text-sm text-muted">
             Sort
-            <select id={sortId} value={sort} onChange={(e) => setParam("sort", e.target.value === fallback ? undefined : e.target.value)} className="h-8 rounded-md border border-rule bg-raised px-2 text-ink">
+            <select id={sortId} value={sort} onChange={(e) => setParam("sort", e.target.value === fallback ? undefined : e.target.value)} className="h-8 rounded-md border border-rule bg-raised px-2 text-ink max-md:h-11">
               {sorts(w).map((s) => (
                 <option key={s.key} value={s.key}>
                   {s.label}
@@ -423,10 +467,10 @@ export function BiblePage({
                   {typePlural(type)} <span className="text-sm font-normal text-muted">{count}</span>
                 </h2>
                 <div className="flex items-center gap-1">
-                  <Button size="sm" variant="ghost" onClick={() => useFieldsDialog.getState().open(type.key)} aria-label={fieldsTitle(type)}>
+                  <Button size="sm" variant="ghost" onClick={() => useFieldsDialog.getState().open(type.key)} aria-label={fieldsTitle(type)} className={TOUCH}>
                     <SlidersHorizontal className="size-4" aria-hidden /> Fields
                   </Button>
-                  <Button size="sm" variant="ghost" onClick={() => add(type.key)} aria-label={`New ${type.label.toLowerCase()}`}>
+                  <Button size="sm" variant="ghost" onClick={() => add(type.key)} aria-label={`New ${type.label.toLowerCase()}`} className={TOUCH}>
                     <Plus className="size-4" aria-hidden /> New
                   </Button>
                 </div>
@@ -536,16 +580,16 @@ export function BiblePage({
   );
 }
 
-function ViewSwitch({ view, onChange }: { view: View; onChange: (v: View) => void }) {
+function ViewSwitch({ view, onChange, table }: { view: View; onChange: (v: View) => void; table: boolean }) {
   const options = [
     { key: "list" as const, label: "List", icon: List },
     { key: "cards" as const, label: "Cards", icon: LayoutGrid },
-    { key: "table" as const, label: "Table", icon: Table2 },
+    ...(table ? [{ key: "table" as const, label: "Table", icon: Table2 }] : []),
   ];
   return (
     <div role="group" aria-label="Show as" className="flex overflow-hidden rounded-md border border-rule text-xs">
       {options.map((o) => (
-        <button key={o.key} type="button" aria-pressed={view === o.key} onClick={() => onChange(o.key)} className={cn("flex items-center gap-1 border-r border-rule px-2.5 py-1", view === o.key ? "bg-ink text-paper" : "bg-raised hover:bg-panel")}>
+        <button key={o.key} type="button" aria-pressed={view === o.key} onClick={() => onChange(o.key)} className={cn("flex items-center gap-1 border-r border-rule px-2.5 py-1 last:border-r-0 max-md:min-h-11 max-md:px-3.5", view === o.key ? "bg-ink text-paper" : "bg-raised hover:bg-panel")}>
           <o.icon className="size-3.5" aria-hidden /> {o.label}
         </button>
       ))}
@@ -614,13 +658,25 @@ function EntryPane({
   alone: boolean;
   position: { at: number; of: number; previous: string | undefined; next: string | undefined } | undefined;
   href: (id: string) => string;
-  onGo: (to: string, e?: MouseEvent) => Promise<void>;
+  onGo: (to: string, e?: MouseEvent, state?: object) => Promise<void>;
   closeTo: string;
 }) {
   const w = vocabulary(novel.kind);
   const headingId = useId();
-  const state = useLocation().state as { focusProse?: boolean; focusEntry?: boolean } | null;
+  const navigate = useNavigate();
+  const state = useLocation().state as { focusProse?: boolean; focusEntry?: boolean; fromList?: boolean } | null;
   const pane = useRef<HTMLElement>(null);
+  const bar = useRef<HTMLDivElement>(null);
+  // One pane at a time, its top bar stays at the top: the entry's strip of parts stays under it (#176).
+  useLayoutEffect(() => {
+    const el = bar.current;
+    if (twoPanes || !el || !pane.current) return;
+    const on = () => pane.current?.style.setProperty("--ghw-sticky-top", `${el.offsetHeight}px`);
+    on();
+    const observer = new ResizeObserver(on);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [twoPanes]);
   const entity = "entry" in selected ? novel.entities.find((e) => e.id === selected.entry) : undefined;
   const record = "record" in selected ? novel.moduleRecords.find((r) => r.type === selected.record.type.type && r.id === selected.record.id) : undefined;
   const id = "entry" in selected ? selected.entry : selected.record.id;
@@ -638,14 +694,23 @@ function EntryPane({
 
   const nav = (to: string | undefined, label: string, icon: ReactNode) =>
     to ? (
-      <a href={href(to)} onClick={(e) => void onGo(href(to), e)} aria-label={label} title={label} className="rounded-md p-1.5 text-muted hover:bg-panel hover:text-ink">
+      <a href={href(to)} onClick={(e) => void onGo(href(to), e)} aria-label={label} title={label} className="grid place-items-center rounded-md p-1.5 text-muted hover:bg-panel hover:text-ink max-md:size-11">
         {icon}
       </a>
     ) : (
-      <span aria-hidden className="rounded-md p-1.5 text-muted/40">
+      <span aria-hidden className="grid place-items-center rounded-md p-1.5 text-muted/40 max-md:size-11">
         {icon}
       </span>
     );
+
+  // Back to the list: the step back it came from (as Android's back), or to the list, to where it was.
+  const back = (e: MouseEvent) => {
+    if (!state?.fromList || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return void onGo(closeTo, e, { back: true });
+    e.preventDefault();
+    void saveOpenParts(parts).then((saved) => {
+      if (saved) void navigate(-1);
+    });
+  };
 
   const gone = (
     <div className="grid gap-2 px-6 py-6">
@@ -657,9 +722,9 @@ function EntryPane({
   if (!workspace) return gone;
   return (
     <section ref={pane} id={PANE_ID} aria-labelledby={headingId} tabIndex={-1} className="grid content-start outline-none">
-      <div className={cn("flex flex-wrap items-center gap-1 border-b border-rule px-4 py-1.5 text-sm", !twoPanes && "sticky top-0 z-10 bg-paper")}>
+      <div ref={bar} className={cn("flex flex-wrap items-center gap-1 border-b border-rule px-4 py-1.5 text-sm", !twoPanes && "sticky top-0 z-20 bg-paper")}>
         {!twoPanes && (
-          <Link to={closeTo} onClick={(e) => void onGo(closeTo, e)} className="flex items-center gap-1 rounded-md px-1.5 py-1 text-muted hover:bg-panel hover:text-ink">
+          <Link to={closeTo} state={{ back: true }} onClick={back} className="flex min-h-11 items-center gap-1 rounded-md px-1.5 py-1 text-muted hover:bg-panel hover:text-ink">
             <ChevronLeft className="size-4" aria-hidden /> {w.codex.One}
           </Link>
         )}
@@ -674,12 +739,12 @@ function EntryPane({
         )}
         <span className="flex-1" />
         {entity && (
-          <Link to={`/novels/${novelId}/bible/${entity.id}/page`} onClick={(e) => void onGo(`/novels/${novelId}/bible/${entity.id}/page`, e)} className="flex items-center gap-1 rounded-md px-1.5 py-1 text-muted hover:bg-panel hover:text-ink">
+          <Link to={`/novels/${novelId}/bible/${entity.id}/page`} onClick={(e) => void onGo(`/novels/${novelId}/bible/${entity.id}/page`, e)} className="flex items-center gap-1 rounded-md px-1.5 py-1 text-muted hover:bg-panel hover:text-ink max-md:min-h-11">
             <Expand className="size-4" aria-hidden /> Open as page
           </Link>
         )}
         {twoPanes && (
-          <Link to={closeTo} onClick={(e) => void onGo(closeTo, e)} aria-label={`Close the ${"entry" in selected ? w.entity.one : (selected.record.type.def.noun.short ?? selected.record.type.def.noun.label).toLowerCase()}`} title="Close" className="rounded-md p-1.5 text-muted hover:bg-panel hover:text-ink">
+          <Link to={closeTo} state={{ back: true }} onClick={(e) => void onGo(closeTo, e, { back: true })} aria-label={`Close the ${"entry" in selected ? w.entity.one : (selected.record.type.def.noun.short ?? selected.record.type.def.noun.label).toLowerCase()}`} title="Close" className="rounded-md p-1.5 text-muted hover:bg-panel hover:text-ink">
             <X className="size-4" aria-hidden />
           </Link>
         )}

@@ -3,6 +3,7 @@ import { Plus, X } from "lucide-react";
 import { Popover } from "radix-ui";
 import { useId, useState, type KeyboardEvent } from "react";
 import { Button } from "../ui/button.tsx";
+import { cn } from "../ui/cn.ts";
 
 /*
  * The index's filters (#134), as chips under its search: by type, tag, a field's value, a part or
@@ -46,10 +47,36 @@ function sections(novel: Book): { id: string; label: string }[] {
   return novel.sections.map((s) => ({ id: s.id, label: `${" ".repeat(depth(s.id))}${w.level(s.level).One}: ${s.title || "Untitled"}` }));
 }
 
-export function FilterBar({ novel, filters, onChange }: { novel: Book; filters: EntryFilters; onChange: (changes: Record<string, string | undefined>) => void }) {
+/**
+ * On a phone (#175): the types as a row of chips of their own, scrolling sideways, each on or off;
+ * All shows every type. The other filters stay under Filter.
+ */
+export function TypeChips({ novel, filters, onChange }: { novel: Book; filters: EntryFilters; onChange: (changes: Record<string, string | undefined>) => void }) {
+  const on = filters.types ?? [];
+  const chip = (pressed: boolean) =>
+    cn("flex h-11 shrink-0 items-center rounded-full border px-4 text-sm whitespace-nowrap focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none", pressed ? "border-accent bg-accent-soft text-accent" : "border-rule bg-raised text-ink");
+  return (
+    <div role="group" aria-label="Types" className="flex min-w-0 gap-1.5 overflow-x-auto overscroll-x-contain [scrollbar-width:none]">
+      <button type="button" aria-pressed={!on.length} onClick={() => onChange({ type: undefined })} className={chip(!on.length)}>
+        All
+      </button>
+      {novel.entityTypes.map((t) => {
+        const pressed = on.includes(t.key);
+        return (
+          <button key={t.key} type="button" aria-pressed={pressed} onClick={() => onChange({ type: (pressed ? on.filter((x) => x !== t.key) : [...on, t.key]).join(",") || undefined })} className={chip(pressed)}>
+            {typePlural(t)}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** The filters set, each a chip that removes it, and Filter to add one; the types too unless they're chips of their own (`types` false). */
+export function FilterBar({ novel, filters, onChange, types = true }: { novel: Book; filters: EntryFilters; onChange: (changes: Record<string, string | undefined>) => void; types?: boolean }) {
   const w = vocabulary(novel.kind);
   const chips: { key: string; label: string; remove: Record<string, string | undefined> }[] = [];
-  for (const t of filters.types ?? []) {
+  for (const t of types ? (filters.types ?? []) : []) {
     const type = novel.entityTypes.find((x) => x.key === t);
     const rest = (filters.types ?? []).filter((x) => x !== t).join(",");
     chips.push({ key: `type:${t}`, label: type ? typePlural(type) : t, remove: { type: rest || undefined } });
@@ -87,17 +114,17 @@ export function FilterBar({ novel, filters, onChange }: { novel: Book; filters: 
           onKeyDown={(e) => onChipKey(e, c.remove)}
           aria-label={`Remove the filter: ${c.label}`}
           title="Remove the filter (Backspace)"
-          className="flex h-7 items-center gap-1 rounded-full border border-accent bg-accent-soft px-2.5 text-xs text-accent hover:bg-accent/20 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+          className="flex h-7 items-center gap-1 rounded-full border border-accent bg-accent-soft px-2.5 text-xs text-accent hover:bg-accent/20 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none max-md:h-11 max-md:px-3.5 max-md:text-sm"
         >
           {c.label} <X className="size-3" aria-hidden />
         </button>
       ))}
-      <AddFilter novel={novel} filters={filters} onAdd={onChange} />
+      <AddFilter novel={novel} filters={filters} onAdd={onChange} types={types} />
     </div>
   );
 }
 
-function AddFilter({ novel, filters, onAdd }: { novel: Book; filters: EntryFilters; onAdd: (changes: Record<string, string | undefined>) => void }) {
+function AddFilter({ novel, filters, onAdd, types }: { novel: Book; filters: EntryFilters; onAdd: (changes: Record<string, string | undefined>) => void; types: boolean }) {
   const w = vocabulary(novel.kind);
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState<Kind>("type");
@@ -117,7 +144,7 @@ function AddFilter({ novel, filters, onAdd }: { novel: Book; filters: EntryFilte
     { key: "in" as const, label: `In a ${novel.kind.levels.map((l) => l.label.toLowerCase()).join(" or ")}`, options: sections(novel).map((s) => ({ value: s.id, label: s.label })) },
     { key: "role" as const, label: "Role", options: roles.map((f) => ({ value: f.key, label: sentence(roleOf(f)) })) },
     { key: "absent" as const, label: `Not in the ${w.content.one} yet`, options: [] },
-  ].filter((k) => k.key === "absent" ? !filters.absent : k.options.length > 0);
+  ].filter((k) => (k.key === "type" ? types && k.options.length > 0 : k.key === "absent" ? !filters.absent : k.options.length > 0));
 
   const current = kinds.find((k) => k.key === kind) ?? kinds[0];
   const chosen = current && current.options.some((o) => o.value === value) ? value : (current?.options[0]?.value ?? "");
@@ -141,7 +168,7 @@ function AddFilter({ novel, filters, onAdd }: { novel: Book; filters: EntryFilte
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
       <Popover.Trigger asChild>
-        <button type="button" className="flex h-7 items-center gap-1 rounded-full border border-dashed border-rule px-2.5 text-xs text-muted hover:border-accent hover:text-ink">
+        <button type="button" className="flex h-7 items-center gap-1 rounded-full border border-dashed border-rule px-2.5 text-xs text-muted hover:border-accent hover:text-ink max-md:h-11 max-md:px-3.5 max-md:text-sm">
           <Plus className="size-3" aria-hidden /> Filter
         </button>
       </Popover.Trigger>

@@ -424,6 +424,26 @@ try {
   if (!taken) throw new Error("The change from GitHub didn't arrive.");
   step("synced: a change made elsewhere arrived");
 
+  // The index on the phone (#175): a type from its chips; an entry opened, and Android's back to the list where it was.
+  await page.getByRole("navigation", { name: "Book" }).getByRole("link", { name: "Bible" }).click();
+  await page.getByRole("group", { name: "Types" }).getByRole("button", { name: "Characters" }).click();
+  await expect(page.locator("section[aria-labelledby^='type-']")).toHaveCount(1);
+  const tomas = page.getByRole("link", { name: /^Tomas Hale/ });
+  await tomas.scrollIntoViewIfNeeded();
+  const listTop = await page.evaluate(() => scrollY);
+  await tomas.click();
+  await expect(page.getByRole("heading", { level: 1, name: "Tomas Hale" })).toBeVisible();
+  // Its strip of parts (#176): a jump to Appears in, the focus on its heading; the way back still at the top.
+  await page.getByRole("navigation", { name: "Parts of the entry" }).getByRole("button", { name: /^Appears in/ }).click();
+  await expect(page.getByRole("region", { name: /^Appears in/ }).getByRole("heading", { name: /^Appears in/ })).toBeFocused();
+  expect(await page.locator("#index-entry > div").first().evaluate((e) => e.getBoundingClientRect().top)).toBe(0);
+  adb("shell", "input", "keyevent", "KEYCODE_BACK");
+  await expect(tomas).toBeFocused();
+  expect(await page.evaluate(() => scrollY)).toBe(listTop);
+  adb("shell", "input", "keyevent", "KEYCODE_BACK");
+  await expect(page.getByRole("textbox", { name: "Chapter text" })).toBeVisible();
+  step("the index: a type from its chips, an entry opened, a jump to Appears in, and Android's back to the list where it was");
+
   // Words selected in the novel, into an entry from Android's toolbar (#157).
   await page.getByRole("textbox", { name: "Chapter text" }).click();
   // On screen above the keyboard.

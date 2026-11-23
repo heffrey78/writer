@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { devices, type Page } from "@playwright/test";
+import { devices, type Locator, type Page } from "@playwright/test";
 import { axe, expect, launch, test } from "./fixtures.ts";
 
 /**
@@ -597,4 +597,96 @@ test("on a phone, Quick look is in More and fills the screen (#141, #174)", asyn
   await expect(look.getByRole("article", { name: "Ada Varn" })).toContainText("Bridge engineer");
   await fits(page);
   await audit(page);
+});
+
+test("on a phone, the index: the types as chips scrolling sideways, the rest under Filter, no Table, and back to the list where it was (#175)", async ({ page, app }) => {
+  await page.setViewportSize({ width: viewport.width, height: 600 });
+  await app.restart(app.novelRepo("varn"));
+  await launch(page, app);
+  await page.getByRole("navigation", { name: "Book" }).getByRole("link", { name: "Bible" }).tap();
+  await expect(page.getByRole("heading", { level: 1, name: "Story bible" })).toBeVisible();
+
+  // The types, a row of their own that scrolls sideways (not the page); no Table at a phone's width.
+  const types = page.getByRole("group", { name: "Types" });
+  await expect(types.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "true");
+  expect(await types.evaluate((el) => getComputedStyle(el).overflowX)).toBe("auto");
+  await expect(page.getByRole("group", { name: "Show as" }).getByRole("button")).toHaveText(["List", "Cards"]);
+  await fits(page);
+  // Every control a finger's size.
+  const small = await page.evaluate(() =>
+    [...document.querySelectorAll<HTMLElement>('h1 + div button, [role=group] button, input[type=search], select, section[aria-labelledby^="type-"] a, section[aria-labelledby^="type-"] button')]
+      .filter((el) => el.getBoundingClientRect().height < 44)
+      .map((el) => el.getAttribute("aria-label") ?? el.textContent),
+  );
+  expect(small).toEqual([]);
+
+  // A type on and off; the other filters under Filter, without the types.
+  await types.getByRole("button", { name: "Characters" }).tap();
+  await expect(types.getByRole("button", { name: "Characters" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("section[aria-labelledby^='type-']")).toHaveCount(1);
+  await page.getByRole("group", { name: "Filters" }).getByRole("button", { name: "Filter" }).tap();
+  await expect(page.getByRole("dialog", { name: /^Filter the / }).getByLabel("By").locator("option")).not.toContainText(["Type"]);
+  await page.keyboard.press("Escape");
+  await types.getByRole("button", { name: "All" }).tap();
+  await expect(page.locator("section[aria-labelledby^='type-']")).not.toHaveCount(1);
+  await page.getByLabel("Sort").selectOption("name");
+
+  // Down the list to an entry, and back (as Android's back does, and by the entry's own way back): the list where it was, its row in focus.
+  const row = page.getByRole("link", { name: /^Trust/ });
+  await row.scrollIntoViewIfNeeded();
+  const top = await page.evaluate(() => scrollY);
+  expect(top).toBeGreaterThan(0);
+  await row.tap();
+  await expect(page.getByRole("heading", { level: 1, name: "Trust" })).toBeVisible();
+  await page.goBack();
+  await expect(row).toBeFocused();
+  expect(await page.evaluate(() => scrollY)).toBe(top);
+  await row.tap();
+  await page.locator("#index-entry").getByRole("link", { name: "Story bible" }).first().tap();
+  await expect(row).toBeFocused();
+  expect(await page.evaluate(() => scrollY)).toBe(top);
+  await expect(page).toHaveURL(/sort=name/);
+  await audit(page);
+});
+
+test("on a phone, a journal's index puts the people last written about first (#175)", async ({ page, app }) => {
+  await app.restart(app.bookRepo(fileURLToPath(new URL("../../../examples/sample-journal", import.meta.url)), "journal"));
+  await launch(page, app);
+  await page.getByRole("navigation", { name: "Book" }).getByRole("link", { name: "Index" }).tap();
+  await expect(page.getByLabel("Sort")).toHaveValue("last");
+  await page.getByRole("group", { name: "Types" }).getByRole("button", { name: "People" }).tap();
+  await expect(page.locator("section[aria-labelledby^='type-']")).toHaveCount(1);
+  await fits(page);
+});
+
+test("on a phone, an entry's strip of parts stays under its top bar and jumps to a part; back to the list in its place (#176)", async ({ page, app }) => {
+  await page.setViewportSize({ width: viewport.width, height: 600 });
+  await app.restart(app.novelRepo("varn"));
+  await launch(page, app);
+  await page.getByRole("navigation", { name: "Book" }).getByRole("link", { name: "Bible" }).tap();
+  const row = page.getByRole("link", { name: /^Ada Varn/ });
+  await row.tap();
+  const entry = page.locator("#index-entry");
+  const back = entry.getByRole("link", { name: "Story bible" }).first();
+  const strip = page.getByRole("navigation", { name: "Parts of the entry" });
+
+  // At once, not smoothly: where it lands is what's measured.
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await strip.getByRole("button", { name: /^Appears in/ }).tap();
+  const heading = page.getByRole("region", { name: /^Appears in/ }).getByRole("heading", { name: /^Appears in/ });
+  await expect(heading).toBeFocused();
+  await expect(strip.getByRole("button", { name: /^Appears in/ })).toHaveAttribute("aria-current", "true");
+  // The way back at the top of the screen, the strip right under it, and the part's heading under both.
+  // Where the page itself sees them (a phone's boundingBox is the visual viewport's).
+  const rect = (l: Locator) => l.evaluate((e) => ({ top: e.getBoundingClientRect().top, bottom: e.getBoundingClientRect().bottom }));
+  const bar = back.locator("..");
+  await expect.poll(async () => (await page.evaluate(() => scrollY)) > 0 && (await rect(bar)).top).toBe(0);
+  await expect.poll(async () => Math.abs((await rect(strip)).top - (await rect(bar)).bottom)).toBeLessThanOrEqual(1);
+  expect((await rect(heading)).top).toBeGreaterThanOrEqual((await rect(strip)).bottom);
+  for (const b of await strip.getByRole("button").all()) expect((await b.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  await fits(page);
+  await audit(page);
+
+  await back.tap();
+  await expect(row).toBeFocused();
 });

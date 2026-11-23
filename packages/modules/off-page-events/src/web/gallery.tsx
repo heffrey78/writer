@@ -24,7 +24,7 @@ export function EventCards({ novelId, novel, query, sort }: { novelId: string; n
         <h2 id="type-events" className="font-semibold">
           {EVENT.group} <span className="text-sm font-normal text-muted">{all.length}</span>
         </h2>
-        <Button size="sm" variant="ghost" onClick={() => ask(EVENT.key)} aria-label="New off-page event">
+        <Button size="sm" variant="ghost" onClick={() => ask(EVENT.key)} aria-label="New off-page event" className="max-md:h-11 max-md:px-3.5">
           <Plus className="size-4" aria-hidden /> New
         </Button>
       </div>

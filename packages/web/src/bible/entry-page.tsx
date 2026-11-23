@@ -248,7 +248,7 @@ export function EntryPage({
         </AddButton>
       )}
 
-      <EntryFields novelId={novelId} novel={novel} entity={entity} place={place} save={change} compact={tab} at={readAt} onAt={setReadAt} />
+      <EntryFields novelId={novelId} novel={novel} entity={entity} place={place} save={change} compact={tab} at={readAt} onAt={setReadAt} heading={Heading === "h1" ? "h2" : "h3"} />
       <NamedBy novelId={novelId} novel={novel} entity={entity} compact={tab} />
 
       {!tab && (
@@ -335,11 +335,17 @@ export function EntryPage({
 
 /**
  * The profile's parts as a strip that stays at the top as it scrolls (mockup 1): each jumps to its
- * part and takes the focus there, and the one being read is marked.
+ * part, the focus on the part's heading, and the one being read is marked. On a phone it stays under
+ * the index's top bar (its height in --ghw-sticky-top, #176).
  */
 function PartsStrip({ label, parts }: { label: string; parts: { id: string; label: string }[] }) {
   const [reading, setReading] = useState(parts[0]?.id);
   const key = parts.map((p) => p.id).join(" ");
+  const nav = useRef<HTMLElement>(null);
+  /** How far down the screen the strip ends while it's stuck: what a part arrived at sits under. */
+  const under = () => (nav.current ? (parseFloat(getComputedStyle(nav.current).top) || 0) + nav.current.offsetHeight : 48);
+  // A part jumped to stays the one marked while the page moves to it, even where the page ends before it reaches the top.
+  const jumped = useRef(0);
   useEffect(() => {
     const showing = new Map<string, boolean>();
     // A part is being read while it crosses the top half of the screen, under the strip.
@@ -347,9 +353,10 @@ function PartsStrip({ label, parts }: { label: string; parts: { id: string; labe
       (entries) => {
         for (const e of entries) showing.set(e.target.id, e.isIntersecting);
         const first = parts.find((p) => showing.get(p.id));
-        if (first) setReading(first.id);
+        if (first && performance.now() - jumped.current > 1000) setReading(first.id);
       },
-      { rootMargin: "-48px 0px -50% 0px" },
+      // From what's written, not measured: measuring here would lay the whole page out again as each entry opens.
+      { rootMargin: `-${Math.round((parseFloat(nav.current?.closest<HTMLElement>("#index-entry")?.style.getPropertyValue("--ghw-sticky-top") ?? "") || 0) + 48)}px 0px -50% 0px` },
     );
     for (const p of parts) {
       const el = document.getElementById(p.id);
@@ -360,12 +367,17 @@ function PartsStrip({ label, parts }: { label: string; parts: { id: string; labe
   const go = (id: string) => {
     const el = document.getElementById(id);
     if (!el) return;
+    jumped.current = performance.now();
+    el.style.scrollMarginTop = `${under() + 8}px`;
     el.scrollIntoView({ block: "start", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
-    el.focus({ preventScroll: true });
+    // Its heading takes the focus, so a screen reader says which part it is and reading goes on from there.
+    const heading = el.querySelector<HTMLElement>("h1, h2, h3") ?? el;
+    if (!heading.hasAttribute("tabindex")) heading.tabIndex = -1;
+    heading.focus({ preventScroll: true });
     setReading(id);
   };
   return (
-    <nav aria-label={label} className="sticky top-0 z-10 -my-2 flex gap-1 overflow-x-auto border-b border-rule bg-paper py-1.5">
+    <nav ref={nav} aria-label={label} style={{ top: "var(--ghw-sticky-top, 0px)" }} className="sticky z-10 -my-2 flex gap-1 overflow-x-auto border-b border-rule bg-paper py-1.5 [scrollbar-width:none]">
       {parts.map((p) => (
         <button
           key={p.id}
@@ -373,7 +385,7 @@ function PartsStrip({ label, parts }: { label: string; parts: { id: string; labe
           aria-current={reading === p.id ? "true" : undefined}
           onClick={() => go(p.id)}
           className={cn(
-            "shrink-0 rounded-md px-2.5 py-1 text-xs whitespace-nowrap focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none",
+            "shrink-0 rounded-md px-2.5 py-1 text-xs whitespace-nowrap focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none max-md:min-h-11 max-md:px-3 max-md:text-sm",
             reading === p.id ? "bg-accent-soft font-medium text-accent" : "text-muted hover:bg-accent-soft/50 hover:text-ink",
           )}
         >

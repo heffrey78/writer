@@ -249,7 +249,7 @@ test("an entry's profile lists every passage naming it, by scene and role; chips
   const strip = page.getByRole("navigation", { name: "Parts of the entry" });
   await expect(strip.getByRole("button")).toHaveText(["Profile", "Notes", "In the story", "Appears in · 6", "Relationships · 5"]);
   await strip.getByRole("button", { name: "Appears in · 6" }).click();
-  await expect(part).toBeFocused();
+  await expect(part.getByRole("heading", { name: "Appears in · 6" })).toBeFocused();
   await expect(strip.getByRole("button", { name: "Appears in · 6" })).toHaveAttribute("aria-current", "true");
 
   // Enter on a passage: its scene, with the sentence selected and the caret in the text.

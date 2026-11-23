@@ -28,9 +28,11 @@ interface Props {
   /** The piece the profile is read at (#140), or none: the whole book, each field's latest value. */
   at: string | undefined;
   onAt: (at: string | undefined) => void;
+  /** The level of its "Other" heading: under the entry's name, h2 where that's the page's h1. */
+  heading?: "h2" | "h3";
 }
 
-export function EntryFields({ novelId, novel, entity, place, save, compact, at, onAt }: Props) {
+export function EntryFields({ novelId, novel, entity, place, save, compact, at, onAt, heading: Sub = "h3" }: Props) {
   const change = (fields: Fields) => save({ fields });
   const w = vocabulary(novel.kind);
   const readAtId = useId();
@@ -146,7 +148,7 @@ export function EntryFields({ novelId, novel, entity, place, save, compact, at, 
       )}
       {own.length > 0 && (
         <>
-          {declared.length > 0 && <h3 className="pt-2 text-xs font-semibold tracking-wide text-muted uppercase">Other</h3>}
+          {declared.length > 0 && <Sub className="pt-2 text-xs font-semibold tracking-wide text-muted uppercase">Other</Sub>}
           <FieldRows
             fields={own}
             compact={compact}
