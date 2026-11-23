@@ -7,7 +7,7 @@ import { useIssueList } from "../issues/use-issues.ts";
 import { useNotice } from "../novel/notice.tsx";
 import { SceneEditor, type SpellService } from "@writer/editor/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Trash2 } from "lucide-react";
+import { Merge, Trash2 } from "lucide-react";
 import { AlertDialog } from "radix-ui";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
@@ -22,6 +22,8 @@ import { Picture, PictureSlot, usePictureUrl } from "./picture.tsx";
 import { pictureAlt, shapeForType } from "./pictures.ts";
 import { AddButton, Lead, PencilButton, TextEditor, useInPlace } from "./profile.tsx";
 import { EntryFields, NamedBy } from "./entry-fields.tsx";
+import { useMergeDialog } from "./merge-dialog.tsx";
+import { useCommands } from "../commands.ts";
 import { useCurrentScene } from "../novel/current.ts";
 import { RelationshipArcs } from "./arcs.tsx";
 import { NotesAbout } from "../notes/notes-about.tsx";
@@ -121,6 +123,8 @@ export function EntryPage({
   const repo = useGitHubRepo(novelId);
   const githubLabel = useIssueList(novelId, { state: "open" }, { enabled: !!repo }).data?.labels.find((l) => entityOfLabel(novel, l)?.id === entity.id);
   const show = useNotice((n) => n.show);
+  // Merging the entry on its profile is a command, as its button is (#173).
+  useCommands(() => (tab ? [] : [{ id: "entry.merge", title: `Merge ${entity.name} into another ${typeOf(novel, entity)?.label.toLowerCase() ?? vocabulary(novel.kind).entity.one}…`, group: vocabulary(novel.kind).codex.One, keywords: ["duplicate", "same", "combine"], run: () => useMergeDialog.getState().open(entity.id) }]), [tab, entity.id, entity.name]);
   const remove = useMutation({
     mutationFn: async (confirm: boolean) => api.bible.deleteEntity(novelId, entity.id, await base(), confirm),
     onSuccess: async (result) => {
@@ -170,6 +174,9 @@ export function EntryPage({
               </Link>{" "}
               · {type?.label ?? entity.type}
             </p>
+            <Button variant="ghost" size="sm" onClick={() => useMergeDialog.getState().open(entity.id)}>
+              <Merge className="size-4" aria-hidden /> Merge into…
+            </Button>
             <Button variant="ghost" size="sm" onClick={() => remove.mutate(false)} disabled={remove.isPending}>
               <Trash2 className="size-4" aria-hidden /> Delete
             </Button>

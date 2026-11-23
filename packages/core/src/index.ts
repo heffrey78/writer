@@ -34,3 +34,4 @@ export { locationProfile, tally, themeProfile, type LocationProfile, type Tally,
 export { appendQuote, quotesIn, type KeptQuote } from "./quotes.ts";
 export { mentionEdits } from "./mention-sync.ts";
 export { foldName, mightBeTheSame, tidyCounts, tidyReport, type SameBecause, type TidyCounts, type TidyReport } from "./tidy.ts";
+export { mergeReach, swapEdits, swapMentions, swapped, type MergeReach } from "./merge-entries.ts";

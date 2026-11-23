@@ -902,3 +902,54 @@ test("Tidy up: the index's counts, each opening its list with the fix beside eac
   writeFileSync(join(dir, "bible/characters/nobody.md"), "---\nid: char_n0b0dy\nname: Nobody Yet\n---\n");
   await expect(index).toHaveAccessibleName(/^Story bible ?, something to tidy up$/, { timeout: 10_000 });
 });
+
+test("merging two entries that are one: from Tidy up's pair or the profile, told first what it changes, every reference moved in one commit, undone (#137, #173)", async ({ page, app }) => {
+  const dir = app.novelRepo("varn");
+  const STATION = "manuscript/01-return/01-arrival/01-the-station.md";
+  // Benjamin, made from @ mid-scene: in The Station's prose and its characters.
+  writeFileSync(join(dir, "bible/characters/benjamin.md"), "---\nid: char_b3nj4m\nname: Benjamin\n---\nAlways at the toll house.\n");
+  writeFileSync(join(dir, STATION), readFileSync(join(dir, STATION), "utf8").replace(/characters: \[([^\]]*)\]/, "characters: [$1, char_b3nj4m]").replace(/\n$/, "\n\nThen [Benjamin](#char_b3nj4m) waved.\n"));
+  app.git(dir, "add", "-A");
+  app.git(dir, "commit", "-qm", "Benjamin");
+  await app.restart(dir);
+  await page.goto(app.launchUrl);
+  await expect(page.getByRole("textbox", { name: "Chapter text" })).toBeFocused();
+  const read = (path: string) => readFileSync(join(dir, path), "utf8");
+  const before = { station: read(STATION), ben: read("bible/characters/ben.md"), benjamin: read("bible/characters/benjamin.md") };
+
+  // From Tidy up's pair: Ben Varn kept, told what changes.
+  await palette(page, "tidy up");
+  await page.getByRole("tab", { name: /Might be the same/ }).click();
+  await page.getByRole("button", { name: "Merge Ben Varn and Benjamin…" }).click();
+  const dialog = page.getByRole("dialog", { name: "Merge Benjamin and Ben Varn" });
+  await expect(dialog.getByRole("radio", { name: "Ben Varn" })).toBeChecked();
+  await expect(dialog).toContainText("Mentions and lists in 1 scene");
+  await axe(page);
+  await page.emulateMedia({ colorScheme: "dark" });
+  await axe(page);
+  await page.emulateMedia({ colorScheme: "light" });
+  await dialog.getByRole("button", { name: "Merge into Ben Varn" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Merged Benjamin into Ben Varn." })).toBeVisible();
+  expect(app.git(dir, "log", "-1", "--format=%s").trim()).toBe("Bible: merge Benjamin into Ben Varn");
+  expect(existsSync(join(dir, "bible/characters/benjamin.md"))).toBe(false);
+  expect(read(STATION)).not.toContain("char_b3nj4m");
+  expect(read(STATION)).toContain("Then [Benjamin](#char_b3n0vs) waved.");
+  expect(read("bible/characters/ben.md")).toContain("aliases: [Ben, Benjamin]");
+  expect(read("bible/characters/ben.md")).toContain("## From Benjamin\n\nAlways at the toll house.\n");
+  await expect(page.getByRole("tab", { name: /Might be the same/ })).toHaveText("0Might be the same");
+
+  // Undo: every file back, byte for byte.
+  await page.getByRole("status").getByRole("button", { name: "Undo" }).click();
+  await expect.poll(() => existsSync(join(dir, "bible/characters/benjamin.md"))).toBe(true);
+  expect({ station: read(STATION), ben: read("bible/characters/ben.md"), benjamin: read("bible/characters/benjamin.md") }).toEqual(before);
+
+  // From the profile, by keyboard: Merge into…, the one to keep chosen; its page follows to the one kept.
+  await page.goto(`${app.url}${new URL(app.launchUrl).pathname.replace(/\/chapter.*$/, "")}/bible/char_b3nj4m/page`);
+  await page.getByRole("button", { name: "Merge into…" }).click();
+  const into = page.getByRole("dialog", { name: "Merge Benjamin into…" });
+  await expect(into.getByRole("combobox", { name: "Into" })).toBeFocused();
+  await into.getByRole("combobox", { name: "Into" }).selectOption({ label: "Ben Varn" });
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(/\/bible\/char_b3n0vs$/);
+  expect(existsSync(join(dir, "bible/characters/benjamin.md"))).toBe(false);
+});

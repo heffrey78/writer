@@ -16,6 +16,7 @@ import { ErrorAlert } from "../ui/alert.tsx";
 import { ErrorBoundary } from "../ui/error-boundary.tsx";
 import { BiblePage } from "../bible/bible-page.tsx";
 import { TidyPage } from "../bible/tidy-page.tsx";
+import { MergeDialog } from "../bible/merge-dialog.tsx";
 import { useNewNote } from "../notes/new-note.tsx";
 import { NotesPage } from "../notes/notes-page.tsx";
 import { NotesLeftDialog } from "../notes/notes-left.tsx";
@@ -403,6 +404,7 @@ export function NovelPage() {
         <SaveConflicts novel={book} workspace={workspace} />
         <ArrangeSidebar novelId={novelId} novel={book} onGitHub={!!repo} onNewFormat={newFormat.commands[0]?.run} />
         <FieldsDialog novelId={novelId} novel={book} onNewFormat={newFormat.commands[0]?.run} />
+        <MergeDialog novelId={novelId} novel={book} />
         {!focus && <BottomBar novelId={novelId} novel={book} onGitHub={!!repo} />}
         <MoreSheet novelId={novelId} novel={book} onGitHub={!!repo} />
         <ArrangeBar novelId={novelId} novel={book} onGitHub={!!repo} />

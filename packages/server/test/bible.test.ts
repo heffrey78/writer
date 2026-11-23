@@ -225,6 +225,66 @@ describe("many entries at once (#167)", () => {
   });
 });
 
+describe("merging two entries (#173)", () => {
+  const BENJ = "char_b3nj4m";
+  const STATION = "manuscript/01-return/01-arrival/01-the-station.md";
+  const BEN_FILE = "bible/characters/ben.md";
+
+  /** Benjamin, a quick entry made twice: named in a scene's prose and characters, in Ada's fields, relationships, a layout and the judgements. */
+  async function benjamin() {
+    writeFileSync(join(dir, "bible/characters/benjamin.md"), `---\nid: ${BENJ}\nname: Benjamin\naliases: [Benjy]\nsummary: Made from @ mid-scene.\nfields:\n  age: 29\n  eyes: brown\ntags: [quick]\n---\nAlways at the toll house. Ask [Ada](#${ADA}).\n`);
+    writeFileSync(join(dir, STATION), read(STATION).replace(/characters: \[([^\]]*)\]/, `characters: [$1, ${BENJ}]`).replace(/\n$/, `\n\nThen [Benjamin](#${BENJ}) waved.\n`));
+    writeFileSync(join(dir, ADA_FILE), read(ADA_FILE).replace("  eyes: grey\n", `  eyes: grey\n  brother: ${BENJ}\n`));
+    writeFileSync(join(dir, "bible/relationships.yaml"), `${read("bible/relationships.yaml").trimEnd()}\n  - id: rel_b3nj01\n    from: ${ADA}\n    to: ${BENJ}\n    type: sibling\n  - id: rel_b3nj02\n    from: ${BEN}\n    to: ${BENJ}\n    type: rivals\n  - id: rel_b3nj03\n    from: ${BENJ}\n    to: char_m1re1a\n    type: owes\n`);
+    writeFileSync(join(dir, "diagrams/layouts.yaml"), read("diagrams/layouts.yaml").replace(`      char_b3n0vs: { x: 260, y: 0 }\n`, `      char_b3n0vs: { x: 260, y: 0 }\n      ${BENJ}: { x: 300, y: 40 }\n`));
+    gitIn(dir, "add", "-A");
+    gitIn(dir, "commit", "-qm", "Benjamin");
+    await bible.areDifferent(BENJ, ADA);
+  }
+
+  it("moves every reference to the one kept, gives it the other's names, notes and missing fields, in one commit; undone byte for byte", async () => {
+    await benjamin();
+    const tracked = gitIn(dir, "ls-files").trim().split("\n").filter((f) => /\.(md|yaml)$/.test(f));
+    const before = Object.fromEntries(tracked.map((f) => [f, read(f)]));
+    const { commit, files } = await bible.mergeEntries(BEN, BENJ, { keep: hash(BEN_FILE), other: hash("bible/characters/benjamin.md") });
+    expect(lastCommit()).toBe("Bible: merge Benjamin into Ben Varn");
+    expect(existsSync(join(dir, "bible/characters/benjamin.md"))).toBe(false);
+    // Nothing anywhere names Benjamin's ID now.
+    for (const f of gitIn(dir, "ls-files").trim().split("\n")) if (existsSync(join(dir, f)) && /\.(md|yaml)$/.test(f)) expect(read(f), f).not.toContain(BENJ);
+    const novel = await valid();
+    const ben = novel.entities.find((e) => e.id === BEN)!;
+    expect(ben.aliases).toEqual(["Ben", "Benjamin", "Benjy"]);
+    expect(ben.tags).toEqual(["pov", "quick"]);
+    expect(ben.fields).toEqual({ age: 29, occupation: "Toll keeper", eyes: "brown" });
+    expect(read(BEN_FILE)).toContain(`## From Benjamin\n\nAlways at the toll house. Ask [Ada](#${ADA}).\n`);
+    // The scene lists Ben once, its prose mentions him; Ada's field names him.
+    const station = novel.pieces.find((p) => p.file === STATION)!;
+    expect((station.fields["characters"] as string[]).filter((c) => c === BEN)).toHaveLength(1);
+    expect(station.body).toContain(`Then [Benjamin](#${BEN}) waved.`);
+    expect(novel.entities.find((e) => e.id === ADA)!.fields["brother"]).toBe(BEN);
+    // Ada sibling Benjamin was Ada sibling Ben again; Ben rivals Benjamin was Ben and himself: both gone. Benjamin owes Mirela is Ben's.
+    expect(novel.relationships.filter((r) => r.type === "sibling" && r.from === ADA && r.to === BEN)).toHaveLength(1);
+    expect(novel.relationships.some((r) => r.from === r.to)).toBe(false);
+    expect(novel.relationships.find((r) => r.id === "rel_b3nj03")).toMatchObject({ from: BEN, to: "char_m1re1a" });
+    expect(novel.different).toEqual([]);
+    expect(novel.layouts["relationship-graph"]!.nodes[BEN]).toEqual({ x: 260, y: 0 });
+    clean();
+
+    await bible.undo(commit!, files);
+    for (const f of tracked) expect(read(f), f).toBe(before[f]);
+    expect(read("bible/characters/benjamin.md")).toContain("name: Benjamin");
+  });
+
+  it("refuses entries of two types, an entry into itself, and a file changed since it was read", async () => {
+    await benjamin();
+    const bases = { keep: hash(BEN_FILE), other: hash("bible/characters/benjamin.md") };
+    await expect(bible.mergeEntries("loc_br1dg3", BENJ, { ...bases, keep: hash("bible/locations/varn-bridge.md") })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(bible.mergeEntries(BEN, BEN, bases)).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(bible.mergeEntries(BEN, BENJ, { ...bases, other: "0".repeat(64) })).rejects.toMatchObject({ code: "STALE" });
+    clean();
+  });
+});
+
 describe("Link all (#172)", () => {
   const LEDGER = "manuscript/01-return/02-old-debts/02-bens-ledger.md";
   const FLOOD = "manuscript/02-the-sale/01-night-crossing/02-the-flood.md";

@@ -28,6 +28,10 @@ import {
   type Passage,
   mentionEdits,
   passagesOf,
+  readFrontMatter,
+  swapEdits,
+  swapMentions,
+  swapped,
   DIFFERENT_HEADER,
   differentLine,
   judgedDifferent,
@@ -825,6 +829,112 @@ export class BibleOperations {
       if (!writes.length) return { commit: null, files: [], linked: 0 };
       const w = vocabulary(novel.kind);
       return { ...(await transaction(this.root, writes, `${codex(novel)}: link ${target.name} in ${w.piece.count(writes.length)}`)), linked };
+    });
+  }
+
+  /**
+   * Merge `other` into `keep`, two entries of one type (#137, #173): every reference to `other` (in
+   * prose, pieces' fields, entries' fields and changes, modules' records, notes, relationships, the
+   * diagrams' layouts and the index's judgements) made one to `keep`, a list naming both left with one;
+   * relationships between the two, and those that become twins of another, dropped. `keep` gains
+   * `other`'s name and other names as other names, its tags, the fields it lacks, its summary and
+   * picture if it has none, and its notes under a heading; `other`'s file goes. One commit, refused if
+   * either entry's file changed since `bases` were read; undone by undo().
+   */
+  mergeEntries(keep: string, other: string, bases: { keep: string; other: string }): Promise<OperationResult> {
+    return this.#run(async (novel) => {
+      const [k, o] = [novel.entities.find((e) => e.id === keep), novel.entities.find((e) => e.id === other)];
+      if (!k || !o) throw new OperationError("NOT_FOUND", `No entity “${!k ? keep : other}”.`);
+      if (k === o) throw new OperationError("BAD_REQUEST", "An entry can't be merged into itself.");
+      if (k.type !== o.type) throw new OperationError("BAD_REQUEST", "Only entries of one type are merged.");
+      const writes = new Map<string, FileWrite>();
+      const text = async (path: string) => {
+        const w = writes.get(path);
+        if (w) return w.content as string | null;
+        const bytes = await filesPort().read(filesPort().join(this.root, path));
+        if (bytes === undefined) return null;
+        const t = new TextDecoder().decode(bytes);
+        writes.set(path, { path, content: t, base: hashText(bytes) });
+        return t;
+      };
+      const put = (path: string, content: string | null) => {
+        const w = writes.get(path)!;
+        writes.set(path, { ...w, content });
+      };
+      for (const [id, path, base] of [[keep, k.file, bases?.keep], [other, o.file, bases?.other]] as const) {
+        const t = await text(path);
+        if (t === null || hashText(t) !== base) throw new OperationError("STALE", `“${novel.entities.find((e) => e.id === id)!.name}” changed since it was read.`, { path });
+      }
+
+      // The one kept: the other's names, tags, the fields it lacks, its summary and picture if it has none, its notes.
+      const names = [...k.aliases, ...[o.name, ...o.aliases].filter((n) => n !== k.name && !k.aliases.includes(n))].filter((n, i, all) => all.indexOf(n) === i);
+      const edits: YamlEdit[] = [];
+      if (names.length !== k.aliases.length) edits.push({ path: ["aliases"], value: names });
+      const tags = [...new Set([...k.tags, ...o.tags])];
+      if (tags.length !== k.tags.length) edits.push({ path: ["tags"], value: tags });
+      if (!k.summary?.trim() && o.summary?.trim()) edits.push({ path: ["summary"], value: o.summary });
+      if (!k.image && o.image) edits.push({ path: ["image"], value: o.image }, ...(o.imageFocus ? [{ path: ["image_focus"], value: o.imageFocus }] : []));
+      const lacking = Object.entries(o.fields).filter(([key]) => k.fields[key] === undefined);
+      if (lacking.length) edits.push(...(Object.keys(k.fields).length ? lacking.map(([key, v]): YamlEdit => ({ path: ["fields", key], value: swapped(v, other, keep) })) : [{ path: ["fields"], value: swapped(Object.fromEntries(lacking), other, keep) }]));
+      let kept = editFrontMatter((await text(k.file))!, edits);
+      if (o.body.trim()) kept = `${kept.trimEnd()}\n\n## From ${o.name}\n\n${swapMentions(o.body.trim(), other, keep)}\n`;
+      put(k.file, kept);
+      put(o.file, null);
+
+      // Every other file that names it.
+      const files = new Set([...novel.allPieces.map((p) => p.file), ...novel.entities.filter((e) => e !== o).map((e) => e.file), ...novel.notes.map((n) => n.file), ...novel.moduleRecords.map((r) => r.file), novel.manifest]);
+      for (const path of files) {
+        const t = await text(path);
+        if (t === null || !t.includes(other)) continue;
+        const front = readFrontMatter(t);
+        let next = front ? editFrontMatter(t, swapEdits(front, other, keep)) : t;
+        const split = next.indexOf("\n---", 3);
+        next = front && split > 0 ? next.slice(0, split) + swapMentions(next.slice(split), other, keep) : path.endsWith(".md") ? swapMentions(next, other, keep) : editYaml(next, swapEdits(parse(next), other, keep));
+        if (next !== t) put(path, next);
+      }
+
+      // Relationships: the other's made the kept one's; between the two, or the twin of another, dropped.
+      const relFile = relationshipsFile(novel);
+      if (novel.relationships.some((r) => r.from === other || r.to === other)) {
+        const relEdits: YamlEdit[] = [];
+        const drop: number[] = [];
+        const key = (r: Relationship) => JSON.stringify([r.from, r.to, r.type, r.since ?? null, r.until ?? null, r.note ?? null]);
+        const seen = new Set(novel.relationships.filter((r) => r.from !== other && r.to !== other).map(key));
+        for (const r of novel.relationships) {
+          if (r.from !== other && r.to !== other) continue;
+          const moved = { ...r, from: r.from === other ? keep : r.from, to: r.to === other ? keep : r.to };
+          if (moved.from === moved.to || seen.has(key(moved))) drop.push(r.index);
+          else {
+            seen.add(key(moved));
+            if (r.from === other) relEdits.push({ path: ["relationships", r.index, "from"], value: keep });
+            if (r.to === other) relEdits.push({ path: ["relationships", r.index, "to"], value: keep });
+          }
+        }
+        relEdits.push(...drop.sort((a, b) => b - a).map((i): YamlEdit => ({ path: ["relationships", i], remove: true })));
+        put(relFile, editYaml((await text(relFile))!, relEdits));
+      }
+
+      // Where diagrams placed it: gone with it.
+      const layouts = await text("diagrams/layouts.yaml");
+      if (layouts?.includes(other)) {
+        const gone = Object.entries(novel.layouts).filter(([, l]) => other in (l.nodes ?? {})).map(([d]): YamlEdit => ({ path: ["layouts", d, "nodes", other], remove: true }));
+        put("diagrams/layouts.yaml", editYaml(layouts, gone));
+      }
+
+      // The index's judgements: a word not the other is not the kept one either; a pair with the other goes.
+      const judgements = judgementFiles(novel.kind);
+      const notNames = await text(judgements.notNames);
+      if (notNames?.includes(other)) put(judgements.notNames, notNames.split(`entry: ${other},`).join(`entry: ${keep},`));
+      const different = await text(judgements.different);
+      if (different?.includes(other)) put(judgements.different, different.split(/(?<=\n)/).filter((l) => !l.includes(other)).join(""));
+
+      // Only the files whose text changed, and the other's file, deleted.
+      const out: FileWrite[] = [];
+      for (const w of writes.values()) {
+        if (w.content === null) out.push(w);
+        else if (hashText(w.content as string) !== w.base) out.push(w);
+      }
+      return transaction(this.root, out, `${codex(novel)}: merge ${o.name} into ${k.name}`);
     });
   }
 

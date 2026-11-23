@@ -12,12 +12,13 @@ import { cn } from "../ui/cn.ts";
 import { PAGE } from "../ui/page.ts";
 import { judgementOf, useNotAName } from "./not-names.ts";
 import { markTidySeen, useNameReview } from "./tidy-state.ts";
+import { useMergeDialog } from "./merge-dialog.tsx";
 
 /*
  * Tidy up (#137, #172): what has drifted in the index, counted first, each count opening its list with
  * the fix beside each item. Names written without a link are linked all at once (one commit, undone as
  * one) or reviewed one by one in the writing view; a word that isn't the name is kept as Not a name
- * here. Entries that might be the same are judged different (merging them is #173's). Entries with
+ * here. Entries that might be the same are merged, or judged different. Entries with
  * no summary get one where they're listed; entries never in the book, and fields left empty, open
  * their entry.
  */
@@ -275,6 +276,9 @@ function MightBeTheSame({ novelId, novel, pairs }: { novelId: string; novel: Boo
               · {typePlural(novel.entityTypes.find((t) => t.key === a.type) ?? { label: a.type }).toLowerCase()} · {because}
             </span>
           </span>
+          <button type="button" onClick={() => useMergeDialog.getState().open(b.id, a.id)} aria-label={`Merge ${a.name} and ${b.name}…`} className={fix}>
+            Merge…
+          </button>
           <button type="button" onClick={() => void different(a, b)} aria-label={`${a.name} and ${b.name} are different`} className={fix}>
             They're different
           </button>

@@ -30,6 +30,7 @@ export async function body(c: Context): Promise<Record<string, unknown>> {
  * POST  /:id/bible/entities/edit               { edits: [{ id, base, changes }] } → { commit, files }: many entries, one commit
  * POST  /:id/bible/relationships/add           { relationships: [{ from, to, type, … }] } → { ids, commit }: several, one commit
  * POST  /:id/bible/undo                        { commit, files } → { commit, files }: that commit's files as they were before it, or 409 STALE
+ * POST  /:id/bible/entities/:entity/merge     { into, bases: { keep, other } } → { commit, files }: the entry merged into another of its type (#173)
  * POST  /:id/bible/entities/:entity/link-names { pieces?, bases? } → { commit, linked }: its plain names made mentions, one commit (#172)
  * POST  /:id/bible/not-names                   { entry, piece, sentence, nth } → { commit }: "Not a name here" kept (D19)
  * POST  /:id/bible/not-names/delete            { entry, piece, sentence, nth } → { commit }: a name there again
@@ -81,6 +82,10 @@ export function bibleRoutes(routes: Hono<Env>): void {
   routes.post("/:id/bible/undo", async (c) => {
     const { commit, files } = await body(c);
     return operation(c, () => bible(c).undo(String(commit ?? ""), files as never));
+  });
+  routes.post("/:id/bible/entities/:entity/merge", async (c) => {
+    const { into, bases } = await body(c);
+    return operation(c, () => bible(c).mergeEntries(String(into ?? ""), c.req.param("entity"), (bases ?? {}) as never));
   });
   routes.post("/:id/bible/entities/:entity/link-names", async (c) => {
     const { pieces, bases } = await body(c);
