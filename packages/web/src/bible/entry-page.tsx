@@ -187,18 +187,19 @@ export function EntryPage({
           />
         )}
         <div className="grid min-w-0 flex-1 gap-1.5">
-          {!tab && <div className={cn("flex items-center gap-2", embedded && "pr-8")}>
-            <p className="flex-1 text-sm text-muted">
+          {/* On a phone, the actions are their icons (named for a screen reader and on hover): beside a portrait there's no room for their words. */}
+          {!tab && <div className={cn("flex items-center gap-2", embedded && "pr-8 max-md:pr-0")}>
+            <p className="min-w-0 flex-1 truncate text-sm text-muted">
               <Link to={`/novels/${novelId}/bible`} className="underline-offset-2 hover:underline">
                 {vocabulary(novel.kind).codex.One}
               </Link>{" "}
               · {type?.label ?? entity.type}
             </p>
-            <Button variant="ghost" size="sm" onClick={() => useMergeDialog.getState().open(entity.id)}>
-              <Merge className="size-4" aria-hidden /> Merge into…
+            <Button variant="ghost" size="sm" onClick={() => useMergeDialog.getState().open(entity.id)} title="Merge into…" className="max-md:size-11 max-md:px-0">
+              <Merge className="size-4" aria-hidden /> <span className="max-md:sr-only">Merge into…</span>
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => remove.mutate(false)} disabled={remove.isPending}>
-              <Trash2 className="size-4" aria-hidden /> Delete
+            <Button variant="ghost" size="sm" onClick={() => remove.mutate(false)} disabled={remove.isPending} title="Delete" className="max-md:size-11 max-md:px-0">
+              <Trash2 className="size-4" aria-hidden /> <span className="max-md:sr-only">Delete</span>
             </Button>
           </div>}
 

@@ -107,7 +107,7 @@ export function TidyPage({ novelId, novel, workspace }: { novelId: string; novel
   );
 }
 
-const fix = "shrink-0 rounded-md border border-rule px-2 py-0.5 text-xs hover:bg-panel focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none";
+const fix = "shrink-0 rounded-md border border-rule px-2 py-0.5 text-xs hover:bg-panel focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none max-md:min-h-11 max-md:px-3 max-md:text-sm";
 
 function EntryLink({ novelId, entry }: { novelId: string; entry: Entity }) {
   return (
@@ -165,26 +165,28 @@ function NamesNotLinked({ novelId, novel, report, workspace }: { novelId: string
           {report.notLinked.map(({ entry, passages }) => (
             <li key={entry.id} className="grid gap-2 rounded-lg border border-rule bg-raised px-3 py-2">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="min-w-0 flex-1">
+                <span className="min-w-0 flex-1 basis-48">
                   <EntryLink novelId={novelId} entry={entry} /> <span className="text-sm text-muted">· {passages.length} not linked in {w.piece.count(new Set(passages.map((p) => p.piece.id)).size)}</span>
                 </span>
-                <Button size="sm" variant="primary" onClick={() => void linkAll(entry)} disabled={busy === entry.id} aria-label={`Link all ${passages.length} to ${entry.name}`}>
+                <span className="flex flex-wrap gap-2">
+                <Button size="sm" variant="primary" className="max-md:h-11" onClick={() => void linkAll(entry)} disabled={busy === entry.id} aria-label={`Link all ${passages.length} to ${entry.name}`}>
                   Link all
                 </Button>
-                <Button size="sm" onClick={() => review(entry, passages)} aria-label={`Review ${entry.name}'s ${passages.length} one by one`}>
+                <Button size="sm" className="max-md:h-11" onClick={() => review(entry, passages)} aria-label={`Review ${entry.name}'s ${passages.length} one by one`}>
                   Review one by one
                 </Button>
-                <Button size="sm" variant="ghost" aria-expanded={open === entry.id} onClick={() => setOpen(open === entry.id ? undefined : entry.id)}>
+                <Button size="sm" variant="ghost" className="max-md:h-11" aria-expanded={open === entry.id} onClick={() => setOpen(open === entry.id ? undefined : entry.id)}>
                   {open === entry.id ? "Hide them" : "Show them"}
                 </Button>
+                </span>
               </div>
               {open === entry.id && (
                 <ul aria-label={`${entry.name}'s names not linked`} className="grid gap-1">
                   {passages.map((p, i) => {
                     const j = judgementOf(p, entry.id);
                     return (
-                      <li key={i} className="flex items-start gap-2 text-sm">
-                        <span className="min-w-0 flex-1 font-prose">
+                      <li key={i} className="flex flex-wrap items-start gap-2 text-sm">
+                        <span className="min-w-0 flex-1 basis-48 font-prose">
                           <span className="font-ui text-xs text-muted">{p.piece.title} · </span>
                           {p.text.slice(0, p.at[0])}
                           <mark className="rounded-sm bg-warn-soft px-0.5 text-ink">{p.text.slice(...p.at)}</mark>
@@ -225,8 +227,8 @@ function Dormant({ novelId, novel, judgements }: { novelId: string; novel: Book;
           const name = novel.entities.find((e) => e.id === n.entry)?.name ?? n.entry;
           const piece = novel.allPieces.find((p) => p.id === n.piece)?.title ?? n.piece;
           return (
-            <li key={i} className="flex items-start gap-2 text-sm">
-              <span className="min-w-0 flex-1">
+            <li key={i} className="flex flex-wrap items-start gap-2 text-sm">
+              <span className="min-w-0 flex-1 basis-48">
                 {name} in “{piece}”: <span className="font-prose text-muted">{n.sentence}</span>
               </span>
               <button type="button" onClick={() => drop(n)} aria-label={`Drop the judgement about ${name} in “${piece}”`} className={fix}>
@@ -247,7 +249,7 @@ function Entries({ novelId, novel, entries, empty, detail }: { novelId: string; 
     <ul className="grid gap-1">
       {entries.map((e) => (
         <li key={e.id} className="flex flex-wrap items-center gap-2 rounded-md px-2 py-1 hover:bg-panel">
-          <span className="min-w-0 flex-1">
+          <span className="min-w-0 flex-1 basis-48">
             <EntryLink novelId={novelId} entry={e} /> <span className="text-sm text-muted">· {typeOf(e)?.label ?? e.type}{detail ? ` · ${detail(e)}` : ""}</span>
           </span>
           <Link to={`/novels/${novelId}/bible/${e.id}`} className={fix} aria-label={`Open ${e.name}`}>
@@ -279,7 +281,7 @@ function MightBeTheSame({ novelId, novel, pairs }: { novelId: string; novel: Boo
     <ul className="grid gap-1">
       {pairs.map(({ a, b, because }) => (
         <li key={`${a.id}|${b.id}`} className="flex flex-wrap items-center gap-2 rounded-md px-2 py-1 hover:bg-panel">
-          <span className="min-w-0 flex-1">
+          <span className="min-w-0 flex-1 basis-48">
             <EntryLink novelId={novelId} entry={a} /> and <EntryLink novelId={novelId} entry={b} />{" "}
             <span className="text-sm text-muted">
               · {typePlural(novel.entityTypes.find((t) => t.key === a.type) ?? { label: a.type }).toLowerCase()} · {because}

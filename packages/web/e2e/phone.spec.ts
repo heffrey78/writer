@@ -690,3 +690,34 @@ test("on a phone, an entry's strip of parts stays under its top bar and jumps to
   await back.tap();
   await expect(row).toBeFocused();
 });
+
+test("on a phone, Tidy up's names and an entry's actions have room: no word to a line, nothing off the screen", async ({ page, app }) => {
+  await app.restart(app.bookRepo(fileURLToPath(new URL("../../../examples/sample-journal", import.meta.url)), "journal"));
+  await launch(page, app);
+  const box = (l: Locator) => l.evaluate((e) => e.getBoundingClientRect().toJSON() as DOMRect);
+
+  // Tidy up: each name and its count on a line or two, its buttons under it.
+  await page.getByRole("navigation", { name: "Book" }).getByRole("link", { name: "Index" }).tap();
+  await page.getByRole("button", { name: "Tidy up" }).tap();
+  const names = page.getByRole("list", { name: "Names not linked" }).getByRole("listitem");
+  await expect(names.first()).toBeVisible();
+  for (const name of await names.locator("> div > span:first-child").all()) expect((await box(name)).height).toBeLessThan(56);
+  for (const button of await names.getByRole("button").all()) expect((await box(button)).height).toBeGreaterThanOrEqual(44);
+  if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/tidy.png` });
+  await fits(page);
+  await audit(page);
+
+  // An entry: its way into the index on one line, Merge and Delete on the screen and a finger's size.
+  await page.goBack();
+  await page.getByRole("region").getByRole("link").first().tap();
+  const entry = page.locator("#index-entry");
+  for (const name of ["Merge into…", "Delete"]) {
+    const b = await box(entry.getByRole("button", { name, exact: true }));
+    expect(b.right).toBeLessThanOrEqual(viewport.width);
+    expect(b.height).toBeGreaterThanOrEqual(44);
+  }
+  expect((await box(entry.getByRole("link", { name: "Index" }).last().locator(".."))).height).toBeLessThan(30);
+  if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/entry.png` });
+  await fits(page);
+  await audit(page);
+});
