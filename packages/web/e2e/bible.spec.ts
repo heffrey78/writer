@@ -624,12 +624,12 @@ test("the index as a table: one type's entries side by side, sorted by a column,
   await page.getByRole("button", { name: /^Characters/ }).click();
   await expect(page).toHaveURL(/type=character/);
   const grid = page.getByRole("grid", { name: /^Characters/ });
-  await expect(grid.getByRole("columnheader")).toHaveText(["Name", "Age", "Occupation", "Appearance", "Wants", "Fears", "Scenes", "First seen", "Tags"]);
-  const names = grid.locator("tbody tr td:first-child");
+  await expect(grid.getByRole("columnheader")).toHaveText(["", "Name", "Age", "Occupation", "Appearance", "Wants", "Fears", "Scenes", "First seen", "Tags"]);
+  const names = grid.locator("tbody tr td:nth-child(2)");
   await expect(names).toHaveText(["Ada Varn", "Ben Varn", "Tomas Hale", "Mirela Kost"]);
   // Tomas Hale has no occupation: a gap, counted with the rest (every empty declared field).
   const row = (name: string) => grid.getByRole("row").filter({ has: page.getByRole("link", { name }) });
-  await expect(row("Tomas Hale").getByRole("gridcell").nth(2)).toHaveText("—Empty");
+  await expect(row("Tomas Hale").getByRole("gridcell").nth(3)).toHaveText("—Empty");
   await expect(page.getByText("4 characters · 14 gaps")).toBeVisible();
   await axe(page);
   await page.emulateMedia({ colorScheme: "dark" });
@@ -648,7 +648,7 @@ test("the index as a table: one type's entries side by side, sorted by a column,
   await expect(grid.getByRole("button", { name: "Age" })).toBeFocused();
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press("ArrowRight");
-  const occupation = row("Ben Varn").getByRole("gridcell").nth(2);
+  const occupation = row("Ben Varn").getByRole("gridcell").nth(3);
   await expect(occupation).toBeFocused();
   await page.keyboard.press("Enter");
   const box = page.getByRole("textbox", { name: "Occupation of Ben Varn" });
@@ -668,7 +668,7 @@ test("the index as a table: one type's entries side by side, sorted by a column,
   await page.keyboard.press("Enter");
   await box.fill("Toll keeper");
   await page.keyboard.press("Tab");
-  await expect(row("Ben Varn").getByRole("gridcell").nth(3)).toBeFocused();
+  await expect(row("Ben Varn").getByRole("gridcell").nth(4)).toBeFocused();
   await expect(occupation).toHaveText("Toll keeper");
   expect(novel.read("bible/characters/ben.md")).toContain("  occupation: Toll keeper\n");
 
@@ -676,7 +676,7 @@ test("the index as a table: one type's entries side by side, sorted by a column,
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press("ArrowLeft");
   await page.keyboard.press("ArrowLeft");
-  await expect(row("Ada Varn").getByRole("gridcell").nth(1)).toBeFocused();
+  await expect(row("Ada Varn").getByRole("gridcell").nth(2)).toBeFocused();
   const opened = page.waitForResponse((r) => r.request().method() === "GET" && decodeURIComponent(r.url()).includes("characters/ada.md"));
   await page.keyboard.press("Enter");
   await opened;
@@ -694,8 +694,77 @@ test("the index as a table: one type's entries side by side, sorted by a column,
   await page.getByRole("checkbox", { name: "Wants" }).uncheck();
   await page.getByRole("checkbox", { name: /^Eyes/ }).check();
   await page.keyboard.press("Escape");
-  await expect(grid.getByRole("columnheader")).toHaveText(["Name", "Age", "Occupation", "Appearance", "Fears", "Scenes", "First seen", "Tags", "Eyes"]);
+  await expect(grid.getByRole("columnheader")).toHaveText(["", "Name", "Age", "Occupation", "Appearance", "Fears", "Scenes", "First seen", "Tags", "Eyes"]);
   await page.reload();
-  await expect(grid.getByRole("columnheader")).toHaveText(["Name", "Age", "Occupation", "Appearance", "Fears", "Scenes", "First seen", "Tags", "Eyes"]);
-  await expect(row("Ada Varn").getByRole("gridcell").nth(8)).toHaveText("green");
+  await expect(grid.getByRole("columnheader")).toHaveText(["", "Name", "Age", "Occupation", "Appearance", "Fears", "Scenes", "First seen", "Tags", "Eyes"]);
+  await expect(row("Ada Varn").getByRole("gridcell").nth(9)).toHaveText("green");
+});
+
+test("rows of the table chosen and changed together in one commit, undone as one, and copied for a spreadsheet (#139, #169)", async ({ page, app }) => {
+  const novel = await open(page, app);
+  const files = ["bible/characters/ada.md", "bible/characters/ben.md", "bible/characters/tomas-hale.md"];
+  const before = files.map((f) => novel.read(f));
+  await palette(page, "story bible");
+  await page.getByRole("button", { name: "Table" }).click();
+  await page.getByRole("button", { name: /^Characters/ }).click();
+  const grid = page.getByRole("grid", { name: /^Characters/ });
+  await page.getByRole("checkbox", { name: "Select Ada Varn" }).check();
+  await page.getByRole("checkbox", { name: "Select Ben Varn" }).check();
+  const bar = page.getByRole("toolbar", { name: "The selected rows" });
+  await expect(bar).toContainText("2 selected");
+  await expect(grid.getByRole("row", { selected: true })).toHaveCount(2);
+
+  // Eyes set on both: one commit, both files, Undo puts both back byte for byte.
+  await bar.getByRole("button", { name: "Set a field…" }).click();
+  const dialog = page.getByRole("dialog", { name: "Set a field on Ada Varn and Ben Varn" });
+  await dialog.getByRole("combobox", { name: "Field" }).selectOption({ label: "Eyes" });
+  await dialog.getByRole("textbox", { name: "Eyes" }).fill("brown");
+  await axe(page);
+  await page.emulateMedia({ colorScheme: "dark" });
+  await axe(page);
+  await page.emulateMedia({ colorScheme: "light" });
+  await dialog.getByRole("button", { name: "Set it" }).click();
+  await expect(dialog).toBeHidden();
+  expect(novel.lastCommit()).toBe("Bible: set Eyes on Ada Varn and Ben Varn");
+  expect(app.git(novel.dir, "show", "--name-only", "--format=", "HEAD").trim().split("\n").sort()).toEqual(files.slice(0, 2));
+  expect(novel.read(files[1]!)).toContain("  eyes: brown\n");
+  await page.getByRole("button", { name: "Undo" }).click();
+  await expect.poll(() => novel.lastCommit()).toBe("Undo “Bible: set Eyes on Ada Varn and Ben Varn”");
+  expect(files.map((f) => novel.read(f))).toEqual(before);
+
+  // By keyboard: three rows chosen with Space and Shift+Down, then tagged.
+  await bar.getByRole("button", { name: "Clear" }).click();
+  await expect(bar).toBeHidden();
+  await page.getByRole("checkbox", { name: "Select Ada Varn" }).focus();
+  await page.keyboard.press("Space");
+  await page.keyboard.press("Shift+ArrowDown");
+  await page.keyboard.press("Shift+ArrowDown");
+  await expect(bar).toContainText("3 selected");
+  await expect(page.getByRole("checkbox", { name: "Select Tomas Hale" })).toBeChecked();
+  for (let i = 0; i < 4; i++) await page.keyboard.press("Shift+Tab");
+  await expect(bar.getByRole("button", { name: "Add a tag…" })).toBeFocused();
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("family");
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("dialog")).toBeHidden();
+  expect(novel.lastCommit()).toBe("Bible: tag Ada Varn, Ben Varn and Tomas Hale “family”");
+  await expect(grid.getByRole("row").filter({ hasText: "Tomas Hale" })).toContainText("family");
+
+  // A relationship from each of two to Mirela, in one commit.
+  await page.getByRole("checkbox", { name: "Select Tomas Hale" }).uncheck();
+  await bar.getByRole("button", { name: "Add a relationship…" }).click();
+  await page.getByRole("combobox", { name: "Relationship" }).selectOption("rivals");
+  await page.getByRole("combobox", { name: "With" }).selectOption({ label: "Mirela Kost" });
+  await page.getByRole("button", { name: "Add it" }).click();
+  await expect(page.getByRole("dialog")).toBeHidden();
+  expect(novel.lastCommit()).toBe("Bible: add 2 “rivals” relationships");
+
+  // Copy as a table: the selected rows, tab-separated, as shown.
+  await page.evaluate(() => Object.defineProperty(navigator, "clipboard", { value: { writeText: async (t: string) => void ((window as unknown as { copied: string }).copied = t) } }));
+  await page.getByRole("button", { name: "Copy as a table" }).click();
+  await expect(page.getByText("Copied 2 characters as a table.")).toBeVisible();
+  const copied = await page.evaluate(() => (window as unknown as { copied: string }).copied);
+  expect(copied.split("\n")[0]).toBe("Name\tAge\tOccupation\tAppearance\tWants\tFears\tScenes\tFirst seen\tTags");
+  expect(copied.split("\n")[1]).toMatch(/^Ada Varn\t31\tStructural engineer\t\t\t\t\d+\tThe Station\t.*family$/);
+  expect(copied.split("\n")).toHaveLength(4);
 });

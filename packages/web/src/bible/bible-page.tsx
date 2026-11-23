@@ -493,10 +493,12 @@ export function BiblePage({
 
   // One pane: the list, or the entry with a way back to it. The gallery of cards, with nothing open, as wide as any page.
   if (!twoPanes || (view !== "list" && !selected)) {
+    // The dialogs (and the line said to a screen reader) first: placed by the page, not the pane, after a
+    // long list one would reach far below it, and the whole page would scroll as well as the pane.
     return (
       <>
-        {selected && !twoPanes ? pane : listContent}
         {dialogs}
+        {selected && !twoPanes ? pane : listContent}
       </>
     );
   }

@@ -9,7 +9,8 @@ import { expect, test, type App } from "./fixtures.ts";
  * The index (#134) on a long book with a large story bible: 500 entries beside a 200,000-word
  * manuscript. It opens in under a second, and each step of working in it answers within 100 ms:
  * a letter typed in its search, the next entry opened with j, a filter taken off. An entry's profile
- * lists every passage naming its main character within 50 ms (#135). Runs alone, after the other tests.
+ * lists every passage naming its main character within 50 ms (#135). Its Table of 500 characters sorts
+ * by a column within 100 ms and scrolls at 60 frames a second (#170). Runs alone, after the other tests.
  */
 
 const BUDGET = 100;
@@ -19,11 +20,11 @@ const ADA = "char_7f3k2q";
 const id = (prefix: string, n: number) => `${prefix}_${Array.from({ length: 6 }, (_, i) => ID_ALPHABET[Math.floor(n / 32 ** (5 - i)) % 32]).join("")}`;
 const OCCUPATIONS = ["Ferryman", "Toll keeper", "Clerk", "Engineer", "Baker", "Surveyor", "Teacher", "Fisher"];
 
-/** A 200,000-word novel whose bible has 500 entries, each with a summary, fields, tags and notes. */
-function bigBible(app: App): string {
+/** A 200,000-word novel whose bible has 500 entries (or `people` characters more), each with a summary, fields, tags and notes. */
+function bigBible(app: App, people = 400): string {
   const dir = join(app.home, "novels", "the-long-crossing");
   writeBigNovel(dir, { total: 200_000, extraCharacters: 0 });
-  for (let i = 1; i <= 400; i++) {
+  for (let i = 1; i <= people; i++) {
     const c = id("char", 1000 + i);
     writeFileSync(
       join(dir, "bible/characters", `${c}.md`),
@@ -148,4 +149,66 @@ test("the index of a 500-entry bible opens in under a second, and searching, ste
   expect(stepped).toBeLessThan(BUDGET);
   expect(filtered).toBeLessThan(BUDGET);
   expect(passages).toBeLessThan(PASSAGES_BUDGET);
+});
+
+test("a table of 500 characters draws in under a second, sorts by a column within 100 ms and scrolls at 60 frames a second (#170)", async ({ page, app }) => {
+  test.setTimeout(120_000);
+  await app.restart(bigBible(app, 496));
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(app.launchUrl);
+  await expect(page.getByRole("textbox", { name: "Chapter text" })).toBeFocused({ timeout: 15_000 });
+  await page.getByRole("navigation", { name: "Views" }).getByRole("link", { name: "Story bible" }).click();
+  await page.getByRole("button", { name: "Table" }).click();
+
+  const start = Date.now();
+  await page.getByRole("button", { name: /^Characters/ }).click();
+  const grid = page.getByRole("grid", { name: /^Characters/ });
+  await expect(grid).toHaveAttribute("aria-rowcount", "501");
+  await expect(grid.locator("tbody tr[aria-rowindex]").first()).toBeVisible();
+  const drawing = Date.now() - start;
+  report("drawing a table of 500 characters", [drawing]);
+
+  // Enter on the Age header's button, again and again: youngest first, then oldest first.
+  await grid.getByRole("button", { name: "Age" }).focus();
+  const sorting = await timed(page, "Enter", 6, "tbody tr[aria-rowindex] td:nth-child(2)", "changed");
+  const sorted = report("sorting 500 rows by age", sorting);
+
+  // Ctrl+End to the last cell, a row not drawn yet: drawn, in focus and in view; Ctrl+Home back.
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Control+End");
+  await expect(grid.locator('tbody tr[aria-rowindex="501"] td').last()).toBeFocused();
+  await expect(grid.locator('tbody tr[aria-rowindex="501"]')).toBeInViewport();
+  await page.keyboard.press("Control+Home");
+  await expect(grid.locator('tbody tr[aria-rowindex="2"] input[type="checkbox"]')).toBeFocused();
+
+  // Scrolled from top to bottom by the wheel: the time between frames as it goes, and the last row reached.
+  await page.mouse.move(700, 500);
+  await page.evaluate(() => {
+    const w = window as unknown as { frames: number[]; framing: boolean };
+    w.frames = [];
+    w.framing = true;
+    let last = performance.now();
+    const tick = (now: number) => {
+      w.frames.push(now - last);
+      last = now;
+      if (w.framing) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+  for (let i = 0; i < 50; i++) {
+    await page.mouse.wheel(0, 400);
+    await page.waitForTimeout(16);
+  }
+  const frames = await page.evaluate(() => {
+    const w = window as unknown as { frames: number[]; framing: boolean };
+    w.framing = false;
+    return w.frames.slice(1);
+  });
+  const frame = report("a frame while scrolling 500 rows", frames);
+  await expect(grid.locator('tbody tr[aria-rowindex="501"]')).toBeVisible();
+
+  expect(drawing).toBeLessThan(1000);
+  expect(sorted).toBeLessThan(BUDGET);
+  // 60 frames a second: a frame every 16.7 ms, give or take the timer's grain.
+  expect(frame).toBeLessThan(20);
 });
