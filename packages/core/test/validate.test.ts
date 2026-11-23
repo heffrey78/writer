@@ -305,7 +305,7 @@ describe("rule documentation", () => {
   });
 
   it("every code used in the source is a known rule", () => {
-    const sources = ["load.ts", "schemas.ts", "parse.ts", "validate.ts"].map((f) =>
+    const sources = ["load.ts", "schemas.ts", "parse.ts", "validate.ts", "judgements.ts"].map((f) =>
       readFileSync(new URL(`../src/${f}`, import.meta.url), "utf8"));
     const used = new Set(sources.flatMap((s) => [...s.matchAll(/"([EW]_[A-Z_]+)"/g)].map((m) => m[1]!)));
     for (const code of used) expect(RULES).toHaveProperty(code);

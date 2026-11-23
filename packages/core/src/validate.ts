@@ -40,6 +40,7 @@ export const RULES: Readonly<Record<string, Severity>> = {
   W_SIDEBAR_UNKNOWN: "warning",
   W_FIELD_VALUE: "warning",
   W_FIELD_CHANGE: "warning",
+  W_JUDGEMENT: "warning",
 };
 
 export interface ValidationResult {
