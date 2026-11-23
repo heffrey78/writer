@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Page } from "@playwright/test";
 import { axe, caretAtEnd, expect, palette, test, type App } from "./fixtures.ts";
@@ -613,4 +613,89 @@ test("a type's fields in a novel in gh-writer's format: the dialog asks to move 
   await expect(dialog).toContainText("Move it to the new format first.");
   await dialog.getByRole("button", { name: "Move to the new format…" }).click();
   await expect(page.getByRole("alertdialog", { name: "Move this book to the new format?" })).toBeVisible();
+});
+
+test("the index as a table: one type's entries side by side, sorted by a column, gaps counted, a cell edited in place by keyboard (#139, #168)", async ({ page, app }) => {
+  const novel = await open(page, app);
+  await palette(page, "story bible");
+  await page.getByRole("button", { name: "Table" }).click();
+  await expect(page.getByRole("button", { name: "Table" })).toHaveAttribute("aria-pressed", "true");
+  // One type at a time: chosen here, it's the type chip.
+  await page.getByRole("button", { name: /^Characters/ }).click();
+  await expect(page).toHaveURL(/type=character/);
+  const grid = page.getByRole("grid", { name: /^Characters/ });
+  await expect(grid.getByRole("columnheader")).toHaveText(["Name", "Age", "Occupation", "Appearance", "Wants", "Fears", "Scenes", "First seen", "Tags"]);
+  const names = grid.locator("tbody tr td:first-child");
+  await expect(names).toHaveText(["Ada Varn", "Ben Varn", "Tomas Hale", "Mirela Kost"]);
+  // Tomas Hale has no occupation: a gap, counted with the rest (every empty declared field).
+  const row = (name: string) => grid.getByRole("row").filter({ has: page.getByRole("link", { name }) });
+  await expect(row("Tomas Hale").getByRole("gridcell").nth(2)).toHaveText("—Empty");
+  await expect(page.getByText("4 characters · 14 gaps")).toBeVisible();
+  await axe(page);
+  await page.emulateMedia({ colorScheme: "dark" });
+  await axe(page);
+  await page.emulateMedia({ colorScheme: "light" });
+
+  // Sorted by age, as numbers: Ben (29) before Ada (31) and Tomas (68); Mirela, with none, last. Again, the other way.
+  await grid.getByRole("button", { name: "Age" }).click();
+  await expect(grid.getByRole("columnheader", { name: "Age" })).toHaveAttribute("aria-sort", "ascending");
+  await expect(names).toHaveText(["Ben Varn", "Ada Varn", "Tomas Hale", "Mirela Kost"]);
+  await grid.getByRole("button", { name: "Age" }).click();
+  await expect(names).toHaveText(["Tomas Hale", "Ada Varn", "Ben Varn", "Mirela Kost"]);
+  await grid.getByRole("button", { name: "Age" }).click();
+
+  // By keyboard: down from the header into Ben's age, right to his occupation; Enter edits it, Enter saves it.
+  await expect(grid.getByRole("button", { name: "Age" })).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("ArrowRight");
+  const occupation = row("Ben Varn").getByRole("gridcell").nth(2);
+  await expect(occupation).toBeFocused();
+  await page.keyboard.press("Enter");
+  const box = page.getByRole("textbox", { name: "Occupation of Ben Varn" });
+  await expect(box).toBeFocused();
+  await box.fill("Ferryman");
+  await page.keyboard.press("Enter");
+  await expect(occupation).toHaveText("Ferryman");
+  await expect(occupation).toBeFocused();
+  expect(novel.read("bible/characters/ben.md")).toContain("  occupation: Ferryman\n");
+  expect(novel.lastCommit()).toBe("Bible: edit Ben Varn");
+  // Escape leaves it as it was; Tab saves and moves on.
+  await page.keyboard.press("Enter");
+  await box.fill("Smuggler");
+  await page.keyboard.press("Escape");
+  await expect(occupation).toHaveText("Ferryman");
+  await expect(occupation).toBeFocused();
+  await page.keyboard.press("Enter");
+  await box.fill("Toll keeper");
+  await page.keyboard.press("Tab");
+  await expect(row("Ben Varn").getByRole("gridcell").nth(3)).toBeFocused();
+  await expect(occupation).toHaveText("Toll keeper");
+  expect(novel.read("bible/characters/ben.md")).toContain("  occupation: Toll keeper\n");
+
+  // A file that changed since its cell was opened isn't written over: the cell says why.
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("ArrowLeft");
+  await expect(row("Ada Varn").getByRole("gridcell").nth(1)).toBeFocused();
+  const opened = page.waitForResponse((r) => r.request().method() === "GET" && decodeURIComponent(r.url()).includes("characters/ada.md"));
+  await page.keyboard.press("Enter");
+  await opened;
+  const age = page.getByRole("textbox", { name: "Age of Ada Varn" });
+  await expect(age).toBeFocused();
+  writeFileSync(join(novel.dir, "bible/characters/ada.md"), novel.read("bible/characters/ada.md").replace("eyes: grey", "eyes: green"));
+  await age.fill("32");
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("alert")).toContainText("changed since it was read");
+  expect(novel.read("bible/characters/ada.md")).toContain("  age: 31\n");
+  await page.keyboard.press("Escape");
+
+  // Columns: Wants taken off and Eyes (a field of Ada's own) put on, kept for next time.
+  await page.getByRole("button", { name: "Columns" }).click();
+  await page.getByRole("checkbox", { name: "Wants" }).uncheck();
+  await page.getByRole("checkbox", { name: /^Eyes/ }).check();
+  await page.keyboard.press("Escape");
+  await expect(grid.getByRole("columnheader")).toHaveText(["Name", "Age", "Occupation", "Appearance", "Fears", "Scenes", "First seen", "Tags", "Eyes"]);
+  await page.reload();
+  await expect(grid.getByRole("columnheader")).toHaveText(["Name", "Age", "Occupation", "Appearance", "Fears", "Scenes", "First seen", "Tags", "Eyes"]);
+  await expect(row("Ada Varn").getByRole("gridcell").nth(8)).toHaveText("green");
 });

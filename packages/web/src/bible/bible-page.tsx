@@ -1,7 +1,7 @@
 import { defaultEntrySort, entryPresences, filterEntries, matchEntry, piecesMatching, sortEntries, typePlural, vocabulary, word, type Book, type Entity, type EntryPresence, type EntrySort, type Vocabulary } from "@writer/core";
 import { findPanel } from "@writer/editor";
 import type { SpellService } from "@writer/editor/react";
-import { ChevronLeft, ChevronRight, Expand, LayoutGrid, List, PanelLeftClose, PanelLeftOpen, Plus, Search, SlidersHorizontal, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Expand, LayoutGrid, List, PanelLeftClose, PanelLeftOpen, Plus, Search, SlidersHorizontal, Table2, X } from "lucide-react";
 import { Fragment, memo, useCallback, useEffect, useId, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 import { create } from "zustand";
@@ -24,6 +24,7 @@ import { opened } from "./recent.ts";
 import { OpenParts, saveOpenParts } from "./profile.tsx";
 import { RelationshipTypes } from "./relationship-types.tsx";
 import { markWords } from "./strip.tsx";
+import { EntryTable } from "./table.tsx";
 import { cardFacts, entriesByType, initials } from "./types.ts";
 
 /*
@@ -44,7 +45,7 @@ const sorts = (w: Vocabulary): { key: EntrySort; label: string }[] => [
 
 const MARK = { carries: "bg-accent", present: "bg-accent/40", mentioned: "bg-accent/15", absent: "bg-rule/60" } as const;
 
-type View = "list" | "cards";
+type View = "list" | "cards" | "table";
 
 /** What the index shows beside its list: an entry, a module's record, or nothing yet. */
 export type Selected = { entry: string } | { record: { type: ReturnType<typeof moduleRecordTypes>[number]; id: string } } | undefined;
@@ -55,7 +56,7 @@ interface IndexLayout {
   width: Record<View, number>;
   collapsed: boolean;
 }
-const LAYOUT_DEFAULT: IndexLayout = { view: "list", width: { list: 352, cards: 560 }, collapsed: false };
+const LAYOUT_DEFAULT: IndexLayout = { view: "list", width: { list: 352, cards: 560, table: 640 }, collapsed: false };
 const MIN_WIDTH = 260;
 const MAX_WIDTH = 760;
 const layoutKey = (novelId: string) => `ghw:index:${novelId}`;
@@ -65,8 +66,8 @@ function readLayout(novelId: string): IndexLayout {
     const saved = JSON.parse(localStorage.getItem(layoutKey(novelId)) ?? "{}") as Partial<IndexLayout>;
     const clamp = (n: unknown, d: number) => Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, Number(n) || d));
     return {
-      view: saved.view === "cards" ? "cards" : "list",
-      width: { list: clamp(saved.width?.list, LAYOUT_DEFAULT.width.list), cards: clamp(saved.width?.cards, LAYOUT_DEFAULT.width.cards) },
+      view: saved.view === "cards" || saved.view === "table" ? saved.view : "list",
+      width: { list: clamp(saved.width?.list, LAYOUT_DEFAULT.width.list), cards: clamp(saved.width?.cards, LAYOUT_DEFAULT.width.cards), table: clamp(saved.width?.table, LAYOUT_DEFAULT.width.table) },
       collapsed: saved.collapsed === true,
     };
   } catch {
@@ -184,6 +185,8 @@ export function BiblePage({
     const type = novel.entityTypes.find((t) => t.key === g.type);
     return type ? [{ type, count: novel.entities.filter((e) => e.type === g.type).length, shown: g.shown.flatMap((id) => byId.get(id) ?? []) }] : [];
   });
+  // The Table shows one type: the one the type chip names.
+  const tableType = filters.types?.length === 1 ? groups.find((g) => g.type.key === filters.types![0]) : undefined;
   const found = groups.reduce((n, g) => n + g.shown.length, 0);
   const listed = groups.flatMap((g) => g.shown);
 
@@ -324,7 +327,7 @@ export function BiblePage({
     [w, layout.collapsed],
   );
   const listContent = (
-    <div ref={list} className={cn("grid content-start gap-5", view === "cards" && !selected ? PAGE : "px-4 py-4")}>
+    <div ref={list} className={cn("grid min-w-0 content-start gap-5", view !== "list" && !selected ? PAGE : "px-4 py-4")}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-xl font-semibold">{w.codex.One}</h1>
         <div className="flex flex-wrap gap-2">
@@ -387,43 +390,67 @@ export function BiblePage({
           {records.length > 0 && query && ` (and the ${records.map((t) => word(t.def.noun).many).join(" and ")} below that do)`}
         </p>
       )}
-      {groups.map(({ type, count, shown }, g) =>
-        (query || filtered) && !shown.length ? null : (
-          <section key={type.key} aria-labelledby={`type-${type.key}`} className="grid gap-2">
-            <div className="flex items-center justify-between gap-2">
-              <h2 id={`type-${type.key}`} className="font-semibold">
-                {typePlural(type)} <span className="text-sm font-normal text-muted">{count}</span>
-              </h2>
-              <div className="flex items-center gap-1">
-                <Button size="sm" variant="ghost" onClick={() => useFieldsDialog.getState().open(type.key)} aria-label={fieldsTitle(type)}>
-                  <SlidersHorizontal className="size-4" aria-hidden /> Fields
-                </Button>
-                <Button size="sm" variant="ghost" onClick={() => add(type.key)} aria-label={`New ${type.label.toLowerCase()}`}>
-                  <Plus className="size-4" aria-hidden /> New
-                </Button>
-              </div>
-            </div>
-            {shown.length ? (
-              <ul className={view === "cards" ? cn("grid gap-3", selected ? "grid-cols-[repeat(auto-fill,minmax(15rem,1fr))]" : "sm:grid-cols-2 lg:grid-cols-3") : "grid gap-0.5"}>
-                {shown.slice(0, Math.max(0, limit - before[g]!)).map((e) => (
-                  <li key={e.id} className="grid" data-entry={e.id}>
-                    {view === "cards" ? (
-                      <EntryCard entity={e} presence={presences.get(e.id)} href={entryHref(e.id)} current={e.id === selectedId} onOpen={onOpen} url={pictureOf(e)} marks={marksByType.get(e.type)!} w={w} book={novel} />
-                    ) : (
-                      <EntryRow entity={e} presence={presences.get(e.id)} href={entryHref(e.id)} current={e.id === selectedId} onOpen={onOpen} onEnter={onEnter} match={matches.get(e.id)} url={pictureOf(e)} marks={marksByType.get(e.type)!} w={w} />
-                    )}
-                  </li>
+      {view === "table" ? (
+        tableType ? (
+          <EntryTable novelId={novelId} novel={novel} type={tableType.type} rows={tableType.shown} presences={presences} href={entryHref} onOpen={onOpen} current={selectedId} />
+        ) : (
+          <section aria-labelledby={`${searchId}-table`} className="grid gap-2">
+            <h2 id={`${searchId}-table`} className="font-semibold">
+              The table shows one type at a time
+            </h2>
+            <p className="text-sm text-muted">Choose which:</p>
+            <div className="flex flex-wrap gap-2">
+              {groups
+                .filter((g) => !filters.types?.length || filters.types.includes(g.type.key))
+                .map((g) => (
+                  <Button key={g.type.key} size="sm" onClick={() => setParam("type", g.type.key)}>
+                    {typePlural(g.type)} <span className="text-muted">{g.shown.length}</span>
+                  </Button>
                 ))}
-              </ul>
-            ) : (
-              <p className="text-sm text-muted">No {typePlural(type).toLowerCase()} yet.</p>
-            )}
+            </div>
           </section>
-        ),
+        )
+      ) : (
+        <>
+        {groups.map(({ type, count, shown }, g) =>
+          (query || filtered) && !shown.length ? null : (
+            <section key={type.key} aria-labelledby={`type-${type.key}`} className="grid gap-2">
+              <div className="flex items-center justify-between gap-2">
+                <h2 id={`type-${type.key}`} className="font-semibold">
+                  {typePlural(type)} <span className="text-sm font-normal text-muted">{count}</span>
+                </h2>
+                <div className="flex items-center gap-1">
+                  <Button size="sm" variant="ghost" onClick={() => useFieldsDialog.getState().open(type.key)} aria-label={fieldsTitle(type)}>
+                    <SlidersHorizontal className="size-4" aria-hidden /> Fields
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => add(type.key)} aria-label={`New ${type.label.toLowerCase()}`}>
+                    <Plus className="size-4" aria-hidden /> New
+                  </Button>
+                </div>
+              </div>
+              {shown.length ? (
+                <ul className={view === "cards" ? cn("grid gap-3", selected ? "grid-cols-[repeat(auto-fill,minmax(15rem,1fr))]" : "sm:grid-cols-2 lg:grid-cols-3") : "grid gap-0.5"}>
+                  {shown.slice(0, Math.max(0, limit - before[g]!)).map((e) => (
+                    <li key={e.id} className="grid" data-entry={e.id}>
+                      {view === "cards" ? (
+                        <EntryCard entity={e} presence={presences.get(e.id)} href={entryHref(e.id)} current={e.id === selectedId} onOpen={onOpen} url={pictureOf(e)} marks={marksByType.get(e.type)!} w={w} book={novel} />
+                      ) : (
+                        <EntryRow entity={e} presence={presences.get(e.id)} href={entryHref(e.id)} current={e.id === selectedId} onOpen={onOpen} onEnter={onEnter} match={matches.get(e.id)} url={pictureOf(e)} marks={marksByType.get(e.type)!} w={w} />
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-muted">No {typePlural(type).toLowerCase()} yet.</p>
+              )}
+            </section>
+          ),
+        )}
+        {records.map((t) => (
+          <Fragment key={t.type}>{t.gallery({ novelId, novel, query, sort })}</Fragment>
+        ))}
+        </>
       )}
-      {records.map((t) => (
-        <Fragment key={t.type}>{t.gallery({ novelId, novel, query, sort })}</Fragment>
-      ))}
       {pieces.length > 0 && (
         <p className="text-sm text-muted">
           Also in {w.piece.count(pieces.length)}:{" "}
@@ -465,7 +492,7 @@ export function BiblePage({
   );
 
   // One pane: the list, or the entry with a way back to it. The gallery of cards, with nothing open, as wide as any page.
-  if (!twoPanes || (view === "cards" && !selected)) {
+  if (!twoPanes || (view !== "list" && !selected)) {
     return (
       <>
         {selected && !twoPanes ? pane : listContent}
@@ -508,6 +535,7 @@ function ViewSwitch({ view, onChange }: { view: View; onChange: (v: View) => voi
   const options = [
     { key: "list" as const, label: "List", icon: List },
     { key: "cards" as const, label: "Cards", icon: LayoutGrid },
+    { key: "table" as const, label: "Table", icon: Table2 },
   ];
   return (
     <div role="group" aria-label="Show as" className="flex overflow-hidden rounded-md border border-rule text-xs">
