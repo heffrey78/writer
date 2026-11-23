@@ -765,6 +765,9 @@ function bibleApi(root: (novelId: string) => string, request: Request, upload: <
       call<OperationResult & { ids: string[] }>("POST", novelId, "/relationships/add", { relationships }),
     /** Put a change the app just made back as it was: its files as before `commit`, one commit; STALE if any changed since. */
     undo: (novelId: string, commit: string, files: string[]) => call<OperationResult>("POST", novelId, "/undo", { commit, files }),
+    /** Link all (#172): every place an entry's names are written as plain words made a mention, in one commit; `pieces` narrows it. */
+    linkNames: (novelId: string, id: string, pieces?: string[], bases?: Record<string, string>) =>
+      call<OperationResult & { linked: number }>("POST", novelId, `/entities/${encodeURIComponent(id)}/link-names`, { ...(pieces ? { pieces } : {}), ...(bases ? { bases } : {}) }),
     /** "Not a name here" (D19): a word in a piece that looks like an entry's name but isn't it there. */
     notAName: (novelId: string, judgement: NotName) => call<OperationResult>("POST", novelId, "/not-names", judgement),
     forgetNotAName: (novelId: string, judgement: NotName) => call<OperationResult>("POST", novelId, "/not-names/delete", judgement),

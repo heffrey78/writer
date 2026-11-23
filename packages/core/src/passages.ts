@@ -553,3 +553,17 @@ export function namesNotLinkedIn(book: Book, piece: Piece): { id: string; passag
   });
   return [...byId].map(([id, passages]) => ({ id, passages }));
 }
+
+/**
+ * Whether a "Not a name here" judgement still finds its word (D19): its piece is there, and one of the
+ * piece's plain names is the one it dismisses. Tidy up lists those that don't, to be dropped.
+ */
+export function notNameHolds(book: Book, judgement: NotName): boolean {
+  const piece = book.allPieces.find((p) => p.id === judgement.piece);
+  if (!piece) return false;
+  const matcher = bookNameMatcher(book);
+  return blocksOf(piece).some((b) => {
+    const plain = namesInBlock(piece.body, b, matcher).filter((h) => !h.linked);
+    return dismissedIn(b.text, plain, [judgement], starts(b)).size > 0;
+  });
+}

@@ -225,6 +225,35 @@ describe("many entries at once (#167)", () => {
   });
 });
 
+describe("Link all (#172)", () => {
+  const LEDGER = "manuscript/01-return/02-old-debts/02-bens-ledger.md";
+  const FLOOD = "manuscript/02-the-sale/01-night-crossing/02-the-flood.md";
+
+  it("makes every plain Ben a mention in one commit, each piece listing him, nothing else changed; undone byte for byte", async () => {
+    const [ledger, flood] = [read(LEDGER), read(FLOOD)];
+    const { commit, files, linked } = await bible.linkNames(BEN);
+    expect(linked).toBe(3);
+    expect(files.sort()).toEqual([FLOOD, LEDGER].sort());
+    expect(lastCommit()).toBe("Bible: link Ben Varn in 2 scenes");
+    expect(read(LEDGER)).toBe(ledger.replace("which meant Ben had", "which meant [Ben](#char_b3n0vs) had").replace("characters: [char_7f3k2q]", "characters: [char_7f3k2q, char_b3n0vs]"));
+    expect(read(FLOOD)).toBe(flood.replace("Ben was fourteen", "[Ben](#char_b3n0vs) was fourteen").replace("Nobody gave Ben anything", "Nobody gave [Ben](#char_b3n0vs) anything"));
+    const novel = await valid();
+    expect(novel.pieces.flatMap((p) => p.body.match(/(?<!\[)\bBen\b(?!\])/g) ?? [])).toEqual([]);
+    clean();
+    await bible.undo(commit!, files);
+    expect([read(LEDGER), read(FLOOD)]).toEqual([ledger, flood]);
+  });
+
+  it("leaves a word judged not a name there, links only the pieces asked for, and refuses a piece changed since it was read", async () => {
+    await bible.notAName({ entry: BEN, piece: "sc_f100d0", sentence: "Nobody gave Ben anything to hold.", nth: 0 });
+    expect((await bible.linkNames(BEN, ["sc_f100d0"])).linked).toBe(1);
+    expect(read(FLOOD)).toContain("Nobody gave Ben anything");
+    expect(read(LEDGER)).toContain("which meant Ben had");
+    await expect(bible.linkNames(BEN, undefined, { sc_1edger: "0".repeat(64) })).rejects.toMatchObject({ code: "STALE" });
+    expect(await bible.linkNames(BEN, ["sc_f100d0"])).toEqual({ commit: null, files: [], linked: 0 });
+  });
+});
+
 describe("the index's judgements (D19, #171)", () => {
   const PIECE = "sc_5tat1n";
   const judgement = { entry: ADA, piece: PIECE, sentence: "Ada said she would go.", nth: 0 };

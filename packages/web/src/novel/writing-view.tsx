@@ -47,6 +47,7 @@ import { useIssueList } from "../issues/use-issues.ts";
 import { useQuickEntry } from "../bible/quick-entry.ts";
 import { mentionEntities } from "../bible/types.ts";
 import { editorNotNames, useNotAName } from "../bible/not-names.ts";
+import { NameReviewBar } from "../bible/name-review.tsx";
 import { useCurrentScene } from "./current.ts";
 import { EntryTab, useEntryPanel } from "./entry-tab.tsx";
 import { useBookKind, useWords } from "./kind.ts";
@@ -547,6 +548,7 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
   return (
     <div className="flex min-h-full flex-col max-md:flex-1 lg:h-full lg:min-h-0 lg:flex-row">
       <div className="flex min-w-0 flex-1 flex-col lg:overflow-y-auto">
+      <NameReviewBar novelId={novelId} novel={novel} workspace={workspace} />
       <div
         className="mx-auto grid w-full max-w-[calc(var(--ghw-prose-measure)+3rem)] flex-1 content-start gap-3 px-6 py-6"
         onContextMenu={(e) => {

@@ -1,7 +1,7 @@
 import { defaultEntrySort, entryPresences, filterEntries, matchEntry, piecesMatching, sortEntries, typePlural, vocabulary, word, type Book, type Entity, type EntryPresence, type EntrySort, type Vocabulary } from "@writer/core";
 import { findPanel } from "@writer/editor";
 import type { SpellService } from "@writer/editor/react";
-import { ChevronLeft, ChevronRight, Expand, LayoutGrid, List, PanelLeftClose, PanelLeftOpen, Plus, Search, SlidersHorizontal, Table2, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Expand, LayoutGrid, List, PanelLeftClose, PanelLeftOpen, Plus, Search, SlidersHorizontal, Sparkles, Table2, X } from "lucide-react";
 import { Fragment, memo, useCallback, useEffect, useId, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 import { create } from "zustand";
@@ -332,6 +332,9 @@ export function BiblePage({
         <h1 className="text-xl font-semibold">{w.codex.One}</h1>
         <div className="flex flex-wrap gap-2">
 
+          <Button size="sm" variant="ghost" onClick={() => void navigate(`/novels/${novelId}/bible/tidy`)}>
+            <Sparkles className="size-4" aria-hidden /> Tidy up
+          </Button>
           <Button size="sm" onClick={() => setAddingType(true)}>
             New type
           </Button>

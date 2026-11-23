@@ -15,6 +15,7 @@ import { MENU_ITEM, Shell } from "../layout.tsx";
 import { ErrorAlert } from "../ui/alert.tsx";
 import { ErrorBoundary } from "../ui/error-boundary.tsx";
 import { BiblePage } from "../bible/bible-page.tsx";
+import { TidyPage } from "../bible/tidy-page.tsx";
 import { useNewNote } from "../notes/new-note.tsx";
 import { NotesPage } from "../notes/notes-page.tsx";
 import { NotesLeftDialog } from "../notes/notes-left.tsx";
@@ -48,7 +49,7 @@ import { useSpell } from "./spell.ts";
 import { usePublish } from "../github/publish.tsx";
 import { SyncBadge } from "./sync-badge.tsx";
 import { createWorkspace, type Workspace } from "./workspace.ts";
-import { mentionEdits } from "./mention-sync.ts";
+import { mentionEdits } from "@writer/core";
 import { createQuickEntries, type QuickEntries } from "../bible/quick-entries.ts";
 import { unlink } from "../bible/quick-entry.ts";
 import { useEntryPanel } from "./entry-tab.tsx";
@@ -231,6 +232,7 @@ export function NovelPage() {
       { id: "novel.arrangeSidebar", title: "Arrange the sidebar…", group: "App", keywords: ["order", "hide", "show", "pages", "views", "menu"], run: () => useArrangeSidebar.getState().set(true) },
       { id: "novel.arrangeBar", title: "Arrange the bar…", group: "App", keywords: ["phone", "bottom", "order", "pages", "tabs"], run: () => useArrangeBar.getState().set(true) },
       { id: "novel.bible", title: w?.codex.One ?? "Index", group: "Go to", run: () => void navigate(`/novels/${novelId}/bible`) },
+      { id: "novel.tidy", title: `Tidy up the ${w?.codex.short ?? "index"}`, group: w?.codex.One ?? "Index", keywords: ["names not linked", "duplicates", "same", "merge", "empty", "summary", "gaps", "clean"], run: () => void navigate(`/novels/${novelId}/bible/tidy`) },
       { id: "novel.outline", title: "Outline", group: "Go to", keywords: ["table"], run: () => void navigate(`/novels/${novelId}/outline/table`) },
       { id: "novel.outlineCards", title: "Outline: cards", group: "Go to", keywords: ["corkboard", "index cards"], run: () => void navigate(`/novels/${novelId}/outline/cards`) },
       { id: "novel.progress", title: "Progress", group: "Go to", keywords: ["stats", "statistics", "goal", "target", "deadline", "streak", "words a day"], run: () => void navigate(`/novels/${novelId}/progress`) },
@@ -433,6 +435,7 @@ function BibleRoute({ novelId, novel, workspace, spell }: RouteProps) {
     const entity = novel.entities.find((e) => e.id === id);
     return entity ? <EntryPage key={entity.id} novelId={novelId} novel={novel} entity={entity} workspace={workspace} spell={spell} /> : <Missing what={vocabulary(novel.kind).entity.one} />;
   }
+  if (id === "tidy") return <TidyPage novelId={novelId} novel={novel} workspace={workspace} />;
   if (id === "new") return <BiblePage novelId={novelId} novel={novel} workspace={workspace} spell={spell} over={<EntryOver novelId={novelId} novel={novel} workspace={workspace} spell={spell} />} />;
   return <BiblePage novelId={novelId} novel={novel} workspace={workspace} spell={spell} selected={id ? { entry: id } : undefined} />;
 }

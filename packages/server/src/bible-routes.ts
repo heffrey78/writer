@@ -30,6 +30,7 @@ export async function body(c: Context): Promise<Record<string, unknown>> {
  * POST  /:id/bible/entities/edit               { edits: [{ id, base, changes }] } → { commit, files }: many entries, one commit
  * POST  /:id/bible/relationships/add           { relationships: [{ from, to, type, … }] } → { ids, commit }: several, one commit
  * POST  /:id/bible/undo                        { commit, files } → { commit, files }: that commit's files as they were before it, or 409 STALE
+ * POST  /:id/bible/entities/:entity/link-names { pieces?, bases? } → { commit, linked }: its plain names made mentions, one commit (#172)
  * POST  /:id/bible/not-names                   { entry, piece, sentence, nth } → { commit }: "Not a name here" kept (D19)
  * POST  /:id/bible/not-names/delete            { entry, piece, sentence, nth } → { commit }: a name there again
  * POST  /:id/bible/different                   { a, b } → { commit }: "They're different" kept (D19)
@@ -80,6 +81,10 @@ export function bibleRoutes(routes: Hono<Env>): void {
   routes.post("/:id/bible/undo", async (c) => {
     const { commit, files } = await body(c);
     return operation(c, () => bible(c).undo(String(commit ?? ""), files as never));
+  });
+  routes.post("/:id/bible/entities/:entity/link-names", async (c) => {
+    const { pieces, bases } = await body(c);
+    return operation(c, () => bible(c).linkNames(c.req.param("entity"), Array.isArray(pieces) ? pieces.map(String) : undefined, (bases ?? {}) as Record<string, string>));
   });
   routes.post("/:id/bible/not-names", async (c) => operation(c, async () => bible(c).notAName((await body(c)) as never)));
   routes.post("/:id/bible/not-names/delete", async (c) => operation(c, async () => bible(c).forgetNotAName((await body(c)) as never)));

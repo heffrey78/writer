@@ -823,3 +823,82 @@ test("Not a name here, from an entry's profile, a scene's Not linked here and th
   expect(read("bible/not-names.yaml").match(/^- /gm)).toHaveLength(3);
   expect(read("bible/not-names.yaml")).toContain('sentence: "Nobody gave Ben anything to hold.", nth: 0 }');
 });
+
+test("Tidy up: the index's counts, each opening its list with the fix beside each; Link all in one commit, undone; reviewed one by one in the text; a quiet dot when a count rises (#137, #172)", async ({ page, app }) => {
+  test.setTimeout(60_000);
+  const dir = app.novelRepo("varn");
+  // A quick entry made twice: Benjamin, beside Ben Varn, in no scene and with no summary.
+  writeFileSync(join(dir, "bible/characters/benjamin.md"), "---\nid: char_b3nj4m\nname: Benjamin\n---\n");
+  app.git(dir, "add", "-A");
+  app.git(dir, "commit", "-qm", "Benjamin");
+  await app.restart(dir);
+  await page.goto(app.launchUrl);
+  await expect(page.getByRole("textbox", { name: "Chapter text" })).toBeFocused();
+  const read = (path: string) => readFileSync(join(dir, path), "utf8");
+  const lastCommit = () => app.git(dir, "log", "-1", "--format=%s").trim();
+  const LEDGER = "manuscript/01-return/02-old-debts/02-bens-ledger.md";
+  const FLOOD = "manuscript/02-the-sale/01-night-crossing/02-the-flood.md";
+  const was = [read(LEDGER), read(FLOOD)];
+
+  await palette(page, "tidy up");
+  await expect(page.getByRole("heading", { level: 1, name: "Tidy up the bible" })).toBeVisible();
+  const tabs = page.getByRole("tablist", { name: "What to tidy" }).getByRole("tab");
+  await expect(tabs).toHaveText(["18Names not linked", "1Not in the manuscript yet", "1Might be the same", "1No summary", "27Empty fields"]);
+  await axe(page);
+  await page.emulateMedia({ colorScheme: "dark" });
+  await axe(page);
+  await page.emulateMedia({ colorScheme: "light" });
+
+  // Link all: Ben's three plain names, mentions in one commit; nothing else in those scenes changes. Undo puts both back.
+  const ben = page.getByRole("list", { name: "Names not linked" }).getByRole("listitem").filter({ hasText: /^Ben Varn/ });
+  await expect(ben).toContainText("3 not linked in 2 scenes");
+  await ben.getByRole("button", { name: "Link all 3 to Ben Varn" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Linked Ben Varn in 2 scenes: 3 places." })).toBeVisible();
+  expect(lastCommit()).toBe("Bible: link Ben Varn in 2 scenes");
+  expect(read(LEDGER)).toBe(was[0]!.replace("which meant Ben had", "which meant [Ben](#char_b3n0vs) had").replace("characters: [char_7f3k2q]", "characters: [char_7f3k2q, char_b3n0vs]"));
+  expect(read(FLOOD)).toBe(was[1]!.replace("Ben was fourteen", "[Ben](#char_b3n0vs) was fourteen").replace("Nobody gave Ben anything", "Nobody gave [Ben](#char_b3n0vs) anything"));
+  await expect(tabs.first()).toHaveText("15Names not linked");
+  await page.getByRole("status").getByRole("button", { name: "Undo" }).click();
+  await expect(tabs.first()).toHaveText("18Names not linked");
+  expect([read(LEDGER), read(FLOOD)]).toEqual(was);
+
+  // The tabs by keyboard; might be the same: Ben Varn and Benjamin, judged different, kept in the index's file.
+  await tabs.first().focus();
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("ArrowRight");
+  await expect(tabs.nth(2)).toBeFocused();
+  await expect(tabs.nth(2)).toHaveAttribute("aria-selected", "true");
+  const panel = page.getByRole("tabpanel");
+  await expect(panel).toContainText("Ben Varn and Benjamin · characters · one begins the other");
+  await panel.getByRole("button", { name: "Ben Varn and Benjamin are different" }).click();
+  await expect(tabs.nth(2)).toHaveText("0Might be the same");
+  expect(read("bible/different.yaml")).toContain("- [char_b3n0vs, char_b3nj4m]\n");
+
+  // No summary: given one where it's listed.
+  await tabs.nth(3).click();
+  await panel.getByRole("textbox", { name: "Benjamin" }).fill("A boy at the ferry, nobody's brother.");
+  await page.keyboard.press("Enter");
+  await expect(tabs.nth(3)).toHaveText("0No summary");
+  expect(read("bible/characters/benjamin.md")).toContain("summary: A boy at the ferry, nobody's brother.");
+
+  // Review one by one: Ben's three in the text, linked, not a name, skipped.
+  await tabs.first().click();
+  await ben.getByRole("button", { name: "Review Ben Varn's 3 one by one" }).click();
+  const bar = page.getByRole("region", { name: "Review names not linked" });
+  await expect(bar).toContainText("Ben Varn, not linked: 1 of 3, in “Ben's Ledger”");
+  await expect.poll(() => page.evaluate(() => getSelection()?.toString())).toContain("which meant Ben had wanted it found");
+  await bar.getByRole("button", { name: "Link it" }).click();
+  await expect(bar).toContainText("2 of 3, in “The Flood”");
+  await expect.poll(() => read(LEDGER)).toContain("which meant [Ben](#char_b3n0vs) had");
+  await bar.getByRole("button", { name: "Not a name here" }).click();
+  await expect(bar).toContainText("3 of 3");
+  await expect.poll(() => read("bible/not-names.yaml")).toContain('sentence: "Ben was fourteen, and the river was louder than he had known a river could be.", nth: 0 }');
+  await bar.getByRole("button", { name: "Skip" }).click();
+  await expect(bar).toBeHidden();
+
+  // The sidebar's quiet dot: none while nothing has risen since Tidy up was opened; one when a count does.
+  const index = page.getByRole("navigation", { name: "Views" }).getByRole("link", { name: /^Story bible/ });
+  await expect(index).toHaveAccessibleName("Story bible");
+  writeFileSync(join(dir, "bible/characters/nobody.md"), "---\nid: char_n0b0dy\nname: Nobody Yet\n---\n");
+  await expect(index).toHaveAccessibleName(/^Story bible ?, something to tidy up$/, { timeout: 10_000 });
+});

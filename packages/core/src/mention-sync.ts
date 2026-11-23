@@ -1,4 +1,5 @@
-import { mentions, readFrontMatter, type Book, type YamlEdit } from "@writer/core";
+import { readFrontMatter, type YamlEdit } from "./edit.ts";
+import { mentions, type Book } from "./model.ts";
 
 /**
  * The front-matter edits that list, in the piece's fields that keep up with its mentions (`mentionAdds`:

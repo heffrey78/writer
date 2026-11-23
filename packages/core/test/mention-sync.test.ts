@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import { editFrontMatter, loadBook, readFrontMatter } from "@writer/core";
 import { nodeSource } from "@writer/core/node";
 import { describe, expect, it } from "vitest";
-import { mentionEdits } from "../src/novel/mention-sync.ts";
+import { mentionEdits } from "../src/index.ts";
 
 const root = fileURLToPath(new URL("../../../examples/sample-novel/", import.meta.url));
 const STATION = "manuscript/01-return/01-arrival/01-the-station.md";

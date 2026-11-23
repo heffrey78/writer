@@ -1,3 +1,4 @@
+import { useTidyRose } from "../bible/tidy-state.ts";
 import { useNarrow } from "../narrow.ts";
 import { arrangeSidebar, MANIFEST, vocabulary, type Book, type BookKind, type SidebarFile } from "@writer/core";
 import { BookOpen, CircleDot, Columns2, Goal, ListTree, Map as MapIcon, Network, PanelLeftClose, PanelLeftOpen, PenLine, StickyNote, type LucideIcon } from "lucide-react";
@@ -191,6 +192,7 @@ function Expanded({ novelId, novel, workspace, current, onGitHub, toggle }: { no
                 <NavLink to={`/novels/${novelId}/${p.path}`} className={({ isActive }) => cn("flex items-center gap-2 rounded-md px-2 py-1 hover:bg-paper", isActive && "bg-accent-soft font-medium")}>
                   <p.icon className="size-4 shrink-0 text-muted" aria-hidden />
                   {p.label}
+                  {p.path === "bible" && <TidyDot novelId={novelId} novel={novel} />}
                 </NavLink>
                 {p.path === "bible" && <RecentEntries novelId={novelId} novel={novel} />}
                 {p.path === "bible" && (
@@ -288,5 +290,16 @@ function RecentEntries({ novelId, novel }: { novelId: string; novel: Book }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+/** A quiet dot by the index when something to tidy has risen since Tidy up was last opened (#172): never a number. */
+function TidyDot({ novelId, novel }: { novelId: string; novel: Book }) {
+  if (!useTidyRose(novelId, novel)) return null;
+  return (
+    <>
+      <span aria-hidden title="Something to tidy up" className="ml-auto size-1.5 rounded-full bg-accent" />
+      <span className="sr-only">, something to tidy up</span>
+    </>
   );
 }

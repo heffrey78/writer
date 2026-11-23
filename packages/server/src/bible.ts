@@ -25,6 +25,9 @@ import {
   type Book,
   type Entity,
   type NotName,
+  type Passage,
+  mentionEdits,
+  passagesOf,
   DIFFERENT_HEADER,
   differentLine,
   judgedDifferent,
@@ -783,6 +786,45 @@ export class BibleOperations {
       const styleEdits = Object.entries(style ?? {}).map(([k, value]) => ({ path: ["relationship_types", index, "style", k], value }));
       const content = editYaml(await this.#read(novel.manifest), [...editsAt(["relationship_types", index], rest), ...styleEdits]);
       return transaction(this.root, [{ path: novel.manifest, content }], `${codex(novel)}: edit the “${key}” relationship`);
+    });
+  }
+
+  /**
+   * Link all (#137, #172): every place an entry's names are written as plain words (those Not a name
+   * here leaves out aside) made a mention of it, `[words](#id)`, as the editor writes one; each piece
+   * lists it as a mention there would (its characters, its locations); one commit. Only those bytes
+   * change. `pieces` narrows it to some; refused if a piece changed since `bases` (its hash) was read.
+   */
+  linkNames(entry: string, pieces?: string[], bases: Record<string, string> = {}): Promise<OperationResult & { linked: number }> {
+    return this.#run(async (novel) => {
+      const target = novel.entities.find((e) => e.id === entry);
+      if (!target) throw new OperationError("NOT_FOUND", `No entity “${entry}”.`);
+      const byPiece = new Map<string, Passage[]>();
+      for (const p of passagesOf(novel, entry)) {
+        if (p.linked || !p.raw || (pieces && !pieces.includes(p.piece.id))) continue;
+        // Plain words only: a mention's text can't hold brackets or a line break.
+        if (/[[\]\n]/.test(p.piece.body.slice(...p.raw))) continue;
+        byPiece.set(p.piece.id, [...(byPiece.get(p.piece.id) ?? []), p]);
+      }
+      const writes: FileWrite[] = [];
+      let linked = 0;
+      for (const passages of byPiece.values()) {
+        const piece = passages[0]!.piece;
+        const text = await this.#read(piece.file);
+        const base = hashText(text);
+        if (bases[piece.id] !== undefined && bases[piece.id] !== base) throw new OperationError("STALE", `“${piece.title}” changed since it was read.`, { path: piece.file });
+        if (!text.endsWith(piece.body)) throw new OperationError("STALE", `“${piece.title}” changed since it was read.`, { path: piece.file });
+        let body = piece.body;
+        for (const p of [...passages].sort((x, y) => y.raw![0] - x.raw![0])) {
+          body = `${body.slice(0, p.raw![0])}[${body.slice(...p.raw!)}](#${entry})${body.slice(p.raw![1])}`;
+          linked++;
+        }
+        const file = text.slice(0, text.length - piece.body.length) + body;
+        writes.push({ path: piece.file, content: editFrontMatter(file, mentionEdits(novel, file, piece.body, body)), base });
+      }
+      if (!writes.length) return { commit: null, files: [], linked: 0 };
+      const w = vocabulary(novel.kind);
+      return { ...(await transaction(this.root, writes, `${codex(novel)}: link ${target.name} in ${w.piece.count(writes.length)}`)), linked };
     });
   }
 
