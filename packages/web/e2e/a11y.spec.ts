@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { Page } from "@playwright/test";
 import { axe, caretAtEnd, expect, launch, palette, test, type App } from "./fixtures.ts";
 
@@ -153,3 +154,110 @@ for (const [name, viewport] of [
     await noSideways(page);
   });
 }
+
+/** Where the focus is: inside what `selector` finds, or not. */
+const focusIn = (page: Page, selector: string) => page.evaluate((s) => !!document.activeElement?.closest(s), selector);
+
+test("the index's screens by keyboard and the palette: the table, its columns and its selection, a type's fields, Tidy up, Merge and Quick look, each audited in light and dark; the focus kept and given back, the changes said (#178)", async ({ page, app }) => {
+  test.setTimeout(90_000);
+  await app.restart(app.novelRepo("varn"));
+  await page.goto(app.launchUrl);
+  await expect(page.getByRole("textbox", { name: "Chapter text" })).toBeFocused();
+  await palette(page, "story bible");
+  await expect(page.getByRole("heading", { level: 1, name: "Story bible" })).toBeVisible();
+
+  // The list's order and view, from the palette, and said.
+  await palette(page, "sort the bible by name");
+  await expect(page.getByLabel("Sort")).toHaveValue("name");
+  await expect(page.locator("p[aria-live]").filter({ hasText: "Sorted by name" })).toBeAttached();
+  await palette(page, "show the bible as table");
+  await expect(page.getByRole("group", { name: "Show as" }).getByRole("button", { name: "Table" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("p[aria-live]").filter({ hasText: "Shown as Table" })).toBeAttached();
+
+  // The table: audited; its columns, its sort and its selection's actions from the palette.
+  await page.getByRole("button", { name: /^Characters/ }).click();
+  const grid = page.getByRole("grid", { name: /^Characters/ });
+  await expect(grid).toBeVisible();
+  await audit(page);
+  await palette(page, "choose the table's columns");
+  const columns = page.getByRole("dialog", { name: "Columns" });
+  await expect(columns).toBeVisible();
+  await audit(page);
+  await page.keyboard.press("Escape");
+  await expect(columns).toHaveCount(0);
+  await palette(page, "sort the table by name");
+  await expect(page.locator("p[aria-live]").filter({ hasText: "Sorted by Name, ascending" })).toBeAttached();
+  await palette(page, "select every one of the characters");
+  await expect(page.getByRole("toolbar", { name: "The selected rows" })).toContainText("4 selected");
+  await palette(page, "add a tag to the selected");
+  const tagging = page.getByRole("dialog", { name: /^Add a tag to / });
+  await expect(tagging.getByRole("combobox", { name: "Tag" })).toBeFocused();
+  await audit(page);
+  // Closed, the focus goes back to the table (the palette that opened it is gone).
+  await page.keyboard.press("Escape");
+  await expect(tagging).toHaveCount(0);
+  await expect.poll(() => focusIn(page, '[role="grid"]')).toBe(true);
+  await palette(page, "clear the selection");
+  await expect(page.getByRole("toolbar", { name: "The selected rows" })).toHaveCount(0);
+
+  // A type's fields: the dialog keeps the focus in it, and gives it back.
+  await palette(page, "fields of characters");
+  const fields = page.getByRole("dialog", { name: "Fields of characters" });
+  await expect(fields).toBeVisible();
+  await expect.poll(() => focusIn(page, '[role="dialog"]')).toBe(true);
+  for (let i = 0; i < 12; i++) {
+    await page.keyboard.press("Tab");
+    expect(await focusIn(page, '[role="dialog"]')).toBe(true);
+  }
+  await audit(page);
+  await page.keyboard.press("Escape");
+  await expect(fields).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => document.activeElement !== document.body)).toBe(true);
+
+  // Tidy up: audited, each list from the palette.
+  await palette(page, "tidy up the bible");
+  await expect(page.getByRole("heading", { level: 1, name: "Tidy up the bible" })).toBeVisible();
+  await audit(page);
+  await palette(page, "tidy up: no summary");
+  await expect(page.getByRole("tab", { name: /No summary$/ })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("tab", { name: /No summary$/ })).toBeFocused();
+
+  // Merge, from an entry's profile: audited; closed, the focus on the entry.
+  await palette(page, "story bible");
+  await palette(page, "show the bible as list");
+  await page.getByRole("link", { name: /^Ben Varn/ }).click();
+  await expect(page.getByRole("heading", { level: 2, name: "Ben Varn" })).toBeVisible();
+  await palette(page, "merge ben varn into another character");
+  const merging = page.getByRole("dialog", { name: "Merge Ben Varn into…" });
+  await expect(merging.getByRole("combobox", { name: "Into" })).toBeFocused();
+  await audit(page);
+  await page.keyboard.press("Escape");
+  await expect(merging).toHaveCount(0);
+  await expect(page.locator("#index-entry")).toBeFocused();
+
+  // Quick look: audited; Tab goes round inside it, never to the page behind.
+  await page.keyboard.press("Control+;");
+  const look = page.getByRole("dialog", { name: "Quick look" });
+  await expect(look.getByRole("combobox")).toBeFocused();
+  await page.keyboard.type("ada");
+  await expect(look.getByRole("article", { name: "Ada Varn" })).toBeVisible();
+  for (let i = 0; i < 8; i++) {
+    await page.keyboard.press("Tab");
+    expect(await focusIn(page, '[role="dialog"]')).toBe(true);
+  }
+  await audit(page);
+  await page.keyboard.press("Escape");
+  await expect(look).toHaveCount(0);
+});
+
+test("Read at a session, from the palette: the list of sessions in focus (#140, #178)", async ({ page, app }) => {
+  const dir = app.bookRepo(fileURLToPath(new URL("../../../examples/sample-campaign", import.meta.url)), "campaign");
+  await app.restart(dir);
+  await page.goto(app.launchUrl);
+  await expect(page.getByRole("textbox", { name: "Arc text" })).toBeFocused();
+  await palette(page, "codex");
+  await page.getByRole("link", { name: /^Marta Hollin/ }).click();
+  await expect(page.getByRole("heading", { level: 2, name: "Marta Hollin" })).toBeVisible();
+  await palette(page, "read marta hollin at a session");
+  await expect(page.getByRole("combobox", { name: "Read at" })).toBeFocused();
+});

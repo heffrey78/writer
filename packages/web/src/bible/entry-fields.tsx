@@ -81,7 +81,7 @@ export function EntryFields({ novelId, novel, entity, place, save, compact, at, 
           <label htmlFor={readAtId} className="text-[13px] text-muted">
             Read at
           </label>
-          <select id={readAtId} value={at ?? ""} onChange={(e) => onAt(e.target.value || undefined)} className="h-7 max-w-full min-w-0 rounded-md border border-rule bg-raised px-1.5 text-[13px]">
+          <select id={readAtId} data-read-at value={at ?? ""} onChange={(e) => onAt(e.target.value || undefined)} className="h-7 max-w-full min-w-0 rounded-md border border-rule bg-raised px-1.5 text-[13px]">
             <option value="">The whole {w.book.one}: the latest</option>
             {novel.pieces.map((p) => (
               <option key={p.id} value={p.id}>

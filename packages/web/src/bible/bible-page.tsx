@@ -323,8 +323,10 @@ export function BiblePage({
     scrollerOf(list.current).scrollTop = place.top;
     if (place.id) rowLink(place.id)?.focus({ preventScroll: true });
   }, [listAlone]); // eslint-disable-line react-hooks/exhaustive-deps
-  const keys = useRef({ stepTo, newOfType, toggleList, editPart, selectedId });
-  keys.current = { stepTo, newOfType, toggleList, editPart, selectedId };
+  const sortBy = (to: EntrySort) => setParam("sort", to === fallback ? undefined : to);
+  const showAs = (as: View) => setLayout({ view: as });
+  const keys = useRef({ stepTo, newOfType, toggleList, editPart, selectedId, sortBy, showAs });
+  keys.current = { stepTo, newOfType, toggleList, editPart, selectedId, sortBy, showAs };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey || typing(e.target) || document.querySelector('[role="dialog"], [role="alertdialog"]')) return;
@@ -366,9 +368,20 @@ export function BiblePage({
       { id: "index.edit", title: `Edit the ${w.entity.one}'s summary`, group: w.codex.One, keys: "e", run: () => keys.current.editPart() },
       { id: "index.newOfType", title: `New ${w.entity.one} of this type`, group: w.codex.One, keys: "n", run: () => keys.current.newOfType() },
       { id: "index.toggleList", title: layout.collapsed ? "Show the list" : "Hide the list", group: w.codex.One, keys: "[", run: () => keys.current.toggleList() },
+      // The list's view and order (#178): each a command, as its switch and its menu are.
+      ...VIEWS.filter((v) => v.key !== "table" || !narrow).map((v) => ({ id: `index.view.${v.key}`, title: `Show the ${w.codex.short} as ${v.label}`, group: w.codex.One, keywords: ["view", "layout"], run: () => keys.current.showAs(v.key), isActive: () => view === v.key })),
+      ...sorts(w).map((s) => ({ id: `index.sort.${s.key}`, title: `Sort the ${w.codex.short} by ${s.label.toLowerCase()}`, group: w.codex.One, keywords: ["order"], run: () => keys.current.sortBy(s.key), isActive: () => sort === s.key })),
     ],
-    [w, layout.collapsed],
+    [w, layout.collapsed, view, narrow, sort],
   );
+  // A new order or view, said to a screen reader (in the same words' place): the list changes under the focus without a word otherwise.
+  const shownAs = useRef({ sort, view });
+  useEffect(() => {
+    const was = shownAs.current;
+    shownAs.current = { sort, view };
+    if (was.sort !== sort) setSaid(`Sorted by ${sorts(w).find((s) => s.key === sort)?.label.toLowerCase() ?? sort}`);
+    else if (was.view !== view) setSaid(`Shown as ${VIEWS.find((v) => v.key === view)?.label ?? view}`);
+  }, [sort, view, w]);
   const listContent = (
     <div ref={list} className={cn("grid min-w-0 content-start gap-5", view !== "list" && !selected ? PAGE : "px-4 py-4")}>
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -535,6 +548,7 @@ export function BiblePage({
       <p aria-live="polite" className="sr-only">
         {said}
       </p>
+
       <NewTypeDialog novelId={novelId} novel={novel} open={addingType} onOpenChange={setAddingType} />
       {over}
     </>
@@ -582,12 +596,14 @@ export function BiblePage({
   );
 }
 
+const VIEWS = [
+  { key: "list" as const, label: "List", icon: List },
+  { key: "cards" as const, label: "Cards", icon: LayoutGrid },
+  { key: "table" as const, label: "Table", icon: Table2 },
+];
+
 function ViewSwitch({ view, onChange, table }: { view: View; onChange: (v: View) => void; table: boolean }) {
-  const options = [
-    { key: "list" as const, label: "List", icon: List },
-    { key: "cards" as const, label: "Cards", icon: LayoutGrid },
-    ...(table ? [{ key: "table" as const, label: "Table", icon: Table2 }] : []),
-  ];
+  const options = VIEWS.filter((v) => table || v.key !== "table");
   return (
     <div role="group" aria-label="Show as" className="flex overflow-hidden rounded-md border border-rule text-xs">
       {options.map((o) => (

@@ -4,6 +4,7 @@ import { ChevronLeft } from "lucide-react";
 import { useEffect, useId, useMemo, useState, type ReactNode } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { api, keys } from "../api.ts";
+import { useCommands } from "../commands.ts";
 import { requestPassage } from "../novel/go-to-passage.ts";
 import { useNotice } from "../novel/notice.tsx";
 import type { Workspace } from "../novel/workspace.ts";
@@ -45,6 +46,14 @@ export function TidyPage({ novelId, novel, workspace }: { novelId: string; novel
     emptyFields: "Empty fields",
   };
   const choose = (s: Show) => setParams((p) => (s === "notLinked" ? (p.delete("show"), p) : (p.set("show", s), p)), { replace: true });
+  // Each list, from the palette too (#178).
+  useCommands(
+    () => SHOWS.map((s) => ({ id: `tidy.${s}`, title: `Tidy up: ${labels[s]}`, group: w.codex.One, run: () => {
+      choose(s);
+      document.getElementById(`${tabsId}-${s}`)?.focus();
+    }, isActive: () => show === s })),
+    [show, w],
+  );
   const onTabKey = (e: React.KeyboardEvent, i: number) => {
     const to = e.key === "ArrowRight" ? i + 1 : e.key === "ArrowLeft" ? i - 1 : e.key === "Home" ? 0 : e.key === "End" ? SHOWS.length - 1 : undefined;
     if (to === undefined) return;
@@ -85,7 +94,7 @@ export function TidyPage({ novelId, novel, workspace }: { novelId: string; novel
           </button>
         ))}
       </div>
-      <section id={`${tabsId}-panel`} role="tabpanel" aria-labelledby={`${tabsId}-${show}`} className="grid gap-3">
+      <section id={`${tabsId}-panel`} role="tabpanel" tabIndex={-1} aria-labelledby={`${tabsId}-${show}`} className="grid gap-3 outline-none">
         {show === "notLinked" && <NamesNotLinked novelId={novelId} novel={novel} report={report} workspace={workspace} />}
         {show === "absent" && <Entries novelId={novelId} novel={novel} entries={report.absent} empty={`Every ${w.entity.one} is in the ${w.content.one}.`} />}
         {show === "same" && <MightBeTheSame novelId={novelId} novel={novel} pairs={report.same} />}

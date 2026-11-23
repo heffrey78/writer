@@ -4,6 +4,7 @@ import { ArrowDown, ArrowUp, Columns3, Copy } from "lucide-react";
 import { Dialog, Popover } from "radix-ui";
 import { memo, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
 import { api, keys } from "../api.ts";
+import { useCommands } from "../commands.ts";
 import { useNotice } from "../novel/notice.tsx";
 import { Button } from "../ui/button.tsx";
 import { cn } from "../ui/cn.ts";
@@ -260,6 +261,35 @@ export function EntryTable({
   };
   const [bulk, setBulk] = useState<Bulk>();
   const all = rows.length > 0 && selected.length === rows.length;
+  const [columnsOpen, setColumnsOpen] = useState(false);
+  // A new order, said: the rows change under the focus without a word otherwise.
+  const [sorted, setSorted] = useState("");
+  const sortAndSay = (col: Column) => {
+    const next = kept?.sort?.key === col.key && kept.sort.direction === "ascending" ? "descending" : "ascending";
+    sortBy(col);
+    setSorted(`Sorted by ${col.label}, ${next}`);
+  };
+  const canRelate = relationshipTypes(novel, type.key).length > 0;
+  // Everything the table does, in the palette too (#178).
+  const acts = useRef({ copy, sortAndSay, setBulk, setChosen, rows, setColumnsOpen });
+  acts.current = { copy, sortAndSay, setBulk, setChosen, rows, setColumnsOpen };
+  useCommands(
+    () => [
+      { id: "table.columns", title: `Choose the table's columns…`, group: "Table", keywords: ["show", "hide", "order"], run: () => acts.current.setColumnsOpen(true) },
+      { id: "table.copy", title: selected.length ? "Copy the selected rows as a table" : "Copy the table", group: "Table", keywords: ["spreadsheet", "clipboard"], run: () => void acts.current.copy() },
+      ...shown.map((col) => ({ id: `table.sort.${col.key}`, title: `Sort the table by ${col.label}`, group: "Table", keywords: ["order"], run: () => acts.current.sortAndSay(col) })),
+      { id: "table.selectAll", title: `Select every one of the ${plural}`, group: "Table", run: () => acts.current.setChosen(new Set(acts.current.rows.map((e) => e.id))) },
+      ...(selected.length
+        ? [
+            { id: "table.tag", title: "Add a tag to the selected…", group: "Table", run: () => acts.current.setBulk("tag") },
+            { id: "table.field", title: "Set a field on the selected…", group: "Table", run: () => acts.current.setBulk("field") },
+            ...(canRelate ? [{ id: "table.relationship", title: "Add a relationship from the selected…", group: "Table", run: () => acts.current.setBulk("relationship") }] : []),
+            { id: "table.clear", title: "Clear the selection", group: "Table", run: () => acts.current.setChosen(new Set()) },
+          ]
+        : []),
+    ],
+    [shown, selected.length > 0, plural, canRelate],
+  );
 
   const caption = `${rows.length} ${(rows.length === 1 ? type.label : typePlural(type)).toLowerCase()}${gaps ? ` · ${gaps} ${gaps === 1 ? "gap" : "gaps"}` : ""}`;
   return (
@@ -272,11 +302,14 @@ export function EntryTable({
           <Button size="sm" variant="ghost" onClick={() => void copy()} title={selected.length ? "Copy the selected rows, for a spreadsheet" : "Copy every row, for a spreadsheet"}>
             <Copy className="size-4" aria-hidden /> Copy as a table
           </Button>
-          <ColumnsMenu columns={columns} shown={shown} onChange={(keys) => keep({ shown: keys })} />
+          <ColumnsMenu columns={columns} shown={shown} onChange={(keys) => keep({ shown: keys })} open={columnsOpen} onOpenChange={setColumnsOpen} />
         </div>
       </div>
       <p aria-live="polite" className="sr-only">
         {selected.length ? `${selected.length} selected` : ""}
+      </p>
+      <p aria-live="polite" className="sr-only">
+        {sorted}
       </p>
       {selected.length > 0 && (
         <div role="toolbar" aria-label="The selected rows" className="flex flex-wrap items-center gap-2 rounded-md bg-accent-soft px-2.5 py-1.5">
@@ -298,7 +331,7 @@ export function EntryTable({
           </Button>
         </div>
       )}
-      {bulk && <BulkDialog mode={bulk} novelId={novelId} novel={novel} type={type} entries={selected} columns={columns} onClose={() => setBulk(undefined)} />}
+      {bulk && <BulkDialog mode={bulk} novelId={novelId} novel={novel} type={type} entries={selected} columns={columns} onClose={() => setBulk(undefined)} focusAfter={() => grid.current?.querySelector<HTMLElement>('[tabindex="0"]')} />}
       {/* Relative: what's there for screen readers alone (an empty cell's "Empty") is placed in it, not down the page. */}
       <div className="relative min-w-0 overflow-x-auto rounded-md border border-rule bg-raised">
         <table ref={grid} role="grid" aria-labelledby={`type-${type.key}`} aria-describedby={`${type.key}-table-foot`} aria-rowcount={rows.length + 1} className="w-full border-separate border-spacing-0 text-sm" onKeyDown={onKeyDown}>
@@ -328,7 +361,7 @@ export function EntryTable({
                       data-focus=""
                       tabIndex={active ? 0 : -1}
                       onFocus={() => setAt({ row: "head", col: col.key })}
-                      onClick={() => sortBy(col)}
+                      onClick={() => sortAndSay(col)}
                       title={`Sort by ${col.label.toLowerCase()}`}
                       className="inline-flex items-center gap-1 rounded uppercase hover:text-ink focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
                     >
@@ -637,7 +670,7 @@ function CellEditor({ book, entity, column, onDone, onSave }: { book: Book; enti
 }
 
 /** Columns: which the table shows, and in what order (the name always first). */
-function ColumnsMenu({ columns, shown, onChange }: { columns: Column[]; shown: Column[]; onChange: (keys: string[]) => void }) {
+function ColumnsMenu({ columns, shown, onChange, open, onOpenChange }: { columns: Column[]; shown: Column[]; onChange: (keys: string[]) => void; open: boolean; onOpenChange: (open: boolean) => void }) {
   const order = [...shown, ...columns.filter((c) => !shown.includes(c))];
   const keysOf = (cs: Column[]) => cs.filter((c) => c.kind !== "name").map((c) => c.key);
   const set = (key: string, on: boolean) => onChange(keysOf(order.filter((c) => (c.key === key ? on : shown.includes(c)))));
@@ -650,7 +683,7 @@ function ColumnsMenu({ columns, shown, onChange }: { columns: Column[]; shown: C
     onChange(list);
   };
   return (
-    <Popover.Root>
+    <Popover.Root open={open} onOpenChange={onOpenChange}>
       <Popover.Trigger asChild>
         <Button size="sm" variant="ghost">
           <Columns3 className="size-4" aria-hidden /> Columns
@@ -710,7 +743,7 @@ function whom(type: Book["entityTypes"][number], entries: Entity[]): string {
  * to another entry. Saved in one commit, against the files as they are when it's saved; the notice
  * after it offers Undo, which puts every file back as one.
  */
-function BulkDialog({ mode, novelId, novel, type, entries, columns, onClose }: { mode: Bulk; novelId: string; novel: Book; type: Book["entityTypes"][number]; entries: Entity[]; columns: Column[]; onClose: () => void }) {
+function BulkDialog({ mode, novelId, novel, type, entries, columns, onClose, focusAfter }: { mode: Bulk; novelId: string; novel: Book; type: Book["entityTypes"][number]; entries: Entity[]; columns: Column[]; onClose: () => void; /** Where the focus goes after, when what opened it is gone (the palette). */ focusAfter: () => HTMLElement | null | undefined }) {
   const queryClient = useQueryClient();
   const show = useNotice((n) => n.show);
   const ids = { tag: useId(), field: useId(), value: useId(), rel: useId(), to: useId(), tags: useId() };
@@ -844,7 +877,15 @@ function BulkDialog({ mode, novelId, novel, type, entries, columns, onClose }: {
     <Dialog.Root open onOpenChange={(o) => !o && onClose()}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-40 bg-black/40" />
-        <Dialog.Content aria-describedby={undefined} className="fixed top-1/2 left-1/2 z-50 grid w-[min(28rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-lg border border-rule bg-raised p-5 text-ink shadow-xl">
+        <Dialog.Content
+          aria-describedby={undefined}
+          // Back to what opened it; or, where that's gone (the palette) and the focus is left on the page, to focusAfter's.
+          onCloseAutoFocus={() =>
+            setTimeout(() => {
+              if (!document.activeElement || document.activeElement === document.body) focusAfter()?.focus();
+            })
+          }
+          className="fixed top-1/2 left-1/2 z-50 grid w-[min(28rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-lg border border-rule bg-raised p-5 text-ink shadow-xl">
           <Dialog.Title className="text-lg font-semibold">{title}</Dialog.Title>
           <form
             className="grid gap-3"

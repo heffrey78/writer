@@ -1,6 +1,6 @@
 import type { EntityFields, Reference } from "@writer/client";
 import { referenceText } from "./references.ts";
-import { entityOfLabel, roleOf, vocabulary, type Entity, type Book, type Relationship } from "@writer/core";
+import { entityOfLabel, fieldsOfType, roleOf, vocabulary, type Entity, type Book, type Relationship } from "@writer/core";
 import { useGitHubRepo } from "../github/repo.ts";
 import { EntryIssues } from "../issues/entry-issues.tsx";
 import { useIssueList } from "../issues/use-issues.ts";
@@ -133,7 +133,18 @@ export function EntryPage({
   const githubLabel = useIssueList(novelId, { state: "open" }, { enabled: !!repo }).data?.labels.find((l) => entityOfLabel(novel, l)?.id === entity.id);
   const show = useNotice((n) => n.show);
   // Merging the entry on its profile is a command, as its button is (#173).
-  useCommands(() => (tab ? [] : [{ id: "entry.merge", title: `Merge ${entity.name} into another ${typeOf(novel, entity)?.label.toLowerCase() ?? vocabulary(novel.kind).entity.one}…`, group: vocabulary(novel.kind).codex.One, keywords: ["duplicate", "same", "combine"], run: () => useMergeDialog.getState().open(entity.id) }]), [tab, entity.id, entity.name]);
+  // Read at a piece (#140), where its fields change: the list of pieces to read it at, in focus.
+  const changing = fieldsOfType(novel, entity.type).some((f) => f.changes) || (entity.changes?.length ?? 0) > 0;
+  useCommands(
+    () =>
+      tab
+        ? []
+        : [
+            { id: "entry.merge", title: `Merge ${entity.name} into another ${typeOf(novel, entity)?.label.toLowerCase() ?? vocabulary(novel.kind).entity.one}…`, group: vocabulary(novel.kind).codex.One, keywords: ["duplicate", "same", "combine"], run: () => useMergeDialog.getState().open(entity.id) },
+            ...(changing ? [{ id: "entry.readAt", title: `Read ${entity.name} at a ${vocabulary(novel.kind).piece.one}…`, group: vocabulary(novel.kind).codex.One, keywords: ["as of", "then", "changes", "time"], run: () => document.querySelector<HTMLSelectElement>("[data-read-at]")?.focus() }] : []),
+          ],
+    [tab, entity.id, entity.name, changing],
+  );
   const remove = useMutation({
     mutationFn: async (confirm: boolean) => api.bible.deleteEntity(novelId, entity.id, await base(), confirm),
     onSuccess: async (result) => {

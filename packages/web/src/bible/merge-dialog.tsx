@@ -99,7 +99,13 @@ function Merging({ novelId, novel, first, second }: { novelId: string; novel: Bo
     : [];
 
   return (
-    <Modal title={second ? `Merge ${first.name} and ${second.name}` : `Merge ${first.name} into…`} onClose={close} className="w-[min(32rem,calc(100vw-2rem))]">
+    <Modal
+      title={second ? `Merge ${first.name} and ${second.name}` : `Merge ${first.name} into…`}
+      onClose={close}
+      className="w-[min(32rem,calc(100vw-2rem))]"
+      // After a merge, what opened it is gone: the entry kept, beside the index, or Tidy up's list.
+      focusAfter={() => document.getElementById("index-entry") ?? document.querySelector<HTMLElement>('[role="tabpanel"]')}
+    >
       <form
         className="grid gap-4"
         onSubmit={(e) => {
