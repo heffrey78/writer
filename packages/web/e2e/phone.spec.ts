@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { devices, type Locator, type Page } from "@playwright/test";
@@ -16,8 +16,9 @@ test.skip(({ browserName }) => browserName !== "chromium", "Phones' webviews are
 
 const STATION = "manuscript/01-return/01-arrival/01-the-station.md";
 
+/** Nothing wider than the phone's screen: measured against the screen, since a page wider than it widens the window too (the phone zooms out to fit it). */
 async function fits(page: Page) {
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  expect(await page.evaluate(() => Math.max(document.documentElement.scrollWidth, innerWidth))).toBeLessThanOrEqual(page.viewportSize()!.width);
 }
 
 async function audit(page: Page) {
@@ -692,8 +693,16 @@ test("on a phone, an entry's strip of parts stays under its top bar and jumps to
 });
 
 test("on a phone, Tidy up's names and an entry's actions have room: no word to a line, nothing off the screen", async ({ page, app }) => {
-  await app.restart(app.bookRepo(fileURLToPath(new URL("../../../examples/sample-journal", import.meta.url)), "journal"));
+  const dir = app.bookRepo(fileURLToPath(new URL("../../../examples/sample-journal", import.meta.url)), "journal");
+  // A link pasted into the sentence Tidy up shows: one long word, which breaks rather than widen the page.
+  const day = join(dir, "entries/01-2026/02-october/01-thursday-1-october.md");
+  writeFileSync(day, readFileSync(day, "utf8").replace("The first count of the season.", "The first count of the season. https://example.org/a/very/long/link/that/never/ends/with/a/space/anywhere/in/it"));
+  app.git(dir, "commit", "-qam", "A link");
+  await app.restart(dir);
   await launch(page, app);
+  // The journal, the link in it: no wider than the screen.
+  await expect(page.getByRole("link", { name: /^https:\/\/example\.org\// })).toBeVisible();
+  await fits(page);
   const box = (l: Locator) => l.evaluate((e) => e.getBoundingClientRect().toJSON() as DOMRect);
 
   // Tidy up: each name and its count on a line or two, its buttons under it.
@@ -703,6 +712,11 @@ test("on a phone, Tidy up's names and an entry's actions have room: no word to a
   await expect(names.first()).toBeVisible();
   for (const name of await names.locator("> div > span:first-child").all()) expect((await box(name)).height).toBeLessThan(56);
   for (const button of await names.getByRole("button").all()) expect((await box(button)).height).toBeGreaterThanOrEqual(44);
+  // Its names shown, each with its ≠ (not a name here): still nothing wider than the screen.
+  await names.first().getByRole("button", { name: "Show them" }).tap();
+  const notAName = names.first().getByRole("button", { name: /: not a name here$/ }).first();
+  await expect(notAName).toHaveText("≠");
+  expect((await box(notAName)).height).toBeGreaterThanOrEqual(44);
   if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/tidy.png` });
   await fits(page);
   await audit(page);

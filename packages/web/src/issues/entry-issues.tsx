@@ -39,7 +39,7 @@ export function EntryIssues({ novelId, novel, entity }: { novelId: string; novel
         <p className="text-sm text-muted">Nothing open about {entity.name}.</p>
       )}
       <p className="text-sm text-muted">
-        On GitHub it's the label <code>{label}</code>.{" "}
+        On GitHub it's the label <code className="break-all">{label}</code>.{" "}
         <Link to={`/novels/${novelId}/issues?state=all&labels=${encodeURIComponent(label)}`} className="text-accent underline">
           All its issues
         </Link>

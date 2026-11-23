@@ -107,9 +107,9 @@ export function ReadPage({ novelId, novel, workspace, spell, entries }: BookView
   return <WritingView novelId={novelId} novel={novel} workspace={workspace} spell={spell} entries={entries} view={{ run: view }} />;
 }
 
-/** The text's look while reading, as the writing view's prose has it. */
+/** The text's look while reading, as the writing view's prose has it (a long word breaking at the edge, too). */
 const PROSE =
-  "text-[length:var(--ghw-prose-size)] leading-[1.65] font-[family-name:var(--ghw-prose-font)] text-ink [&_a]:text-accent [&_a]:underline [&_a]:decoration-1 [&_a]:underline-offset-4 [&_img]:mx-auto [&_img]:my-4 [&_img]:max-w-full [&_p]:my-3";
+  "[overflow-wrap:anywhere] text-[length:var(--ghw-prose-size)] leading-[1.65] font-[family-name:var(--ghw-prose-font)] text-ink [&_a]:text-accent [&_a]:underline [&_a]:decoration-1 [&_a]:underline-offset-4 [&_img]:mx-auto [&_img]:my-4 [&_img]:max-w-full [&_p]:my-3";
 
 /** An entry's title (opening it alone), its date and its words; or, over where today's begins, today's. */
 function Header({ novelId, piece, day, words }: { novelId: string; piece?: Piece; day: Day | undefined; words?: number }) {

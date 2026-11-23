@@ -78,6 +78,13 @@ img.ProseMirror-separator {
   caret-color: transparent;
 }
 
+/* A long word (a link pasted in) breaks at the edge rather than widen what holds the text: on a phone, the whole page.
+   Over ProseMirror's own break-word, which breaks it only once it's already too wide for its line. */
+.ghw-prose.ProseMirror,
+.ghw-prose {
+  overflow-wrap: anywhere;
+}
+
 .ghw-prose {
   max-width: var(--ghw-prose-measure);
   margin: 0 auto;

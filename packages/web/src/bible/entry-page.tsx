@@ -186,7 +186,7 @@ export function EntryPage({
             onRemove={() => save((b) => api.bible.removePicture(novelId, entity.id, b))}
           />
         )}
-        <div className="grid min-w-0 flex-1 gap-1.5">
+        <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)] gap-1.5">
           {/* On a phone, the actions are their icons (named for a screen reader and on hover): beside a portrait there's no room for their words. */}
           {!tab && <div className={cn("flex items-center gap-2", embedded && "pr-8 max-md:pr-0")}>
             <p className="min-w-0 flex-1 truncate text-sm text-muted">

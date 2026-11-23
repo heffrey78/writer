@@ -165,7 +165,7 @@ function NamesNotLinked({ novelId, novel, report, workspace }: { novelId: string
           {report.notLinked.map(({ entry, passages }) => (
             <li key={entry.id} className="grid gap-2 rounded-lg border border-rule bg-raised px-3 py-2">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="min-w-0 flex-1 basis-48">
+                <span className="min-w-0 flex-1 basis-48 [overflow-wrap:anywhere]">
                   <EntryLink novelId={novelId} entry={entry} /> <span className="text-sm text-muted">· {passages.length} not linked in {w.piece.count(new Set(passages.map((p) => p.piece.id)).size)}</span>
                 </span>
                 <span className="flex flex-wrap gap-2">
@@ -186,15 +186,15 @@ function NamesNotLinked({ novelId, novel, report, workspace }: { novelId: string
                     const j = judgementOf(p, entry.id);
                     return (
                       <li key={i} className="flex flex-wrap items-start gap-2 text-sm">
-                        <span className="min-w-0 flex-1 basis-48 font-prose">
+                        <span className="min-w-0 flex-1 basis-48 font-prose [overflow-wrap:anywhere]">
                           <span className="font-ui text-xs text-muted">{p.piece.title} · </span>
                           {p.text.slice(0, p.at[0])}
                           <mark className="rounded-sm bg-warn-soft px-0.5 text-ink">{p.text.slice(...p.at)}</mark>
                           {p.text.slice(p.at[1])}
                         </span>
                         {j && (
-                          <button type="button" onClick={() => void notAName(j, p.text.slice(...p.at))} aria-label={`“${p.text.slice(...p.at)}” in “${p.piece.title}” isn't ${entry.name}: not a name here`} className={cn(fix, "text-muted")}>
-                            Not a name here
+                          <button type="button" onClick={() => void notAName(j, p.text.slice(...p.at))} aria-label={`“${p.text.slice(...p.at)}” in “${p.piece.title}” isn't ${entry.name}: not a name here`} title="Not a name here" className={cn(fix, "grid size-7 place-items-center px-0 text-base leading-none text-muted max-md:size-11 max-md:px-0")}>
+                            <span aria-hidden>≠</span>
                           </button>
                         )}
                       </li>
@@ -228,7 +228,7 @@ function Dormant({ novelId, novel, judgements }: { novelId: string; novel: Book;
           const piece = novel.allPieces.find((p) => p.id === n.piece)?.title ?? n.piece;
           return (
             <li key={i} className="flex flex-wrap items-start gap-2 text-sm">
-              <span className="min-w-0 flex-1 basis-48">
+              <span className="min-w-0 flex-1 basis-48 [overflow-wrap:anywhere]">
                 {name} in “{piece}”: <span className="font-prose text-muted">{n.sentence}</span>
               </span>
               <button type="button" onClick={() => drop(n)} aria-label={`Drop the judgement about ${name} in “${piece}”`} className={fix}>
@@ -249,7 +249,7 @@ function Entries({ novelId, novel, entries, empty, detail }: { novelId: string; 
     <ul className="grid gap-1">
       {entries.map((e) => (
         <li key={e.id} className="flex flex-wrap items-center gap-2 rounded-md px-2 py-1 hover:bg-panel">
-          <span className="min-w-0 flex-1 basis-48">
+          <span className="min-w-0 flex-1 basis-48 [overflow-wrap:anywhere]">
             <EntryLink novelId={novelId} entry={e} /> <span className="text-sm text-muted">· {typeOf(e)?.label ?? e.type}{detail ? ` · ${detail(e)}` : ""}</span>
           </span>
           <Link to={`/novels/${novelId}/bible/${e.id}`} className={fix} aria-label={`Open ${e.name}`}>
@@ -281,7 +281,7 @@ function MightBeTheSame({ novelId, novel, pairs }: { novelId: string; novel: Boo
     <ul className="grid gap-1">
       {pairs.map(({ a, b, because }) => (
         <li key={`${a.id}|${b.id}`} className="flex flex-wrap items-center gap-2 rounded-md px-2 py-1 hover:bg-panel">
-          <span className="min-w-0 flex-1 basis-48">
+          <span className="min-w-0 flex-1 basis-48 [overflow-wrap:anywhere]">
             <EntryLink novelId={novelId} entry={a} /> and <EntryLink novelId={novelId} entry={b} />{" "}
             <span className="text-sm text-muted">
               · {typePlural(novel.entityTypes.find((t) => t.key === a.type) ?? { label: a.type }).toLowerCase()} · {because}

@@ -155,7 +155,8 @@ export function RelationshipArcs({
                                     borderStyle: BORDER[line],
                                     background: `color-mix(in srgb, var(--ghw-${slot}) 16%, transparent)`,
                                   }}
-                                  className="min-w-0 truncate rounded-[4px] border-2 px-1.5 py-0.5 text-left text-xs text-ink hover:brightness-95 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+                                  // Relative: its words for a screen reader are placed in it, clipped with the rest, not after the line's end (which widened a phone's page).
+                                  className="relative min-w-0 truncate rounded-[4px] border-2 px-1.5 py-0.5 text-left text-xs text-ink hover:brightness-95 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
                                 >
                                   <span aria-hidden>
                                     {typeLabel(r)}
