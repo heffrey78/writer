@@ -9,7 +9,7 @@ import { SceneEditor, type SpellService } from "@writer/editor/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Merge, Trash2 } from "lucide-react";
 import { AlertDialog } from "radix-ui";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { startTransition, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { useStore } from "zustand";
 import { imageUrl } from "@writer/client";
@@ -78,7 +78,16 @@ export function EntryPage({
   };
   const ids = { notes: useId(), parts: useId() };
   const part = (name: string) => `${ids.parts}-${name}`;
-  const passages = usePassages(novel, entity.id);
+  // Beside the index's list, the parts under the fields are drawn once the writer stops on the entry
+  // (#177): stepping through a long index, the next entry's name, lead and fields answer at once, and
+  // an entry passed over on the way isn't drawn whole.
+  const [rest, setRest] = useState(!embedded || tab);
+  useEffect(() => {
+    if (rest) return;
+    const t = setTimeout(() => startTransition(() => setRest(true)), 120);
+    return () => clearTimeout(t);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const passages = usePassages(novel, rest ? entity.id : undefined);
   const relationships = novel.relationships.filter((r) => r.from === entity.id || r.to === entity.id).length;
   const place = useInPlace(startEditing);
   // Read at one piece (#140): its fields and its relationships as they are there. Beside the text, the
@@ -251,7 +260,7 @@ export function EntryPage({
       <EntryFields novelId={novelId} novel={novel} entity={entity} place={place} save={change} compact={tab} at={readAt} onAt={setReadAt} heading={Heading === "h1" ? "h2" : "h3"} />
       <NamedBy novelId={novelId} novel={novel} entity={entity} compact={tab} />
 
-      {!tab && (
+      {rest && !tab && (
         <PartsStrip
           label={`Parts of the ${vocabulary(novel.kind).entity.one}`}
           parts={[
@@ -264,6 +273,7 @@ export function EntryPage({
         />
       )}
 
+      {rest && <>
       <section id={part("notes")} tabIndex={-1} aria-labelledby={`${ids.notes}-h`} className="grid scroll-mt-12 gap-1 border-t border-rule pt-4 outline-none">
         <h2 id={`${ids.notes}-h`} className="text-xs font-semibold tracking-wide text-muted uppercase">
           Notes
@@ -296,6 +306,7 @@ export function EntryPage({
       {!tab && <TypeSections novelId={novelId} novel={novel} entity={entity} workspace={workspace} />}
 
       <RelationshipArcs novelId={novelId} novel={novel} entity={entity} compact={tab} id={part("relationships")} readAt={readAt} onReadAt={setReadAt} />
+      </>}
       {tab && (
         <Link to={`/novels/${novelId}/bible/${entity.id}`} className="justify-self-start text-sm text-accent underline decoration-accent/35 underline-offset-[3px] hover:decoration-accent">
           Open the full {vocabulary(novel.kind).entity.one}

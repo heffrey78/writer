@@ -95,8 +95,9 @@ function useIndexLayout(novelId: string): [IndexLayout, (change: Partial<IndexLa
   return [layout, set];
 }
 
-/** How many rows of the list are drawn at a time. */
-const STRETCH = 120;
+/** How many rows of the list are drawn at once (more than a tall screen holds), and then at a time after. */
+const FIRST = 40;
+const STRETCH = 80;
 
 /** The entry beside the list, for the keyboard to find. */
 const PANE_ID = "index-entry";
@@ -217,8 +218,8 @@ export function BiblePage({
   // so a search, a sort or a filter answers within a frame or two however long the bible is. The open
   // entry's row is always among those drawn.
   const orderKey = `${query}|${sort}|${ids}|${filterKey}|${view}`;
-  const [progress, setProgress] = useState({ key: orderKey, limit: STRETCH });
-  const drawn = progress.key === orderKey ? progress.limit : STRETCH;
+  const [progress, setProgress] = useState({ key: orderKey, limit: FIRST });
+  const drawn = progress.key === orderKey ? progress.limit : FIRST;
   useEffect(() => {
     if (drawn >= listed.length) return;
     const t = setTimeout(() => setProgress({ key: orderKey, limit: drawn + STRETCH }));
@@ -478,7 +479,8 @@ export function BiblePage({
               {shown.length ? (
                 <ul className={view === "cards" ? cn("grid gap-3", selected ? "grid-cols-[repeat(auto-fill,minmax(15rem,1fr))]" : "sm:grid-cols-2 lg:grid-cols-3") : "grid gap-0.5"}>
                   {shown.slice(0, Math.max(0, limit - before[g]!)).map((e) => (
-                    <li key={e.id} className="grid" data-entry={e.id}>
+                    // A row off the screen isn't laid out until it's near (a long list's 500 rows otherwise are, whenever anything on the page changes).
+                    <li key={e.id} className={view === "cards" ? "grid" : "grid [contain-intrinsic-size:auto_3.25rem] [content-visibility:auto]"} data-entry={e.id}>
                       {view === "cards" ? (
                         <EntryCard entity={e} presence={presences.get(e.id)} href={entryHref(e.id)} current={e.id === selectedId} onOpen={onOpen} url={pictureOf(e)} marks={marksByType.get(e.type)!} w={w} book={novel} />
                       ) : (

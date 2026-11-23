@@ -1,6 +1,7 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { lazy, StrictMode, Suspense } from "react";
 import { createRoot } from "react-dom/client";
+import { StableNavigate } from "./ui/navigate.tsx";
 import { BrowserRouter, Route, Routes } from "react-router";
 import { HistoryKeeper } from "./history.tsx";
 import { AboutDialog } from "./about.tsx";
@@ -59,6 +60,7 @@ void ready.then(() =>
     <StrictMode>
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
+          <StableNavigate>
           <AppContextMenu>
             <HistoryKeeper />
             <GlobalCommands />
@@ -86,6 +88,7 @@ void ready.then(() =>
               </Routes>
             </ErrorBoundary>
           </AppContextMenu>
+          </StableNavigate>
         </BrowserRouter>
       </QueryClientProvider>
     </StrictMode>,

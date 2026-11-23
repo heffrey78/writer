@@ -26,12 +26,26 @@ export interface EntryPresence {
 }
 
 /**
+ * A type's marks across the book, worked out once per book: the index's list and the profile of an
+ * entry opened from it ask for the same (#177). A book is read whole each time it changes, so its
+ * object is the key.
+ */
+const matrices = new WeakMap<Book, Map<string, PresenceMatrix>>();
+function matrixOf(novel: Book, type: string): PresenceMatrix {
+  let byType = matrices.get(novel);
+  if (!byType) matrices.set(novel, (byType = new Map()));
+  let matrix = byType.get(type);
+  if (!matrix) byType.set(type, (matrix = presence(novel, type)));
+  return matrix;
+}
+
+/**
  * Where an entry is across the book (heffrey78/gh-writer#159), from the same marks as the Presence view: the strip of
  * scenes on its profile, and the facts beneath it. Undefined for an ID the novel doesn't have.
  */
 export function entryPresence(novel: Book, id: string): EntryPresence | undefined {
   const entity = novel.entities.find((e) => e.id === id);
-  return entity && fromMatrix(novel, presence(novel, entity.type), id, recordsNaming(novel, id));
+  return entity && fromMatrix(novel, matrixOf(novel, entity.type), id, recordsNaming(novel, id));
 }
 
 /** Every entry's presence, by ID: each type's marks worked out once (the bible's gallery). */
@@ -39,7 +53,7 @@ export function entryPresences(novel: Book): Map<string, EntryPresence> {
   const out = new Map<string, EntryPresence>();
   const records = recordsByEntry(novel);
   for (const type of new Set(novel.entities.map((e) => e.type))) {
-    const matrix = presence(novel, type);
+    const matrix = matrixOf(novel, type);
     for (const e of novel.entities) if (e.type === type) out.set(e.id, fromMatrix(novel, matrix, e.id, records.get(e.id) ?? []));
   }
   return out;

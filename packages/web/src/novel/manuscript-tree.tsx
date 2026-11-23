@@ -2,7 +2,7 @@ import { countWords, listedOrder, pieceLevel, sectionById, vocabulary, type Book
 import { ChevronDown, ChevronRight, Ellipsis, FilePlus, FolderPlus, History, Layers, Plus } from "lucide-react";
 import { ContextMenu, DropdownMenu } from "radix-ui";
 import { memo, useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
-import { useNavigate } from "react-router";
+import { useStableNavigate } from "../ui/navigate.tsx";
 import { Button } from "../ui/button.tsx";
 import { cn } from "../ui/cn.ts";
 import { chapterTitle } from "./navigation.tsx";
@@ -39,7 +39,7 @@ type Dialog = StructureDialog;
  * reorders; the context menu (right-click, Shift+F10) has the rest.
  */
 export function ManuscriptTree({ novelId, novel, structure, current }: { novelId: string; novel: Book; structure: Structure; current: string | undefined }) {
-  const navigate = useNavigate();
+  const navigate = useStableNavigate();
   const [focused, setFocused] = useState<string>();
   const [dialog, setDialog] = useState<Dialog>();
   const [drop, setDrop] = useState<{ id: string; at: "before" | "after" | "inside" }>();

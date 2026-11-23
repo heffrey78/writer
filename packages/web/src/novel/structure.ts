@@ -1,6 +1,6 @@
 import { pieceLevel, pieceSections, sectionById, vocabulary, type Book, type LevelDef, type Section } from "@writer/core";
 import { useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router";
+import { useStableNavigate } from "../ui/navigate.tsx";
 import { api, keys } from "../api.ts";
 import { useNotesLeft } from "../notes/notes-left.tsx";
 import { chapterTitle } from "./navigation.tsx";
@@ -129,7 +129,7 @@ function enqueue<T>(novelId: string, task: () => Promise<T>): Promise<T> {
  */
 export function useStructure(novelId: string, novel: Book, workspace: Workspace) {
   const queryClient = useQueryClient();
-  const navigate = useNavigate();
+  const navigate = useStableNavigate();
   const show = useNotice((s) => s.show);
   const refresh = () => queryClient.invalidateQueries({ queryKey: keys.novel(novelId) });
   const m = api.manuscript;

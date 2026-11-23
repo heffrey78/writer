@@ -1,7 +1,7 @@
 import { entityOfLabel, matchEntry, vocabulary, type Book, type Entity } from "@writer/core";
 import { Command as Cmdk } from "cmdk";
 import { Dialog } from "radix-ui";
-import { Fragment, useDeferredValue, useEffect, useMemo, useState } from "react";
+import { Fragment, useDeferredValue, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useNavigate } from "react-router";
 import { create } from "zustand";
 import { useCommands } from "../commands.ts";
@@ -52,6 +52,7 @@ export function QuickLook({ novelId, novel, workspace }: { novelId: string; nove
   const query = useDeferredValue(search);
   // What happens as it closes: back to the cursor, or on to the index (its own focus).
   const [then, setThen] = useState<"back" | "index">("back");
+  const input = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -106,12 +107,22 @@ export function QuickLook({ novelId, novel, workspace }: { novelId: string; nove
     void navigate(`/novels/${novelId}/bible/${e.id}`, { state: { focusEntry: true } });
   };
 
+  // Not Radix's modal: its scroll lock and the page made untouchable restyle every element of a long
+  // index as it opens and closes (130 ms of 500 entries, #177). The focus is kept in it here instead,
+  // and the page behind is shaded and closes it when touched.
   return (
-    <Dialog.Root open={open} onOpenChange={(o) => !o && close("back")}>
+    <Dialog.Root open={open} onOpenChange={(o) => !o && close("back")} modal={false}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-[70] bg-black/30" />
+        {open && <div aria-hidden className="fixed inset-0 z-[70] bg-black/30" />}
         <Dialog.Content
           aria-describedby={undefined}
+          aria-modal
+          onKeyDown={keepFocusIn}
+          // The focus kept in it: taken back if something else gives it away (the palette it was opened from, closing).
+          onFocusOutside={(e) => {
+            e.preventDefault();
+            input.current?.focus();
+          }}
           onCloseAutoFocus={(e) => {
             e.preventDefault();
             if (then === "back") returnFocus(returnTo, () => document.querySelector<HTMLElement>(".ghw-prose") ?? document.getElementById("main"));
@@ -121,6 +132,7 @@ export function QuickLook({ novelId, novel, workspace }: { novelId: string; nove
           <Dialog.Title className="sr-only">Quick look</Dialog.Title>
           <Cmdk label={`Quick look: find ${w.entity.a}`} shouldFilter={false} value={shown?.id ?? ""} onValueChange={setValue} loop>
             <Cmdk.Input
+              ref={input}
               value={search}
               onValueChange={setSearch}
               placeholder={`Find ${w.entity.a} by name, or anything it says…`}
@@ -154,6 +166,22 @@ export function QuickLook({ novelId, novel, workspace }: { novelId: string; nove
       </Dialog.Portal>
     </Dialog.Root>
   );
+}
+
+/** Tab and Shift+Tab go round what's in the dialog, never out of it to the page behind. */
+function keepFocusIn(e: ReactKeyboardEvent<HTMLElement>) {
+  if (e.key !== "Tab") return;
+  const all = [...e.currentTarget.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])')].filter((el) => el.offsetParent !== null || el === document.activeElement);
+  const first = all[0];
+  const last = all.at(-1);
+  if (!first || !last) return;
+  if (e.shiftKey && document.activeElement === first) {
+    e.preventDefault();
+    last.focus();
+  } else if (!e.shiftKey && document.activeElement === last) {
+    e.preventDefault();
+    first.focus();
+  }
 }
 
 /** The entry at a glance: picture, name, type, summary, its facts at the piece being written, open issues, and what modules add. */

@@ -24,8 +24,9 @@ const FIRST = 20;
 const BESIDE = 5;
 
 /** An entry's passages, worked out once per book; timed for the index's performance spec (#152). */
-export function usePassages(novel: Book, id: string): Passage[] {
+export function usePassages(novel: Book, id: string | undefined): Passage[] {
   return useMemo(() => {
+    if (!id) return [];
     const start = performance.now();
     const passages = passagesOf(novel, id);
     try {

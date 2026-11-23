@@ -1,77 +1,74 @@
-import { writeFileSync } from "node:fs";
-import { join } from "node:path";
-import type { Page } from "@playwright/test";
-import { ID_ALPHABET } from "@writer/core";
-import { writeBigNovel } from "./big-novel.ts";
-import { expect, test, type App } from "./fixtures.ts";
+import type { Locator, Page } from "@playwright/test";
+import { BIG_INDEX, OCCUPATIONS, writeBigIndex } from "./big-index.ts";
+import { expect, test } from "./fixtures.ts";
 
 /**
- * The index (#134) on a long book with a large story bible: 500 entries beside a 200,000-word
- * manuscript. It opens in under a second, and each step of working in it answers within 100 ms:
- * a letter typed in its search, the next entry opened with j, a filter taken off. An entry's profile
- * lists every passage naming its main character within 50 ms (#135). Its Table of 500 characters sorts
- * by a column within 100 ms and scrolls at 60 frames a second (#170). Runs alone, after the other tests.
+ * The index (#134, #177) on a long book with a large index: about 500 entries across the kind's types,
+ * their fields declared and filled in, related and mentioned through a 200,000-word manuscript
+ * (big-index.ts). It opens in under a second, and each step of working in it answers within 100 ms:
+ * a letter typed in its search, the next entry opened with j, a filter taken off, Quick look opened
+ * over it (#141). An entry's profile lists every passage naming its main character within 50 ms (#135);
+ * Tidy up counts what has drifted within 500 ms (#137). Its Table of 500 characters sorts by a column
+ * within 100 ms and scrolls at 60 frames a second (#170). A step timed more than once is judged by its
+ * median, so one slow frame on a busy machine doesn't fail it. Runs alone, after the other tests.
  */
 
 const BUDGET = 100;
 const PASSAGES_BUDGET = 50;
+const TIDY_BUDGET = 500;
 const ADA = "char_7f3k2q";
-/** An ID in the format's alphabet: char_000001, loc_000002… */
-const id = (prefix: string, n: number) => `${prefix}_${Array.from({ length: 6 }, (_, i) => ID_ALPHABET[Math.floor(n / 32 ** (5 - i)) % 32]).join("")}`;
-const OCCUPATIONS = ["Ferryman", "Toll keeper", "Clerk", "Engineer", "Baker", "Surveyor", "Teacher", "Fisher"];
-
-/** A 200,000-word novel whose bible has 500 entries (or `people` characters more), each with a summary, fields, tags and notes. */
-function bigBible(app: App, people = 400): string {
-  const dir = join(app.home, "novels", "the-long-crossing");
-  writeBigNovel(dir, { total: 200_000, extraCharacters: 0 });
-  for (let i = 1; i <= people; i++) {
-    const c = id("char", 1000 + i);
-    writeFileSync(
-      join(dir, "bible/characters", `${c}.md`),
-      `---\nid: ${c}\nname: Person ${i} of Varn\nsummary: Someone from the ${i % 2 ? "east" : "west"} bank who remembers the old bridge.\nfields:\n  age: ${20 + (i % 60)}\n  occupation: ${OCCUPATIONS[i % OCCUPATIONS.length]}\ntags: [${i % 3 ? "town" : "river"}]\n---\nGrew up near pier ${1 + (i % 9)}. Keeps a ledger of the tolls.\n`,
-    );
-  }
-  for (let i = 1; i <= 87; i++) {
-    const l = id("loc", 1000 + i);
-    writeFileSync(join(dir, "bible/locations", `${l}.md`), `---\nid: ${l}\nname: Place ${i} in Varn\nsummary: A corner of the town by the water.\ntags: [town]\n---\nCobbles, a lamp, the sound of the weir.\n`);
-  }
-  app.git(dir, "init", "-q");
-  app.git(dir, "add", "-A");
-  app.git(dir, "commit", "-qm", "Start");
-  return dir;
-}
 
 /**
  * Each press of `key`, timed in the page from the key going down to the frame after the page has
- * answered it (`selector`'s text has changed, or it's gone): what the writer waits for, without the
- * test's own work in it.
+ * answered it (`selector`'s text has changed, it's gone, or it's there): what the writer waits for,
+ * without the test's own work in it. `press` is what's pressed, when it isn't the key alone (Ctrl+;);
+ * `between` runs after each answer (closing what it opened).
  */
-async function timed(page: Page, key: string, times: number, selector: string, until: "changed" | "gone"): Promise<number[]> {
+async function timed(page: Page, key: string, times: number, selector: string, until: "changed" | "gone" | "there", { press = key, between }: { press?: string; between?: () => Promise<void> } = {}): Promise<number[]> {
   await page.evaluate(
     ({ key, selector, until }) => {
-      const w = window as unknown as { answered: number[] };
+      const w = window as unknown as { answered: number[]; timing?: (e: KeyboardEvent) => void };
       w.answered = [];
-      document.addEventListener(
-        "keydown",
-        (e) => {
-          if (e.key !== key) return;
-          const start = e.timeStamp;
-          const from = document.querySelector(selector)?.textContent;
-          const done = () => (until === "gone" ? !document.querySelector(selector) : document.querySelector(selector)?.textContent !== from);
-          const check = () => (done() ? requestAnimationFrame(() => w.answered.push(performance.now() - start)) : requestAnimationFrame(check));
-          requestAnimationFrame(check);
-        },
-        true,
-      );
+      // One listener at a time; on the window, as it's captured: a key the page takes there (Quick look's) still reaches it.
+      if (w.timing) window.removeEventListener("keydown", w.timing, true);
+      w.timing = (e: KeyboardEvent) => {
+        if (e.key !== key) return;
+        const start = e.timeStamp;
+        const from = document.querySelector(selector)?.textContent;
+        const done = () => (until === "gone" ? !document.querySelector(selector) : until === "there" ? !!document.querySelector(selector) : document.querySelector(selector)?.textContent !== from);
+        const check = () => (done() ? requestAnimationFrame(() => w.answered.push(performance.now() - start)) : requestAnimationFrame(check));
+        requestAnimationFrame(check);
+      };
+      window.addEventListener("keydown", w.timing, true);
     },
     { key, selector, until },
   );
   for (let i = 0; i < times; i++) {
     const before = await page.evaluate(() => (window as unknown as { answered: number[] }).answered.length);
-    await page.keyboard.press(key);
+    await page.keyboard.press(press);
     await page.waitForFunction((n) => (window as unknown as { answered: number[] }).answered.length > n, before, { polling: "raf" });
+    await between?.();
   }
   return page.evaluate(() => (window as unknown as { answered: number[] }).answered);
+}
+
+/** A click on `on`, timed in the page from the click to the frame after `selector` is there. */
+async function clicked(page: Page, on: Locator, selector: string): Promise<number> {
+  await page.evaluate((selector) => {
+    const w = window as unknown as { clicked?: number };
+    delete w.clicked;
+    document.addEventListener(
+      "click",
+      (e) => {
+        const start = e.timeStamp;
+        const check = () => (document.querySelector(selector) ? requestAnimationFrame(() => (w.clicked = performance.now() - start)) : requestAnimationFrame(check));
+        requestAnimationFrame(check);
+      },
+      { capture: true, once: true },
+    );
+  }, selector);
+  await on.click();
+  return page.waitForFunction(() => (window as unknown as { clicked?: number }).clicked, undefined, { polling: "raf" }).then((h) => h.jsonValue() as Promise<number>);
 }
 
 const report = (what: string, times: number[]) => {
@@ -83,21 +80,17 @@ const report = (what: string, times: number[]) => {
   return median;
 };
 
-test("the index of a 500-entry bible opens in under a second, and searching, stepping and filtering each answer within 100 ms", async ({ page, app }) => {
-  test.setTimeout(120_000);
-  await app.restart(bigBible(app));
+test("the index of a 500-entry book opens in under a second; searching, stepping, filtering and Quick look each answer within 100 ms; Tidy up counts within 500 ms", async ({ page, app }) => {
+  test.setTimeout(180_000);
+  await app.restart(writeBigIndex(app));
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(app.launchUrl);
   await expect(page.getByRole("textbox", { name: "Chapter text" })).toBeFocused({ timeout: 15_000 });
 
   // Opened from the sidebar, the book already loaded.
   const views = page.getByRole("navigation", { name: "Views" });
-  const start = Date.now();
-  await views.getByRole("link", { name: "Story bible" }).click();
+  const opening = report("opening the index", [await clicked(page, views.getByRole("link", { name: "Story bible" }), '[aria-labelledby^="type-"] li a')]);
   await expect(page.getByRole("region", { name: /^Characters/ }).getByRole("link").first()).toBeVisible();
-  const opening = Date.now() - start;
-  report("opening the index", [opening]);
-  expect(opening).toBeLessThan(1000);
 
   // A letter typed in the search: the list matches it in the same frame (the search answers at once).
   const status = page.getByRole("status").filter({ hasText: / match/ });
@@ -111,29 +104,53 @@ test("the index of a 500-entry bible opens in under a second, and searching, ste
     }, true);
   });
   await page.keyboard.type("ferryman", { delay: 150 });
-  await expect(status).toHaveText(/^50 entries match “ferryman”/);
+  await expect(status).toHaveText(new RegExp(`^${Math.ceil(BIG_INDEX.characters / OCCUPATIONS.length)} entries match “ferryman”`));
   const typed = report("a letter typed in the search", await page.evaluate(() => (window as unknown as { latencies: number[] }).latencies));
 
-  // j: the next entry opened beside the list.
-  // The entry's name: the first heading beside the list.
+  // j: the next entry opened beside the list. Answered once the name beside the list (its first heading) is the next one's.
   const heading = page.locator("#index-entry h2").first();
   await page.keyboard.press("ArrowDown");
-  await expect(heading).toHaveText(/^Person/);
-  // Answered once the name beside the list is the next one's.
-  const stepping = await timed(page, "j", 10, "#index-entry h2", "changed");
-  const stepped = report("j to the next entry", stepping);
+  await expect(heading).not.toBeEmpty();
+  const stepped = report("j to the next entry", await timed(page, "j", 10, "#index-entry h2", "changed"));
 
-  // A filter taken off with Backspace: the list widens.
+  // A filter taken off with Backspace, five times over: the list widens.
   await page.getByRole("searchbox", { name: "Search the bible" }).fill("");
-  await page.getByRole("button", { name: "Filter", exact: true }).click();
-  const adding = page.getByRole("dialog", { name: "Filter the bible" });
-  await adding.getByRole("combobox", { name: "By" }).selectOption("tag");
-  await adding.getByRole("combobox", { name: "Tag" }).selectOption("river");
-  await adding.getByRole("button", { name: "Add the filter" }).click();
-  await expect(status).toHaveText("133 entries match the filters");
-  await page.getByRole("button", { name: "Remove the filter: Tag: river" }).focus();
-  const filtering = await timed(page, "Backspace", 1, '[aria-label="Remove the filter: Tag: river"]', "gone");
+  const filtering: number[] = [];
+  for (let i = 0; i < 5; i++) {
+    await page.getByRole("button", { name: "Filter", exact: true }).click();
+    const adding = page.getByRole("dialog", { name: "Filter the bible" });
+    await adding.getByRole("combobox", { name: "By" }).selectOption("tag");
+    await adding.getByRole("combobox", { name: "Tag" }).selectOption("river");
+    await adding.getByRole("button", { name: "Add the filter" }).click();
+    await expect(status).toHaveText(`${Math.ceil(BIG_INDEX.characters / 3)} entries match the filters`);
+    await page.getByRole("button", { name: "Remove the filter: Tag: river" }).focus();
+    filtering.push(...(await timed(page, "Backspace", 1, '[aria-label="Remove the filter: Tag: river"]', "gone")));
+  }
   const filtered = report("a filter taken off", filtering);
+
+  // Quick look over the index, five times: from Ctrl+; to the frame its first result is drawn in.
+  const quickLook = page.getByRole("dialog", { name: "Quick look" });
+  const looked = report(
+    "opening Quick look",
+    await timed(page, ";", 5, '[role="dialog"] [cmdk-item]', "there", {
+      press: "Control+;",
+      between: async () => {
+        await expect(quickLook.getByRole("option").first()).toBeVisible();
+        await page.keyboard.press("Escape");
+        await expect(quickLook).toHaveCount(0);
+      },
+    }),
+  );
+
+  // Tidy up, three times: from its button pressed to the frame its counts are drawn in.
+  const tidying: number[] = [];
+  for (let i = 0; i < 3; i++) {
+    tidying.push(await clicked(page, page.getByRole("button", { name: "Tidy up" }), '[role="tablist"][aria-label="What to tidy"]'));
+    await expect(page.getByRole("tab", { name: /Names not linked$/ })).not.toHaveText(/^0/);
+    await page.goBack();
+    await expect(page.getByRole("button", { name: "Tidy up" })).toBeVisible();
+  }
+  const tidied = report("Tidy up's counts", tidying);
 
   // Ada Varn's profile, in a fresh page: every passage of the 200,000 words naming her, worked out
   // from nothing (as the profile times it).
@@ -145,28 +162,27 @@ test("the index of a 500-entry bible opens in under a second, and searching, ste
   );
   const passages = report("listing a main character's passages", listing.slice(0, 1));
 
+  expect(opening).toBeLessThan(1000);
   expect(typed).toBeLessThan(BUDGET);
   expect(stepped).toBeLessThan(BUDGET);
   expect(filtered).toBeLessThan(BUDGET);
+  expect(looked).toBeLessThan(BUDGET);
+  expect(tidied).toBeLessThan(TIDY_BUDGET);
   expect(passages).toBeLessThan(PASSAGES_BUDGET);
 });
 
 test("a table of 500 characters draws in under a second, sorts by a column within 100 ms and scrolls at 60 frames a second (#170)", async ({ page, app }) => {
   test.setTimeout(120_000);
-  await app.restart(bigBible(app, 496));
+  await app.restart(writeBigIndex(app, { characters: 496 }));
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(app.launchUrl);
   await expect(page.getByRole("textbox", { name: "Chapter text" })).toBeFocused({ timeout: 15_000 });
   await page.getByRole("navigation", { name: "Views" }).getByRole("link", { name: "Story bible" }).click();
   await page.getByRole("button", { name: "Table" }).click();
 
-  const start = Date.now();
-  await page.getByRole("button", { name: /^Characters/ }).click();
+  const drawing = report("drawing a table of 500 characters", [await clicked(page, page.getByRole("button", { name: /^Characters/ }), '[role="grid"] tbody tr[aria-rowindex]')]);
   const grid = page.getByRole("grid", { name: /^Characters/ });
   await expect(grid).toHaveAttribute("aria-rowcount", "501");
-  await expect(grid.locator("tbody tr[aria-rowindex]").first()).toBeVisible();
-  const drawing = Date.now() - start;
-  report("drawing a table of 500 characters", [drawing]);
 
   // Enter on the Age header's button, again and again: youngest first, then oldest first.
   await grid.getByRole("button", { name: "Age" }).focus();
