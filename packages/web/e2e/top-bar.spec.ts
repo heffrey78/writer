@@ -19,19 +19,21 @@ test("the top bar is the title, the open version, save and sync, and a ⋯ menu 
   await more.focus();
   await page.keyboard.press("Enter");
   const menu = page.getByRole("menu");
-  await expect(menu.getByRole("menuitem")).toHaveText(["Checkpoints…", "Arrange the sidebar…", "Compile…", "Connect GitHub…", "Your name and email…", "Commands…", "Keyboard shortcuts", "About Writer"]);
-  await expect(menu.getByRole("menuitemradio")).toHaveText(["Like the system", "Light", "Dark"]);
-  await expect(menu.getByRole("menuitemradio", { name: "Like the system" })).toBeChecked();
+  await expect(menu.getByRole("menuitem")).toHaveText(["Checkpoints…", "Arrange the sidebar…", "Compile…", "Theme…", "Connect GitHub…", "Your name and email…", "Commands…", "Keyboard shortcuts", "About Writer"]);
   await axe(page);
 
-  // The theme changes in place; the menu stays open for another choice.
-  await menu.getByRole("menuitemradio", { name: "Dark" }).focus();
+  // Theme… opens the picker (#190); light or dark changes in place, and Done gives the focus back.
+  await menu.getByRole("menuitem", { name: "Theme…" }).focus();
   await page.keyboard.press("Enter");
-  await expect(menu.getByRole("menuitemradio", { name: "Dark" })).toBeChecked();
+  const picker = page.getByRole("dialog", { name: "Theme" });
+  await expect(picker.getByRole("radio", { name: "Follow the system" })).toBeFocused();
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("ArrowRight");
+  await expect(picker.getByRole("radio", { name: "Dark" })).toBeChecked();
   expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBe("dark");
   await axe(page);
-  await page.keyboard.press("Escape");
-  await expect(menu).toHaveCount(0);
+  await picker.getByRole("button", { name: "Done" }).click();
+  await expect(picker).toHaveCount(0);
   await expect(more).toBeFocused();
 
   await page.keyboard.press("Enter");

@@ -444,6 +444,27 @@ try {
   await expect(page.getByRole("textbox", { name: "Chapter text" })).toBeVisible();
   step("the index: a type from its chips, an entry opened, a jump to Appears in, and Android's back to the list where it was");
 
+  // The Theme picker (#190): a page on the phone, Study picked by touch, Android's back to leave it, kept.
+  await page.getByRole("banner").getByRole("button", { name: "More" }).click();
+  await page.getByRole("menuitem", { name: "Theme…" }).click();
+  const picker = page.getByRole("dialog", { name: "Theme" });
+  await expect(picker).toContainText("the theme is kept on this phone");
+  await picker.getByText("Study", { exact: true }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-palette", "study");
+  const study = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  expect(["rgb(243, 234, 215)", "rgb(32, 26, 19)"]).toContain(study);
+  adb("shell", "input", "keyevent", "KEYCODE_BACK");
+  await expect(picker).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByRole("textbox", { name: "Chapter text" })).toBeVisible();
+  expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe(study);
+  await page.getByRole("banner").getByRole("button", { name: "More" }).click();
+  await page.getByRole("menuitem", { name: "Theme…" }).click();
+  await picker.getByRole("button", { name: "Back to Paper" }).click();
+  adb("shell", "input", "keyevent", "KEYCODE_BACK");
+  await expect(page.locator("html")).not.toHaveAttribute("data-palette");
+  step("the Theme picker: a page on the phone, Study picked by touch and kept after a reload, Android's back to leave it");
+
   // Words selected in the novel, into an entry from Android's toolbar (#157).
   await page.getByRole("textbox", { name: "Chapter text" }).click();
   // On screen above the keyboard.

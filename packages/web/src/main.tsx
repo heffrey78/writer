@@ -29,6 +29,7 @@ import { NovelPage } from "./novel/novel-page.tsx";
 import { NotFound } from "./not-found.tsx";
 import { onAndroid } from "./platform.ts";
 import { apply } from "./theme.ts";
+import { ThemePicker } from "./theme-picker.tsx";
 import { ErrorBoundary } from "./ui/error-boundary.tsx";
 import "./styles.css";
 
@@ -70,6 +71,7 @@ void ready.then(() =>
             <AboutDialog />
             <IdentityDialog />
             <DictationSettingsDialog />
+            <ThemePicker />
             <FirstRunIdentity />
             <DesktopBridge />
             <ErrorBoundary what="this page">

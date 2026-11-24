@@ -56,6 +56,8 @@ interface ThemeState {
   theme: ThemeChoice;
   setTheme: (t: ThemeChoice) => void;
   setPalette: (p: PaletteId) => void;
+  /** Back to Paper, following the system, in the writing view's own font and size; a writer's own colors are kept for another time. */
+  reset: () => void;
 }
 
 /** Light or dark follows the OS unless the writer picks one, in the theme they pick; the choice is this device's own. */
@@ -71,6 +73,10 @@ export const useTheme = create<ThemeState>((set, get) => {
     theme: appearance.mode,
     setTheme: (mode) => change({ ...get().appearance, mode }),
     setPalette: (palette) => change({ ...get().appearance, palette }),
+    reset: () => {
+      const { own } = get().appearance;
+      change({ ...DEFAULT, ...(own ? { own } : {}) });
+    },
   };
 });
 

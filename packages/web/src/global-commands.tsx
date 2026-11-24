@@ -7,6 +7,8 @@ import { useIdentityDialog } from "./identity.tsx";
 import { useOpenNovel, useShowLibrary } from "./desktop.ts";
 import { APP_KEYS, useOverlay } from "./palette.tsx";
 import { useTheme, type ThemeChoice } from "./theme.ts";
+import { useThemePicker } from "./theme-picker.tsx";
+import { THEMES } from "./themes.ts";
 import { onAndroid } from "./platform.ts";
 import { useDictation } from "./dictation/dictation.ts";
 import { useDictationSettings } from "./dictation/dictation-settings.tsx";
@@ -35,6 +37,15 @@ export function GlobalCommands() {
         run: () => useTheme.getState().setTheme(t),
         isActive: () => useTheme.getState().theme === t,
       })),
+      ...THEMES.map((t) => ({
+        id: `app.palette.${t.id}`,
+        title: `Theme: ${t.name}`,
+        group: "App",
+        keywords: ["colors", t.line],
+        run: () => useTheme.getState().setPalette(t.id),
+        isActive: () => useTheme.getState().appearance.palette === t.id,
+      })),
+      { id: "app.theme", title: "Theme…", group: "App", keywords: ["colors", "light", "dark", "appearance"], run: () => useThemePicker.getState().set(true) },
       signedIn
         ? {
             id: "app.github.sign-out",

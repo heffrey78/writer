@@ -1,6 +1,6 @@
-import { Check, Command, Ellipsis, Info, Keyboard, Mic, PanelRight, UserPen } from "lucide-react";
+import { Command, Ellipsis, Info, Keyboard, Mic, Palette, PanelRight, UserPen } from "lucide-react";
 import { DropdownMenu } from "radix-ui";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import { UpdateButton, useAbout } from "./about.tsx";
 import { desktop, useShowLibrary } from "./desktop.ts";
@@ -10,7 +10,7 @@ import { AccountItems, useGitHubAttention } from "./github/connect.tsx";
 import { HistoryButtons } from "./history.tsx";
 import { useIdentityDialog } from "./identity.tsx";
 import { useOverlay } from "./palette.tsx";
-import { useTheme, type ThemeChoice } from "./theme.ts";
+import { useThemePicker } from "./theme-picker.tsx";
 import { cn } from "./ui/cn.ts";
 import { usePageMenu } from "./page-menu.ts";
 import { useNarrow } from "./narrow.ts";
@@ -91,17 +91,17 @@ function MoreMenu({ items }: { items?: ReactNode }) {
   // On a phone they're on the bottom bar's More sheet instead (#100).
   const narrow = useNarrow();
   const pageItems = usePageMenu((s) => (narrow ? NONE : s.items));
-  const { theme, setTheme } = useTheme();
   const dictation = useDictation((s) => s.available);
   const { expired, missingScopes } = useGitHubAttention();
   const attention = expired || missingScopes;
   // The menu opens inside the top bar's landmark, not at the end of the page.
   const [anchor, setAnchor] = useState<HTMLSpanElement | null>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
   return (
     <span ref={setAnchor}>
       <DropdownMenu.Root modal={false}>
         <DropdownMenu.Trigger asChild>
-          <button type="button" aria-label={attention ? "More (GitHub needs reconnecting)" : "More"} title="More" className="relative rounded-md p-1.5 text-muted hover:bg-paper hover:text-ink">
+          <button ref={trigger} type="button" aria-label={attention ? "More (GitHub needs reconnecting)" : "More"} title="More" className="relative rounded-md p-1.5 text-muted hover:bg-paper hover:text-ink">
             <Ellipsis className="size-5" aria-hidden />
             {attention && <span className="absolute top-1 right-1 size-2 rounded-full bg-warn" aria-hidden />}
           </button>
@@ -119,23 +119,9 @@ function MoreMenu({ items }: { items?: ReactNode }) {
                 <DropdownMenu.Separator className="my-1 h-px bg-rule" />
               </>
             )}
-            <DropdownMenu.Label className="px-2 pt-1.5 pb-0.5 text-xs font-semibold tracking-wide text-muted uppercase">Theme</DropdownMenu.Label>
-            <DropdownMenu.RadioGroup value={theme} onValueChange={(v) => setTheme(v as ThemeChoice)} aria-label="Theme">
-              {(
-                [
-                  ["system", "Like the system"],
-                  ["light", "Light"],
-                  ["dark", "Dark"],
-                ] as const
-              ).map(([value, label]) => (
-                <DropdownMenu.RadioItem key={value} value={value} className={cn(MENU_ITEM, "relative pl-7")} onSelect={(e) => e.preventDefault()}>
-                  <DropdownMenu.ItemIndicator className="absolute left-3">
-                    <Check className="size-3.5" aria-hidden />
-                  </DropdownMenu.ItemIndicator>
-                  {label}
-                </DropdownMenu.RadioItem>
-              ))}
-            </DropdownMenu.RadioGroup>
+            <DropdownMenu.Item className={MENU_ITEM} onSelect={() => useThemePicker.getState().set(true, trigger.current)}>
+              <Palette className="size-4" aria-hidden /> Theme…
+            </DropdownMenu.Item>
             <DropdownMenu.Separator className="my-1 h-px bg-rule" />
             <AccountItems item={MENU_ITEM} />
             <DropdownMenu.Item className={MENU_ITEM} onSelect={() => useIdentityDialog.getState().show()}>

@@ -249,15 +249,17 @@ test("follows the OS theme, and remembers a chosen one", async ({ page, app }) =
   await launch(page, app);
   const background = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
   expect(await background()).toBe("rgb(27, 26, 24)");
-  // In the top bar's ⋯ menu, by keyboard.
+  // In the top bar's ⋯ menu: Theme….
   await page.getByRole("banner").getByRole("button", { name: "More" }).click();
-  await page.getByRole("menuitemradio", { name: "Light" }).click();
+  await page.getByRole("menuitem", { name: "Theme…" }).click();
+  await page.getByRole("dialog", { name: "Theme" }).getByText("Light", { exact: true }).click();
   expect(await background()).toBe("rgb(250, 248, 244)");
-  await expect(page.getByRole("menuitemradio", { name: "Light" })).toBeChecked();
+  await expect(page.getByRole("radio", { name: "Light" })).toBeChecked();
   await page.keyboard.press("Escape");
   await page.reload();
   await page.getByRole("banner").getByRole("button", { name: "More" }).click();
-  await expect(page.getByRole("menuitemradio", { name: "Light" })).toBeChecked();
+  await page.getByRole("menuitem", { name: "Theme…" }).click();
+  await expect(page.getByRole("radio", { name: "Light" })).toBeChecked();
   expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBe("light");
 });
 
