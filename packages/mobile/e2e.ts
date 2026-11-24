@@ -556,3 +556,7 @@ try {
   await fake.close();
   rmSync(tmp, { recursive: true, force: true });
 }
+// Done, cleaned up: leave. Something of Playwright's Android connection keeps the process alive
+// otherwise, and a run left hanging holds the device's UI automation, so the next run can't read
+// Android's own dialogs (the microphone's question) and fails there.
+process.exit();
