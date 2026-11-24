@@ -235,6 +235,8 @@ test("deletes a book once it has said what isn't on GitHub, and offers one taken
   await page.goto(app.url);
   await page.keyboard.press("ControlOrMeta+k");
   await page.getByRole("dialog", { name: "Command palette" }).getByRole("combobox").fill("delete the book: the bridge");
+  // The command comes with the shelf's books, which may still be on their way.
+  await expect(page.getByRole("option", { name: /^Delete the book: The Bridge at Varn/ })).toBeVisible();
   await page.keyboard.press("Enter");
   await expect(page.getByRole("alertdialog", { name: "Delete “The Bridge at Varn”?" })).toContainText("1 change isn't on GitHub yet, and will be gone. Sync first to keep it. The copy on GitHub stays.");
   await page.getByRole("alertdialog").getByRole("button", { name: "Delete the book" }).click();
