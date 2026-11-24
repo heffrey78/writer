@@ -90,14 +90,15 @@
   --color-warn: var(--ghw-warn);
   --color-warn-soft: var(--ghw-warn-soft);
   --font-prose: var(--ghw-prose-font);
-  --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* The interface font: the system's, unless the device chose one of the app's (#192). */
+  --font-ui: var(--ghw-ui-font, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif);
 }
 
 html,
 body {
   background: var(--ghw-paper);
   color: var(--ghw-ink);
-  font-family: var(--font-ui);
+  font-family: var(--ghw-ui-font, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif);
 }
 
 :focus-visible {

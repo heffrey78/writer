@@ -1,5 +1,5 @@
 import { Check } from "lucide-react";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { create } from "zustand";
 import { onAndroid } from "./platform.ts";
 import { useTheme, type ThemeChoice } from "./theme.ts";
@@ -7,6 +7,7 @@ import { contrast, derive, isHex, SWATCHES, themeById, THEMES, type Colors, type
 import { Button } from "./ui/button.tsx";
 import { cn } from "./ui/cn.ts";
 import { Modal } from "./ui/dialog.tsx";
+import { UI_FONTS, UI_SIZES, WRITING_FONTS, WRITING_SIZES } from "./text-settings.ts";
 
 /**
  * Whether the Theme picker is open (More › Theme…, or the palette's Theme…), and what takes the focus
@@ -119,6 +120,8 @@ function Picker({ onClose }: { onClose: () => void }) {
           </fieldset>
 
           {appearance.palette === "own" && appearance.own && <OwnColorsSection own={appearance.own} mode={shown} />}
+
+          <TextFieldset />
         </div>
 
         <figure className="grid min-w-0 content-start gap-2">
@@ -128,7 +131,7 @@ function Picker({ onClose }: { onClose: () => void }) {
             The whole app changes as you pick, this {onAndroid ? "page" : "window"} too. There's nothing to save: the theme is kept on this {DEVICE}
             {onAndroid ? ", and your computer keeps its own" : ", and your phone keeps its own"}.
           </p>
-          <p className="text-sm text-muted">In the palette: Theme: Study, Theme: dark, and the rest.</p>
+          <p className="text-sm text-muted">In the palette: Theme: Study, Writing size: Large, and the rest.</p>
         </figure>
       </div>
 
@@ -139,6 +142,75 @@ function Picker({ onClose }: { onClose: () => void }) {
         </Button>
       </div>
     </Modal>
+  );
+}
+
+/** A row of choices, as Light or dark's: one radio each, the chosen one tinted. */
+function Segments<T extends string | number>({ label, name, options, value, onPick }: { label: string; name: string; options: readonly { value: T; label: ReactNode; aria?: string }[]; value: T; onPick: (v: T) => void }) {
+  return (
+    <div role="radiogroup" aria-label={label} className="grid min-w-0 gap-1.5">
+      <span aria-hidden className="text-sm">
+        {label}
+      </span>
+      <div className="grid overflow-hidden rounded-md border border-rule" style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}>
+        {options.map((o, i) => (
+          <label key={o.value} className={cn("relative cursor-pointer", i > 0 && "border-l border-rule")}>
+            <input type="radio" name={name} checked={value === o.value} onChange={() => onPick(o.value)} aria-label={o.aria} className="peer sr-only" />
+            {/* Quiet text would be too faint on the chosen one's tint, over the dialog. */}
+            <span className={cn("flex min-h-11 flex-col items-center justify-center px-1 text-center text-sm leading-tight peer-checked:font-semibold", CHOICE, value === o.value && "[&_.text-muted]:text-ink")}>{o.label}</span>
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const SELECT = "h-9 min-w-0 rounded-md border border-rule bg-raised px-2 text-sm text-ink";
+
+/**
+ * The text settings (#192): the writing font and size, and on the desktop the interface's; on a
+ * phone the interface is as large as Android's own font size makes it.
+ */
+function TextFieldset() {
+  const { appearance, setText } = useTheme();
+  const text = appearance.text ?? {};
+  const id = useId();
+  return (
+    <fieldset className="grid min-w-0 gap-4">
+      <legend className="mb-2 font-semibold">Text</legend>
+      <label className="grid gap-1.5 text-sm">
+        Writing font
+        <select value={text.font ?? "book"} onChange={(e) => setText({ font: e.target.value })} className={SELECT}>
+          {WRITING_FONTS.map((f) => (
+            <option key={f.id} value={f.id}>
+              {f.id === "book" ? `${f.name} (today's)` : f.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <Segments
+        label="Writing size"
+        name={`${id}-size`}
+        value={text.size ?? 19}
+        onPick={(size) => setText({ size })}
+        options={WRITING_SIZES.map((s) => ({ value: s.px, aria: `${s.name}, ${s.px} pixels`, label: <><span>{s.name}</span><span className="text-xs text-muted">{s.px} px</span></> }))}
+      />
+      <label className="grid gap-1.5 text-sm">
+        Interface font
+        <select value={text.ui ?? "system"} onChange={(e) => setText({ ui: e.target.value })} className={SELECT}>
+          {UI_FONTS.map((f) => (
+            <option key={f.id} value={f.id}>
+              {f.id === "system" ? `${f.name} (today's)` : f.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      {onAndroid ? (
+        <p className="text-sm text-muted">The interface's size follows Android's own font size.</p>
+      ) : (
+        <Segments label="Interface size" name={`${id}-ui-size`} value={text.uiSize ?? 100} onPick={(uiSize) => setText({ uiSize })} options={UI_SIZES.map((s) => ({ value: s.percent, label: s.name }))} />
+      )}
+    </fieldset>
   );
 }
 

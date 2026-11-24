@@ -9,6 +9,7 @@ import { APP_KEYS, useOverlay } from "./palette.tsx";
 import { useTheme, type ThemeChoice } from "./theme.ts";
 import { useThemePicker } from "./theme-picker.tsx";
 import { THEMES } from "./themes.ts";
+import { UI_FONTS, UI_SIZES, WRITING_FONTS, WRITING_SIZES } from "./text-settings.ts";
 import { onAndroid } from "./platform.ts";
 import { useDictation } from "./dictation/dictation.ts";
 import { useDictationSettings } from "./dictation/dictation-settings.tsx";
@@ -47,6 +48,12 @@ export function GlobalCommands() {
         isActive: () => useTheme.getState().appearance.palette === t.id,
       })),
       ...(own ? [{ id: "app.palette.own", title: "Theme: Your own", group: "App", keywords: ["colors"], run: () => useTheme.getState().setPalette("own"), isActive: () => useTheme.getState().appearance.palette === "own" }] : []),
+      ...WRITING_FONTS.map((f) => ({ id: `app.font.${f.id}`, title: `Writing font: ${f.name}`, group: "App", keywords: ["text", "typeface"], run: () => useTheme.getState().setText({ font: f.id }), isActive: () => (useTheme.getState().appearance.text?.font ?? "book") === f.id })),
+      ...WRITING_SIZES.map((s) => ({ id: `app.size.${s.px}`, title: `Writing size: ${s.name}`, group: "App", keywords: ["text", "bigger", "smaller", `${s.px} px`], run: () => useTheme.getState().setText({ size: s.px }), isActive: () => (useTheme.getState().appearance.text?.size ?? 19) === s.px })),
+      ...UI_FONTS.map((f) => ({ id: `app.ui-font.${f.id}`, title: `Interface font: ${f.name}`, group: "App", keywords: ["text", "typeface"], run: () => useTheme.getState().setText({ ui: f.id }), isActive: () => (useTheme.getState().appearance.text?.ui ?? "system") === f.id })),
+      ...(onAndroid
+        ? []
+        : UI_SIZES.map((s) => ({ id: `app.ui-size.${s.percent}`, title: `Interface size: ${s.name}`, group: "App", keywords: ["text", "bigger", "smaller", "zoom"], run: () => useTheme.getState().setText({ uiSize: s.percent }), isActive: () => (useTheme.getState().appearance.text?.uiSize ?? 100) === s.percent }))),
       { id: "app.theme", title: "Theme…", group: "App", keywords: ["colors", "light", "dark", "appearance"], run: () => useThemePicker.getState().set(true) },
       signedIn
         ? {

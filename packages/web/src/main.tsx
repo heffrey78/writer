@@ -32,6 +32,7 @@ import { apply } from "./theme.ts";
 import { ThemePicker } from "./theme-picker.tsx";
 import { ErrorBoundary } from "./ui/error-boundary.tsx";
 import "./styles.css";
+import "./fonts/fonts.css";
 
 apply();
 

@@ -32,11 +32,13 @@ export function UpdateButton() {
 /**
  * About Writer: its version, the Node and git it runs on, a newer release's notes and download,
  * and, in the desktop app, the licences of what it ships (git's with where its source is: GPL-2.0).
+ * The fonts it ships, everywhere (#192).
  */
 export function AboutDialog() {
   const { open, set } = useAbout();
   const info = useAppInfo().data;
   const licenses = useQuery({ queryKey: keys.licenses, queryFn: api.licenses, enabled: open && !!info?.desktop, staleTime: Infinity });
+  const fonts = useQuery({ queryKey: ["font-licences"], queryFn: fontLicences, enabled: open, staleTime: Infinity });
   if (!open) return null;
   return (
     <Modal title="About Writer" onClose={() => set(false)} className="max-w-2xl">
@@ -78,6 +80,34 @@ export function AboutDialog() {
           ))}
         </section>
       )}
+
+      <section aria-labelledby="about-fonts" className="mt-5">
+        <h3 id="about-fonts" className="font-semibold">
+          Fonts
+        </h3>
+        <p className="mt-1 text-sm text-muted">Writer comes with these fonts, each under the SIL Open Font License 1.1.</p>
+        {fonts.data?.map((f) => (
+          <details key={f.name} className="mt-2 text-sm">
+            <summary className="cursor-pointer">{f.name}</summary>
+            <pre className="mt-1 max-h-60 overflow-auto rounded bg-paper p-2 text-xs whitespace-pre-wrap">{f.text}</pre>
+          </details>
+        ))}
+      </section>
     </Modal>
   );
+}
+
+const FONT_NAMES: Record<string, string> = {
+  "atkinson-hyperlegible": "Atkinson Hyperlegible",
+  "eb-garamond": "EB Garamond",
+  "ibm-plex-mono": "IBM Plex Mono",
+  inter: "Inter",
+  literata: "Literata",
+};
+
+/** The fonts' licences, from beside them in fonts/: read only when About is open. */
+async function fontLicences(): Promise<{ name: string; text: string }[]> {
+  const files = import.meta.glob<string>("./fonts/*/OFL.txt", { query: "?raw", import: "default" });
+  const out = await Promise.all(Object.entries(files).map(async ([path, load]) => ({ name: FONT_NAMES[path.split("/")[2]!] ?? path, text: await load() })));
+  return out.sort((a, b) => a.name.localeCompare(b.name));
 }

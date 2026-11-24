@@ -1,4 +1,6 @@
 import { create } from "zustand";
+import { onAndroid } from "./platform.ts";
+import { textOf, textStyle, type TextSettings } from "./text-settings.ts";
 import { ownFrom, ownOf, ownTheme, themeById, themeCss, themesCss, type Mode, type Own, type PaletteChoice, type Role } from "./themes.ts";
 
 export type ThemeChoice = "system" | "light" | "dark";
@@ -12,7 +14,7 @@ export interface Appearance {
   mode: ThemeChoice;
   palette: PaletteChoice;
   own?: Own;
-  text?: { font?: string; size?: number };
+  text?: TextSettings;
 }
 
 const KEY = "ghw:appearance";
@@ -32,9 +34,11 @@ function stored(): Appearance {
     if (!value || typeof value !== "object") return DEFAULT;
     const record = value as Partial<Appearance>;
     const own = ownOf(record.own);
-    const { own: _, ...rest } = record;
+    const text = textOf(record.text);
+    const { own: _, text: __, ...rest } = record;
     return {
       ...rest,
+      ...(text ? { text } : {}),
       mode: record.mode === "light" || record.mode === "dark" ? record.mode : "system",
       palette: (record.palette === "own" && own) || (record.palette && themeById(record.palette)) ? record.palette! : "paper",
       ...(own ? { own } : {}),
@@ -62,6 +66,8 @@ interface ThemeState {
   setPalette: (p: PaletteChoice) => void;
   /** One of the writer's own colors, in light or dark; their own colors become the theme. */
   setOwn: (mode: Mode, role: Role, color: string) => void;
+  /** One or more of the text settings; undefined goes back to today's. */
+  setText: (patch: TextSettings) => void;
   /** Back to Paper, following the system, in the writing view's own font and size; a writer's own colors are kept for another time. */
   reset: () => void;
 }
@@ -87,6 +93,12 @@ export const useTheme = create<ThemeState>((set, get) => {
       const now = get().appearance;
       const own = now.own ?? ownFrom(themeById(now.palette) ?? themeById("paper")!);
       change({ ...now, palette: "own", own: { ...own, [mode]: { ...own[mode], [role]: color } } });
+    },
+    setText: (patch) => {
+      const now = get().appearance;
+      const text = textOf({ ...now.text, ...patch });
+      const { text: _, ...rest } = now;
+      change({ ...rest, ...(text ? { text } : {}) });
     },
     reset: () => {
       const { own } = get().appearance;
@@ -115,6 +127,10 @@ export function apply(appearance: Appearance = useTheme.getState().appearance): 
     document.head.append(own);
   }
   own.textContent = appearance.own ? themeCss(ownTheme(appearance.own)) : "";
+  for (const [property, value] of Object.entries(textStyle(appearance.text, onAndroid))) {
+    if (value === undefined) root.style.removeProperty(property);
+    else root.style.setProperty(property, value);
+  }
   if (appearance.mode === "system") delete root.dataset.theme;
   else root.dataset.theme = appearance.mode;
   if (appearance.palette === "paper") delete root.dataset.palette;

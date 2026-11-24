@@ -1,5 +1,6 @@
 import { devices, type Page } from "@playwright/test";
 import { derive, THEMES, tokensOf } from "../src/themes.ts";
+import { UI_FONTS, WRITING_FONTS } from "../src/text-settings.ts";
 import { axe, expect, launch, palette, test } from "./fixtures.ts";
 
 /*
@@ -127,6 +128,99 @@ test("your own colors: started from the theme on screen, a too-faint link moved 
   expect(await background(page)).toBe("rgb(253, 246, 227)");
 });
 
+/** Whether a face of `family` has been read and is in use on the page: the app's own copy, not a system one. */
+const loaded = (page: Page, family: string) =>
+  page.evaluate(async (f) => {
+    await document.fonts.ready;
+    return [...document.fonts].some((face) => face.family.replace(/"/g, "") === f && face.status === "loaded");
+  }, family);
+
+test("every writing and interface font renders from the app itself, as it's chosen; the sizes too, and Back to Paper is today's text (#192)", async ({ page, app }) => {
+  test.setTimeout(90_000);
+  const fetched: string[] = [];
+  page.on("request", (r) => {
+    if (/\.woff2?($|\?)/.test(r.url())) fetched.push(r.url());
+  });
+  await app.restart(app.novelRepo("varn"));
+  await page.goto(app.launchUrl);
+  const prose = page.getByRole("textbox", { name: "Chapter text" });
+  await expect(prose).toBeFocused();
+  const style = (what: string) => prose.evaluate((el, w) => getComputedStyle(el).getPropertyValue(w), what);
+  // Today's, until one's chosen: no font of the app's read.
+  expect(await style("font-size")).toBe("19px");
+  await page.evaluate(() => document.fonts.ready);
+  expect(fetched).toEqual([]);
+
+  for (const font of WRITING_FONTS.filter((f) => f.id !== "book")) {
+    await palette(page, `writing font: ${font.name.toLowerCase()}`);
+    const family = /^"([^"]+)"/.exec(font.family)![1]!;
+    await expect.poll(() => style("font-family")).toContain(family);
+    await expect.poll(() => loaded(page, family), family).toBe(true);
+  }
+  // From the app, nowhere else.
+  const origin = new URL(app.url).origin;
+  expect(fetched.length).toBeGreaterThan(0);
+  expect(fetched.filter((u) => new URL(u).origin !== origin)).toEqual([]);
+
+  for (const [size, px] of [["small", "17px"], ["large", "21px"], ["larger", "24px"]] as const) {
+    await palette(page, `writing size: ${size}`);
+    await expect.poll(() => style("font-size")).toBe(px);
+  }
+  for (const font of UI_FONTS.filter((f) => f.id !== "system")) {
+    await palette(page, `interface font: ${font.name.toLowerCase()}`);
+    const family = /^"([^"]+)"/.exec(font.family)![1]!;
+    await expect.poll(() => page.evaluate(() => getComputedStyle(document.body).fontFamily)).toContain(family);
+    await expect.poll(() => loaded(page, family), family).toBe(true);
+  }
+
+  // The picker shows what's chosen, by keyboard too, and is audited with it.
+  await palette(page, "theme…");
+  const picker = page.getByRole("dialog", { name: "Theme" });
+  await expect(picker.getByRole("combobox", { name: "Writing font" })).toHaveValue("plex");
+  await expect(picker.getByRole("radio", { name: "Larger, 24 pixels" })).toBeChecked();
+  await expect(picker.getByRole("combobox", { name: "Interface font" })).toHaveValue("atkinson");
+  await picker.getByRole("radio", { name: "Larger, 24 pixels" }).focus();
+  await page.keyboard.press("ArrowLeft");
+  await expect(picker.getByRole("radio", { name: "Large, 21 pixels" })).toBeChecked();
+  await picker.getByRole("combobox", { name: "Writing font" }).selectOption("literata");
+  await expect(picker.locator(".ghw-prose")).toHaveCSS("font-size", "21px");
+  await axe(page);
+  await picker.getByRole("button", { name: "Back to Paper" }).click();
+  await expect(picker.getByRole("combobox", { name: "Writing font" })).toHaveValue("book");
+  await picker.getByRole("button", { name: "Done" }).click();
+  expect(await style("font-size")).toBe("19px");
+  expect(await page.evaluate(() => document.documentElement.getAttribute("style"))).toBeFalsy();
+
+  // Their licences, in About.
+  await palette(page, "about writer");
+  const about = page.getByRole("dialog", { name: "About Writer" });
+  const fonts = about.getByRole("region", { name: "Fonts" });
+  await expect(fonts.locator("summary")).toHaveText(["Atkinson Hyperlegible", "EB Garamond", "IBM Plex Mono", "Inter", "Literata"]);
+  await fonts.getByText("Literata", { exact: true }).click();
+  await expect(fonts.locator("pre").first()).toContainText("SIL Open Font License, Version 1.1");
+});
+
+test("nothing is wider than the window at the larger interface sizes, and everything grows with them (#192)", async ({ page, app }) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await app.restart(app.novelRepo("varn"));
+  await page.goto(app.launchUrl);
+  await expect(page.getByRole("textbox", { name: "Chapter text" })).toBeFocused();
+  const book = page.url().replace(/\/chapter.*$/, "");
+  for (const [size, px] of [["larger", 17.92], ["largest", 20]] as const) {
+    await palette(page, `interface size: ${size}`);
+    await expect.poll(() => page.evaluate(() => parseFloat(getComputedStyle(document.documentElement).fontSize))).toBeCloseTo(px, 1);
+    for (const url of [`${app.url}/`, page.url(), `${book}/bible`, `${book}/bible/char_7f3k2q`, `${book}/outline`]) {
+      await page.goto(url);
+      await expect(page.locator("#main")).toBeVisible();
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${size}: ${url}`).toBe(true);
+    }
+    await page.goto(`${book}/chapter/ch_arr1va`);
+  }
+  // The writing keeps its own size: Medium, 19 px, whatever the interface's.
+  await expect(page.locator(".ghw-prose").first()).toHaveCSS("font-size", "19px");
+});
+
 test.describe("on a phone", () => {
   const { viewport, deviceScaleFactor, isMobile, hasTouch, userAgent } = devices["Pixel 7"]!;
   test.use({ viewport: { ...viewport, width: 390 }, deviceScaleFactor, isMobile, hasTouch, userAgent });
@@ -161,6 +255,22 @@ test.describe("on a phone", () => {
     await expect(own.getByText("Too faint on this paper")).toBeVisible();
     expect(await picker.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
     for (const box of await own.getByRole("textbox").all()) expect((await box.boundingBox())!.x + (await box.boundingBox())!.width).toBeLessThanOrEqual(390);
+    await axe(page);
+  });
+
+  test("the largest writing size fits: the writing view and the picker's Text (#192)", async ({ page, app }) => {
+    await app.restart(app.novelRepo("varn"));
+    await page.goto(app.launchUrl);
+    await expect(page.getByRole("textbox", { name: "Chapter text" })).toBeVisible();
+    await page.evaluate(() => localStorage.setItem("ghw:appearance", JSON.stringify({ mode: "system", palette: "paper", text: { font: "garamond", size: 24, ui: "atkinson" } })));
+    await page.reload();
+    await expect(page.locator(".ghw-prose").first()).toHaveCSS("font-size", "24px");
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.getByRole("banner").getByRole("button", { name: "More" }).tap();
+    await page.getByRole("menuitem", { name: "Theme…" }).tap();
+    const picker = page.getByRole("dialog", { name: "Theme" });
+    await picker.getByRole("radiogroup", { name: "Writing size" }).scrollIntoViewIfNeeded();
+    expect(await picker.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
     await axe(page);
   });
 });

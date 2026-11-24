@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { expect, test, type App } from "./fixtures.ts";
 import { writeBigNovel } from "./big-novel.ts";
+import { WRITING_FONTS } from "../src/text-settings.ts";
 
 /**
  * heffrey78/gh-writer#54 / heffrey78/gh-writer#7: a 150,000-word novel opens to an editable state in under 2 seconds, and typing in it
@@ -61,25 +62,33 @@ test("a 150,000-word novel opens on a first launch, nothing cached, in under 2 s
   expect(elapsed).toBeLessThan(2000);
 });
 
-test("typing in a chapter of the 150,000-word novel stays under 50 ms at the 95th percentile", async ({ page, app }) => {
-  await app.restart(bigNovel(app, { plotlines: 12 }));
-  // With details pinned under each scene's title (heffrey78/gh-writer#153), and the right sidebar open.
-  await page.addInitScript(() => localStorage.setItem("ghw.pinnedDetails", JSON.stringify(["pov", "when", "plotlines"])));
-  await page.goto(app.launchUrl);
-  const text = page.getByRole("textbox", { name: "Chapter text" });
-  await expect(text).toBeFocused({ timeout: 10_000 });
-  await expect(page.locator(".ghw-pinned").first()).toBeVisible();
-  await page.evaluate(() => {
-    const w = window as unknown as { latencies: number[] };
-    w.latencies = [];
-    document.addEventListener(
-      "keydown",
-      (e) => {
-        const start = e.timeStamp;
-        requestAnimationFrame(() => setTimeout(() => w.latencies.push(performance.now() - start)));
-      },
-      true,
-    );
+// In each writing font (#192): today's book serif, and each the app ships, read before the typing starts.
+for (const font of WRITING_FONTS) {
+  const title = font.id === "book" ? "typing in a chapter of the 150,000-word novel stays under 50 ms at the 95th percentile" : `typing in a chapter of the 150,000-word novel stays under 50 ms at the 95th percentile in ${font.name}`;
+  test(title, async ({ page, app }) => {
+    await app.restart(bigNovel(app, { plotlines: 12 }));
+    // With details pinned under each scene's title (heffrey78/gh-writer#153), and the right sidebar open.
+    await page.addInitScript(() => localStorage.setItem("ghw.pinnedDetails", JSON.stringify(["pov", "when", "plotlines"])));
+    if (font.id !== "book") await page.addInitScript((id) => localStorage.setItem("ghw:appearance", JSON.stringify({ mode: "system", palette: "paper", text: { font: id } })), font.id);
+    await page.goto(app.launchUrl);
+    const text = page.getByRole("textbox", { name: "Chapter text" });
+    await expect(text).toBeFocused({ timeout: 10_000 });
+    await expect(page.locator(".ghw-pinned").first()).toBeVisible();
+    if (font.id !== "book") {
+      const family = /^"([^"]+)"/.exec(font.family)![1]!;
+      await expect.poll(() => page.evaluate(async (f) => (await document.fonts.ready, [...document.fonts].some((face) => face.family.replace(/"/g, "") === f && face.status === "loaded")), family)).toBe(true);
+    }
+    await page.evaluate(() => {
+      const w = window as unknown as { latencies: number[] };
+      w.latencies = [];
+      document.addEventListener(
+        "keydown",
+        (e) => {
+          const start = e.timeStamp;
+          requestAnimationFrame(() => setTimeout(() => w.latencies.push(performance.now() - start)));
+        },
+        true,
+      );
   });
   await page.keyboard.press("Control+End");
   const sentence = "The wind came off the river hard enough to lean on. ";
@@ -95,4 +104,5 @@ test("typing in a chapter of the 150,000-word novel stays under 50 ms at the 95t
   test.info().annotations.push({ type: "latency", description: result });
   expect(latencies.length).toBeGreaterThan(200);
   expect(at(0.95)).toBeLessThan(50);
-});
+  });
+}

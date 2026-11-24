@@ -460,10 +460,29 @@ try {
   expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe(study);
   await page.getByRole("banner").getByRole("button", { name: "More" }).click();
   await page.getByRole("menuitem", { name: "Theme…" }).click();
+  step("the Theme picker: a page on the phone, Study picked by touch and kept after a reload, Android's back to leave it");
+
+  // Literata at Large (#192): the font read from the app itself, the writing that size; no interface size on a phone.
+  await picker.getByRole("combobox", { name: "Writing font" }).selectOption("literata");
+  await picker.getByRole("radiogroup", { name: "Writing size" }).getByText("Large", { exact: true }).click();
+  await expect(picker.getByRole("radiogroup", { name: "Interface size" })).toHaveCount(0);
+  await expect(picker).toContainText("The interface's size follows Android's own font size.");
+  adb("shell", "input", "keyevent", "KEYCODE_BACK");
+  await expect(picker).toHaveCount(0);
+  const chapter = page.getByRole("textbox", { name: "Chapter text" });
+  await expect(chapter).toHaveCSS("font-size", "21px");
+  await expect(chapter).toHaveCSS("font-family", /^"?Literata/);
+  await expect
+    .poll(() => page.evaluate(async () => (await document.fonts.ready, [...document.fonts].some((f) => f.family.replace(/"/g, "") === "Literata" && f.status === "loaded"))))
+    .toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.getByRole("banner").getByRole("button", { name: "More" }).click();
+  await page.getByRole("menuitem", { name: "Theme…" }).click();
   await picker.getByRole("button", { name: "Back to Paper" }).click();
   adb("shell", "input", "keyevent", "KEYCODE_BACK");
   await expect(page.locator("html")).not.toHaveAttribute("data-palette");
-  step("the Theme picker: a page on the phone, Study picked by touch and kept after a reload, Android's back to leave it");
+  await expect(chapter).toHaveCSS("font-size", "19px");
+  step("Literata at Large: the font from the app itself, the writing that size, and back to today's");
 
   // Words selected in the novel, into an entry from Android's toolbar (#157).
   await page.getByRole("textbox", { name: "Chapter text" }).click();
