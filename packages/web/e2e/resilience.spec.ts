@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Page } from "@playwright/test";
@@ -28,6 +28,8 @@ function machines(app: App) {
 }
 
 const read = (dir: string, path: string) => readFileSync(join(dir, path), "utf8");
+/** A file's text, or "" while it's missing: a sync replaces files, so for a moment one isn't there. */
+const readNow = (dir: string, path: string) => (existsSync(join(dir, path)) ? read(dir, path) : "");
 
 async function openNovel(page: Page, launchUrl: string) {
   await page.goto(launchUrl);
@@ -59,7 +61,7 @@ test("draft, close the tab and quit, reopen: all the work is there and committed
   await typeAtEnd(page, " Drafted just before closing.");
   // Close the tab at once, well inside the autosave interval: it saves on the way out.
   await page.close({ runBeforeUnload: true });
-  await expect.poll(() => read(here, BRIDGE), { timeout: 10_000 }).toMatch(/ Drafted just before closing\.\n$/);
+  await expect.poll(() => readNow(here, BRIDGE), { timeout: 10_000 }).toMatch(/ Drafted just before closing\.\n$/);
   // Quit Writer (Ctrl+C): saved work is committed as it stops.
   await app.stop();
   expect(app.git(here, "status", "--porcelain")).toBe("");
@@ -88,7 +90,7 @@ test("with the engine in the page, the page closed mid-autosave (Android killing
   const reopened = await context.newPage();
   await openNovel(reopened, app.launchUrl);
   await expect(text(reopened)).toContainText("Typed as Android closed the app.");
-  await expect.poll(() => read(here, BRIDGE), { timeout: 10_000 }).toMatch(/ Typed as Android closed the app\.\n$/);
+  await expect.poll(() => readNow(here, BRIDGE), { timeout: 10_000 }).toMatch(/ Typed as Android closed the app\.\n$/);
 });
 
 test("a crash loses at most the text typed within the autosave interval, and the tab brings even that back", async ({ page, app }) => {
@@ -98,7 +100,7 @@ test("a crash loses at most the text typed within the autosave interval, and the
   await openNovel(page, app.launchUrl);
 
   await typeAtEnd(page, " Saved before the crash.");
-  await expect.poll(() => read(here, BRIDGE), { timeout: 10_000 }).toContain("Saved before the crash.");
+  await expect.poll(() => readNow(here, BRIDGE), { timeout: 10_000 }).toContain("Saved before the crash.");
   const typedAt = Date.now();
   await page.keyboard.type(" Typed in the last moment.");
   await app.kill();
@@ -114,7 +116,7 @@ test("a crash loses at most the text typed within the autosave interval, and the
   // Start Writer again on the same address and open it in the same tab: the tab still holds the text.
   await app.restart(here, "--port", port);
   await openNovel(page, app.launchUrl);
-  await expect.poll(() => read(here, BRIDGE), { timeout: 10_000 }).toMatch(/ Saved before the crash\. Typed in the last moment\.\n$/);
+  await expect.poll(() => readNow(here, BRIDGE), { timeout: 10_000 }).toMatch(/ Saved before the crash\. Typed in the last moment\.\n$/);
   await expect(text(page)).toContainText("Typed in the last moment.");
 });
 
@@ -129,11 +131,11 @@ test("a whole drafting session with the network down syncs by itself once it's b
 
   // Writing goes on: one chapter, then a scene in another.
   await typeAtEnd(page, " Written offline, first.");
-  await expect.poll(() => read(here, BRIDGE), { timeout: 10_000 }).toContain("Written offline, first.");
+  await expect.poll(() => readNow(here, BRIDGE), { timeout: 10_000 }).toContain("Written offline, first.");
   await page.getByRole("treeitem", { name: /^Ben's Ledger,/ }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Ben's Ledger" })).toBeVisible();
   await typeAtEnd(page, " Written offline, second.");
-  await expect.poll(() => read(here, LEDGER), { timeout: 10_000 }).toContain("Written offline, second.");
+  await expect.poll(() => readNow(here, LEDGER), { timeout: 10_000 }).toContain("Written offline, second.");
   await expect(badge(page)).toHaveAccessibleName("Sync: Offline");
 
   // The network comes back. Nobody presses anything: the retry finds it.
@@ -162,8 +164,8 @@ test("the same scene edited on two machines ends in a resolvable conflict, never
   // Both machines rewrite the end of the same scene.
   await typeAtEnd(page, " The ending, as written on A.");
   await typeAtEnd(pageB, " The ending, as written on B.");
-  await expect.poll(() => read(here, BRIDGE), { timeout: 10_000 }).toContain("written on A.");
-  await expect.poll(() => read(other, BRIDGE), { timeout: 10_000 }).toContain("written on B.");
+  await expect.poll(() => readNow(here, BRIDGE), { timeout: 10_000 }).toContain("written on A.");
+  await expect.poll(() => readNow(other, BRIDGE), { timeout: 10_000 }).toContain("written on B.");
 
   // A syncs first; B meets the conflict and settles it in the resolver.
   await palette(page, "sync now");
@@ -222,7 +224,7 @@ test("Not a name here kept on two machines, each about another word, holds on bo
   await expect.poll(onRemote, { timeout: 15_000 }).toContain("“The Flood”");
   await expect(badge(pageB)).toHaveAccessibleName("Sync: Synced");
   await palette(page, "sync now");
-  await expect.poll(() => read(here, NOT_NAMES), { timeout: 15_000 }).toContain("piece: sc_f100d0");
+  await expect.poll(() => readNow(here, NOT_NAMES), { timeout: 15_000 }).toContain("piece: sc_f100d0");
   await expect(badge(page)).toHaveAccessibleName("Sync: Synced");
   const final = app.git(remote, "show", `main:${NOT_NAMES}`);
   expect(final.match(/^- /gm)).toHaveLength(2);
