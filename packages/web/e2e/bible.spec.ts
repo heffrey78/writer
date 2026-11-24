@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Page } from "@playwright/test";
-import { axe, expect, palette, test, type App } from "./fixtures.ts";
+import { axe, expect, palette, selectionSettled, test, type App } from "./fixtures.ts";
 
 const ADA = "char_7f3k2q";
 
@@ -853,6 +853,7 @@ test("Not a name here, from an entry's profile, a scene's Not linked here and th
 
   // And from the text: the caret on the other, then Not a name here from the palette.
   await text.locator(".ghw-unlinked", { hasText: /^Ben$/ }).click();
+  await selectionSettled(page);
   await palette(page, "not a name here");
   await expect(text.locator(".ghw-unlinked", { hasText: /^Ben$/ })).toHaveCount(0);
   await expect(sidebar.getByRole("button", { name: /^Link “Ben” to Ben Varn/ })).toHaveCount(0);
