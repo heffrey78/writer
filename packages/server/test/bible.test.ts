@@ -581,6 +581,27 @@ describe("a novel in format v1", () => {
   });
 });
 
+describe("entries' notes moved into the book's notes (D20, #181)", () => {
+  it("moves them only when asked, in one commit: each entry's file down to its front matter, its words in a note about it", async () => {
+    await bible.migrate(3);
+    const before = read(ADA_FILE);
+    expect(before).toContain("---\nLeft Varn");
+    // Asked only for the format (a field's change needs no more): the notes stay.
+    expect(await bible.migrate()).toMatchObject({ migrated: false });
+    expect(read(ADA_FILE)).toBe(before);
+
+    expect(await bible.migrate(undefined, { entryNotes: true })).toMatchObject({ migrated: true });
+    expect(lastCommit()).toMatch(/^\d+ entries' notes moved into the book's notes, each in a note that mentions it$/);
+    clean();
+    expect(read(ADA_FILE)).toBe(before.slice(0, before.indexOf("Left Varn")));
+    const book = await valid();
+    const note = book.notes.find((n) => n.title === "Ada Varn")!;
+    expect(note.body).toMatch(/^\n\[Ada Varn\]\(#char_7f3k2q\)\n\nLeft Varn at nineteen/);
+    expect(book.entities.every((e) => !e.body.trim())).toBe(true);
+    expect(await bible.migrate(undefined, { entryNotes: true })).toEqual({ commit: null, files: [], migrated: false });
+  });
+});
+
 describe("notes (D12)", () => {
   const IDEA = "notes/what-if-ben-never-sold.md";
   const today = new Date().toLocaleDateString("en-CA");

@@ -282,7 +282,7 @@ describe("server bundle", () => {
 });
 
 describe("writer migrate", () => {
-  it("moves the sample to the newest format (v3) in one commit, with the template's tools; it compiles the same and its own validator passes", () => {
+  it("moves the sample to the newest format (v3) in one commit, with its entries' notes and the template's tools; it compiles the same and its own validator passes", () => {
     const novel = join(tmp, "migrate-me");
     cpSync(sample, novel, { recursive: true });
     asFormatV1(novel);
@@ -300,8 +300,8 @@ describe("writer migrate", () => {
 
     const r = spawnSync("node", [main, "migrate", novel], { encoding: "utf8", env: { ...env(), ...date } });
     expect(r.status, r.stdout + r.stderr).toBe(0);
-    expect(r.stdout).toMatch(/^Moved from format v1 to v3, in commit [0-9a-f]{7}: “Format v3: off-page events as files, and the book's settings in book.yaml, naming its kind”\.\n/);
-    expect(git("log", "-1", "--format=%s")).toBe("Format v3: off-page events as files, and the book's settings in book.yaml, naming its kind\n");
+    expect(r.stdout).toMatch(/^Moved from format v1 to v3, in commit [0-9a-f]{7}: “Format v3: off-page events as files, and the book's settings in book.yaml, naming its kind, and 5 entries' notes moved into the book's notes, each in a note that mentions it”\.\n/);
+    expect(git("log", "-1", "--format=%s")).toBe("Format v3: off-page events as files, and the book's settings in book.yaml, naming its kind, and 5 entries' notes moved into the book's notes, each in a note that mentions it\n");
     expect(git("status", "--porcelain")).toBe("");
     expect(git("show", "--name-status", "--format=", "HEAD").split("\n").filter(Boolean).sort()).toEqual([
       "A\t.github/gh-writer/compile.mjs",
@@ -313,6 +313,9 @@ describe("writer migrate", () => {
       "A\tbible/events/the-plans-are-stolen.md",
       "D\tbible/events.yaml",
       "M\t.github/gh-writer/validate.mjs",
+      // Each entry's notes, in a note that mentions it (D20).
+      ...["characters/ada", "characters/ben", "characters/mirela-kost", "characters/tomas-hale", "locations/varn-bridge"].map((f) => `M\tbible/${f}.md`),
+      ...["ada-varn", "ben-varn", "mirela-kost", "tomas-hale", "the-varn-bridge"].map((f) => `A\tnotes/${f}.md`),
       // novel.yaml becomes book.yaml: a rename, so its history follows.
       "R096\tnovel.yaml\tbook.yaml",
     ].sort());

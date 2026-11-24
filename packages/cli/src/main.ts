@@ -41,8 +41,8 @@ Commands:
       --from <chapter>      The first chapter to compile, by ID (default: the first)
       --to <chapter>        The last, by ID (default: the last)
       --out <dir>           Where the files go (default: compiled/ in the novel)
-  migrate [dir]             Move a novel to the newest format, as one commit (and update its
-                            tools in .github/gh-writer/)
+  migrate [dir]             Move a book to the newest format, as one commit: entries' notes
+                            into its notes, and its tools in .github/gh-writer/ updated
   convert [dir] --to <kind> Make a book another kind, as one commit: a novel kept as a journal
                             a journal ("--to journal"), every ID kept
   new-id <prefix>           Print a new random ID, e.g. "writer new-id char"

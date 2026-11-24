@@ -11,6 +11,7 @@ import {
   proseText,
   indexById,
   loadBook,
+  localDateTime,
   MANIFEST,
   nextSeriesSlot,
   SERIES,
@@ -593,10 +594,13 @@ export class BibleOperations {
     return keep ? { path: note.file, content: editFrontMatter(text, [{ path: ["became"], value: made }]), base: hashText(text) } : { path: note.file, content: null, base: hashText(text) };
   }
 
-  /** Move the book to format `to` (the newest by default: D11, D15), on its own, in one commit. */
-  migrate(to?: number): Promise<OperationResult & { migrated: boolean }> {
+  /**
+   * Move the book to format `to` (the newest by default: D11, D15), on its own, in one commit; with
+   * `entryNotes`, entries' notes into the book's notes too (D20), which a book in the newest format may still need.
+   */
+  migrate(to?: number, { entryNotes = false }: { entryNotes?: boolean } = {}): Promise<OperationResult & { migrated: boolean }> {
     return this.#exclusive(async () => {
-      const { migration, result } = await migrateNovel(this.root, undefined, to);
+      const { migration, result } = await migrateNovel(this.root, undefined, to, { entryNotes });
       if (migration.status === "refused") throw new OperationError("BAD_REQUEST", migration.reason);
       return { ...(result ?? { commit: null, files: [] }), migrated: migration.status === "migrate" };
     });
@@ -1119,12 +1123,6 @@ function checkFocus(focus: [number, number]): [number, number] {
 export function required(value: string | undefined, field: string): string {
   if (typeof value !== "string" || !value.trim()) throw new OperationError("BAD_REQUEST", `A ${field} is required.`);
   return value.trim();
-}
-
-/** "2026-10-15T14:03:09": a moment as the writer's clock reads it. */
-function localDateTime(d: Date): string {
-  const two = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}T${two(d.getHours())}:${two(d.getMinutes())}:${two(d.getSeconds())}`;
 }
 
 /** A Markdown file with its prose replaced, and its front matter kept byte for byte. */

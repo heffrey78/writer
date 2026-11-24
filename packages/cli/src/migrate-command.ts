@@ -1,10 +1,10 @@
 import { resolve } from "node:path";
 import { migrateNovel } from "@writer/server";
 
-/** Move the novel in `dir` to the newest format, as one commit, and return the process exit code. */
+/** Move the book in `dir` to the newest format, entries' notes into its notes (D20), as one commit, and return the process exit code. */
 export async function runMigrate(dir: string, out: (s: string) => void = console.log, err: (s: string) => void = console.error): Promise<number> {
   const root = resolve(dir);
-  const { migration, result } = await migrateNovel(root);
+  const { migration, result } = await migrateNovel(root, undefined, undefined, { entryNotes: true });
   if (migration.status === "current") {
     out("Already in the newest format: nothing to do.");
     return 0;
@@ -13,7 +13,8 @@ export async function runMigrate(dir: string, out: (s: string) => void = console
     err(migration.reason);
     return 1;
   }
-  out(`Moved from format v${migration.from} to v${migration.to}, ${result?.commit ? `in commit ${result.commit.slice(0, 7)}` : "with nothing to commit"}: “${migration.message}”.`);
+  const what = migration.from === migration.to ? "Moved" : `Moved from format v${migration.from} to v${migration.to}`;
+  out(`${what}, ${result?.commit ? `in commit ${result.commit.slice(0, 7)}` : "with nothing to commit"}: “${migration.message}”.`);
   for (const path of result?.files ?? []) out(`  ${path}`);
   return 0;
 }

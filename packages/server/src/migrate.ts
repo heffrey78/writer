@@ -1,4 +1,4 @@
-import { migration, SCHEMA_VERSION, type FileSource, type Migration } from "@writer/core";
+import { migration, SCHEMA_VERSION, type FileSource, type Migration, type MigrationOptions } from "@writer/core";
 import { filesUnder, readToolBytes, sameBytes, TOOLS_DIR } from "./files.ts";
 import { templateOf } from "./new-book.ts";
 import { transaction, type FileWrite, type OperationResult } from "./operations.ts";
@@ -7,18 +7,23 @@ import { bookSource, filesPort } from "./ports.ts";
 /*
  * Moving a book to a newer format (D11, D15) as one commit: core's migration of its files, and the
  * novel template's vendored tools (.github/gh-writer/), so the book's own workflows read the new format.
+ * The writer's own move (writer migrate, the app's command) also moves entries' notes into the book's
+ * notes (D20); a change that only needs a format (a module's, a conversion) doesn't.
  */
 
 /** What migrating the book at `root` to format `to` would write, with the tools from `templateDir` where the book has them. */
-export async function migrationWrites(root: string, templateDir = templateOf("novel"), to = SCHEMA_VERSION): Promise<{ migration: Migration; writes: FileWrite[] }> {
-  const m = await migration(bookSource(root), to);
+export async function migrationWrites(root: string, templateDir = templateOf("novel"), to = SCHEMA_VERSION, options: MigrationOptions = {}): Promise<{ migration: Migration; writes: FileWrite[] }> {
+  const m = await migration(bookSource(root), to, options);
   if (m.status !== "migrate") return { migration: m, writes: [] };
   return { migration: m, writes: [...m.writes, ...(await toolWrites(root, templateDir))] };
 }
 
-/** Migrate the book at `root` to format `to` (the newest by default) in one commit. Nothing is written unless the migration's status is "migrate". */
-export async function migrateNovel(root: string, templateDir = templateOf("novel"), to = SCHEMA_VERSION): Promise<{ migration: Migration; result?: OperationResult }> {
-  const { migration: m, writes } = await migrationWrites(root, templateDir, to);
+/**
+ * Migrate the book at `root` to format `to` (the newest by default) in one commit, with entries' notes
+ * moved into the book's notes too if asked (D20). Nothing is written unless the migration's status is "migrate".
+ */
+export async function migrateNovel(root: string, templateDir = templateOf("novel"), to = SCHEMA_VERSION, options: MigrationOptions = {}): Promise<{ migration: Migration; result?: OperationResult }> {
+  const { migration: m, writes } = await migrationWrites(root, templateDir, to, options);
   if (m.status !== "migrate") return { migration: m };
   return { migration: m, result: await transaction(root, writes, m.message) };
 }

@@ -604,8 +604,12 @@ export function createApi({ baseUrl = "", headers = {}, fetch = globalThis.fetch
     },
     /** Make the book a book of the kind `to` (#39), one commit; `notes` say what it did that the writer should know. */
     convert: async (id: string, to: string) => (await request<OperationResult & { notes: string[] }>("POST", `/api/novels/${encodeURIComponent(id)}/convert`, { to })).data,
-    /** Move the book to format `to` (the newest by default: D11, D15), one commit; `migrated` false when it was already. */
-    migrate: async (id: string, to?: number) => (await request<OperationResult & { migrated: boolean }>("POST", `/api/novels/${encodeURIComponent(id)}/migrate`, to === undefined ? undefined : { to })).data,
+    /**
+     * Move the book to format `to` (the newest by default: D11, D15), one commit, and with `entryNotes`
+     * its entries' notes into the book's notes (D20); `migrated` false when there was nothing to move.
+     */
+    migrate: async (id: string, to?: number, { entryNotes = false }: { entryNotes?: boolean } = {}) =>
+      (await request<OperationResult & { migrated: boolean }>("POST", `/api/novels/${encodeURIComponent(id)}/migrate`, to === undefined && !entryNotes ? undefined : { ...(to === undefined ? {} : { to }), ...(entryNotes ? { entryNotes } : {}) })).data,
   };
 }
 

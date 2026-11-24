@@ -9,7 +9,8 @@ export { arrangeSidebar, barPages, BASE_PAGES, sidebarOf, sidebarPages, type Sid
 export { BASE_SIDEBAR, kindByKey, knownKind, knownKinds, levelOf, registerKind, startLevels, V2_KIND, type BookKind, type FieldDef, type ItemProp, type LevelDef, type Noun, type SidebarGroup, type StatusDef } from "./kinds.ts";
 export { plural, typePlural, typesInSentence, vocabulary, word, type Vocabulary, type Word } from "./vocabulary.ts";
 export { conversionsOf, defineModule, moduleFacts, moduleSnapshots, modulesOf, recordType, recordTypesOf, registerModule, storyClock, withModules, type BookModule, type Conversion, type Finding, type ModuleCheck, type ModuleMigration, type ModuleSnapshots, type RecordTypeDef, type StoryClock } from "./modules.ts";
-export { migration, type Migration, type MigrationWrite } from "./migrate.ts";
+export { migration, type Migration, type MigrationOptions, type MigrationWrite } from "./migrate.ts";
+export { entryNotesMove, frontMatterOf, isNoteAbout, localDateTime, mentionOf, noteAbout, noteAboutText, pluralPossessive } from "./entry-notes-move.ts";
 export { parseMarkdown, parseYaml } from "./parse.ts";
 export { AJV_OPTIONS, checkSchema, schemaFingerprint, schemaFor, SCHEMAS, schemasOf, useCompiledSchemas, type SchemaKind } from "./schemas.ts";
 export { joinPath, memorySource, type DirEntry, type FileSource } from "./source.ts";
