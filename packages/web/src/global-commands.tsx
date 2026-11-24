@@ -23,6 +23,7 @@ export function GlobalCommands() {
   const github = useGitHub();
   const signedIn = github.data?.signedIn ?? false;
   const dictation = useDictation((s) => s.available);
+  const own = useTheme((s) => !!s.appearance.own);
   useCommands(
     () => [
       { id: "app.library", title: "Go to your books", group: "Go to", run: () => showLibrary() },
@@ -45,6 +46,7 @@ export function GlobalCommands() {
         run: () => useTheme.getState().setPalette(t.id),
         isActive: () => useTheme.getState().appearance.palette === t.id,
       })),
+      ...(own ? [{ id: "app.palette.own", title: "Theme: Your own", group: "App", keywords: ["colors"], run: () => useTheme.getState().setPalette("own"), isActive: () => useTheme.getState().appearance.palette === "own" }] : []),
       { id: "app.theme", title: "Theme…", group: "App", keywords: ["colors", "light", "dark", "appearance"], run: () => useThemePicker.getState().set(true) },
       signedIn
         ? {
@@ -61,7 +63,7 @@ export function GlobalCommands() {
         : []),
       { id: "app.about", title: "About Writer", group: "App", keywords: ["version", "update", "licence", "license"], run: () => useAbout.getState().set(true) },
     ],
-    [openNovel, showLibrary, novels, signedIn, queryClient, dictation],
+    [openNovel, showLibrary, novels, signedIn, queryClient, dictation, own],
   );
   return null;
 }

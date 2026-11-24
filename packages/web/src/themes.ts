@@ -49,9 +49,11 @@ export interface Colors {
 }
 
 export type PaletteId = "paper" | "study" | "slate" | "moss" | "contrast";
+/** What <html data-palette> names: a theme, or a writer's own colors. */
+export type PaletteChoice = PaletteId | "own";
 
 export interface Theme {
-  id: PaletteId;
+  id: PaletteChoice;
   name: string;
   /** What it looks like, in a few words. */
   line: string;
@@ -164,7 +166,60 @@ export const THEMES: readonly Theme[] = [
   },
 ];
 
-export const themeById = (id: string): Theme | undefined => THEMES.find((t) => t.id === id);
+export const themeById = (id: string): Theme | undefined => THEMES.find((t) => t.id === id && id !== "own");
+
+/** A writer's own paper, text and links for one mode (#191): the rest is made from them. */
+export interface OwnColors {
+  paper: string;
+  ink: string;
+  accent: string;
+}
+
+/** A writer's own colors, light and dark, and the theme they started from. */
+export interface Own {
+  from: PaletteId;
+  light: OwnColors;
+  dark: OwnColors;
+}
+
+export type Role = keyof OwnColors;
+
+/**
+ * The short lists a writer's own colors are picked from, besides a hex code (#186): the themes' own,
+ * and a few more. One link color in each reads on few papers, and is made to by its nearest shade.
+ */
+export const SWATCHES: Record<Mode, Record<Role, readonly string[]>> = {
+  light: {
+    paper: ["#faf8f4", "#f3ead7", "#f7f8fa", "#f4f5ee", "#ffffff", "#fdf6e3"],
+    ink: ["#1f1d1a", "#33281c", "#1b2130", "#1e271c", "#000000", "#4a4640"],
+    accent: ["#2c5d8f", "#8f3a14", "#3451c6", "#3a6a2c", "#7a3d8f", "#e0b84a"],
+  },
+  dark: {
+    paper: ["#1b1a18", "#201a13", "#13161c", "#151912", "#000000", "#002b36"],
+    ink: ["#e8e4dc", "#ecdfc8", "#dde2ea", "#dfe5d6", "#ffffff", "#8a857c"],
+    accent: ["#8cb8e6", "#e6a273", "#9fb3f7", "#a5d18e", "#d2a8e6", "#3451c6"],
+  },
+};
+
+/** "#rrggbb", lower case; anything else isn't a color here. */
+export const isHex = (value: unknown): value is string => typeof value === "string" && /^#[0-9a-f]{6}$/.test(value);
+
+/** A writer's own colors, starting from a theme's paper, text and links. */
+export function ownFrom(theme: Theme): Own {
+  const pick = ({ paper, ink, accent }: Colors): OwnColors => ({ paper, ink, accent });
+  return { from: theme.id === "own" ? "paper" : theme.id, light: pick(theme.light), dark: pick(theme.dark) };
+}
+
+/** A record's own colors, if they're whole and colors. */
+export function ownOf(value: unknown): Own | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const own = value as Partial<Own>;
+  const whole = (c: unknown) => !!c && typeof c === "object" && (["paper", "ink", "accent"] as const).every((r) => isHex((c as Record<string, unknown>)[r]));
+  return whole(own.light) && whole(own.dark) ? { from: own.from && themeById(own.from) ? own.from : "paper", light: own.light!, dark: own.dark! } : undefined;
+}
+
+/** The theme a writer's own colors make: every token derived at WCAG AA. */
+export const ownTheme = (own: Own): Theme => ({ id: "own", name: "Your own", line: "Your colors from a short list, checked as you pick", minimum: 4.5, light: own.light, dark: own.dark });
 
 // Colors as numbers: "#rrggbb" ⇄ [r, g, b].
 
@@ -229,16 +284,9 @@ export function derive(colors: Colors, minimum = 4.5): Tokens {
   const panel = colors.panel ?? mix(paper, colors.ink, 0.05);
   const raised = dark ? mix(paper, colors.ink, 0.08) : mix(paper, "#ffffff", 0.75);
   const surfaces = [paper, panel, raised];
-  const ink = readable(colors.ink, surfaces, minimum);
-  const accent = readable(colors.accent, surfaces, minimum);
-  // Quiet text sits on a selected row's tint too (a chapter's word count in the outline).
-  const selected = [paper, panel].map((s) => over(accent, dark ? 0.14 : 0.1, s));
-  const muted = readable(colors.muted ?? mix(ink, paper, 0.4), [...surfaces, ...selected], minimum);
-  const base = PAPER[mode];
-  // A status color's text sits on its own soft tint too (a warning's box, a failed field).
-  const soft = { danger: dark ? 0.12 : 0.09, warn: dark ? 0.12 : 0.1 };
-  // The tint is made from the shade chosen, so check again until the shade reads on its own tint.
-  const status = (color: string, tint?: number) => {
+  // A color's text sits on its own soft tint too: a link on a mention's, a warning in its box. The
+  // tint is made from the shade chosen, so check again until the shade reads on its own tint.
+  const onTint = (color: string, tint?: number) => {
     let shade = readable(color, surfaces, minimum);
     for (let i = 0; tint && i < 10; i++) {
       const next = readable(shade, [...surfaces, ...surfaces.map((s) => over(shade, tint, s))], minimum);
@@ -247,14 +295,22 @@ export function derive(colors: Colors, minimum = 4.5): Tokens {
     }
     return shade;
   };
-  const danger = status(base.danger, soft.danger);
-  const warn = status(base.warn, soft.warn);
+  const soft = { accent: dark ? 0.14 : 0.1, danger: dark ? 0.12 : 0.09, warn: dark ? 0.12 : 0.1 };
+  const accent = onTint(colors.accent, soft.accent);
+  // Text sits on a selected row's tint too, the link color's; quiet text in a list or the outline
+  // (a chapter's word count), on paper or panel.
+  const selected = surfaces.map((s) => over(accent, soft.accent, s));
+  const ink = readable(colors.ink, [...surfaces, ...selected], minimum);
+  const muted = readable(colors.muted ?? mix(ink, paper, 0.4), [...surfaces, ...selected.slice(0, 2)], minimum);
+  const base = PAPER[mode];
+  const danger = onTint(base.danger, soft.danger);
+  const warn = onTint(base.warn, soft.warn);
   const ground = dark ? paper : panel;
   return {
     ink,
     muted,
     accent,
-    "accent-soft": alpha(accent, dark ? 0.14 : 0.1),
+    "accent-soft": alpha(accent, soft.accent),
     "raw-bg": alpha(ink, dark ? 0.07 : 0.05),
     selection: alpha(accent, dark ? 0.3 : 0.22),
     rule: colors.rule ?? mix(paper, ink, 0.15),
@@ -263,7 +319,7 @@ export function derive(colors: Colors, minimum = 4.5): Tokens {
     raised,
     danger,
     "danger-soft": alpha(danger, soft.danger),
-    ok: status(base.ok),
+    ok: onTint(base.ok),
     warn,
     "warn-soft": alpha(warn, soft.warn),
     shelf: mix(ground, ink, 0.12),

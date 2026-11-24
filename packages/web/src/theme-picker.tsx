@@ -3,7 +3,7 @@ import { useEffect, useId, useState } from "react";
 import { create } from "zustand";
 import { onAndroid } from "./platform.ts";
 import { useTheme, type ThemeChoice } from "./theme.ts";
-import { THEMES, type Colors, type Mode } from "./themes.ts";
+import { contrast, derive, isHex, SWATCHES, themeById, THEMES, type Colors, type Mode, type Own, type Role } from "./themes.ts";
 import { Button } from "./ui/button.tsx";
 import { cn } from "./ui/cn.ts";
 import { Modal } from "./ui/dialog.tsx";
@@ -86,8 +86,9 @@ function Picker({ onClose }: { onClose: () => void }) {
           <fieldset className="min-w-0">
             <legend className="mb-2 font-semibold">Colors</legend>
             <div className="grid overflow-hidden rounded-md border border-rule">
-              {THEMES.map((t, i) => {
+              {[...THEMES, OWN_CARD].map((t, i) => {
                 const checked = appearance.palette === t.id;
+                const colors = t.id === "own" ? appearance.own?.[shown] : t[shown];
                 return (
                   <label key={t.id} className={cn("relative block cursor-pointer", i > 0 && "border-t border-rule")}>
                     <input
@@ -101,7 +102,7 @@ function Picker({ onClose }: { onClose: () => void }) {
                       className="peer sr-only"
                     />
                     <span className={cn("flex min-h-12 items-center gap-3 px-3 py-2", CHOICE)}>
-                      <Swatches colors={t[shown]} />
+                      {colors ? <Swatches colors={colors} /> : <span aria-hidden className="h-5 w-[2.75rem] shrink-0 rounded-full border border-dashed border-muted" />}
                       <span className="grid min-w-0 flex-1">
                         <span className={cn(checked && "font-semibold")}>{t.name}</span>
                         {/* Quiet text would be too faint on the chosen row's tint, over the dialog. */}
@@ -116,6 +117,8 @@ function Picker({ onClose }: { onClose: () => void }) {
               })}
             </div>
           </fieldset>
+
+          {appearance.palette === "own" && appearance.own && <OwnColorsSection own={appearance.own} mode={shown} />}
         </div>
 
         <figure className="grid min-w-0 content-start gap-2">
@@ -136,6 +139,109 @@ function Picker({ onClose }: { onClose: () => void }) {
         </Button>
       </div>
     </Modal>
+  );
+}
+
+/** Your own colors as a card among the themes', their colors the record's own. */
+const OWN_CARD = { id: "own" as const, name: "Your own", line: "Your colors from a short list, checked as you pick", light: undefined, dark: undefined };
+
+const ROLES: readonly [Role, string][] = [
+  ["paper", "Paper"],
+  ["ink", "Text"],
+  ["accent", "Links"],
+];
+
+/**
+ * A writer's own paper, text and links (#191), for the mode on screen: each from six swatches or a
+ * hex code. What they make is checked as they're picked, and a color too faint to read is replaced
+ * by its nearest shade that reads, named here and said aloud.
+ */
+function OwnColorsSection({ own, mode }: { own: Own; mode: Mode }) {
+  const setOwn = useTheme((s) => s.setOwn);
+  const id = useId();
+  const raw = own[mode];
+  const made = derive(raw);
+  const checks = [
+    { label: "Text on paper", color: raw.ink, now: made.ink },
+    { label: "Links and the focus ring", color: raw.accent, now: made.accent },
+    { label: "Quiet text, made from your text color", color: made.muted, now: made.muted },
+  ];
+  return (
+    <section aria-labelledby={`${id}-own`} className="grid min-w-0 gap-4 rounded-md border border-rule p-3">
+      <h3 id={`${id}-own`} className="font-semibold">
+        Your own, {mode}, started from {themeById(own.from)?.name ?? "Paper"}
+      </h3>
+      {ROLES.map(([role, name]) => (
+        <fieldset key={role} className="min-w-0">
+          <legend className="mb-1.5 text-sm font-semibold">{name}</legend>
+          <div className="flex flex-wrap items-center gap-2">
+            {SWATCHES[mode][role].map((hex) => (
+              <label key={hex} className="relative cursor-pointer" title={hex}>
+                <input type="radio" name={`${id}-${role}`} checked={raw[role] === hex} onChange={() => setOwn(mode, role, hex)} aria-label={`${name} ${hex}`} className="peer sr-only" />
+                <span
+                  className="block size-8 rounded-full shadow-[inset_0_0_0_1px_var(--ghw-rule)] peer-checked:outline-2 peer-checked:outline-offset-2 peer-checked:outline-ink peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent"
+                  style={{ background: hex }}
+                />
+              </label>
+            ))}
+            <HexField value={raw[role]} label={`${name} color, as a hex code`} onColor={(hex) => setOwn(mode, role, hex)} />
+          </div>
+        </fieldset>
+      ))}
+      <ul aria-live="polite" className="grid gap-2 text-sm">
+        {checks.map((c) => {
+          const adjusted = c.now !== c.color;
+          return (
+            <li key={c.label} className="flex gap-2">
+              <span aria-hidden className={cn("w-3 shrink-0 font-bold", adjusted ? "text-warn" : "text-ok")}>
+                {adjusted ? "!" : "✓"}
+              </span>
+              <span className="grid min-w-0 gap-1">
+                <span>
+                  <strong className="font-semibold">{c.label}</strong> {contrast(c.color, raw.paper).toFixed(1)} : 1
+                </span>
+                {adjusted &&
+                  (contrast(c.now, raw.paper) >= 4.5 ? (
+                    <span className="flex flex-wrap items-center gap-1.5">
+                      Too faint on this paper (4.5 : 1 needed). Writer uses the nearest shade that reads:{" "}
+                      <span aria-hidden className="inline-block size-4 rounded-full shadow-[inset_0_0_0_1px_var(--ghw-rule)]" style={{ background: c.now }} />
+                      <code className="font-mono">{c.now}</code>
+                    </span>
+                  ) : (
+                    // A mid-tone paper: no shade of any color reads on it at 4.5.
+                    <span>Nothing reads at 4.5 : 1 on this paper. Pick a lighter or a darker paper.</span>
+                  ))}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+/** A color typed as a hex code: taken once it's whole ("#e0b84a", or without the #). */
+function HexField({ value, label, onColor }: { value: string; label: string; onColor: (hex: string) => void }) {
+  const [text, setText] = useState(value);
+  // A swatch picked, or the mode changed: the field shows the color in use.
+  useEffect(() => setText(value), [value]);
+  const hex = `#${text.trim().replace(/^#/, "").toLowerCase()}`;
+  const invalid = text.trim() !== "" && !isHex(hex);
+  return (
+    <input
+      type="text"
+      value={text}
+      onChange={(e) => {
+        setText(e.target.value);
+        const next = `#${e.target.value.trim().replace(/^#/, "").toLowerCase()}`;
+        if (isHex(next) && next !== value) onColor(next);
+      }}
+      aria-label={label}
+      aria-invalid={invalid || undefined}
+      spellCheck={false}
+      autoComplete="off"
+      className="h-8 w-24 rounded-md border border-rule bg-paper px-2 font-mono text-sm aria-invalid:border-danger"
+    />
   );
 }
 

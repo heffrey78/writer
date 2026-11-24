@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { themeById, themesCss, type Mode, type PaletteId } from "./themes.ts";
+import { ownFrom, ownOf, ownTheme, themeById, themeCss, themesCss, type Mode, type Own, type PaletteChoice, type Role } from "./themes.ts";
 
 export type ThemeChoice = "system" | "light" | "dark";
 
@@ -10,8 +10,8 @@ export type ThemeChoice = "system" | "light" | "dark";
  */
 export interface Appearance {
   mode: ThemeChoice;
-  palette: PaletteId;
-  own?: Record<Mode, { paper: string; ink: string; accent: string }>;
+  palette: PaletteChoice;
+  own?: Own;
   text?: { font?: string; size?: number };
 }
 
@@ -31,10 +31,13 @@ function stored(): Appearance {
     const value: unknown = JSON.parse(raw);
     if (!value || typeof value !== "object") return DEFAULT;
     const record = value as Partial<Appearance>;
+    const own = ownOf(record.own);
+    const { own: _, ...rest } = record;
     return {
-      ...record,
+      ...rest,
       mode: record.mode === "light" || record.mode === "dark" ? record.mode : "system",
-      palette: record.palette && themeById(record.palette) ? record.palette : "paper",
+      palette: (record.palette === "own" && own) || (record.palette && themeById(record.palette)) ? record.palette! : "paper",
+      ...(own ? { own } : {}),
     };
   } catch {
     return DEFAULT;
@@ -55,7 +58,10 @@ interface ThemeState {
   /** Light or dark, or following the system. */
   theme: ThemeChoice;
   setTheme: (t: ThemeChoice) => void;
-  setPalette: (p: PaletteId) => void;
+  /** A theme, or the writer's own colors: started from the theme on screen the first time. */
+  setPalette: (p: PaletteChoice) => void;
+  /** One of the writer's own colors, in light or dark; their own colors become the theme. */
+  setOwn: (mode: Mode, role: Role, color: string) => void;
   /** Back to Paper, following the system, in the writing view's own font and size; a writer's own colors are kept for another time. */
   reset: () => void;
 }
@@ -72,7 +78,16 @@ export const useTheme = create<ThemeState>((set, get) => {
     appearance,
     theme: appearance.mode,
     setTheme: (mode) => change({ ...get().appearance, mode }),
-    setPalette: (palette) => change({ ...get().appearance, palette }),
+    setPalette: (palette) => {
+      const now = get().appearance;
+      const own = now.own ?? (palette === "own" ? ownFrom(themeById(now.palette) ?? themeById("paper")!) : undefined);
+      change({ ...now, palette, ...(own ? { own } : {}) });
+    },
+    setOwn: (mode, role, color) => {
+      const now = get().appearance;
+      const own = now.own ?? ownFrom(themeById(now.palette) ?? themeById("paper")!);
+      change({ ...now, palette: "own", own: { ...own, [mode]: { ...own[mode], [role]: color } } });
+    },
     reset: () => {
       const { own } = get().appearance;
       change({ ...DEFAULT, ...(own ? { own } : {}) });
@@ -81,6 +96,7 @@ export const useTheme = create<ThemeState>((set, get) => {
 });
 
 const STYLE_ID = "ghw-themes";
+const OWN_STYLE_ID = "ghw-own-theme";
 
 /** The choice on <html>: data-theme for light or dark, data-palette for any theme but Paper, and the themes' rules. */
 export function apply(appearance: Appearance = useTheme.getState().appearance): void {
@@ -91,6 +107,14 @@ export function apply(appearance: Appearance = useTheme.getState().appearance): 
     style.textContent = themesCss();
     document.head.append(style);
   }
+  // A writer's own colors, made into a theme's rules like the others.
+  let own = document.getElementById(OWN_STYLE_ID);
+  if (!own) {
+    own = document.createElement("style");
+    own.id = OWN_STYLE_ID;
+    document.head.append(own);
+  }
+  own.textContent = appearance.own ? themeCss(ownTheme(appearance.own)) : "";
   if (appearance.mode === "system") delete root.dataset.theme;
   else root.dataset.theme = appearance.mode;
   if (appearance.palette === "paper") delete root.dataset.palette;

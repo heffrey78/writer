@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { contrast, derive, luminance, PAPER, readable, THEMES, themeCss, themesCss, tokensOf, TOKENS, type Mode, type Tokens } from "../src/themes.ts";
+import { contrast, derive, luminance, ownFrom, ownOf, ownTheme, SWATCHES, PAPER, readable, THEMES, themeCss, themesCss, tokensOf, TOKENS, type Mode, type Tokens } from "../src/themes.ts";
 
 const css = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
 const STYLESHEETS = css("../../editor/src/styles.css") + css("../src/styles.css");
@@ -88,17 +88,16 @@ describe("themes (#189)", () => {
     expect(failures).toEqual([]);
   });
 
-  it("makes readable tokens from any paper not mid-grey, and any text and links, changing a color only when it doesn't read", () => {
+  it("makes readable tokens from any paper not mid-tone, and any text and links, changing a color only when it doesn't read", () => {
     const color = fc.tuple(fc.integer({ min: 0, max: 255 }), fc.integer({ min: 0, max: 255 }), fc.integer({ min: 0, max: 255 })).map((c) => `#${c.map((v) => v.toString(16).padStart(2, "0")).join("")}`);
-    // On a mid-grey paper neither black nor white reads at 4.5 (the own-colors check warns of it, #191).
-    const paper = color.filter((p) => luminance(p) < 0.12 || luminance(p) > 0.3);
+    // On a mid-tone paper neither black nor white reads at 4.5 everywhere text sits (the picker says so, #191).
+    const paper = color.filter((p) => luminance(p) < 0.05 || luminance(p) > 0.3);
     fc.assert(
       fc.property(paper, color, color, (paper, ink, accent) => {
         const t = derive({ paper, ink, accent });
-        for (const role of ["ink", "muted", "accent"] as const) {
-          for (const surface of [t.paper, t.panel, t.raised]) expect(contrast(t[role], surface)).toBeGreaterThanOrEqual(4.5);
-        }
-        if (contrast(ink, t.paper) >= 4.5 && contrast(ink, t.panel) >= 4.5 && contrast(ink, t.raised) >= 4.5) expect(t.ink).toBe(ink);
+        for (const [role, surface] of pairs(t)) expect(contrast(t[role], surface), `${role} on ${surface}`).toBeGreaterThanOrEqual(4.5);
+        // Where the text color reads on everything text sits on, it's kept as it is.
+        if (pairs(t).every(([role, surface]) => role !== "ink" || contrast(ink, surface) >= 4.5)) expect(t.ink).toBe(ink);
       }),
       { numRuns: 300 },
     );
@@ -118,5 +117,38 @@ describe("themes (#189)", () => {
     expect(study).toContain('html:root[data-palette="study"][data-theme="dark"] {\n  --ghw-ink: #ecdfc8;');
     expect(themesCss()).not.toContain("paper\"]");
     expect(themesCss().match(/  color-scheme: dark;/g)).toHaveLength(8);
+  });
+
+  it("reads a writer's own colors from the record only when they're whole: three colors each for light and dark", () => {
+    const own = ownFrom(THEMES.find((t) => t.id === "study")!);
+    expect(own).toEqual({ from: "study", light: { paper: "#f3ead7", ink: "#33281c", accent: "#8f3a14" }, dark: { paper: "#201a13", ink: "#ecdfc8", accent: "#e6a273" } });
+    expect(ownOf(JSON.parse(JSON.stringify(own)))).toEqual(own);
+    expect(ownOf({ ...own, from: "nowhere" })?.from).toBe("paper");
+    expect(ownOf({ ...own, light: { ...own.light, ink: "black" } })).toBeUndefined();
+    expect(ownOf({ light: own.light })).toBeUndefined();
+    expect(ownOf("#ffffff")).toBeUndefined();
+  });
+
+  it("makes a writer's own colors into a theme's rules, a too-faint link moved to its nearest readable shade", () => {
+    const own = { ...ownFrom(THEMES[0]!), light: { paper: "#faf8f4", ink: "#1f1d1a", accent: "#e0b84a" } };
+    const css = themeCss(ownTheme(own));
+    const accent = derive(own.light)["accent"];
+    expect(accent).not.toBe("#e0b84a");
+    expect(contrast(accent, "#faf8f4")).toBeGreaterThanOrEqual(4.5);
+    expect(css).toContain(`html:root[data-palette="own"] {\n  --ghw-ink: #1f1d1a;\n  --ghw-muted: `);
+    expect(css).toContain(`  --ghw-accent: ${accent};\n`);
+  });
+
+  it("offers, in every mode, swatches that make readable tokens whichever are picked together", () => {
+    for (const mode of ["light", "dark"] as const) {
+      for (const paper of SWATCHES[mode].paper) {
+        for (const ink of SWATCHES[mode].ink) {
+          for (const accent of SWATCHES[mode].accent) {
+            const t = derive({ paper, ink, accent });
+            for (const [role, surface] of pairs(t)) expect(contrast(t[role], surface), `${mode} ${paper} ${ink} ${accent}: ${role} on ${surface}`).toBeGreaterThanOrEqual(4.5);
+          }
+        }
+      }
+    }
   });
 });
