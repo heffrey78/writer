@@ -437,7 +437,7 @@ function BibleRoute({ novelId, novel, workspace, spell }: RouteProps) {
   const [id, page] = (useParams()["*"] ?? "").split("/");
   if (id && page === "page") {
     const entity = novel.entities.find((e) => e.id === id);
-    return entity ? <EntryPage key={entity.id} novelId={novelId} novel={novel} entity={entity} workspace={workspace} spell={spell} /> : <Missing what={vocabulary(novel.kind).entity.one} />;
+    return entity ? <EntryPage key={entity.id} novelId={novelId} novel={novel} entity={entity} workspace={workspace} /> : <Missing what={vocabulary(novel.kind).entity.one} />;
   }
   if (id === "tidy") return <TidyPage novelId={novelId} novel={novel} workspace={workspace} />;
   if (id === "new") return <BiblePage novelId={novelId} novel={novel} workspace={workspace} spell={spell} over={<EntryOver novelId={novelId} novel={novel} workspace={workspace} spell={spell} />} />;

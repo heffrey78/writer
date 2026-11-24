@@ -8,4 +8,3 @@ fields:
   occupation: Toll keeper
 tags: [pov]
 ---
-Never given anything to hold. Charming, evasive, and more like their father than Ada will admit.

@@ -1,6 +1,6 @@
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, cpSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -33,6 +33,18 @@ beforeAll(() => {
   const scene = join(broken, "manuscript/02-the-sale/01-night-crossing/01-the-betrayal.md");
   writeFileSync(scene, readFileSync(scene, "utf8").replace("pov: char_7f3k2q", "pov: char_zzzzzz"));
 });
+
+/**
+ * A copy of the sample in a repository of its own, committed, for a server to open: a server commits
+ * what changed outside it, and the sample sits in Writer's own repository, so serving it in place
+ * would commit any edit to it there.
+ */
+function sampleRepo(name: string): string {
+  const dir = join(tmp, name);
+  cpSync(sample, dir, { recursive: true });
+  for (const args of [["init", "-q"], ["config", "user.name", "t"], ["config", "user.email", "t@t"], ["add", "-A"], ["commit", "-qm", "Sample"]]) spawnSync("git", ["-C", dir, ...args]);
+  return realpathSync(dir);
+}
 
 // Servers the tests start, stopped even when a test fails before stopping its own.
 const servers: ChildProcess[] = [];
@@ -128,12 +140,13 @@ async function serve(file: string, ...args: string[]) {
 
 describe("writer serve", () => {
   it("opens the novel, prints a launch URL with a token, serves it, and exits cleanly on SIGTERM", async () => {
-    const { child, exited, launch, exchange, cookie, out } = await serve(main, sample);
-    expect(out()).toContain(`Writer is serving The Bridge at Varn (${realpathSync(sample)})`);
+    const served = sampleRepo("served");
+    const { child, exited, launch, exchange, cookie, out } = await serve(main, served);
+    expect(out()).toContain(`Writer is serving The Bridge at Varn (${served})`);
 
     expect(exchange.status).toBe(303);
     const library = (await (await fetch(new URL("/api/library", launch), { headers: { cookie } })).json()) as { novels: { path: string }[] };
-    expect(library.novels.map((n) => n.path)).toEqual([realpathSync(sample)]);
+    expect(library.novels.map((n) => n.path)).toEqual([served]);
     expect((await fetch(new URL("/api/library", launch))).status).toBe(403);
 
     child.kill("SIGTERM");
@@ -254,10 +267,11 @@ describe("server bundle", () => {
   }, 60_000);
 
   it("serves the web app beside it and the API, away from the repository's node_modules", async () => {
-    const { child, exited, launch, cookie } = await serve(bundle, sample);
+    const served = sampleRepo("served-bundle");
+    const { child, exited, launch, cookie } = await serve(bundle, served);
     expect(await (await fetch(new URL("/", launch), { headers: { cookie } })).text()).toContain("<title>Stand-in</title>");
     const library = (await (await fetch(new URL("/api/library", launch), { headers: { cookie } })).json()) as { novels: { path: string }[] };
-    expect(library.novels.map((n) => n.path)).toContain(realpathSync(sample));
+    expect(library.novels.map((n) => n.path)).toContain(served);
     child.kill("SIGTERM");
     expect(await exited).toBe(0);
   }, 30_000);
@@ -286,6 +300,8 @@ describe("writer migrate", () => {
     const novel = join(tmp, "migrate-me");
     cpSync(sample, novel, { recursive: true });
     asFormatV1(novel);
+    // An entry with notes of its own, from before D20: moved into a note about it.
+    appendFileSync(join(novel, "bible/characters/ada.md"), "Counts things when she is frightened.\n");
     mkdirSync(join(novel, ".github/gh-writer"), { recursive: true });
     writeFileSync(join(novel, ".github/gh-writer/validate.mjs"), "// an older validator\n");
     // One date for both commits, so the compiles can be compared byte for byte.
@@ -300,8 +316,8 @@ describe("writer migrate", () => {
 
     const r = spawnSync("node", [main, "migrate", novel], { encoding: "utf8", env: { ...env(), ...date } });
     expect(r.status, r.stdout + r.stderr).toBe(0);
-    expect(r.stdout).toMatch(/^Moved from format v1 to v3, in commit [0-9a-f]{7}: “Format v3: off-page events as files, and the book's settings in book.yaml, naming its kind, and 5 entries' notes moved into the book's notes, each in a note that mentions it”\.\n/);
-    expect(git("log", "-1", "--format=%s")).toBe("Format v3: off-page events as files, and the book's settings in book.yaml, naming its kind, and 5 entries' notes moved into the book's notes, each in a note that mentions it\n");
+    expect(r.stdout).toMatch(/^Moved from format v1 to v3, in commit [0-9a-f]{7}: “Format v3: off-page events as files, and the book's settings in book.yaml, naming its kind, and an entry's notes moved into the book's notes, each in a note that mentions it”\.\n/);
+    expect(git("log", "-1", "--format=%s")).toBe("Format v3: off-page events as files, and the book's settings in book.yaml, naming its kind, and an entry's notes moved into the book's notes, each in a note that mentions it\n");
     expect(git("status", "--porcelain")).toBe("");
     expect(git("show", "--name-status", "--format=", "HEAD").split("\n").filter(Boolean).sort()).toEqual([
       "A\t.github/gh-writer/compile.mjs",
@@ -314,8 +330,8 @@ describe("writer migrate", () => {
       "D\tbible/events.yaml",
       "M\t.github/gh-writer/validate.mjs",
       // Each entry's notes, in a note that mentions it (D20).
-      ...["characters/ada", "characters/ben", "characters/mirela-kost", "characters/tomas-hale", "locations/varn-bridge"].map((f) => `M\tbible/${f}.md`),
-      ...["ada-varn", "ben-varn", "mirela-kost", "tomas-hale", "the-varn-bridge"].map((f) => `A\tnotes/${f}.md`),
+      "M\tbible/characters/ada.md",
+      "A\tnotes/ada-varn-2.md",
       // novel.yaml becomes book.yaml: a rename, so its history follows.
       "R096\tnovel.yaml\tbook.yaml",
     ].sort());

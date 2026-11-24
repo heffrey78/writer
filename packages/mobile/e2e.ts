@@ -456,11 +456,12 @@ try {
   await expect(page.getByRole("dialog", { name: "Add to an entry" })).toContainText("spine");
   await page.keyboard.type("ada");
   await page.keyboard.press("Enter");
-  await page.getByRole("dialog", { name: "Add to Ada Varn" }).getByRole("button", { name: "Add to its notes" }).click();
-  await expect(page.getByRole("status").filter({ hasText: "Added to Ada Varn's notes, from “The Station”." })).toBeVisible();
+  await page.getByRole("dialog", { name: "Add to Ada Varn" }).getByRole("button", { name: "Add to your notes on Ada Varn" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Added to your notes on Ada Varn, from “The Station”." })).toBeVisible();
   let kept = "";
-  for (let i = 0; i < 40 && !kept; i++, await sleep(250)) kept = inApp("grep -l \"spine\" books/*/bible/characters/ada.md || true").trim();
-  if (!kept) throw new Error("The words weren't saved to Ada Varn's notes.");
+  // In the note about her (D20), which her notes were moved into.
+  for (let i = 0; i < 40 && !kept; i++, await sleep(250)) kept = inApp("grep -l \"spine\" books/*/notes/ada-varn.md || true").trim();
+  if (!kept) throw new Error("The words weren't saved to the note about Ada Varn.");
   step("words selected in a novel, added to an entry from Android's toolbar");
 
   // Typing, then the app killed before the autosave lands; opened again, the text is there and saved.

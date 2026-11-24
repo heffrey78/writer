@@ -141,9 +141,10 @@ describe("loader structure checks", () => {
 describe("notes mentioning a record (heffrey78/gh-writer#205)", () => {
   it("finds the sample's note by the entries and events it mentions", async () => {
     const novel = await loadBook(nodeSource(SAMPLE));
-    expect(notesMentioning(novel, "char_7f3k2q").map((n) => n.id)).toEqual(["note_w1fben"]);
+    // Newest first: each entry's own, moved there from its file (D20), then the idea that names them.
+    expect(notesMentioning(novel, "char_7f3k2q").map((n) => n.title)).toEqual(["Ada Varn", "What if Ben never sold the plans?"]);
     expect(notesMentioning(novel, "evt_9ab3kd").map((n) => n.id)).toEqual(["note_w1fben"]);
-    expect(notesMentioning(novel, "char_b3n0vs")).toEqual([]);
+    expect(notesMentioning(novel, "char_b3n0vs").map((n) => n.title)).toEqual(["Ben Varn"]);
   });
 });
 

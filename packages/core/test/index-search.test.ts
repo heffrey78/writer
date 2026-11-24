@@ -15,14 +15,10 @@ describe("searchEntries", () => {
     expect(found("grey")).toEqual([["Ada Varn", "field"]]);
     expect(found("protagonist")).toEqual([["Ada Varn", "tag"]]);
     expect(found("M. K.")).toEqual([["Mirela Kost", "alias"]]);
-    expect(found("iron")).toEqual([
-      ["Ada Varn", "notes"],
-      ["The Varn Bridge", "summary"],
-    ]);
-    expect(found("toll")).toEqual([
-      ["Ben Varn", "field"],
-      ["The Varn Bridge", "notes"],
-    ]);
+    expect(found("iron")).toEqual([["The Varn Bridge", "summary"]]);
+    expect(found("toll")).toEqual([["Ben Varn", "field"]]);
+    // An entry's notes are the book's notes about it (D20): not searched as the entry.
+    expect(matchEntry({ ...entity("Ada"), body: "Sentimental about iron." }, "iron")).toBeUndefined();
   });
 
   it("ignores case and accents", () => {
@@ -48,7 +44,8 @@ describe("searchEntries", () => {
   it("shows a field as its name and value, and a few words of long text around the match", () => {
     const [eyes] = searchEntries(novel, "grey");
     expect(eyes).toMatchObject({ text: "eyes: grey", at: [6, 10] });
-    const iron = searchEntries(novel, "iron")[0]!;
+    const long = { ...entity("Ada"), summary: "Left Varn at nineteen for the polytechnic and never quite came back; precise, unsentimental out loud, and sentimental about iron, as her father was before her." };
+    const iron = matchEntry(long, "iron")!;
     expect(iron.text!.slice(...iron.at!)).toBe("iron");
     expect(iron.text).toMatch(/^…/);
     expect(iron.text!.split(/\s+/).length).toBeLessThanOrEqual(19);

@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Page } from "@playwright/test";
-import { axe, caretAtEnd, expect, palette, test, type App } from "./fixtures.ts";
+import { axe, expect, palette, test, type App } from "./fixtures.ts";
 
 const ADA = "char_7f3k2q";
 
@@ -17,7 +17,7 @@ async function open(page: Page, app: App) {
   };
 }
 
-test("adds a character, fills in the details and notes, all saved to its file", async ({ page, app }) => {
+test("adds a character, fills in its details, all saved to its file", async ({ page, app }) => {
   const novel = await open(page, app);
   await page.getByRole("navigation", { name: "Views" }).getByRole("link", { name: "Story bible" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Story bible" })).toBeVisible();
@@ -92,11 +92,45 @@ test("adds a character, fills in the details and notes, all saved to its file", 
   await page.getByRole("button", { name: "Remove the field" }).click();
   await expect.poll(() => novel.read(file)).not.toContain("born");
 
-  const notes = page.getByRole("textbox", { name: "Notes on Ilse Varn" });
-  await notes.click();
-  await page.keyboard.type("Lives above the toll house.");
-  await expect.poll(() => novel.read(file), { timeout: 10_000 }).toMatch(/---\nLives above the toll house\.\n$/);
+  // No notes of its own (D20): what's said about it goes in the book's notes.
+  await expect(page.getByRole("textbox", { name: /^Notes on/ })).toHaveCount(0);
+  expect(await novel.read(file)).toMatch(/\n---\n$/);
   await axe(page);
+});
+
+test("notes still in an entry's file show on its profile until they're moved into a note about it, in one commit (D20, #181)", async ({ page, app }) => {
+  const dir = app.novelRepo("varn");
+  const MIRELA = "bible/characters/mirela-kost.md";
+  writeFileSync(join(dir, MIRELA), `${readFileSync(join(dir, MIRELA), "utf8")}Owes the bank more than she says.\n`);
+  app.git(dir, "commit", "-qam", "Mirela's notes");
+  await app.restart(dir);
+  await page.goto(app.launchUrl);
+  await expect(page.getByRole("textbox", { name: "Chapter text" })).toBeFocused();
+  await palette(page, "character: mirela");
+  const kept = page.getByRole("region", { name: "Notes kept in the entry's file" });
+  await expect(kept).toContainText("Owes the bank more than she says.");
+  await axe(page);
+  await page.emulateMedia({ colorScheme: "dark" });
+  await axe(page);
+  await page.emulateMedia({ colorScheme: "light" });
+  await kept.getByRole("button", { name: "Move them into your notes…" }).click();
+  const ask = page.getByRole("alertdialog", { name: "Move entries' notes into your notes?" });
+  await expect(ask).toContainText("Every word is kept, in one commit");
+  await ask.getByRole("button", { name: "Move them" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Moved: the entries' notes are in your notes now" })).toBeVisible();
+  await expect(kept).toHaveCount(0);
+  expect(app.git(dir, "log", "-1", "--format=%s").trim()).toBe("An entry's notes moved into the book's notes, each in a note that mentions it");
+  // A gh-writer novel stays one: only the notes moved.
+  expect(app.git(dir, "show", "--name-status", "--format=", "HEAD").trim().split("\n").sort()).toEqual(["A\tnotes/mirela-kost-2.md", "M\tbible/characters/mirela-kost.md"]);
+  expect(readFileSync(join(dir, MIRELA), "utf8")).toMatch(/\n---\n$/);
+  const about = page.getByRole("region", { name: "In your notes" }).getByRole("link");
+  await expect(about.first()).toHaveText("Mirela Kost");
+  expect(readFileSync(join(dir, "notes/mirela-kost-2.md"), "utf8")).toMatch(/\n\[Mirela Kost\]\(#char_m1re1a\)\n\nOwes the bank more than she says\.\n$/);
+  // Nothing left to move: the palette no longer offers it.
+  await page.keyboard.press("ControlOrMeta+k");
+  await page.keyboard.type("move entries");
+  await expect(page.getByRole("option", { name: /Move entries' notes/ })).toHaveCount(0);
+  await page.keyboard.press("Escape");
 });
 
 test("renames an entry by moving its file only; every reference still resolves", async ({ page, app }) => {
@@ -167,7 +201,7 @@ test("a new type of entry works at once, with no code changes", async ({ page, a
   expect(novel.read("bible/vehicles/the-night-train.md")).toMatch(/^---\nid: vehi_[0-9a-hjkmnp-tv-z]{6}\nname: The Night Train\n---\n$/);
 });
 
-test("searches the bible by anything an entry says: names, other names, summaries, fields and notes", async ({ page, app }) => {
+test("searches the bible by anything an entry says: names, other names, summaries and fields", async ({ page, app }) => {
   await open(page, app);
   await palette(page, "story bible");
   const search = page.getByRole("searchbox", { name: "Search the bible" });
@@ -177,13 +211,13 @@ test("searches the bible by anything an entry says: names, other names, summarie
   await expect(page.getByText(/entr(y|ies) match(es)? “GREY”/)).toBeVisible();
   await expect(results.getByRole("link")).toHaveCount(1);
   await expect(results.getByRole("link", { name: /^Ada Varn/ })).toBeVisible();
-  // Another name, in any case; and a summary and notes: Ben is “Ada's younger brother”, Tomas “taught Ada to read a gauge”.
+  // Another name, in any case; and a summary: Ben is “Ada's younger brother”. Not the notes about an entry, which are the book's (D20): Tomas's “taught Ada to read a gauge”.
   await search.fill("m. k.");
   await expect(results.getByRole("link", { name: /^Mirela Kost/ })).toBeVisible();
   await search.fill("ada");
   await expect(results.getByRole("link", { name: /^Ada Varn/ })).toBeVisible();
   await expect(results.getByRole("link", { name: /^Ben Varn/ })).toBeVisible();
-  await expect(results.getByRole("link", { name: /^Tomas Hale/ })).toBeVisible();
+  await expect(results.getByRole("link", { name: /^Tomas Hale/ })).toHaveCount(0);
   await expect(results.getByRole("link", { name: /^Mirela/ })).toHaveCount(0);
   await axe(page);
   await page.emulateMedia({ colorScheme: "dark" });
@@ -247,7 +281,7 @@ test("an entry's profile lists every passage naming it, by scene and role; chips
 
   // The strip of the profile's parts jumps to one, and marks it.
   const strip = page.getByRole("navigation", { name: "Parts of the entry" });
-  await expect(strip.getByRole("button")).toHaveText(["Profile", "Notes", "In the story", "Appears in · 6", "Relationships · 5"]);
+  await expect(strip.getByRole("button")).toHaveText(["Profile", "In your notes · 1", "In the story", "Appears in · 6", "Relationships · 5"]);
   await strip.getByRole("button", { name: "Appears in · 6" }).click();
   await expect(part.getByRole("heading", { name: "Appears in · 6" })).toBeFocused();
   await expect(strip.getByRole("button", { name: "Appears in · 6" })).toHaveAttribute("aria-current", "true");
@@ -430,12 +464,12 @@ test("the index's search says where each entry matched, filters narrow it as chi
   const locations = page.getByRole("region", { name: /^Locations/ });
   const found = page.getByRole("status").filter({ hasText: / match/ });
 
-  // Where each matched: Ada in her notes, the bridge in its summary, each with the word marked.
-  await search.fill("iron");
-  await expect(characters.getByRole("link", { name: /^Ada Varn/ })).toContainText("notes");
-  await expect(characters.getByRole("link", { name: /^Ada Varn/ }).locator("mark")).toHaveText("iron");
-  await expect(locations.getByRole("link", { name: /^The Varn Bridge/ })).toContainText("summary");
-  await expect(found).toHaveText("2 entries match “iron” (and the off-page events below that do)");
+  // Where each matched: Ada and the house in their summaries, each with the word marked.
+  await search.fill("family");
+  await expect(characters.getByRole("link", { name: /^Ada Varn/ })).toContainText("summary");
+  await expect(characters.getByRole("link", { name: /^Ada Varn/ }).locator("mark")).toHaveText("family");
+  await expect(locations.getByRole("link", { name: /^The Varn House/ })).toContainText("summary");
+  await expect(found).toHaveText("5 entries match “family” (and the off-page events below that do)");
 
   // A filter by type, from + Filter: only characters, said as a chip; the count says so.
   await page.getByRole("button", { name: "Filter", exact: true }).click();
@@ -445,7 +479,7 @@ test("the index's search says where each entry matched, filters narrow it as chi
   await adding.getByRole("button", { name: "Add the filter" }).click();
   await expect(page.getByRole("button", { name: "Remove the filter: Characters" })).toBeVisible();
   await expect(locations).toHaveCount(0);
-  await expect(found).toHaveText("1 entry matches “iron” and the filters");
+  await expect(found).toHaveText("3 entries match “family” and the filters");
   for (const colorScheme of ["light", "dark"] as const) {
     await page.emulateMedia({ colorScheme });
     await axe(page);
@@ -575,12 +609,14 @@ test("the index by the keyboard alone: / searches, j and k open the next and pre
   await page.keyboard.press("Escape");
   await expect(focusedRow(/^Ada Varn/)).toBeFocused();
 
-  // In the notes, the keys are the text's.
-  const notes = page.getByRole("textbox", { name: "Notes on Ada Varn" });
-  await caretAtEnd(page, notes);
+  // In a part being edited, the keys are the text's.
+  await page.getByRole("button", { name: "Edit summary" }).click();
+  const summary = page.getByRole("textbox", { name: "Summary" });
+  await summary.press("Control+End");
   await page.keyboard.type(" jk/");
-  await expect.poll(() => novel.read("bible/characters/ada.md")).toContain(" jk/");
+  await expect(summary).toHaveValue(/ jk\/$/);
   await expect(page.getByRole("region", { name: "Ada Varn" })).toBeVisible();
+  await page.keyboard.press("Escape");
 
   // n: a new one of the open one's type.
   await focusedRow(/^Ada Varn/).focus();
@@ -924,6 +960,7 @@ test("merging two entries that are one: from Tidy up's pair or the profile, told
   const dialog = page.getByRole("dialog", { name: "Merge Benjamin and Ben Varn" });
   await expect(dialog.getByRole("radio", { name: "Ben Varn" })).toBeChecked();
   await expect(dialog).toContainText("Mentions and lists in 1 scene");
+  await expect(dialog).toContainText("The notes kept in Benjamin's file become a note about Ben Varn.");
   await axe(page);
   await page.emulateMedia({ colorScheme: "dark" });
   await axe(page);
@@ -935,13 +972,15 @@ test("merging two entries that are one: from Tidy up's pair or the profile, told
   expect(read(STATION)).not.toContain("char_b3nj4m");
   expect(read(STATION)).toContain("Then [Benjamin](#char_b3n0vs) waved.");
   expect(read("bible/characters/ben.md")).toContain("aliases: [Ben, Benjamin]");
-  expect(read("bible/characters/ben.md")).toContain("## From Benjamin\n\nAlways at the toll house.\n");
+  // Benjamin's notes, still in his file from before D20: a note about Ben, which Ben's profile lists.
+  expect(read("notes/benjamin.md")).toMatch(/\n\[Ben Varn\]\(#char_b3n0vs\)\n\nAlways at the toll house\.\n$/);
   await expect(page.getByRole("tab", { name: /Might be the same/ })).toHaveText("0Might be the same");
 
   // Undo: every file back, byte for byte.
   await page.getByRole("status").getByRole("button", { name: "Undo" }).click();
   await expect.poll(() => existsSync(join(dir, "bible/characters/benjamin.md"))).toBe(true);
   expect({ station: read(STATION), ben: read("bible/characters/ben.md"), benjamin: read("bible/characters/benjamin.md") }).toEqual(before);
+  expect(existsSync(join(dir, "notes/benjamin.md"))).toBe(false);
 
   // From the profile, by keyboard: Merge into…, the one to keep chosen; its page follows to the one kept.
   await page.goto(`${app.url}${new URL(app.launchUrl).pathname.replace(/\/chapter.*$/, "")}/bible/char_b3nj4m/page`);

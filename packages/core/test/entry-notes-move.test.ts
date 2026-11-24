@@ -35,7 +35,14 @@ describe("entries' notes moved into the book's notes (D20, #181)", () => {
   it("is asked for: a format-only migration leaves a book in format 3 as it is", async () => {
     const source = memorySource({ "book.yaml": BOOK, "bible/characters/ada.md": ADA });
     expect(await migration(source)).toEqual({ status: "current" });
-    expect(await migration(source, 2, { entryNotes: true })).toEqual({ status: "current" });
+  });
+
+  it("moves only the notes of a gh-writer novel asked for its own format, which it keeps", async () => {
+    const v2 = "schema_version: 2\nid: nv_4k8h2c\ntitle: Tiny\n";
+    const m = await migration(memorySource({ "novel.yaml": v2, "bible/characters/ada.md": ADA }), 2, { entryNotes: true, now: NOW });
+    expect(m).toMatchObject({ status: "migrate", from: 2, to: 2, message: "An entry's notes moved into the book's notes, each in a note that mentions it" });
+    if (m.status === "migrate") expect(m.writes.map((w) => w.path)).toEqual(["bible/characters/ada.md", "notes/ada-varn.md"]);
+    expect(await migration(memorySource({ "novel.yaml": v2, "bible/characters/ben.md": BEN }), 2, { entryNotes: true })).toEqual({ status: "current" });
   });
 
   it("empties the entry's file to its front matter, byte for byte, and puts its words in a note that mentions it first", async () => {

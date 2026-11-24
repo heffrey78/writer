@@ -1,6 +1,6 @@
 import type { Editor } from "@tiptap/core";
 import { useQueryClient } from "@tanstack/react-query";
-import { appendQuote, entriesInPiece, vocabulary, type Book, type Entity } from "@writer/core";
+import { appendQuote, entriesInPiece, mentionOf, noteAbout, vocabulary, type Book, type Entity } from "@writer/core";
 import { joinSceneFile } from "@writer/editor";
 import { Command as Cmdk } from "cmdk";
 import { Dialog } from "radix-ui";
@@ -15,8 +15,10 @@ import { typeOf } from "./types.ts";
 
 /*
  * Add to an entry (#157): words just written, put into an entry without leaving the sentence. Into
- * its notes as a quote naming the piece (core's appendQuote: the profile finds the sentence again by
- * it), or as a field's value. From the right-click menu, Android's selection toolbar and the palette.
+ * a note about it as a quote naming the piece (core's appendQuote: the profile finds the sentence again
+ * by it), or as a field's value. An entry has no notes of its own (D20): the note is the one the move
+ * made, or one this made before (noteAbout), else a new one titled after it that mentions it first.
+ * From the right-click menu, Android's selection toolbar and the palette.
  */
 
 export const useAddToEntry = create<{ passage: Selected | undefined; editor: Editor | undefined; open: (passage: Selected, editor: Editor) => void; close: () => void }>((set) => ({
@@ -118,14 +120,39 @@ function Into({ novelId, novel, workspace, passage, entity, onBack, onDone }: { 
   const value = passage.quote.replace(/\s+/g, " ").trim();
 
   const toNotes = async () => {
-    await workspace.open([path]);
-    const f = workspace.store.getState().files[path];
-    const body = workspace.current(path);
-    if (!f || body === undefined) return setProblem(`Couldn't open ${entity.name}'s file.`);
-    const was = joinSceneFile({ ...f, body });
-    workspace.change(path, appendQuote(body, passage.quote, passage.sceneTitle));
-    onDone();
-    show({ message: `Added to ${entity.name}'s notes, from “${passage.sceneTitle}”.`, action: { label: "Undo", run: () => workspace.replace(path, was) } });
+    const about = noteAbout(novel, entity.id);
+    const said = `Added to your notes on ${entity.name}, from “${passage.sceneTitle}”.`;
+    if (about) {
+      await workspace.open([about.file]);
+      const f = workspace.store.getState().files[about.file];
+      const body = workspace.current(about.file);
+      if (!f || body === undefined) return setProblem(`Couldn't open the note “${about.title}”.`);
+      const was = joinSceneFile({ ...f, body });
+      workspace.change(about.file, appendQuote(body, passage.quote, passage.sceneTitle));
+      onDone();
+      return show({ message: said, action: { label: "Undo", run: () => workspace.replace(about.file, was) } });
+    }
+    setSaving(true);
+    try {
+      const made = await api.notes.create(novelId, { title: entity.name, note: `${mentionOf(entity)}\n\n${appendQuote("", passage.quote, passage.sceneTitle)}` });
+      await refresh();
+      onDone();
+      show({
+        message: said,
+        action: {
+          label: "Undo",
+          run: () =>
+            void api.notes
+              .delete(novelId, made.id)
+              .then(refresh)
+              .catch((e: unknown) => show({ message: `Couldn't undo it: ${e instanceof Error ? e.message : String(e)}` })),
+        },
+      });
+    } catch (e) {
+      setProblem(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
+    }
   };
 
   const toField = async () => {
@@ -162,8 +189,8 @@ function Into({ novelId, novel, workspace, passage, entity, onBack, onDone }: { 
 
   return (
     <div className="grid gap-3">
-      <Button variant="primary" autoFocus onClick={() => void toNotes()} className="justify-self-start">
-        Add to its notes
+      <Button variant="primary" autoFocus onClick={() => void toNotes()} disabled={saving} className="justify-self-start">
+        Add to your notes on {entity.name}
       </Button>
       <form
         className="grid gap-2 border-t border-rule pt-3"

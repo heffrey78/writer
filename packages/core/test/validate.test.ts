@@ -183,6 +183,13 @@ describe("validate", () => {
     expect(r.errors).toBe(0);
   });
 
+  it("W_ENTRY_BODY for an entry with notes still in its file, kept and said where to move them (D20)", async () => {
+    const r = await fixture({ "bible/characters/ada.md": "---\nid: char_aaaaaa\nname: Ada\n---\nCounts things.\n" });
+    expect(r.diagnostics.map((d) => [d.code, d.file, d.line])).toEqual([["W_ENTRY_BODY", "bible/characters/ada.md", 5]]);
+    expect(r.diagnostics[0]!.message).toBe("Ada has notes in its file; an entry's notes are the book's notes about it now: run writer migrate to move them");
+    expect(r.novel.entities[0]!.body).toBe("Counts things.\n");
+  });
+
   it("W_HARD_WRAP, W_POV_NOT_PRESENT and W_REL_SELF", async () => {
     const r = await fixture({
       "manuscript/01-one/02-b.md": scene("sc_bbbbbb", "B", "pov: char_bbbbbb\n", "A wrapped\nparagraph.\n"),

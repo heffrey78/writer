@@ -124,7 +124,7 @@ test("an NPC's fields are ready; a faction picked from its list is written by it
 
   // The faction names Orrin among its NPCs, as a link to him.
   await profile.getByRole("link", { name: "The Tide Choir" }).click();
-  const named = page.getByRole("region", { name: "Named in their fields" });
+  const named = page.getByRole("region", { name: "Links" });
   await expect(named.locator("dt")).toHaveText(["NPCs · Faction"]);
   await expect(named.getByRole("link", { name: "Orrin" })).toBeVisible();
 });

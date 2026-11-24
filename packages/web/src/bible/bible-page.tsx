@@ -808,7 +808,7 @@ export function stripMarks(presence: EntryPresence | undefined, most: number): {
  */
 const EntryBody = memo(
   function EntryBody({ novelId, novel, entity, workspace, spell, headingId, alone }: { novelId: string; novel: Book; entity: Entity; workspace: Workspace; spell: { service: SpellService; onAddWord: (w: string) => void } | undefined; headingId: string; alone: boolean }) {
-    return <EntryPage novelId={novelId} novel={novel} entity={entity} workspace={workspace} spell={spell} embedded={{ headingId, modal: alone }} />;
+    return <EntryPage novelId={novelId} novel={novel} entity={entity} workspace={workspace} embedded={{ headingId, modal: alone }} />;
   },
   (a, b) => a.novel === b.novel && a.entity === b.entity && a.workspace === b.workspace && a.spell?.service === b.spell?.service && a.headingId === b.headingId && a.alone === b.alone,
 );

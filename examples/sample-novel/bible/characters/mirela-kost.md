@@ -7,4 +7,3 @@ fields:
   occupation: Developer
 tags: [antagonist]
 ---
-Not a villain in her own story: she genuinely believes the new bridge will save the town.

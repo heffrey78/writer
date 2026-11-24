@@ -116,7 +116,7 @@ describe("entities", () => {
     const before = read(ADA_FILE);
     await bible.updateEntity(ADA, hash(ADA_FILE), { changes: [change] });
     expect(changedInLastCommit()).toEqual([`M\t${ADA_FILE}`]);
-    expect(read(ADA_FILE)).toBe(before.replace("---\nLeft", "changes:\n  - field: occupation\n    value: Bridge keeper\n    since: sc_5tat1n\n---\nLeft"));
+    expect(read(ADA_FILE)).toBe(before.replace(/---\n$/, "changes:\n  - field: occupation\n    value: Bridge keeper\n    since: sc_5tat1n\n---\n"));
     expect((await valid()).entities.find((e) => e.id === ADA)!.changes).toEqual([change]);
   });
 
@@ -242,7 +242,7 @@ describe("merging two entries (#173)", () => {
     await bible.areDifferent(BENJ, ADA);
   }
 
-  it("moves every reference to the one kept, gives it the other's names, notes and missing fields, in one commit; undone byte for byte", async () => {
+  it("moves every reference to the one kept, gives it the other's names and missing fields, its unmoved notes a note about it, in one commit; undone byte for byte", async () => {
     await benjamin();
     const tracked = gitIn(dir, "ls-files").trim().split("\n").filter((f) => /\.(md|yaml)$/.test(f));
     const before = Object.fromEntries(tracked.map((f) => [f, read(f)]));
@@ -256,7 +256,10 @@ describe("merging two entries (#173)", () => {
     expect(ben.aliases).toEqual(["Ben", "Benjamin", "Benjy"]);
     expect(ben.tags).toEqual(["pov", "quick"]);
     expect(ben.fields).toEqual({ age: 29, occupation: "Toll keeper", eyes: "brown" });
-    expect(read(BEN_FILE)).toContain(`## From Benjamin\n\nAlways at the toll house. Ask [Ada](#${ADA}).\n`);
+    // Benjamin's notes, still in his file (from before D20): a note about Ben now, not in Ben's file.
+    expect(read(BEN_FILE)).toMatch(/\n---\n$/);
+    expect(novel.notes.find((n) => n.file === "notes/benjamin.md")).toMatchObject({ title: "Ben Varn" });
+    expect(novel.notes.find((n) => n.file === "notes/benjamin.md")!.body).toBe(`\n[Ben Varn](#${BEN})\n\nAlways at the toll house. Ask [Ada](#${ADA}).\n`);
     // The scene lists Ben once, its prose mentions him; Ada's field names him.
     const station = novel.pieces.find((p) => p.file === STATION)!;
     expect((station.fields["characters"] as string[]).filter((c) => c === BEN)).toHaveLength(1);
@@ -584,18 +587,20 @@ describe("a novel in format v1", () => {
 describe("entries' notes moved into the book's notes (D20, #181)", () => {
   it("moves them only when asked, in one commit: each entry's file down to its front matter, its words in a note about it", async () => {
     await bible.migrate(3);
+    // Notes of its own, from before D20.
+    writeFileSync(join(dir, ADA_FILE), `${read(ADA_FILE)}Left Varn at nineteen for the polytechnic.\n`);
+    gitIn(dir, "commit", "-qam", "Ada's notes");
     const before = read(ADA_FILE);
-    expect(before).toContain("---\nLeft Varn");
     // Asked only for the format (a field's change needs no more): the notes stay.
     expect(await bible.migrate()).toMatchObject({ migrated: false });
     expect(read(ADA_FILE)).toBe(before);
 
     expect(await bible.migrate(undefined, { entryNotes: true })).toMatchObject({ migrated: true });
-    expect(lastCommit()).toMatch(/^\d+ entries' notes moved into the book's notes, each in a note that mentions it$/);
+    expect(lastCommit()).toBe("An entry's notes moved into the book's notes, each in a note that mentions it");
     clean();
     expect(read(ADA_FILE)).toBe(before.slice(0, before.indexOf("Left Varn")));
     const book = await valid();
-    const note = book.notes.find((n) => n.title === "Ada Varn")!;
+    const note = book.notes.find((n) => n.title === "Ada Varn" && n.file !== "notes/ada-varn.md")!;
     expect(note.body).toMatch(/^\n\[Ada Varn\]\(#char_7f3k2q\)\n\nLeft Varn at nineteen/);
     expect(book.entities.every((e) => !e.body.trim())).toBe(true);
     expect(await bible.migrate(undefined, { entryNotes: true })).toEqual({ commit: null, files: [], migrated: false });

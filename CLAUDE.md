@@ -12,9 +12,9 @@ The plan lives in this repository's issues (see *Project tracking*); `get_status
 2. Keep gh-writer v2 novels opening unchanged (#2). Done.
 3. Generalize: kinds (#3, D15 #11) and modules (#4, D14 #10), starting from the inventory (#17). Done.
 4. The Journal kind, the first proof of the base (#5). Done.
-5. Roadmap: Non-fiction (#7) and Android (#8, D16 #12) are done. Campaign (#6) is built and waits on its game master. Dictation (#71–#76, D17 #77) works on Linux and Android; Windows and macOS wait on signed apps (#74). Other languages (#92) are a draft.
+5. Roadmap: Non-fiction (#7) and Android (#8, D16 #12) are done. Campaign (#6) is built and waits on its game master. Dictation (#71–#76, D17 #77) works on Linux and Android; Windows and macOS wait on signed apps (#74). Other languages (#92) are a draft. Themes (milestone 5, #185–#187) are approved, from agreed mock-ups.
 
-D13–D15 are accepted (2026-10-18), D16 (2026-10-21, amended from its spike: docs/architecture/d16-spike.md), D17 (2026-10-24; its spike, #78, amends it with the engine and model), and D18 and D19 (2026-11-22: a type's fields declared in the manifest, values in an entry's `fields:`, changes in its file; "Not a name here" kept in files of the index's own). Don't build on a proposed decision as if it were settled, and point it out when work depends on one.
+D13–D15 are accepted (2026-10-18), D16 (2026-10-21, amended from its spike: docs/architecture/d16-spike.md), D17 (2026-10-24; its spike, #78, amends it with the engine and model), D18 and D19 (2026-11-22: a type's fields declared in the manifest, values in an entry's `fields:`, changes in its file; "Not a name here" kept in files of the index's own), and D20 and D21 (2026-11-23: an entry has no notes of its own, what's said about it is in the notes that mention it; a theme is colors only, kept per device, fonts shipped in the app). Don't build on a proposed decision as if it were settled, and point it out when work depends on one.
 
 ## gh-writer is the reference
 

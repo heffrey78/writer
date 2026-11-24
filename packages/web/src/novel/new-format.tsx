@@ -1,6 +1,7 @@
 import { MANIFEST, NOVEL_MANIFEST, pluralPossessive, SCHEMA_VERSION, vocabulary, type Book } from "@writer/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { create } from "zustand";
 import { api, keys } from "../api.ts";
 import { Confirm } from "../ui/confirm.tsx";
 import { useNotice } from "./notice.tsx";
@@ -14,6 +15,13 @@ export const entryNotesMove = (book: Book) => {
   return `Writer keeps what you write about ${w.a} in your notes now. Each ${w.one}'s own notes become a note that mentions it, titled with its name and listed under In your notes on its page. Every word is kept, in one commit; nothing else changes.`;
 };
 
+/** Asking to move entries' notes (D20), from wherever an entry shows notes still in its file. */
+export const useEntryNotesMove = create<{ asking: boolean; ask: () => void; done: () => void }>((set) => ({
+  asking: false,
+  ask: () => set({ asking: true }),
+  done: () => set({ asking: false }),
+}));
+
 /**
  * Moving a novel in format v1 or v2 to v3 (D15), when the writer asks: a palette command for a book
  * still in ${NOVEL_MANIFEST}, and the dialog that asks first. And moving entries' own notes into the
@@ -22,16 +30,18 @@ export const entryNotesMove = (book: Book) => {
 export function useNewFormat(novelId: string, novel: Book | undefined) {
   const queryClient = useQueryClient();
   const show = useNotice((n) => n.show);
-  const [asking, setAsking] = useState<"format" | "notes" | false>(false);
+  const [asking, setAsking] = useState(false);
+  const notes = useEntryNotesMove();
   const notesLeft = !!novel?.entities.some((e) => e.body.trim());
   const theirs = pluralPossessive(novel ? vocabulary(novel.kind).entity.many : "entries");
   const commands = [
-    ...(novel?.manifest === NOVEL_MANIFEST ? [{ id: "novel.newFormat", title: "Move this book to the new format…", group: "Book", run: () => setAsking("format") }] : []),
-    ...(notesLeft ? [{ id: "novel.entryNotes", title: `Move ${theirs} notes into your notes…`, group: "Book", run: () => setAsking("notes") }] : []),
+    ...(novel?.manifest === NOVEL_MANIFEST ? [{ id: "novel.newFormat", title: "Move this book to the new format…", group: "Book", run: () => setAsking(true) }] : []),
+    ...(notesLeft ? [{ id: "novel.entryNotes", title: `Move ${theirs} notes into your notes…`, group: "Book", run: notes.ask }] : []),
   ];
   const moveNotes = async () => {
     try {
-      await api.migrate(novelId, SCHEMA_VERSION, { entryNotes: true });
+      // In the book's own format: a gh-writer novel stays one.
+      await api.migrate(novelId, novel?.manifest === NOVEL_MANIFEST ? (novel.config?.schema_version ?? 1) : SCHEMA_VERSION, { entryNotes: true });
       await queryClient.invalidateQueries({ queryKey: keys.novel(novelId) });
       show({ message: `Moved: the ${theirs} notes are in your notes now, each in a note that mentions it.` });
     } catch (e) {
@@ -49,11 +59,11 @@ export function useNewFormat(novelId: string, novel: Book | undefined) {
   };
   const dialog = (
     <>
-      <Confirm open={asking === "format"} onOpenChange={(open) => setAsking(open && "format")} title="Move this book to the new format?" description={NEW_FORMAT} action="Move it" onConfirm={() => void move()} />
+      <Confirm open={asking} onOpenChange={setAsking} title="Move this book to the new format?" description={NEW_FORMAT} action="Move it" onConfirm={() => void move()} />
       {novel && (
         <Confirm
-          open={asking === "notes"}
-          onOpenChange={(open) => setAsking(open && "notes")}
+          open={notes.asking}
+          onOpenChange={(open) => (open ? notes.ask() : notes.done())}
           title={`Move ${theirs} notes into your notes?`}
           description={entryNotesMove(novel)}
           action="Move them"
@@ -62,5 +72,5 @@ export function useNewFormat(novelId: string, novel: Book | undefined) {
       )}
     </>
   );
-  return { commands, dialog, askEntryNotes: () => setAsking("notes") };
+  return { commands, dialog };
 }

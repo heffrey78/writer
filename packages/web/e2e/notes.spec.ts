@@ -106,14 +106,18 @@ test("an entry's and an event's profiles list the notes that mention them", asyn
   await openNovel(page, app);
   await palette(page, "character: ada");
   const section = page.getByRole("region", { name: "In your notes" });
-  await expect(section.getByRole("link")).toHaveText(["What if Ben never sold the plans?"]);
+  // The note about her (her notes, moved there from her file: D20), then the idea that names her.
+  await expect(section.getByRole("link")).toHaveText(["Ada Varn", "What if Ben never sold the plans?"]);
   await expect(section).toContainText("ending, ben");
   await axe(page);
   await palette(page, "off the page: the flood");
   await expect(page.getByRole("region", { name: "The flood of '09" })).toBeVisible();
   await expect(page.getByRole("region", { name: "In your notes" }).getByRole("link")).toHaveText(["What if Ben never sold the plans?"]);
-  await palette(page, "character: ben varn");
-  await expect(page.getByRole("heading", { level: 2, name: "Ben Varn" })).toBeVisible();
+  await palette(page, "character: tomas");
+  await expect(page.getByRole("heading", { level: 2, name: "Tomas Hale" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "In your notes" }).getByRole("link")).toHaveText(["Tomas Hale"]);
+  await palette(page, "location: varn station");
+  await expect(page.getByRole("heading", { level: 2, name: "Varn Station" })).toBeVisible();
   await expect(page.getByRole("region", { name: "In your notes" })).toHaveCount(0);
   await palette(page, "character: ada");
   await page.getByRole("region", { name: "In your notes" }).getByRole("link", { name: "What if Ben never sold the plans?" }).click();
@@ -140,7 +144,7 @@ test("the note just written is found by its words in the gallery, and its mentio
 
   // Mirela's profile lists it.
   await palette(page, "character: mirela");
-  await expect(page.getByRole("region", { name: "In your notes" }).getByRole("link")).toHaveText(["A toll on the bridge"]);
+  await expect(page.getByRole("region", { name: "In your notes" }).getByRole("link")).toHaveText(["A toll on the bridge", "Mirela Kost"]);
 });
 
 test("the Notes gallery: every note as a card, by tag and words, newest or by title", async ({ page, app }) => {
@@ -153,14 +157,15 @@ test("the Notes gallery: every note as a card, by tag and words, newest or by ti
   await page.keyboard.press("Escape");
   await expect(page.getByRole("heading", { level: 1, name: /^Notes/ })).toBeVisible();
   const cards = page.getByRole("list", { name: "Notes" }).getByRole("listitem");
-  await expect(cards.locator("span.font-semibold")).toHaveText(["A toll on the bridge", "What if Ben never sold the plans?"]);
-  await expect(cards.nth(1)).toContainText("ending · ben");
+  // Newest first: the one just written, the entries' notes moved from their files (D20), then the idea.
+  await expect(cards.locator("span.font-semibold")).toHaveText(["A toll on the bridge", "Ada Varn", "Ben Varn", "Mirela Kost", "The Varn Bridge", "Tomas Hale", "What if Ben never sold the plans?"]);
+  await expect(cards.nth(6)).toContainText("ending · ben");
   for (const colorScheme of ["light", "dark"] as const) {
     await page.emulateMedia({ colorScheme });
     await axe(page);
   }
   await page.getByRole("combobox", { name: "Sort" }).selectOption("title");
-  await expect(cards.locator("span.font-semibold")).toHaveText(["A toll on the bridge", "What if Ben never sold the plans?"]);
+  await expect(cards.locator("span.font-semibold")).toHaveText(["A toll on the bridge", "Ada Varn", "Ben Varn", "Mirela Kost", "The Varn Bridge", "Tomas Hale", "What if Ben never sold the plans?"]);
   await page.getByRole("combobox", { name: "Tag", exact: true }).selectOption("ben");
   await expect(cards).toHaveCount(1);
   await expect(page.getByRole("status").filter({ hasText: "note matches" })).toHaveText("1 note matches");

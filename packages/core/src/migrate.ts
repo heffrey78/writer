@@ -27,7 +27,7 @@ export type Migration =
   | { status: "migrate"; from: number; to: number; writes: MigrationWrite[]; message: string };
 
 export interface MigrationOptions {
-  /** Move entries' own notes into the book's notes too (D20), when moving to the newest format. */
+  /** Move entries' own notes into the book's notes too (D20): with `to` the book's own format, only them. */
   entryNotes?: boolean;
   /** The moment the moved notes are dated (now by default). */
   now?: Date;
@@ -41,13 +41,16 @@ export interface MigrationOptions {
  * whose entries have none is current.
  */
 export async function migration(source: FileSource, to = SCHEMA_VERSION, { entryNotes = false, now }: MigrationOptions = {}): Promise<Migration> {
-  const notesToo = entryNotes && to >= SCHEMA_VERSION;
+  /** Entries' notes alone, the book's format as it is. */
+  const notesOnly = async (format: number): Promise<Migration> => {
+    const move = entryNotes ? await entryNotesMove(source, now) : undefined;
+    if (!move?.moved) return { status: "current" };
+    return { status: "migrate", from: format, to: format, writes: move.writes, message: move.message };
+  };
   if ((await source.read(MANIFEST)) !== undefined) {
     const manifest = await readManifest(source);
     if (manifest!.version > SCHEMA_VERSION) return { status: "refused", reason: `This book is in format v${manifest!.version}, newer than this Writer (v${SCHEMA_VERSION}).` };
-    const move = notesToo ? await entryNotesMove(source, now) : undefined;
-    if (!move?.moved) return { status: "current" };
-    return { status: "migrate", from: manifest!.version, to: manifest!.version, writes: move.writes, message: move.message };
+    return notesOnly(manifest!.version);
   }
   // Only novels were ever in formats 1 and 2.
   const kind = kindByKey(V2_KIND);
@@ -57,7 +60,8 @@ export async function migration(source: FileSource, to = SCHEMA_VERSION, { entry
   if (novel.diagnostics.length || !isObject(novel.data)) return { status: "refused", reason: `${NOVEL_MANIFEST} can't be read: fix it first (writer validate).` };
   const from = typeof novel.data["schema_version"] === "number" ? novel.data["schema_version"] : 1;
   if (from > EVENT_FILES_FORMAT) return { status: "refused", reason: `${NOVEL_MANIFEST} says format v${from}, which keeps a book's settings in ${MANIFEST}: fix it first (writer validate).` };
-  if (from >= to) return { status: "current" };
+  // Already as far as asked: a gh-writer novel keeps its format, its entries' notes moved if asked.
+  if (from >= to) return notesOnly(from);
 
   const writes: MigrationWrite[] = [];
   const steps: string[] = [];
@@ -79,7 +83,7 @@ export async function migration(source: FileSource, to = SCHEMA_VERSION, { entry
   } else {
     writes.push({ path: NOVEL_MANIFEST, content: manifest });
   }
-  if (notesToo) {
+  if (entryNotes) {
     const move = await entryNotesMove(overlay(source, writes), now);
     writes.push(...move.writes);
     if (move.moved) steps.push(move.message.charAt(0).toLowerCase() + move.message.slice(1));

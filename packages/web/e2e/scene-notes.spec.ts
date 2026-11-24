@@ -82,8 +82,11 @@ test("a note already written is put on the scene from its Notes tab, keeping the
   await expect(titles(page)).toHaveText(["What if Ben never sold the plans?"]);
   await expect(titles(page).first()).toHaveAttribute("aria-expanded", "true");
   await expect.poll(read).toContain("scenes:\n  - sc_5tat1n\n");
-  // On the scene, it isn't offered again: nothing else is left to add.
-  await expect(sidebar(page).getByRole("button", { name: /^Add a note already written/ })).toHaveCount(0);
+  // On the scene, it isn't offered again: only the notes not on it are.
+  await sidebar(page).getByRole("button", { name: /^Add a note already written/ }).click();
+  await expect(page.getByRole("group", { name: "On no scene" })).toBeVisible();
+  await expect(page.getByRole("option", { name: /^What if Ben never sold/ })).toHaveCount(0);
+  await page.keyboard.press("Escape");
 
   // Another scene: offered as on other scenes, and added there it keeps the first.
   await page.getByRole("tree", { name: "Manuscript" }).getByRole("treeitem", { name: /^Walking the Span,/ }).click();

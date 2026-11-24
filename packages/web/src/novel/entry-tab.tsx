@@ -132,7 +132,6 @@ export function EntryTab({
           novel={novel}
           entity={entity}
           workspace={workspace}
-          spell={spell}
           embedded={{ headingId }}
           size="tab"
           {...(editing ? { startEditing: "name" as const } : {})}

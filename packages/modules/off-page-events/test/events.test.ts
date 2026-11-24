@@ -97,7 +97,7 @@ describe("off-page events", () => {
         "novel.yaml": V2,
         "bible/events/flood.md": event("evt_aaaaaa", "when: {at: 2009-11-02}\ncharacters: [char_aaaaaa]\nscene: sc_bbbbbb\n", "\n[Ada](#char_aaaaaa) holds the pier.\n"),
         "manuscript/01-one/02-b.md": scene("sc_bbbbbb", "B", "", "After [the flood](#evt_aaaaaa).\n"),
-        "bible/characters/ada.md": "---\nid: char_aaaaaa\nname: Ada\n---\nShe remembers [the flood](#evt_aaaaaa).\n",
+        "notes/ada.md": "---\nid: note_aaaaaa\ntitle: Ada\n---\n[Ada](#char_aaaaaa)\n\nShe remembers [the flood](#evt_aaaaaa).\n",
       });
       expect(r.diagnostics).toEqual([]);
       const [ev] = eventsOf(r.novel);

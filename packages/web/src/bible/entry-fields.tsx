@@ -463,8 +463,8 @@ export function FieldEditor({
 }
 
 /**
- * The entries whose fields name this one (#138): a faction's NPCs, a place's people, a person's books,
- * each under its type and the field ("NPCs · Faction").
+ * Links: the entries whose fields name this one (#138, so called since #180): a faction's NPCs, a
+ * place's people, a person's books, each under its type and the field ("NPCs · Faction").
  */
 export function NamedBy({ novelId, novel, entity, compact }: { novelId: string; novel: Book; entity: Entity; compact?: boolean }) {
   const heading = useId();
@@ -481,7 +481,7 @@ export function NamedBy({ novelId, novel, entity, compact }: { novelId: string; 
   return (
     <section aria-labelledby={heading} className="grid gap-1 border-t border-rule pt-4">
       <h2 id={heading} className="text-xs font-semibold tracking-wide text-muted uppercase">
-        Named in their fields
+        Links
       </h2>
       <dl className="grid gap-0.5">
         {[...groups.values()].map((g) => (

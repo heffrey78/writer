@@ -12,6 +12,7 @@ import {
   indexById,
   loadBook,
   localDateTime,
+  noteAboutText,
   MANIFEST,
   nextSeriesSlot,
   SERIES,
@@ -841,9 +842,10 @@ export class BibleOperations {
    * prose, pieces' fields, entries' fields and changes, modules' records, notes, relationships, the
    * diagrams' layouts and the index's judgements) made one to `keep`, a list naming both left with one;
    * relationships between the two, and those that become twins of another, dropped. `keep` gains
-   * `other`'s name and other names as other names, its tags, the fields it lacks, its summary and
-   * picture if it has none, and its notes under a heading; `other`'s file goes. One commit, refused if
-   * either entry's file changed since `bases` were read; undone by undo().
+   * `other`'s name and other names as other names, its tags, the fields it lacks, and its summary and
+   * picture if it has none; `other`'s file goes. Neither has notes of its own (D20): notes that mention
+   * `other` mention `keep` instead, and notes still in `other`'s file, not yet moved, become a note about
+   * `keep`. One commit, refused if either entry's file changed since `bases` were read; undone by undo().
    */
   mergeEntries(keep: string, other: string, bases: { keep: string; other: string }): Promise<OperationResult> {
     return this.#run(async (novel) => {
@@ -870,7 +872,7 @@ export class BibleOperations {
         if (t === null || hashText(t) !== base) throw new OperationError("STALE", `“${novel.entities.find((e) => e.id === id)!.name}” changed since it was read.`, { path });
       }
 
-      // The one kept: the other's names, tags, the fields it lacks, its summary and picture if it has none, its notes.
+      // The one kept: the other's names, tags, the fields it lacks, its summary and picture if it has none.
       const names = [...k.aliases, ...[o.name, ...o.aliases].filter((n) => n !== k.name && !k.aliases.includes(n))].filter((n, i, all) => all.indexOf(n) === i);
       const edits: YamlEdit[] = [];
       if (names.length !== k.aliases.length) edits.push({ path: ["aliases"], value: names });
@@ -880,10 +882,14 @@ export class BibleOperations {
       if (!k.image && o.image) edits.push({ path: ["image"], value: o.image }, ...(o.imageFocus ? [{ path: ["image_focus"], value: o.imageFocus }] : []));
       const lacking = Object.entries(o.fields).filter(([key]) => k.fields[key] === undefined);
       if (lacking.length) edits.push(...(Object.keys(k.fields).length ? lacking.map(([key, v]): YamlEdit => ({ path: ["fields", key], value: swapped(v, other, keep) })) : [{ path: ["fields"], value: swapped(Object.fromEntries(lacking), other, keep) }]));
-      let kept = editFrontMatter((await text(k.file))!, edits);
-      if (o.body.trim()) kept = `${kept.trimEnd()}\n\n## From ${o.name}\n\n${swapMentions(o.body.trim(), other, keep)}\n`;
-      put(k.file, kept);
+      put(k.file, editFrontMatter((await text(k.file))!, edits));
       put(o.file, null);
+      // Notes the other kept in its file, from before D20: a note about the one kept, so no word goes with the file.
+      if (o.body.trim()) {
+        const id = uniqueId(RECORD_PREFIXES.note, new Set(indexById(novel).keys()));
+        const path = this.#noteFileName(novel, o.name);
+        writes.set(path, { path, content: noteAboutText(k, id, localDateTime(new Date()), swapMentions(o.body.trim(), other, keep)), base: null });
+      }
 
       // Every other file that names it.
       const files = new Set([...novel.allPieces.map((p) => p.file), ...novel.entities.filter((e) => e !== o).map((e) => e.file), ...novel.notes.map((n) => n.file), ...novel.moduleRecords.map((r) => r.file), novel.manifest]);

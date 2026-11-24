@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { axe, caretAtEnd, expect, proseOnItsGround, test } from "./fixtures.ts";
+import { axe, caretAtEnd, expect, test } from "./fixtures.ts";
 
 test("the Entry tab: a sheet to read, Back and Forward through names opened, a pin to keep it, the form in place", async ({ page, app }) => {
   await app.restart(app.novelRepo("varn"));
@@ -22,7 +22,8 @@ test("the Entry tab: a sheet to read, Back and Forward through names opened, a p
   const strip = ada.getByRole("region", { name: "In the story" }).getByRole("list", { name: "Scenes, in reading order" });
   await expect(strip.getByRole("link", { name: "The Station: point of view" })).toBeVisible();
   await expect(ada.getByRole("region", { name: "Relationships" }).getByRole("list", { name: "All relationships" })).toBeVisible();
-  await expect(ada.getByRole("region", { name: "Notes", exact: true })).toContainText("Voice: short sentences when she is angry");
+  // What's said about her is in the book's notes that mention her (D20).
+  await expect(ada.getByRole("region", { name: "In your notes" }).getByRole("link")).toHaveText(["Ada Varn", "What if Ben never sold the plans?"]);
   await expect(ada.getByRole("link", { name: "Open the full entry" })).toBeVisible();
   // What the book has said of her up to the scene being written (#153); one selects its sentence in the chapter.
   const appears = ada.getByRole("region", { name: "Appears in · 7" });
@@ -34,8 +35,6 @@ test("the Entry tab: a sheet to read, Back and Forward through names opened, a p
   await page.emulateMedia({ colorScheme: "dark" });
   await axe(page);
   await page.emulateMedia({ colorScheme: "light" });
-  // Its notes are written on the sidebar's own ground, the caret in them or not (#127).
-  await proseOnItsGround(page, ada.getByRole("textbox", { name: "Notes on Ada Varn" }), sidebar, ada.getByRole("button", { name: "Edit occupation" }));
   const url = page.url();
   await passages.click();
   await expect(page.getByRole("textbox", { name: "Chapter text" })).toBeFocused();

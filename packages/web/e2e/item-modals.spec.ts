@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Page } from "@playwright/test";
-import { axe, caretAtEnd, expect, openView, palette, proseOnItsGround, test, type App } from "./fixtures.ts";
+import { axe, expect, openView, palette, test, type App } from "./fixtures.ts";
 
 /** Notes open as a modal over their gallery (heffrey78/gh-writer#233); entries and off-page events beside the index's list (#134), new ones named in a modal; their parts saved on leaving them (heffrey78/gh-writer#234). */
 
@@ -140,15 +140,6 @@ test("an entry beside the list: a part saves when the focus leaves it, another o
   await expect.poll(() => novel.read(ADA)).toContain("She counts. Twice.");
   await expect(page.getByRole("region", { name: /^Characters/ }).locator("a[aria-current=page]")).toContainText("Ben Varn");
 
-  // In its notes, Escape closes the mention suggestions, and the entry stays.
-  await page.goBack();
-  const notes = page.getByRole("textbox", { name: "Notes on Ada Varn" });
-  await caretAtEnd(page, notes);
-  await page.keyboard.type(" @tom");
-  await expect(page.getByRole("listbox", { name: "Mention suggestions" })).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(page.getByRole("listbox", { name: "Mention suggestions" })).toBeHidden();
-  await expect(entry).toBeVisible();
 });
 
 test("an off-page event: made in its modal over the Story bible by a title, then beside the list; the Timeline and the palette open it there (heffrey78/gh-writer#236, #134)", async ({ page, app }) => {
@@ -210,8 +201,6 @@ test("an entry: made in its modal by a type and a name, then open beside the lis
     await page.emulateMedia({ colorScheme });
     await axe(page);
   }
-  // Its notes are written on the page's own ground, the caret in them or not (#127).
-  await proseOnItsGround(page, mill.getByRole("textbox", { name: "Notes on The Mill" }), mill, mill.getByRole("button", { name: "Add a summary" }));
   await mill.getByRole("button", { name: "Add a summary" }).click();
   await page.keyboard.type("Where the flour came from.");
   await mill.getByRole("heading", { level: 2, name: "The Mill" }).click();

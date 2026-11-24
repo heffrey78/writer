@@ -153,7 +153,8 @@ function Merging({ novelId, novel, first, second }: { novelId: string; novel: Bo
         {keep && (
           <div className="grid gap-2 text-sm">
             <p>
-              <b>{other.name}</b> goes. Everything that names it names <b>{keep.name}</b> instead, and {keep.name} takes its names as other names, its tags, the fields it lacks and its notes, under “From {other.name}”.
+              <b>{other.name}</b> goes. Everything that names it names <b>{keep.name}</b> instead, your notes too, and {keep.name} takes its names as other names, its tags and the fields it lacks.
+              {other.body.trim() && ` The notes kept in ${other.name}'s file become a note about ${keep.name}.`}
             </p>
             {lines.length > 0 ? (
               <>

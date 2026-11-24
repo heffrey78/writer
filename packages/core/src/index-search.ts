@@ -11,9 +11,10 @@ import { fieldText } from "./entry-fields.ts";
  */
 
 /** The part of an entry a search matched, best first: its name before its notes. */
-export type EntryMatchWhere = "name" | "alias" | "summary" | "field" | "tag" | "notes";
+/** Where in an entry a search found it. Not in notes: an entry has none of its own (D20). */
+export type EntryMatchWhere = "name" | "alias" | "summary" | "field" | "tag";
 
-const RANK: Record<EntryMatchWhere, number> = { name: 0, alias: 1, summary: 2, field: 3, tag: 4, notes: 5 };
+const RANK: Record<EntryMatchWhere, number> = { name: 0, alias: 1, summary: 2, field: 3, tag: 4 };
 
 export interface EntryMatch {
   entity: Entity;
@@ -53,15 +54,6 @@ export function searchTerms(query: string): string[] {
   return searchable(query).split(/\s+/).filter(Boolean);
 }
 
-/** An entry's notes as words a reader sees: links' targets and Markdown's markers left out. */
-function notesText(markdown: string): string {
-  return proseText(markdown)
-    .replace(/^[ \t]*(?:#{1,6}|>|[-*+])[ \t]+/gm, "")
-    .replace(/(\*\*|__|[*_~`])/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
 interface Part {
   where: EntryMatchWhere;
   text: string;
@@ -76,7 +68,6 @@ function parts(entity: Entity, book: Pick<Book, "entities"> | undefined): Part[]
     ...(entity.summary ? [{ where: "summary", text: entity.summary, long: true } as Part] : []),
     ...Object.entries(entity.fields).map(([k, v]): Part => ({ where: "field", text: `${k.replace(/_/g, " ")}: ${fieldText(book ?? { entities: [] }, v)}` })),
     ...entity.tags.map((t): Part => ({ where: "tag", text: t })),
-    ...(entity.body.trim() ? [{ where: "notes", text: notesText(entity.body), long: true } as Part] : []),
   ];
 }
 

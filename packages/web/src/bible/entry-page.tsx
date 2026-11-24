@@ -1,18 +1,15 @@
 import type { EntityFields, Reference } from "@writer/client";
 import { referenceText } from "./references.ts";
-import { entityOfLabel, fieldsOfType, roleOf, vocabulary, type Entity, type Book, type Relationship } from "@writer/core";
+import { entityOfLabel, fieldsOfType, notesMentioning, roleOf, vocabulary, type Entity, type Book, type Relationship } from "@writer/core";
 import { useGitHubRepo } from "../github/repo.ts";
 import { EntryIssues } from "../issues/entry-issues.tsx";
 import { useIssueList } from "../issues/use-issues.ts";
 import { useNotice } from "../novel/notice.tsx";
-import { SceneEditor, type SpellService } from "@writer/editor/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Merge, Trash2 } from "lucide-react";
 import { AlertDialog } from "radix-ui";
 import { startTransition, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { useStore } from "zustand";
-import { imageUrl } from "@writer/client";
 import { api, keys } from "../api.ts";
 import type { Workspace } from "../novel/workspace.ts";
 import { ErrorAlert } from "../ui/alert.tsx";
@@ -31,21 +28,23 @@ import { InTheStory } from "./strip.tsx";
 import { AppearsIn, usePassages } from "./appears-in.tsx";
 import { QuotesFrom } from "./quotes-from.tsx";
 import { TypeSections } from "./type-sections.tsx";
-import { mentionEntities, typeOf } from "./types.ts";
+import { typeOf } from "./types.ts";
+import { useEntryNotesMove } from "../novel/new-format.tsx";
 
 
 
 /**
  * A bible entry as a profile (heffrey78/gh-writer#158), read first: its type, tags, name and other names, a portrait,
- * the summary as a lead, its fields as rows, then its notes, issues, scenes and relationships. Each
- * part edits in place from its pencil (or "+ Add…" while empty), saved to the entry's file at once.
+ * the summary as a lead, its fields as rows, what names it in theirs (Links), then the notes that
+ * mention it, issues, scenes and relationships. Each part edits in place from its pencil (or "+ Add…"
+ * while empty), saved to the entry's file at once. An entry has no notes of its own (D20): what's said
+ * about it is in the book's notes that mention it.
  */
 export function EntryPage({
   novelId,
   novel,
   entity,
   workspace,
-  spell,
   embedded,
   startEditing,
   size = "page",
@@ -54,7 +53,6 @@ export function EntryPage({
   novel: Book;
   entity: Entity;
   workspace: Workspace;
-  spell?: { service: SpellService; onAddWord: (w: string) => void } | undefined;
   /** Shown beside the text, or beside the index's list (#134): its name is a level-2 heading with this ID, and it takes the panel's width. */
   embedded?: { headingId: string; /** The page's own top heading: the index's list isn't showing beside it. */ modal?: boolean };
   /** A part to open for editing at once ("name" after a quick entry's Add details). */
@@ -69,14 +67,12 @@ export function EntryPage({
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const type = typeOf(novel, entity);
-  const file = useStore(workspace.store, (s) => s.files[entity.file]);
-  const mentions = useMemo(() => mentionEntities(novel), [novel]);
   /** How a piece refers to it, in the kind's words: a field's role ("point of view", "set here"), or a mention. */
   const via = (link: string) => {
     const f = novel.kind.fields.find((x) => x.key === link);
     return f ? roleOf(f) : link === "mention" ? "mentioned" : link;
   };
-  const ids = { notes: useId(), parts: useId() };
+  const ids = { parts: useId(), left: useId() };
   const part = (name: string) => `${ids.parts}-${name}`;
   // Beside the index's list, the parts under the fields are drawn once the writer stops on the entry
   // (#177): stepping through a long index, the next entry's name, lead and fields answer at once, and
@@ -89,6 +85,7 @@ export function EntryPage({
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const passages = usePassages(novel, rest ? entity.id : undefined);
   const relationships = novel.relationships.filter((r) => r.from === entity.id || r.to === entity.id).length;
+  const notes = useMemo(() => notesMentioning(novel, entity.id), [novel, entity.id]);
   const place = useInPlace(startEditing);
   // Read at one piece (#140): its fields and its relationships as they are there. Beside the text, the
   // piece being written; in the index, the whole book.
@@ -103,7 +100,7 @@ export function EntryPage({
   useEffect(() => void workspace.open([entity.file]), [workspace, entity.file]);
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: keys.novel(novelId) });
-  /** The file's current hash, after any notes still being saved. */
+  /** The file's current hash, after any change still being saved. */
   const base = async () => {
     await workspace.autosave.flush();
     return workspace.store.getState().files[entity.file]?.hash ?? "";
@@ -277,7 +274,7 @@ export function EntryPage({
           label={`Parts of the ${vocabulary(novel.kind).entity.one}`}
           parts={[
             { id: part("profile"), label: "Profile" },
-            { id: part("notes"), label: "Notes" },
+            ...(notes.length ? [{ id: part("notes"), label: `In your notes · ${notes.length}` }] : []),
             { id: part("story"), label: `In the ${vocabulary(novel.kind).subject}` },
             { id: part("passages"), label: `Appears in · ${passages.length}` },
             { id: part("relationships"), label: `Relationships · ${relationships}` },
@@ -286,35 +283,29 @@ export function EntryPage({
       )}
 
       {rest && <>
-      <section id={part("notes")} tabIndex={-1} aria-labelledby={`${ids.notes}-h`} className="grid scroll-mt-12 gap-1 border-t border-rule pt-4 outline-none">
-        <h2 id={`${ids.notes}-h`} className="text-xs font-semibold tracking-wide text-muted uppercase">
-          Notes
-        </h2>
-        {file ? (
-          // Prose that edits in place, as part of the page.
-          <SceneEditor
-            key={entity.file}
-            sceneId={entity.file}
-            label={`Notes on ${entity.name}`}
-            placeholder="Backstory, voice, anything worth remembering…"
-            markdown={file.body}
-            onChange={(md) => workspace.change(entity.file, md)}
-            entities={mentions}
-            pictureUrl={(path) => imageUrl(novelId, path)}
-            className={cn("ghw-notes", tab && "[--ghw-prose-size:1rem]")}
-            {...(spell ? { spell } : {})}
-          />
-        ) : (
-          <p className="text-sm text-muted">Opening…</p>
-        )}
-        <QuotesFrom novelId={novelId} novel={novel} body={file?.body ?? entity.body} />
-      </section>
+      {entity.body.trim() && (
+        // Notes still in the entry's file, from before D20: shown as they are until they're moved, so no word is out of sight.
+        <section aria-labelledby={ids.left} className="grid gap-2 rounded-md border border-rule bg-panel p-3">
+          <h2 id={ids.left} className="text-xs font-semibold tracking-wide text-muted uppercase">
+            Notes kept in the {vocabulary(novel.kind).entity.one}'s file
+          </h2>
+          <p className="max-h-48 overflow-y-auto font-prose text-[15px] whitespace-pre-wrap [overflow-wrap:anywhere]">{entity.body.trim()}</p>
+          <p className="text-sm text-muted">
+            Writer keeps what you write about {vocabulary(novel.kind).entity.a} in your notes now.{" "}
+            <Button variant="ghost" size="sm" onClick={() => useEntryNotesMove.getState().ask()} className="-my-1 px-1 text-accent underline">
+              Move them into your notes…
+            </Button>
+          </p>
+        </section>
+      )}
+      <NotesAbout novelId={novelId} novel={novel} id={entity.id} notes={notes} sectionId={part("notes")}>
+        <QuotesFrom novelId={novelId} novel={novel} body={notes.map((n) => n.body).join("\n\n")} />
+      </NotesAbout>
 
       {!tab && <EntryIssues novelId={novelId} novel={novel} entity={entity} />}
 
       <InTheStory novelId={novelId} novel={novel} entity={entity} compact={tab} id={part("story")} />
       <AppearsIn novelId={novelId} novel={novel} entity={entity} workspace={workspace} passages={passages} compact={tab} id={part("passages")} />
-      <NotesAbout novelId={novelId} novel={novel} id={entity.id} />
       {!tab && <TypeSections novelId={novelId} novel={novel} entity={entity} workspace={workspace} />}
 
       <RelationshipArcs novelId={novelId} novel={novel} entity={entity} compact={tab} id={part("relationships")} readAt={readAt} onReadAt={setReadAt} />

@@ -40,6 +40,7 @@ export const RULES: Readonly<Record<string, Severity>> = {
   W_SIDEBAR_UNKNOWN: "warning",
   W_FIELD_VALUE: "warning",
   W_FIELD_CHANGE: "warning",
+  W_ENTRY_BODY: "warning",
   W_JUDGEMENT: "warning",
 };
 
@@ -208,6 +209,8 @@ export function validateBook(novel: Book): Diagnostic[] {
   // Bible entries: their fields, and mentions in notes.
   for (const e of novel.entities) {
     entryFields(e);
+    // An entry has no notes of its own (D20): text left in its file, kept and shown, until it's moved into a note about it.
+    if (e.body.trim()) push("warning", "W_ENTRY_BODY", e.file, `${e.name} has notes in its file; ${vocabulary(novel.kind).entity.a}'s notes are the book's notes about it now: run writer migrate to move them`, { line: e.bodyLine });
     for (const m of mentions(e.body)) ref(m.id, MENTIONABLE, e.file, "", `Mention "${m.text}"`, e.bodyLine + m.line - 1);
     for (const p of pictures(e.body)) outsideImages(p, e.file, e.bodyLine);
   }

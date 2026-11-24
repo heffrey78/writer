@@ -47,9 +47,11 @@ test("Back and Forward by button and by Alt+Left/Right, but not in text", async 
   await expect(page.getByRole("region", { name: "Ada Varn" })).toBeVisible();
 
   // In text they're the text's: nothing moves.
-  await page.getByRole("textbox", { name: "Notes on Ada Varn" }).click();
+  await page.getByRole("button", { name: "Edit summary" }).click();
+  await expect(page.getByRole("textbox", { name: "Summary" })).toBeFocused();
   await page.keyboard.press("Alt+ArrowLeft");
   await expect(page.getByRole("region", { name: "Ada Varn" })).toBeVisible();
+  await page.keyboard.press("Escape");
 
   // Out of the text, back to Notes, then the Story bible and the chapter, where the caret is in its text and Alt+Right is the text's.
   await page.getByRole("heading", { level: 2, name: "Ada Varn" }).click();
