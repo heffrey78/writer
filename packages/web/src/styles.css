@@ -5,7 +5,8 @@
 
 /*
  * One palette for the app and the editor: the editor's --ghw-* properties (light, dark, and
- * data-theme overrides) plus the few the app adds here, in the same three places.
+ * data-theme overrides) plus the few the app adds here, in the same three places. This is Paper, the
+ * default theme; the others are data in themes.ts, painted when <html data-palette> names one.
  */
 :root {
   --ghw-panel: #f1ede5;

@@ -2,6 +2,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Page } from "@playwright/test";
+import { THEMES, tokensOf } from "../src/themes.ts";
 import { axe, caretAtEnd, expect, launch, palette, test, type App } from "./fixtures.ts";
 
 /**
@@ -260,4 +261,69 @@ test("Read at a session, from the palette: the list of sessions in focus (#140, 
   await expect(page.getByRole("heading", { level: 2, name: "Marta Hollin" })).toBeVisible();
   await palette(page, "read marta hollin at a session");
   await expect(page.getByRole("combobox", { name: "Read at" })).toBeFocused();
+});
+
+/** "#rrggbb" as getComputedStyle gives it. */
+const asRgb = (hex: string) => `rgb(${[1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(", ")})`;
+
+test("every theme reads, light and dark: the shelf, the writing view, the index, an entry and a dialog pass axe in each (#189)", async ({ page, app }) => {
+  test.setTimeout(240_000);
+  await app.restart(app.novelRepo("varn"));
+  await page.goto(app.launchUrl);
+  const text = page.getByRole("textbox", { name: "Chapter text" });
+  await expect(text).toBeFocused();
+  const writing = page.url();
+  const book = writing.replace(/\/chapter.*$/, "");
+  const pages: [string, () => Promise<void>][] = [
+    [`${app.url}/`, () => expect(page.getByRole("heading", { level: 1, name: "Your books" })).toBeVisible()],
+    [writing, () => expect(text).toBeVisible()],
+    [`${book}/bible`, () => expect(page.getByRole("heading", { level: 1, name: "Story bible" })).toBeVisible()],
+    [`${book}/bible/char_7f3k2q`, () => expect(page.getByRole("heading", { level: 2, name: "Ada Varn" })).toBeVisible()],
+  ];
+  for (const theme of THEMES) {
+    await page.evaluate((palette) => localStorage.setItem("ghw:appearance", JSON.stringify({ mode: "system", palette })), theme.id);
+    for (const [url, ready] of pages) {
+      await page.goto(url);
+      await ready();
+      if (theme.id === "paper") await expect(page.locator("html")).not.toHaveAttribute("data-palette");
+      else await expect(page.locator("html")).toHaveAttribute("data-palette", theme.id);
+      for (const mode of ["light", "dark"] as const) {
+        await page.emulateMedia({ colorScheme: mode });
+        await expect.poll(() => page.evaluate(() => getComputedStyle(document.body).backgroundColor), `${theme.name} ${mode}`).toBe(asRgb(tokensOf(theme, mode).paper));
+        await axe(page);
+      }
+      await page.emulateMedia({ colorScheme: "light" });
+    }
+    // A dialog, over the entry.
+    await page.keyboard.press("ControlOrMeta+k");
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await audit(page);
+    await page.keyboard.press("Escape");
+  }
+});
+
+test("light or dark chosen before themes stays chosen, and a theme is chosen with it on this device alone (#189)", async ({ page, app }) => {
+  await launch(page, app);
+  await page.evaluate(() => {
+    localStorage.removeItem("ghw:appearance");
+    localStorage.setItem("ghw:theme", "dark");
+  });
+  await page.reload();
+  await expect(page.getByRole("heading", { level: 1, name: "Your books" })).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await expect(page.locator("html")).not.toHaveAttribute("data-palette");
+  // Chosen again, from the palette: kept in the one record, and the old key gone.
+  await palette(page, "theme: light");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  expect(await page.evaluate(() => [localStorage.getItem("ghw:appearance"), localStorage.getItem("ghw:theme")])).toEqual([JSON.stringify({ mode: "light", palette: "paper" }), null]);
+  // Study, dark, chosen in the record: on the page from its first paint, whatever the system says.
+  await page.evaluate(() => localStorage.setItem("ghw:appearance", JSON.stringify({ mode: "dark", palette: "study", text: { size: 21 } })));
+  await page.reload();
+  await expect(page.locator("html")).toHaveAttribute("data-palette", "study");
+  expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe(asRgb(tokensOf(THEMES.find((t) => t.id === "study")!, "dark").paper));
+  // A record this app can't read is Paper, following the system.
+  await page.evaluate(() => localStorage.setItem("ghw:appearance", "{not json"));
+  await page.reload();
+  await expect(page.locator("html")).not.toHaveAttribute("data-palette");
+  await expect(page.locator("html")).not.toHaveAttribute("data-theme");
 });
