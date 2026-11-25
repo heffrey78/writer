@@ -27,6 +27,7 @@ import { dailyWeb } from "@writer/module-daily/web";
 import { citationsWeb } from "@writer/module-citations/web";
 import { NovelPage } from "./novel/novel-page.tsx";
 import { NotFound } from "./not-found.tsx";
+import { SaveToWriterPage, ShareWatcher } from "./share/save-to-writer.tsx";
 import { onAndroid } from "./platform.ts";
 import { apply } from "./theme.ts";
 import { ThemePicker } from "./theme-picker.tsx";
@@ -75,6 +76,7 @@ void ready.then(() =>
             <ThemePicker />
             <FirstRunIdentity />
             <DesktopBridge />
+            <ShareWatcher />
             <ErrorBoundary what="this page">
               <Routes>
                 <Route path="/" element={<LibraryPage />} />
@@ -86,6 +88,7 @@ void ready.then(() =>
                     </Suspense>
                   }
                 />
+                <Route path="/share" element={<SaveToWriterPage />} />
                 <Route path="/novels/:novelId/*" element={<NovelPage />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>

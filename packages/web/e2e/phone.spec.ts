@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { devices, type Locator, type Page } from "@playwright/test";
@@ -768,4 +768,86 @@ test("a picture from the phone's photos into a note, from Picture on the bar abo
   await expect(prose.getByRole("img", { name: "A sketch of the toll house" })).toBeVisible();
   await expect.poll(() => readFileSync(join(dir, "notes/what-if-ben-never-sold.md"), "utf8")).toContain("\n\n![A sketch of the toll house](/images/a-sketch-of-the-toll-house.jpg)\n");
   await fits(page);
+});
+
+/**
+ * Shares from another app (#204), as the Android app's plugin keeps them: its two commands answered
+ * in the page in place of Tauri's, what's written let go, and kept across reloads as the app keeps them.
+ */
+async function sharing(page: Page, shares: { id: string; received: number; text?: string; subject?: string; pictures: { name: string; type: string; data: string }[] }[]) {
+  await page.addInitScript((seed) => {
+    const kept = () => JSON.parse(localStorage.getItem("test-shares") ?? "null") ?? seed;
+    (window as unknown as { __TAURI_INTERNALS__: unknown }).__TAURI_INTERNALS__ = {
+      invoke: async (command: string, args: { id?: string }) => {
+        if (command === "shares") return { shares: kept() };
+        if (command === "share_done") return void localStorage.setItem("test-shares", JSON.stringify(kept().filter((s: { id: string }) => s.id !== args.id)));
+        throw new Error(`No command ${command}`);
+      },
+      transformCallback: () => 0,
+    };
+  }, shares);
+  return () => page.evaluate(() => (JSON.parse(localStorage.getItem("test-shares") ?? "null") as { id: string }[] | null)?.map((s) => s.id));
+}
+
+const icon = (size: "32x32" | "128x128") => readFileSync(fileURLToPath(new URL(`../../mobile/src-tauri/icons/${size}.png`, import.meta.url))).toString("base64");
+
+test("Save to Writer: a picture and a link shared from another app become a new note in the book used last, each picture described (#205)", async ({ page, app }) => {
+  const dir = app.novelRepo("varn");
+  await app.restart(dir);
+  const left = await sharing(page, [
+    { id: "1", received: 1, text: "Toll houses of the valley https://example.com/tolls", subject: "The toll house", pictures: [{ name: "IMG_2041.png", type: "image/png", data: icon("128x128") }, { name: "IMG_2042.png", type: "image/png", data: icon("32x32") }] },
+  ]);
+  await page.goto(app.launchUrl);
+  // What was shared opens Save to Writer.
+  await expect(page.getByRole("heading", { level: 1, name: "Save to Writer" })).toBeVisible();
+  const shared = page.getByRole("region", { name: "What was shared" });
+  await expect(shared).toContainText("Toll houses of the valley");
+  await expect(shared).toContainText("https://example.com/tolls");
+  await expect(page.getByRole("combobox", { name: "Book" })).toHaveValue(/.+/);
+  await expect(page.getByRole("combobox", { name: "Book" }).locator("option:checked")).toHaveText("The Bridge at Varn");
+  await expect(page.getByRole("radio", { name: "New note" })).toBeChecked();
+  await expect(page.getByRole("textbox", { name: "Title" })).toHaveValue("The toll house");
+  const save = page.getByRole("button", { name: "Save as a new note" });
+  // Each picture described first.
+  await expect(save).toBeDisabled();
+  await page.getByRole("textbox", { name: "Description of picture 1" }).fill("The toll house from the bridge");
+  await page.getByRole("textbox", { name: "Description of picture 2" }).fill("The toll board");
+  await audit(page);
+  for (const target of await page.locator("main").locator("input:not([type=radio]), select, button").all()) expect((await target.boundingBox())!.height).toBeGreaterThanOrEqual(48);
+  await fits(page);
+  await save.tap();
+
+  // The note, opened; written in the book with its pictures saved in images/, and the share let go.
+  await expect(page.getByRole("textbox", { name: "Note: The toll house" })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Note: The toll house" }).getByRole("img", { name: "The toll board" })).toBeVisible();
+  const note = readFileSync(join(dir, "notes/the-toll-house.md"), "utf8");
+  expect(note).toMatch(/^---\nid: note_\w+\ntitle: The toll house\ncreated: [\d-]+T[\d:]+\n---\n/);
+  // A new note as New note makes one: a line between its front matter and its words.
+  expect(note.split("---\n")[2]).toBe("\nToll houses of the valley <https://example.com/tolls>\n\n![The toll house from the bridge](/images/the-toll-house-from-the-bridge.png)\n\n![The toll board](/images/the-toll-board.png)\n");
+  expect(existsSync(join(dir, "images/the-toll-house-from-the-bridge.png"))).toBe(true);
+  expect(await left()).toEqual([]);
+  // Let go: a reload doesn't bring it back.
+  await page.reload();
+  await expect(page.getByRole("heading", { level: 1, name: "Save to Writer" })).toHaveCount(0);
+});
+
+test("Save to Writer: shared text added at the end of a note picked from the book's, newest first, with search (#205)", async ({ page, app }) => {
+  const dir = app.novelRepo("varn");
+  await app.restart(dir);
+  const IDEA = "notes/what-if-ben-never-sold.md";
+  const before = readFileSync(join(dir, IDEA), "utf8");
+  const left = await sharing(page, [{ id: "7", received: 7, text: "The ford floods in spring. Ask the ferryman.", pictures: [] }]);
+  await page.goto(app.launchUrl);
+  await expect(page.getByRole("heading", { level: 1, name: "Save to Writer" })).toBeVisible();
+  await page.getByRole("radio", { name: "Add to a note…" }).tap();
+  const notes = page.getByRole("list", { name: "Notes, newest first" });
+  await expect(notes.getByRole("radio")).not.toHaveCount(0);
+  await page.getByRole("searchbox", { name: "Search the notes" }).fill("flood");
+  await expect(notes.getByRole("radio")).toHaveCount(1);
+  await notes.getByRole("radio", { name: /What if Ben never sold the plans\?/ }).tap();
+  await audit(page);
+  await page.getByRole("button", { name: "Add to the note" }).tap();
+  await expect(page.getByRole("textbox", { name: "Note: What if Ben never sold the plans?" })).toContainText("Ask the ferryman.");
+  expect(readFileSync(join(dir, IDEA), "utf8")).toBe(`${before.trimEnd()}\n\nThe ford floods in spring. Ask the ferryman.\n`);
+  expect(await left()).toEqual([]);
 });

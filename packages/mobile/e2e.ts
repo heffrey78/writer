@@ -533,6 +533,41 @@ try {
   if (!onGitHub) throw new Error("The picture didn't reach GitHub.");
   step("a picture chosen from the photos into a note from the bar above the keyboard, saved on the phone and synced to GitHub");
 
+  // Shared from another app (#204, #205), as Android's share sheet sends it: a picture from the
+  // phone's photos, then a link with its words, each to Save to Writer, into the novel, offline.
+  adb("push", "-q", join(repo, "packages/mobile/src-tauri/icons/128x128.png"), "/sdcard/Pictures/toll-house.png");
+  adb("shell", "am", "broadcast", "-a", "android.intent.action.MEDIA_SCANNER_SCAN_FILE", "-d", "file:///sdcard/Pictures/toll-house.png");
+  let media = "";
+  for (let i = 0; i < 40 && !media; i++, await sleep(250)) media = /_id=(\d+)/.exec(adb("shell", "content", "query", "--uri", "content://media/external/images/media", "--projection", "_id", "--where", "\"_display_name='toll-house.png'\""))?.[1] ?? "";
+  if (!media) throw new Error("The picture isn't in the phone's photos.");
+  adb("shell", "svc", "wifi", "disable");
+  adb("shell", "svc", "data", "disable");
+  adb("shell", "am", "start", "-a", "android.intent.action.SEND", "-t", "image/png", "--grant-read-uri-permission", "--eu", "android.intent.extra.STREAM", `content://media/external/images/media/${media}`, "-n", `${PACKAGE}/.MainActivity`);
+  await expect(page.getByRole("heading", { level: 1, name: "Save to Writer" })).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "Book" }).locator("option:checked")).toHaveText("The Bridge at Varn");
+  await page.getByRole("textbox", { name: "Description of the picture" }).fill("The toll house");
+  await page.getByRole("textbox", { name: "Title" }).fill("The toll house");
+  await page.getByRole("button", { name: "Save as a new note" }).click();
+  await expect(page.getByRole("textbox", { name: "Note: The toll house" })).toBeVisible();
+  adb("shell", "am", "start", "-a", "android.intent.action.SEND", "-t", "text/plain", "--es", "android.intent.extra.TEXT", "'Toll houses of the valley https://example.com/tolls'", "-n", `${PACKAGE}/.MainActivity`);
+  await expect(page.getByRole("heading", { level: 1, name: "Save to Writer" })).toBeVisible();
+  await page.getByRole("radio", { name: "Add to a note…" }).click();
+  await page.getByRole("searchbox", { name: "Search the notes" }).fill("toll house");
+  await page.getByRole("radio", { name: /The toll house/ }).click();
+  await page.getByRole("button", { name: "Add to the note" }).click();
+  await expect(page.getByRole("textbox", { name: "Note: The toll house" })).toContainText("Toll houses of the valley");
+  const tollHouse = inApp("cat books/varn/notes/the-toll-house.md");
+  if (!/!\[The toll house\]\(\/images\/the-toll-house\.png\)/.test(tollHouse) || !tollHouse.includes("Toll houses of the valley <https://example.com/tolls>")) throw new Error(`The shares weren't written into the note: ${tollHouse}`);
+  if (inApp("ls files/shared 2>/dev/null || true").trim()) throw new Error("What was shared is still kept after it was written.");
+  adb("shell", "svc", "wifi", "enable");
+  adb("shell", "svc", "data", "enable");
+  await page.getByRole("button", { name: /^Sync: / }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Sync now" }).click();
+  let sharedOnGitHub = false;
+  for (let i = 0; i < 80 && !sharedOnGitHub; i++, await sleep(250)) sharedOnGitHub = git(varn, "ls-tree", "-r", "--name-only", "main").split("\n").includes("notes/the-toll-house.md");
+  if (!sharedOnGitHub) throw new Error("The note made of what was shared didn't reach GitHub.");
+  step("shared from another app offline: a picture made a new note, a link added to it, both synced to GitHub once back online");
+
   // Typing, then the app killed before the autosave lands; opened again, the text is there and saved.
   const todaysEntry = async (p: Page) => {
     await p.goto("http://tauri.localhost/");

@@ -5,6 +5,8 @@ import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.provider.OpenableColumns
+import android.util.Log
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
@@ -16,6 +18,7 @@ import android.view.WindowManager
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
+import androidx.core.content.IntentCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.webkit.ServiceWorkerClientCompat
@@ -30,7 +33,9 @@ import app.tauri.annotation.TauriPlugin
 import app.tauri.plugin.Invoke
 import app.tauri.plugin.JSObject
 import app.tauri.plugin.Plugin
+import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
 import java.security.KeyStore
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
@@ -65,6 +70,11 @@ class SelectionArgs {
 }
 
 @InvokeArg
+class ShareArgs {
+    lateinit var id: String
+}
+
+@InvokeArg
 class BytesArgs {
     /** Base64. */
     lateinit var data: String
@@ -73,7 +83,8 @@ class BytesArgs {
 /**
  * Writer's Android plugin (#52): the GitHub token sealed by an AES key kept in Android's keystore,
  * other sites opened in the phone's browser, the page kept clear of the system's bars, the page's
- * service worker given the app's own files, and the microphone asked for, for dictation (#86).
+ * service worker given the app's own files, the microphone asked for, for dictation (#86), and
+ * what other apps share with Writer kept for the page (#204).
  */
 @TauriPlugin(permissions = [Permission(strings = [Manifest.permission.RECORD_AUDIO], alias = "microphone")])
 class WriterPlugin(private val activity: Activity) : Plugin(activity) {
@@ -84,6 +95,108 @@ class WriterPlugin(private val activity: Activity) : Plugin(activity) {
         keepClearOfBars(webView)
         serveTheWorker(webView)
         addToSelectionToolbar(webView)
+        received(activity.intent)
+    }
+
+    /** A share while the app's open (its activity is singleTask): it comes as a new intent. */
+    override fun onNewIntent(intent: Intent) {
+        received(intent)
+    }
+
+    /**
+     * What another app shared (#204), copied into the app's own storage at once, before the share
+     * closes (an app may take back its permission to read it then), and kept there until the page has
+     * written it into a book (`shareDone`): nothing's lost if the app is closed first. The page hears
+     * of it with a `writer-shared` event, and asks for what's kept (`shares`) as it starts, too.
+     */
+    private fun received(intent: Intent?) {
+        if (intent == null) return
+        val streams: List<Uri> = when (intent.action) {
+            Intent.ACTION_SEND -> listOfNotNull(IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java))
+            Intent.ACTION_SEND_MULTIPLE -> IntentCompat.getParcelableArrayListExtra(intent, Intent.EXTRA_STREAM, Uri::class.java) ?: emptyList()
+            else -> emptyList()
+        }
+        val share = readShare(intent.action, intent.type, streams, intent.getCharSequenceExtra(Intent.EXTRA_TEXT), intent.getCharSequenceExtra(Intent.EXTRA_SUBJECT)) ?: return
+        // Taken: not again when Android makes the activity anew with the same intent (the phone turned).
+        intent.action = null
+        Thread {
+            try {
+                keep(share)
+                webView?.post { webView?.evaluateJavascript("dispatchEvent(new Event('writer-shared'))", null) }
+            } catch (e: Exception) {
+                Log.e("Writer", "Couldn't keep what was shared: ${e.message}")
+            }
+        }.start()
+    }
+
+    private fun sharesDir() = File(activity.filesDir, "shared")
+
+    /** A share in a folder of its own, shared/<id>: its pictures, and share.json saying what it is. Whole, or not at all. */
+    private fun keep(share: Shared<Uri>) {
+        val id = "${System.currentTimeMillis()}"
+        val part = File(sharesDir(), "$id.part").apply { deleteRecursively(); mkdirs() }
+        val files = JSONArray()
+        share.streams.forEachIndexed { i, uri ->
+            val resolver = activity.contentResolver
+            val type = resolver.getType(uri) ?: "image/jpeg"
+            if (!type.startsWith("image/")) return@forEachIndexed
+            val name = safeName(displayName(uri), "picture-${i + 1}")
+            val file = File(part, "$i-$name")
+            val copied = resolver.openInputStream(uri)?.use { input -> file.outputStream().use { input.copyTo(it) } } != null
+            if (copied) files.put(JSONObject().put("name", name).put("type", type).put("file", file.name))
+        }
+        if (files.length() == 0 && share.text == null) {
+            part.deleteRecursively()
+            return
+        }
+        val json = JSONObject().put("id", id).put("received", System.currentTimeMillis()).put("files", files)
+        share.text?.let { json.put("text", it) }
+        share.subject?.let { json.put("subject", it) }
+        File(part, "share.json").writeText(json.toString())
+        part.renameTo(File(sharesDir(), id))
+    }
+
+    private fun displayName(uri: Uri): String? = try {
+        activity.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+            if (c.moveToFirst()) c.getString(0) else null
+        }
+    } catch (e: Exception) {
+        null
+    }
+
+    /** What's been shared and not yet written into a book, oldest first: each with its pictures' bytes (base64). */
+    @Command
+    fun shares(invoke: Invoke) {
+        Thread {
+            try {
+                val list = JSONArray()
+                val kept = sharesDir().listFiles { f -> f.isDirectory && !f.name.endsWith(".part") }?.sortedBy { it.name } ?: emptyList()
+                for (dir in kept) {
+                    val json = JSONObject(File(dir, "share.json").readText())
+                    val files = json.getJSONArray("files")
+                    val pictures = JSONArray()
+                    for (i in 0 until files.length()) {
+                        val f = files.getJSONObject(i)
+                        val bytes = File(dir, f.getString("file")).readBytes()
+                        pictures.put(JSONObject().put("name", f.getString("name")).put("type", f.getString("type")).put("data", Base64.encodeToString(bytes, Base64.NO_WRAP)))
+                    }
+                    json.remove("files")
+                    list.put(json.put("pictures", pictures))
+                }
+                invoke.resolve(JSObject().put("shares", list))
+            } catch (e: Exception) {
+                invoke.reject(e.message ?: e.javaClass.simpleName)
+            }
+        }.start()
+    }
+
+    /** A share written into a book: its folder goes. */
+    @Command
+    fun shareDone(invoke: Invoke) {
+        val id = invoke.parseArgs(ShareArgs::class.java).id
+        if (!Regex("\\d+").matches(id)) return invoke.reject("No share “$id”.")
+        File(sharesDir(), id).deleteRecursively()
+        invoke.resolve()
     }
 
     /** The page's actions on selected text, as it last said (#95). */

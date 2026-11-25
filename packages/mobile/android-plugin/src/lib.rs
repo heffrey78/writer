@@ -2,7 +2,8 @@
 //! lives in Android's keystore and can't leave it, for the GitHub token; opens other sites in the
 //! phone's browser; asks for the microphone, for dictation (#86), and keeps the screen on while it
 //! listens (#97); adds Writer's actions on selected
-//! text to Android's selection toolbar (#95); and, when the webview loads, keeps the page clear of the system's bars and gives
+//! text to Android's selection toolbar (#95); keeps what other apps share with Writer for the page
+//! (#204); and, when the webview loads, keeps the page clear of the system's bars and gives
 //! the page's service worker (packages/web/public/engine-sw.js) the same answers as the page, which
 //! Android's webview otherwise asks the network for.
 
@@ -48,6 +49,12 @@ struct Allowed {
 pub struct SelectionAction {
     pub id: String,
     pub label: String,
+}
+
+#[derive(Serialize)]
+#[cfg_attr(not(target_os = "android"), allow(dead_code))]
+struct ShareId {
+    id: String,
 }
 
 #[derive(Serialize)]
@@ -107,6 +114,27 @@ impl<R: Runtime> Android<R> {
         #[cfg(not(target_os = "android"))]
         return {
             let _ = items;
+            Ok(())
+        };
+    }
+
+    /// What other apps have shared with Writer and the page hasn't yet written into a book (#204):
+    /// `{ shares: [{ id, received, text?, subject?, pictures: [{ name, type, data }] }] }`, the
+    /// pictures' bytes base64. It reads files, so not from the main thread.
+    pub fn shares(&self) -> Result<serde_json::Value, String> {
+        #[cfg(target_os = "android")]
+        return self.0.run_mobile_plugin::<serde_json::Value>("shares", ()).map_err(|e| e.to_string());
+        #[cfg(not(target_os = "android"))]
+        return Ok(serde_json::json!({ "shares": [] }));
+    }
+
+    /// The share `id` written into a book: what was kept of it goes.
+    pub fn share_done(&self, id: String) -> Result<(), String> {
+        #[cfg(target_os = "android")]
+        return self.0.run_mobile_plugin::<()>("shareDone", ShareId { id }).map_err(|e| e.to_string());
+        #[cfg(not(target_os = "android"))]
+        return {
+            let _ = ShareId { id };
             Ok(())
         };
     }
