@@ -141,8 +141,8 @@ function SaveShare({ share, onDone }: { share: Share; onDone: () => void }) {
               ? ["Choose the note to add it to.", document.getElementById(ids.notes)?.querySelector<HTMLElement>("input") ?? document.getElementById(ids.search)]
               : undefined;
     setMissing(gap?.[0]);
-    if (gap) {
-      gap[1]?.focus();
+    if (gap || !book) {
+      gap?.[1]?.focus();
       return;
     }
     setSaving(true);
