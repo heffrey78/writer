@@ -4,6 +4,7 @@ import { useContext, useEffect, useMemo, useRef, useState, type FocusEvent, type
 import { useLocation, useNavigate } from "react-router";
 import { OpenParts, partEscapes, saveOpenParts } from "../bible/profile.tsx";
 import { ErrorAlert } from "./alert.tsx";
+import { cn } from "./cn.ts";
 
 /*
  * A note opens as a modal over its gallery (heffrey78/gh-writer#233), like a card picked up off a board: its whole
@@ -34,7 +35,7 @@ function escapeTaken(target: EventTarget | null) {
 }
 
 /** The modal: a large sheet (the whole window when it's narrow), titled for screen readers. */
-export function ItemModal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+export function ItemModal({ title, onClose, children, className }: { title: string; onClose: () => void; children: ReactNode; /** Its background, where the item has one of its own (a note's color). */ className?: string | undefined }) {
   const parts = useMemo(() => new Set<() => Promise<boolean>>(), []);
   const content = useRef<HTMLDivElement>(null);
   const closing = useRef(false);
@@ -72,7 +73,7 @@ export function ItemModal({ title, onClose, children }: { title: string; onClose
             e.preventDefault();
             partEscapes.add(e);
           }}
-          className="fixed inset-0 z-50 overflow-y-auto bg-raised text-ink outline-none sm:inset-x-auto sm:top-[4vh] sm:bottom-auto sm:left-1/2 sm:max-h-[92vh] sm:w-[min(52rem,calc(100vw-3rem))] sm:-translate-x-1/2 sm:rounded-lg sm:border sm:border-rule sm:shadow-xl"
+          className={cn("fixed inset-0 z-50 overflow-y-auto bg-raised text-ink outline-none sm:inset-x-auto sm:top-[4vh] sm:bottom-auto sm:left-1/2 sm:max-h-[92vh] sm:w-[min(52rem,calc(100vw-3rem))] sm:-translate-x-1/2 sm:rounded-lg sm:border sm:border-rule sm:shadow-xl", className)}
         >
           <Dialog.Title className="sr-only">{title}</Dialog.Title>
           <div className="px-6 pt-5 pb-8 sm:px-8">
