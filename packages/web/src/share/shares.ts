@@ -102,7 +102,7 @@ export function sharedTitle(share: Omit<Share, "id" | "received">): string {
 }
 
 /**
- * What's shared as Markdown for a note: its words, each link kept as a link (Writer doesn't fetch the
+ * What's shared as Markdown for a note: its words, a paragraph to a line, each link kept as a link (Writer doesn't fetch the
  * page), the subject its words where a link came alone, then each picture saved on a line of its own,
  * its caption with it.
  */
@@ -112,7 +112,9 @@ export function sharedMarkdown(share: Omit<Share, "id" | "received" | "pictures"
   if (text) {
     const link = sharedLink(share);
     if (link && !link.words && share.subject) parts.push(`[${escapeText(share.subject)}](${link.url})`);
-    else parts.push(...text.split(/\n\s*\n/).map((p) => p.trim().replace(LINK, (url) => `<${url}>`)));
+    // Each line its own paragraph: in Markdown, lines in one paragraph run together, and a recipe's
+    // or a list's lines would read as one.
+    else parts.push(...text.split("\n").map((l) => l.trim()).filter(Boolean).map((l) => l.replace(LINK, (url) => `<${url}>`)));
   }
   for (const p of pictures) parts.push(`![${escapeText(p.alt)}](${p.url}${p.caption ? ` "${p.caption.replace(/\s+/g, " ").trim().replace(/["\\]/g, (c) => `\\${c}`)}"` : ""})`);
   return parts.length ? `${parts.join("\n\n")}\n` : "";

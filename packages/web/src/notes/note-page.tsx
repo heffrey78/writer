@@ -133,19 +133,21 @@ export function NotePage({
   const becameRecord = note.became ? novel.moduleRecords.find((r) => r.id === note.became) : undefined;
   const becameType = becameRecord && moduleRecordType(novel.kind, becameRecord.type);
   const Heading = embedded && !embedded.modal ? "h2" : "h1";
+  const iconOnly = narrow ? "size-12 justify-center p-0" : undefined;
   return (
     <div className={embedded ? "grid gap-4" : "mx-auto grid w-full max-w-[calc(var(--ghw-prose-measure)+3rem)] gap-5 px-6 py-6"}>
       <div className="grid gap-1.5">
         <div className="flex flex-wrap items-center gap-2 pr-8">
-          <p className="flex-1 text-sm text-muted">Note{note.created && ` · ${realDay(note.created)}`}</p>
-          <Button variant="ghost" size="sm" onClick={() => askPicture(editor)} disabled={!editor}>
-            <ImagePlus className="size-4" aria-hidden /> Add a picture
+          <p className="flex-1 text-sm whitespace-nowrap text-muted">Note{note.created && ` · ${realDay(note.created)}`}</p>
+          {/* On a phone, icons alone, each a finger's size: their words squeezed the date onto four lines. */}
+          <Button variant="ghost" size="sm" className={iconOnly} aria-label={narrow ? "Add a picture" : undefined} onClick={() => askPicture(editor)} disabled={!editor}>
+            <ImagePlus className={narrow ? "size-5" : "size-4"} aria-hidden /> {!narrow && "Add a picture"}
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => setPromoting(true)}>
-            <ArrowUpRight className="size-4" aria-hidden /> Make it {becomes}
+          <Button variant="ghost" size="sm" className={iconOnly} aria-label={narrow ? `Make it ${becomes}` : undefined} onClick={() => setPromoting(true)}>
+            <ArrowUpRight className={narrow ? "size-5" : "size-4"} aria-hidden /> {!narrow && `Make it ${becomes}`}
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => setDeleting(true)} disabled={remove.isPending}>
-            <Trash2 className="size-4" aria-hidden /> Delete
+          <Button variant="ghost" size="sm" className={iconOnly} aria-label={narrow ? "Delete" : undefined} onClick={() => setDeleting(true)} disabled={remove.isPending}>
+            <Trash2 className={narrow ? "size-5" : "size-4"} aria-hidden /> {!narrow && "Delete"}
           </Button>
         </div>
         {place.editing === "title" ? (

@@ -861,6 +861,17 @@ test("Save to Writer: shared text added at the end of a note picked from the boo
   await expect(page.getByRole("textbox", { name: "Note: What if Ben never sold the plans?" })).toContainText("Ask the ferryman.");
   expect(readFileSync(join(dir, IDEA), "utf8")).toBe(`${before.trimEnd()}\n\nThe ford floods in spring. Ask the ferryman.\n`);
   expect(await left()).toEqual([]);
+
+  // The note's own buttons, on a phone: icons a finger's size, named for screen readers, and the date
+  // on one line beside them.
+  for (const name of ["Add a picture", "Make it an event or a scene", "Delete"]) {
+    const button = page.getByRole("button", { name, exact: true });
+    await expect(button).toHaveText("");
+    expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(48);
+  }
+  const date = page.getByText(/^Note · /);
+  expect((await date.boundingBox())!.height).toBeLessThan(30);
+  await fits(page);
 });
 
 test("Save to Writer: what's shared can be left for later, by Not now or Back, and waits on the shelf without sending the writer back to it (#205)", async ({ page, app }) => {

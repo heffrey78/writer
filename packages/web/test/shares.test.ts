@@ -34,11 +34,13 @@ describe("a note made of what's shared", () => {
     expect(sharedMarkdown({ ...share, subject: "The ford at Varn" }, [])).toBe("[The ford at Varn](https://www.example.com/ford)\n");
   });
 
-  it("from text alone: titled by its first line, its paragraphs kept", () => {
+  it("from text alone: titled by its first line, each line kept as a paragraph of its own", () => {
     const share = { text: "  The ford floods in spring.\nAsk the ferryman.\n\nHe knows the depths.  ", pictures: [] };
     expect(sharedLink(share)).toBeUndefined();
     expect(sharedTitle(share)).toBe("The ford floods in spring.");
-    expect(sharedMarkdown(share, [])).toBe("The ford floods in spring.\nAsk the ferryman.\n\nHe knows the depths.\n");
+    expect(sharedMarkdown(share, [])).toBe("The ford floods in spring.\n\nAsk the ferryman.\n\nHe knows the depths.\n");
+    const recipe = "Crust\n2½ cups flour\n1 cup cold butter";
+    expect(sharedMarkdown({ text: recipe }, [])).toBe("Crust\n\n2½ cups flour\n\n1 cup cold butter\n");
     expect(sharedTitle({ text: "x".repeat(100), pictures: [] })).toBe(`${"x".repeat(79)}…`);
   });
 
