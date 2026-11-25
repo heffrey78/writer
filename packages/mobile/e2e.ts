@@ -504,6 +504,35 @@ try {
   if (!kept) throw new Error("The words weren't saved to the note about Ada Varn.");
   step("words selected in a novel, added to an entry from Android's toolbar");
 
+  // A picture into a note from the bar above the keyboard (#203): Picture, then Choose from your
+  // photos, the photo described, resized and saved on the phone, then synced to GitHub.
+  await page.goto(`${new URL(page.url()).origin}${new URL(page.url()).pathname.split("/").slice(0, 3).join("/")}/note/note_w1fben`);
+  const noteText = page.getByRole("textbox", { name: "Note: What if Ben never sold the plans?" });
+  await noteText.click();
+  const writingBar = page.getByRole("toolbar", { name: "Writing" });
+  await writingBar.getByRole("button", { name: "Picture" }).click();
+  for (const button of await writingBar.getByRole("button").all()) if ((await button.boundingBox())!.height < 48) throw new Error("A button on the bar is smaller than a finger.");
+  // The file chooser taken by Playwright, in place of Android's photo picker.
+  // The app's own icon, a sketch's stand-in.
+  const photo = readFileSync(join(repo, "packages/mobile/src-tauri/icons/128x128.png"));
+  const chooser = page.waitForEvent("filechooser");
+  await writingBar.getByRole("button", { name: "Choose from your photos" }).click();
+  await (await chooser).setFiles({ name: "IMG_2041.png", mimeType: "image/png", buffer: photo });
+  const insert = page.getByRole("dialog", { name: "Insert a picture" });
+  await insert.getByLabel("Description").fill("A sketch of the toll house");
+  await expect(insert.getByRole("button", { name: "Insert" })).toBeEnabled();
+  await insert.getByRole("button", { name: "Insert" }).click();
+  await expect(noteText.getByRole("img", { name: "A sketch of the toll house" })).toBeVisible();
+  let pictured = "";
+  for (let i = 0; i < 40 && !pictured; i++, await sleep(250)) pictured = inApp("grep -l \"a-sketch-of-the-toll-house\" books/varn/notes/what-if-ben-never-sold.md || true").trim();
+  if (!pictured) throw new Error("The picture wasn't saved in the note on the phone.");
+  await page.getByRole("button", { name: /^Sync: / }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Sync now" }).click();
+  let onGitHub = false;
+  for (let i = 0; i < 80 && !onGitHub; i++, await sleep(250)) onGitHub = git(varn, "ls-tree", "-r", "--name-only", "main").split("\n").some((f) => /^images\/a-sketch-of-the-toll-house\.(png|jpg)$/.test(f));
+  if (!onGitHub) throw new Error("The picture didn't reach GitHub.");
+  step("a picture chosen from the photos into a note from the bar above the keyboard, saved on the phone and synced to GitHub");
+
   // Typing, then the app killed before the autosave lands; opened again, the text is there and saved.
   const todaysEntry = async (p: Page) => {
     await p.goto("http://tauri.localhost/");

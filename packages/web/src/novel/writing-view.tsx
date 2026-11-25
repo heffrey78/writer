@@ -612,7 +612,7 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
           />
         )}
       </div>
-      <StatusBar novelId={novelId} workspace={workspace} editor={editor} selection={onSelection.map(({ label, icon, run }) => ({ label, ...(icon ? { icon } : {}), run }))} />
+      <StatusBar novelId={novelId} workspace={workspace} editor={editor} picture={(file) => askPicture(editor, file)} selection={onSelection.map(({ label, icon, run }) => ({ label, ...(icon ? { icon } : {}), run }))} />
       </div>
       {raising || issueOpen ? (
         // An issue being raised or read takes the sidebar's place until it's closed: beside the text,
@@ -756,7 +756,7 @@ function EmptyChapter({ autofocus, onAdd }: { autofocus: boolean; onAdd: (title:
  * against the daily goal. In focus mode, only while the count is pinned there. On a phone while
  * writing, the writing bar instead (#96), on top of the keyboard: the page ends there.
  */
-function StatusBar({ novelId, workspace, editor, selection }: { novelId: string; workspace: Workspace; editor: Editor | undefined; selection: BarAction[] }) {
+function StatusBar({ novelId, workspace, editor, selection, picture }: { novelId: string; workspace: Workspace; editor: Editor | undefined; selection: BarAction[]; picture: (file: File) => void }) {
   const hidden = useWritingModes((m) => m.focus && !m.pinCount);
   const words = editorWords(useBookKind());
   const narrow = useNarrow();
@@ -767,7 +767,7 @@ function StatusBar({ novelId, workspace, editor, selection }: { novelId: string;
   if (writing)
     return (
       <div className={cn("sticky z-10 border-t border-rule bg-paper px-2 py-1 text-[13px] text-muted", above)}>
-        <WritingBar editor={editor} dictate={<DictateButton editor={editor} />} selection={selection} />
+        <WritingBar editor={editor} dictate={<DictateButton editor={editor} />} selection={selection} picture={picture} />
       </div>
     );
   if (hidden) return null;

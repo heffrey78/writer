@@ -22,6 +22,9 @@ import { ErrorAlert } from "../ui/alert.tsx";
 import { Button } from "../ui/button.tsx";
 import { Confirm } from "../ui/confirm.tsx";
 import { usePictures } from "../novel/use-pictures.tsx";
+import { useTextFocused, WritingBar } from "../novel/writing-bar.tsx";
+import { DictateButton } from "../dictation/dictation-ui.tsx";
+import { useNarrow } from "../narrow.ts";
 import { PromoteNoteDialog } from "./promote.tsx";
 
 /**
@@ -66,6 +69,10 @@ export function NotePage({
   // Pictures, as a scene takes them (#200): dropped, pasted, from Add a picture or the palette.
   const [editor, setEditor] = useState<Editor>();
   const { pictureUrl, picturesFor, ask: askPicture, dialog: pictureDialog } = usePictures(novelId);
+  // On a phone, while writing, the bar above the keyboard (#96), with Picture (#203).
+  const narrow = useNarrow();
+  const inText = useTextFocused();
+  const writing = narrow && inText;
   useCommands(
     () => [
       { id: "note.promote", title: `Make “${note.title}” ${becomes}`, group: "Notes", keywords: ["promote", ...into.map((x) => x.one), w.piece.one], run: () => setPromoting(true) },
@@ -249,6 +256,11 @@ export function NotePage({
         )}
       </section>
 
+      {writing && (
+        <div className="sticky bottom-0 z-10 -mx-2 border-t border-rule bg-paper px-2 py-1">
+          <WritingBar editor={editor} dictate={<DictateButton editor={editor} />} selection={[]} picture={(file) => askPicture(editor, file)} />
+        </div>
+      )}
       {pictureDialog}
       {promoting && <PromoteNoteDialog novelId={novelId} novel={novel} workspace={workspace} note={note} flush={() => workspace.autosave.flush()} open onOpenChange={setPromoting} />}
       <Confirm open={deleting} onOpenChange={setDeleting} title={`Delete “${note.title}”?`} description={`The note goes from the ${w.book.one}. It stays in the history.`} action="Delete" danger onConfirm={() => remove.mutate()} />

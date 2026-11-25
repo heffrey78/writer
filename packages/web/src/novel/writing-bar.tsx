@@ -1,6 +1,6 @@
 import type { Editor } from "@tiptap/core";
-import { AtSign, ChevronDown, Command, Keyboard, MessageSquarePlus, Redo2, Undo2, type LucideIcon } from "lucide-react";
-import { useEffect, useReducer, useState, type MouseEvent, type ReactNode } from "react";
+import { AtSign, Camera, ChevronDown, Command, ImagePlus, Images, Keyboard, MessageSquarePlus, Redo2, Undo2, type LucideIcon } from "lucide-react";
+import { useEffect, useReducer, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { openOverlay } from "../palette.tsx";
 import { cn } from "../ui/cn.ts";
 
@@ -50,9 +50,10 @@ const keepFocus = (e: MouseEvent) => e.preventDefault();
 /**
  * On a phone, while writing (#96): what's wanted at hand, on top of the keyboard, without leaving the
  * text. Commands (the palette), then `dictate` where the device can hear, Undo, Redo, @ to mention,
- * and the selected text's actions while there's a selection; last, Hide the keyboard.
+ * a picture where pictures can go (#203), and the selected text's actions while there's a selection;
+ * last, Hide the keyboard. Every target is at least 48 px, a finger's.
  */
-export function WritingBar({ editor, dictate, selection }: { editor: Editor | undefined; dictate?: ReactNode; selection: BarAction[] }) {
+export function WritingBar({ editor, dictate, selection, picture }: { editor: Editor | undefined; dictate?: ReactNode; selection: BarAction[]; picture?: (file: File) => void }) {
   useEditorChanges(editor);
   const live = editor && !editor.isDestroyed ? editor : undefined;
   const selected = !!live && !live.state.selection.empty;
@@ -63,6 +64,7 @@ export function WritingBar({ editor, dictate, selection }: { editor: Editor | un
       <BarButton label="Undo" icon={Undo2} disabled={!live?.can().undo()} onPress={() => live?.commands.undo()} />
       <BarButton label="Redo" icon={Redo2} disabled={!live?.can().redo()} onPress={() => live?.commands.redo()} />
       <BarButton label="Mention" icon={AtSign} disabled={!live} onPress={() => live && mention(live)} />
+      {picture && <PictureButton disabled={!live} onPicture={picture} />}
       {/* One in words; more as their icons, or they'd run off a phone's screen. */}
       {selected &&
         selection.map((a) => (
@@ -75,7 +77,7 @@ export function WritingBar({ editor, dictate, selection }: { editor: Editor | un
         title="Hide the keyboard"
         onMouseDown={keepFocus}
         onClick={() => (document.activeElement as HTMLElement | null)?.blur()}
-        className="ml-auto grid h-10 w-10 shrink-0 place-items-center content-center rounded-md text-ink hover:bg-panel"
+        className="ml-auto grid h-12 w-12 shrink-0 place-items-center content-center rounded-md text-ink hover:bg-panel"
       >
         <Keyboard className="size-5" aria-hidden />
         <ChevronDown className="-mt-1 size-3.5" aria-hidden />
@@ -93,10 +95,56 @@ function BarButton({ label, icon: Icon, onPress, disabled, wide }: { label: stri
       disabled={disabled}
       onMouseDown={keepFocus}
       onClick={onPress}
-      className={cn("inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-md text-ink hover:bg-panel disabled:opacity-40", wide ? "px-2.5 text-sm" : "w-10")}
+      className={cn("inline-flex h-12 shrink-0 items-center justify-center gap-1.5 rounded-md text-ink hover:bg-panel disabled:opacity-40", wide ? "px-3 text-sm" : "w-12")}
     >
       <Icon className="size-5" aria-hidden />
       {wide && label}
     </button>
+  );
+}
+
+/**
+ * A picture for the text, on a phone (#203): Picture opens its two choices in the bar, Take a photo
+ * (the phone's camera) and Choose from your photos, without taking the focus from the text (a menu
+ * would, and the keyboard and the bar would go with it). Either hands the file to `onPicture`, which
+ * asks about it as a dropped one is.
+ */
+function PictureButton({ disabled, onPicture }: { disabled: boolean; onPicture: (file: File) => void }) {
+  const [open, setOpen] = useState(false);
+  const camera = useRef<HTMLInputElement>(null);
+  const photos = useRef<HTMLInputElement>(null);
+  const take = (input: HTMLInputElement) => {
+    const file = input.files?.[0];
+    input.value = "";
+    if (file) onPicture(file);
+  };
+  const choose = (input: HTMLInputElement | null) => {
+    setOpen(false);
+    input?.click();
+  };
+  return (
+    <>
+      <button
+        type="button"
+        aria-label="Picture"
+        title="Picture"
+        aria-expanded={open}
+        disabled={disabled}
+        onMouseDown={keepFocus}
+        onClick={() => setOpen(!open)}
+        className={cn("inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-md text-ink hover:bg-panel disabled:opacity-40", open && "bg-accent-soft")}
+      >
+        <ImagePlus className="size-5" aria-hidden />
+      </button>
+      {open && (
+        <>
+          <BarButton label="Take a photo" icon={Camera} wide onPress={() => choose(camera.current)} />
+          <BarButton label="Choose from your photos" icon={Images} wide onPress={() => choose(photos.current)} />
+        </>
+      )}
+      {/* The camera where the phone has one (the app's webview opens it for `capture`); the photos otherwise. */}
+      <input ref={camera} type="file" accept="image/*" capture="environment" hidden tabIndex={-1} onChange={(e) => take(e.currentTarget)} />
+      <input ref={photos} type="file" accept="image/*" hidden tabIndex={-1} onChange={(e) => take(e.currentTarget)} />
+    </>
   );
 }

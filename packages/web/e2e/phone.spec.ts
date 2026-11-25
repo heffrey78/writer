@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { devices, type Locator, type Page } from "@playwright/test";
 import { axe, expect, launch, test } from "./fixtures.ts";
+import { makePicture } from "./pictures.ts";
 
 /**
  * Writer on a phone (#53), by touch at 412 px: the shelf, a book opened, its sidebar over the text,
@@ -734,4 +735,37 @@ test("on a phone, Tidy up's names and an entry's actions have room: no word to a
   if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/entry.png` });
   await fits(page);
   await audit(page);
+});
+
+test("a picture from the phone's photos into a note, from Picture on the bar above the keyboard (#203)", async ({ page, app }) => {
+  const dir = app.novelRepo("varn");
+  await app.restart(dir);
+  await page.goto(app.launchUrl);
+  await expect(page.getByRole("textbox", { name: "Chapter text" })).toBeVisible();
+  const id = new URL(page.url()).pathname.split("/")[2]!;
+  await page.goto(`${new URL(page.url()).origin}/novels/${id}/note/note_w1fben`);
+  const prose = page.getByRole("textbox", { name: "Note: What if Ben never sold the plans?" });
+  await prose.tap();
+  const bar = page.getByRole("toolbar", { name: "Writing" });
+  await expect(bar).toBeVisible();
+  // Every target a finger's: 48 px.
+  for (const button of await bar.getByRole("button").all()) expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(48);
+  await bar.getByRole("button", { name: "Picture" }).tap();
+  await expect(prose).toBeFocused();
+  await expect(bar.getByRole("button", { name: "Take a photo" })).toBeVisible();
+  for (const button of await bar.getByRole("button").all()) expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(48);
+  await audit(page);
+  const bytes = await makePicture(page, { width: 3000, height: 4000, name: "IMG_2041.jpg" });
+  const chooser = page.waitForEvent("filechooser");
+  await bar.getByRole("button", { name: "Choose from your photos" }).tap();
+  await (await chooser).setFiles({ name: "IMG_2041.jpg", mimeType: "image/jpeg", buffer: bytes });
+  const dialog = page.getByRole("dialog", { name: "Insert a picture" });
+  await expect(dialog).toContainText("IMG_2041.jpg · 3000 × 4000 px");
+  await dialog.getByLabel("Description").fill("A sketch of the toll house");
+  await expect(dialog.getByRole("button", { name: "Insert" })).toBeEnabled();
+  await dialog.getByRole("button", { name: "Insert" }).tap();
+  await expect(dialog).toBeHidden();
+  await expect(prose.getByRole("img", { name: "A sketch of the toll house" })).toBeVisible();
+  await expect.poll(() => readFileSync(join(dir, "notes/what-if-ben-never-sold.md"), "utf8")).toContain("\n\n![A sketch of the toll house](/images/a-sketch-of-the-toll-house.jpg)\n");
+  await fits(page);
 });
