@@ -1,18 +1,28 @@
 import { Dialog } from "radix-ui";
-import type { ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import { cn } from "./cn.ts";
 
 /**
- * A modal dialog with a title, closed by Escape, the overlay or `onClose`; focus returns to where it
- * was, or, when that's gone (the palette that opened it, an entry merged away), to `focusAfter`'s.
+ * A modal dialog with a title, closed by Escape, the overlay or `onClose`. It opens with the focus on
+ * what's marked `data-autofocus`, if anything is; focus returns to where it was, or, when that's gone (the palette that opened it, an entry merged away), to `focusAfter`'s.
  */
 export function Modal({ title, onClose, children, className, focusAfter }: { title: string; onClose: () => void; children: ReactNode; className?: string; focusAfter?: () => HTMLElement | null | undefined }) {
+  const content = useRef<HTMLDivElement>(null);
   return (
     <Dialog.Root open onOpenChange={(o) => !o && onClose()}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-40 bg-black/40" />
         <Dialog.Content
+          ref={content}
           aria-describedby={undefined}
+          // What's marked to take the focus takes it once the dialog traps it: over another dialog (a note's
+          // page in its modal, #200), React's autoFocus comes first and the dialog underneath takes it back.
+          onOpenAutoFocus={(e) => {
+            const marked = content.current?.querySelector<HTMLElement>("[data-autofocus]");
+            if (!marked) return;
+            e.preventDefault();
+            marked.focus();
+          }}
           // Back to what opened it; or, where that's gone (the palette) and the focus is left on the page, to focusAfter's.
           onCloseAutoFocus={() =>
             setTimeout(() => {

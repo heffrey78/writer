@@ -26,12 +26,15 @@ test("a note's page: its title, tags and prose edited in place, mentions include
     await axe(page);
   }
 
-  // Tags, by keyboard.
+  // Tags, by keyboard: a new one added from the list of the book's.
   await page.getByRole("button", { name: "Edit tags" }).focus();
   await page.keyboard.press("Enter");
-  await page.getByRole("textbox", { name: "Tags" }).fill("ending, ben, bridge");
+  await page.getByRole("button", { name: /^Add a tag/ }).focus();
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("bridge");
   await page.keyboard.press("Enter");
   await expect.poll(() => readFileSync(join(dir, IDEA), "utf8")).toContain("\ntags: [ending, ben, bridge]\n");
+  await page.keyboard.press("Escape");
 
   // The prose, with a mention.
   const prose = page.getByRole("textbox", { name: "Note: What if Ben never sold the plans?" });

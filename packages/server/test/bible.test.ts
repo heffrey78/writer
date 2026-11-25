@@ -662,6 +662,12 @@ describe("notes (D12)", () => {
     await valid();
   });
 
+  it("writes a note's pictures into the scene it becomes, each on its own line (#200)", async () => {
+    writeFileSync(join(dir, IDEA), `${read(IDEA).trimEnd()}\n\n![The plans](/images/plans.jpg "Ben's copy")\n\nAnd more.\n\n![The bridge](/images/bridge.png)\n`);
+    const { id, file } = await bible.promoteNote("note_w1fben", "ch_h01d50", { keep: false }, new ManuscriptOperations(dir, (fn) => fn()));
+    expect(read(file)).toMatch(new RegExp(`^---\\nid: ${id}\\n[^]*\\n---\\n!\\[The plans\\]\\(/images/plans.jpg "Ben's copy"\\)\\n\\n!\\[The bridge\\]\\(/images/bridge.png\\)\\n$`));
+  });
+
   it("an entry a note mentions is only deleted once confirmed", async () => {
     await expect(bible.deleteEntity(ADA, hash(ADA_FILE))).rejects.toMatchObject({ code: "REFERENCED", details: { references: expect.arrayContaining([{ kind: "note", id: "note_w1fben", title: "What if Ben never sold the plans?" }]) } });
   });

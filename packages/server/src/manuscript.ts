@@ -108,14 +108,15 @@ export class ManuscriptOperations {
 
   /**
    * What adding a piece to a section writes, for an operation to commit with its own changes: the
-   * piece's file, with `front` after its ID, title and status, and the section's order and numbering.
+   * piece's file, with `front` after its ID, title and status, and `body` after its kind's template,
+   * and the section's order and numbering.
    */
-  async sceneWrites(novel: Book, chapterId: string, piece: { title: string; after?: string | null; front?: Record<string, unknown> }): Promise<{ id: string; title: string; file: string; writes: FileWrite[] }> {
+  async sceneWrites(novel: Book, chapterId: string, piece: { title: string; after?: string | null; front?: Record<string, unknown>; body?: string }): Promise<{ id: string; title: string; file: string; writes: FileWrite[] }> {
     return this.#sceneWrites(novel, new Overlay(this.root), chapterId, piece);
   }
 
   /** sceneWrites, on top of an operation's pending changes `o`. */
-  async #sceneWrites(novel: Book, o: Overlay, chapterId: string, { title, after, front = {} }: { title: string; after?: string | null; front?: Record<string, unknown> }): Promise<{ id: string; title: string; file: string; writes: FileWrite[] }> {
+  async #sceneWrites(novel: Book, o: Overlay, chapterId: string, { title, after, front = {}, body = "" }: { title: string; after?: string | null; front?: Record<string, unknown>; body?: string }): Promise<{ id: string; title: string; file: string; writes: FileWrite[] }> {
     const chapter = this.#holder(novel, chapterId);
     const name = required(title, "title");
     const id = uniqueId(novel.kind.piece.prefix, new Set(indexById(novel).keys()));
@@ -123,7 +124,9 @@ export class ManuscriptOperations {
     // In a piece's usual order: ID, title, synopsis and status, then the rest.
     const { synopsis, status = novel.kind.statuses[0]!.key, ...rest } = front;
     // A new piece starts with its kind's template, where it has one.
-    o.set(path, `---\n${stringify({ id, title: name, ...(synopsis ? { synopsis } : {}), status, ...rest }, { lineWidth: 0 })}---\n${novel.kind.piece.template ?? ""}`);
+    const template = novel.kind.piece.template ?? "";
+    const prose = template && body ? `${template.replace(/\n*$/, "")}\n\n${body}` : template || body;
+    o.set(path, `---\n${stringify({ id, title: name, ...(synopsis ? { synopsis } : {}), status, ...rest }, { lineWidth: 0 })}---\n${prose}`);
     await this.#insert(o, novel, { section: chapter }, id, after);
     await this.#renumber(o, novel, { section: chapter }, new Map([[id, path]]));
     const writes = await o.changes();

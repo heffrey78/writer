@@ -436,7 +436,9 @@ try {
   // Its strip of parts (#176): a jump to Appears in, the focus on its heading; the way back still at the top.
   await page.getByRole("navigation", { name: "Parts of the entry" }).getByRole("button", { name: /^Appears in/ }).click();
   await expect(page.getByRole("region", { name: /^Appears in/ }).getByRole("heading", { name: /^Appears in/ })).toBeFocused();
-  expect(await page.locator("#index-entry > div").first().evaluate((e) => e.getBoundingClientRect().top)).toBe(0);
+  // Once the page has moved there: the jump scrolls smoothly unless the phone asks for less motion (Android's
+  // animations off), and the heading has the focus at once, before the page is there.
+  await expect.poll(() => page.locator("#index-entry > div").first().evaluate((e) => e.getBoundingClientRect().top), { message: "the way back at the top" }).toBe(0);
   adb("shell", "input", "keyevent", "KEYCODE_BACK");
   await expect(tomas).toBeFocused();
   expect(await page.evaluate(() => scrollY)).toBe(listTop);
@@ -503,6 +505,74 @@ try {
   for (let i = 0; i < 40 && !kept; i++, await sleep(250)) kept = inApp("grep -l \"spine\" books/*/notes/ada-varn.md || true").trim();
   if (!kept) throw new Error("The words weren't saved to the note about Ada Varn.");
   step("words selected in a novel, added to an entry from Android's toolbar");
+
+  // A picture into a note from the bar above the keyboard (#203): Picture, then Choose from your
+  // photos, the photo described, resized and saved on the phone, then synced to GitHub.
+  await page.goto(`${new URL(page.url()).origin}${new URL(page.url()).pathname.split("/").slice(0, 3).join("/")}/note/note_w1fben`);
+  const noteText = page.getByRole("textbox", { name: "Note: What if Ben never sold the plans?" });
+  await noteText.click();
+  const writingBar = page.getByRole("toolbar", { name: "Writing" });
+  await writingBar.getByRole("button", { name: "Picture" }).click();
+  for (const button of await writingBar.getByRole("button").all()) if ((await button.boundingBox())!.height < 48) throw new Error("A button on the bar is smaller than a finger.");
+  // The file chooser taken by Playwright, in place of Android's photo picker.
+  // The app's own icon, a sketch's stand-in.
+  const photo = readFileSync(join(repo, "packages/mobile/src-tauri/icons/128x128.png"));
+  const chooser = page.waitForEvent("filechooser");
+  await writingBar.getByRole("button", { name: "Choose from your photos" }).click();
+  await (await chooser).setFiles({ name: "IMG_2041.png", mimeType: "image/png", buffer: photo });
+  const insert = page.getByRole("dialog", { name: "Insert a picture" });
+  await insert.getByLabel("Description").fill("A sketch of the toll house");
+  await expect(insert.getByRole("button", { name: "Insert" })).toBeEnabled();
+  await insert.getByRole("button", { name: "Insert" }).click();
+  await expect(noteText.getByRole("img", { name: "A sketch of the toll house" })).toBeVisible();
+  let pictured = "";
+  for (let i = 0; i < 40 && !pictured; i++, await sleep(250)) pictured = inApp("grep -l \"a-sketch-of-the-toll-house\" books/varn/notes/what-if-ben-never-sold.md || true").trim();
+  if (!pictured) throw new Error("The picture wasn't saved in the note on the phone.");
+  // The note's modal closed, Android's back, for the book's Sync.
+  adb("shell", "input", "keyevent", "KEYCODE_BACK");
+  adb("shell", "input", "keyevent", "KEYCODE_BACK");
+  await page.getByRole("button", { name: /^Sync: / }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Sync now" }).click();
+  let onGitHub = false;
+  for (let i = 0; i < 80 && !onGitHub; i++, await sleep(250)) onGitHub = git(varn, "ls-tree", "-r", "--name-only", "main").split("\n").some((f) => /^images\/a-sketch-of-the-toll-house\.(png|jpg)$/.test(f));
+  if (!onGitHub) throw new Error("The picture didn't reach GitHub.");
+  step("a picture chosen from the photos into a note from the bar above the keyboard, saved on the phone and synced to GitHub");
+
+  // Shared from another app (#204, #205), as Android's share sheet sends it: a picture from the
+  // phone's photos, then a link with its words, each to Save to Writer, into the novel, offline.
+  // The picture behind the app's own FileProvider (its cache), standing in for a photos app's: one
+  // that grants Writer reading it, which a share from adb's shell can't.
+  adb("push", "-q", join(repo, "packages/mobile/src-tauri/icons/128x128.png"), "/data/local/tmp/toll-house.png");
+  inApp("mkdir -p cache && cp /data/local/tmp/toll-house.png cache/toll-house.png");
+  adb("shell", "svc", "wifi", "disable");
+  adb("shell", "svc", "data", "disable");
+  adb("shell", "am", "start", "-a", "android.intent.action.SEND", "-t", "image/png", "--grant-read-uri-permission", "--eu", "android.intent.extra.STREAM", `content://${PACKAGE}.fileprovider/my_cache_images/toll-house.png`, "-n", `${PACKAGE}/.MainActivity`);
+  await expect(page.getByRole("heading", { level: 1, name: "Save to Writer" })).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "Book" }).locator("option:checked")).toHaveText("The Bridge at Varn");
+  // Only the title asked for: a picture alone has none to start with. Its description is optional.
+  await page.getByRole("textbox", { name: "Title" }).fill("The toll house");
+  await page.getByRole("button", { name: "Save as a new note" }).click();
+  await expect(page.getByRole("textbox", { name: "Note: The toll house" })).toBeVisible();
+  adb("shell", "am", "start", "-a", "android.intent.action.SEND", "-t", "text/plain", "--es", "android.intent.extra.TEXT", "'Toll houses of the valley https://example.com/tolls'", "-n", `${PACKAGE}/.MainActivity`);
+  await expect(page.getByRole("heading", { level: 1, name: "Save to Writer" })).toBeVisible();
+  await page.getByRole("radio", { name: "Add to a note…" }).click();
+  await page.getByRole("searchbox", { name: "Search the notes" }).fill("toll house");
+  await page.getByRole("radio", { name: /The toll house/ }).click();
+  await page.getByRole("button", { name: "Add to the note" }).click();
+  await expect(page.getByRole("textbox", { name: "Note: The toll house" })).toContainText("Toll houses of the valley");
+  const tollHouse = inApp("cat books/varn/notes/the-toll-house.md");
+  if (!/!\[The toll house\]\(\/images\/the-toll-house\.png\)/.test(tollHouse) || !tollHouse.includes("Toll houses of the valley <https://example.com/tolls>")) throw new Error(`The shares weren't written into the note: ${tollHouse}`);
+  if (inApp("ls files/shared 2>/dev/null || true").trim()) throw new Error("What was shared is still kept after it was written.");
+  adb("shell", "svc", "wifi", "enable");
+  adb("shell", "svc", "data", "enable");
+  // The book's page, for its Sync.
+  await page.goto(`${new URL(page.url()).origin}${new URL(page.url()).pathname.split("/").slice(0, 3).join("/")}`);
+  await page.getByRole("button", { name: /^Sync: / }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Sync now" }).click();
+  let sharedOnGitHub = false;
+  for (let i = 0; i < 80 && !sharedOnGitHub; i++, await sleep(250)) sharedOnGitHub = git(varn, "ls-tree", "-r", "--name-only", "main").split("\n").includes("notes/the-toll-house.md");
+  if (!sharedOnGitHub) throw new Error("The note made of what was shared didn't reach GitHub.");
+  step("shared from another app offline: a picture made a new note, a link added to it, both synced to GitHub once back online");
 
   // Typing, then the app killed before the autosave lands; opened again, the text is there and saved.
   const todaysEntry = async (p: Page) => {

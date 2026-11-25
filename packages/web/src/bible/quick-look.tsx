@@ -72,7 +72,7 @@ export function QuickLook({ novelId, novel, workspace }: { novelId: string; nove
     else setThen("back");
   }, [open]);
 
-  const results = useMemo(() => {
+  const find = (query: string): Entity[] => {
     if (!query.trim()) {
       const byId = new Map(novel.entities.map((e) => [e.id, e]));
       const first = recent.flatMap((id) => byId.get(id) ?? []);
@@ -91,7 +91,8 @@ export function QuickLook({ novelId, novel, workspace }: { novelId: string; nove
       .sort((a, b) => a.rank - b.rank || a.e.name.localeCompare(b.e.name))
       .slice(0, MOST)
       .map((x) => x.e);
-  }, [novel, query, recent]);
+  };
+  const results = useMemo(() => find(query), [novel, query, recent]); // eslint-disable-line react-hooks/exhaustive-deps
   const shown = results.find((e) => e.id === value) ?? results[0];
 
   const close = (how: "back" | "index") => {
@@ -137,10 +138,14 @@ export function QuickLook({ novelId, novel, workspace }: { novelId: string; nove
               onValueChange={setSearch}
               placeholder={`Find ${w.entity.a} by name, or anything it says…`}
               onKeyDown={(e) => {
-                if (e.key !== "Enter" || !shown) return;
+                if (e.key !== "Enter") return;
+                // The list follows the typing a moment behind (deferred, for a long index): Enter
+                // pressed before it has caught up is for what's typed, not the list as it was.
+                const found = query === search ? shown : find(search)[0];
+                if (!found) return;
                 e.preventDefault();
-                if (e.ctrlKey || e.metaKey) toIndex(shown);
-                else pin(shown);
+                if (e.ctrlKey || e.metaKey) toIndex(found);
+                else pin(found);
               }}
               className="h-12 w-full border-b border-rule bg-transparent px-4 text-base outline-none placeholder:text-muted"
             />

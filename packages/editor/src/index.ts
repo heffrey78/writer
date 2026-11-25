@@ -3,7 +3,7 @@ export { parseProse, serializeProse } from "./markdown.ts";
 export { joinSceneFile, splitSceneFile, type SceneFile } from "./scene-file.ts";
 export { insertSectionBreak, Picture, proseContent, type PictureOptions } from "./extensions.ts";
 export { insertTable, setHeading, structureCommands } from "./structure.ts";
-export { insertPicture, pictureAt, PicturesExtension, setPicture, type PictureAttrs, type PictureCallbacks } from "./pictures.ts";
+export { insertPicture, movePicture, pictureAt, PicturesExtension, removePicture, setPicture, type PictureAttrs, type PictureCallbacks } from "./pictures.ts";
 export { getMarkdown, loadMarkdown, setInitialMarkdown } from "./editor.ts";
 export { sound, spellNames, spokenPhrase, type Spoken, type SpokenName } from "./spoken.ts";
 export { DICTATE_KEYS, DictationExtension, heardText, holdHeard, joinPhrase, leaveDictation, offerDictation, settleHeard, showHeard, type DictationOffer, type HeldPhrase } from "./dictation.ts";
@@ -93,3 +93,4 @@ export { decoratePinned, PinnedLinesExtension, pinnedLinesKey, refreshPinnedLine
 export { IssueMarksExtension, issueMarksKey, ISSUE_MARKS_KEY, refreshIssueMarks, sceneText, sceneTextAt, type AnchoredIssue, type IssueMarksOptions } from "./issue-marks.ts";
 export { FootnotesExtension } from "./footnotes.ts";
 export { passageRange, quoteRange, selectPassage, selectQuote, type PassagePlace } from "./passage.ts";
+export { changeLink, linkAt, removeLink, LinksExtension, type LinkAt } from "./links.ts";

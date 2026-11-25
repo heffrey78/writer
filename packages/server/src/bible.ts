@@ -44,6 +44,8 @@ import {
   NOT_NAMES_HEADER,
   notNameLine,
   pair,
+  pictures,
+  picturesShown,
   readDifferent,
   readNotNames,
   unionLines,
@@ -581,14 +583,16 @@ export class BibleOperations {
 
   /**
    * Promote a note to a scene (heffrey78/gh-writer#205): a new one at the end of `chapter`, its title the note's and its
-   * prose the synopsis. The note is kept, `became` naming the scene, or removed; one commit. What a
+   * prose the synopsis, its pictures (#200) the scene's prose, each on its own line as the note had it. The note is kept, `became` naming the scene, or removed; one commit. What a
    * module makes of a note (an off-page event) is its own, with noteBecame.
    */
   promoteNote(id: string, chapter: string, { keep }: { keep: boolean }, manuscript: ManuscriptOperations): Promise<OperationResult & { id: string; file: string }> {
     return this.#run(async (novel) => {
       const note = this.findNote(novel, id);
       const synopsis = proseText(note.body).replace(/\s+/g, " ").trim();
-      const scene = await manuscript.sceneWrites(novel, chapter, { title: note.title, front: synopsis ? { synopsis } : {} });
+      const lines = note.body.split("\n");
+      const shown = [...new Set(pictures(note.body).map((p) => p.line))].map((n) => lines[n - 1]!.trim());
+      const scene = await manuscript.sceneWrites(novel, chapter, { title: note.title, front: synopsis ? { synopsis } : {}, ...(shown.length ? { body: `${shown.join("\n\n")}\n` } : {}) });
       const writes = [...scene.writes, await this.noteBecame(novel, (path) => this.#read(path), id, scene.id, keep)];
       const message = `Notes: write “${note.title}” as ${vocabulary(novel.kind).piece.a}${keep ? "" : ", removing the note"}`;
       return { ...(await transaction(this.root, writes, message)), id: scene.id, file: scene.file };
@@ -1051,8 +1055,8 @@ export class BibleOperations {
    */
   #ownPicture(novel: Book, image: string | undefined, owner: string): string | undefined {
     if (!image?.startsWith(`${IMAGES_DIR}/`) || image.split("/").some((s) => s === ".." || s === "." || s.startsWith("."))) return undefined;
-    const shared = (owner !== "novel" && novel.config?.cover === image) || novel.entities.some((e) => e.id !== owner && e.image === image);
-    return shared ? undefined : image;
+    // Shown by anything else (the cover, another entry, a picture in the prose of a piece or a note), it stays.
+    return picturesShown(novel, { except: owner }).has(image) ? undefined : image;
   }
 
   /** images/<slug><ext>, with a suffix if another file has the name; `replacing` (the picture it takes over) doesn't count. */

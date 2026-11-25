@@ -10,14 +10,18 @@ import { Modal } from "../ui/dialog.tsx";
 import { Field } from "../ui/field.tsx";
 import { useWords } from "./kind.ts";
 
-/** What the dialog is for: a new picture to put in at `at` (from a file dropped or pasted, or one to choose), or the picture at `at` to change. */
-export type PictureRequest = { kind: "add"; at: number; file?: File } | { kind: "edit"; at: number; picture: PictureAttrs };
+/**
+ * What the dialog is for: a new picture to put in at `at` (from a file dropped or pasted, or one to
+ * choose), or the picture at `at` to change: its description and caption, or (`change`, #200) the
+ * picture itself, for another chosen in its place.
+ */
+export type PictureRequest = { kind: "add"; at: number; file?: File } | { kind: "edit"; at: number; picture: PictureAttrs; change?: boolean };
 
 /**
  * A picture between paragraphs (heffrey78/gh-writer#203): the image (chosen, dropped or pasted), its description for
  * screen readers (required) and an optional caption, and what it's saved as. Resized here, in the
- * browser, and saved under images/ before it's put in the text; changing one changes only its
- * description and caption.
+ * browser, and saved under images/ before it's put in the text; changing one changes its
+ * description and caption, and the picture too if another is chosen.
  */
 export function PictureInTextDialog({
   novelId,
@@ -36,6 +40,7 @@ export function PictureInTextDialog({
   const editing = request.kind === "edit" ? request.picture : undefined;
   const w = useWords();
   const [file, setFile] = useState<File | undefined>(request.kind === "add" ? request.file : undefined);
+  const change = request.kind === "edit" && !!request.change;
   const [image, setImage] = useState<{ bitmap: ImageBitmap; url: string }>();
   const [rendered, setRendered] = useState<Rendered>();
   const [alt, setAlt] = useState(editing?.alt ?? "");
@@ -79,7 +84,7 @@ export function PictureInTextDialog({
     e.preventDefault();
     const description = alt.trim();
     if (!description) return;
-    if (editing) {
+    if (editing && !file) {
       onDone({ url: editing.url, alt: description, caption: caption.trim() || null });
       return;
     }
@@ -96,20 +101,19 @@ export function PictureInTextDialog({
   };
 
   const size = image && savedSize(image.bitmap);
-  const shown = editing ? pictureUrl(editing.url.replace(/^\//, "")) : image?.url;
+  const shown = editing && !file ? pictureUrl(editing.url.replace(/^\//, "")) : image?.url;
   return (
     <Modal title={editing ? "Change the picture" : "Insert a picture"} onClose={onClose} className="w-[min(40rem,calc(100vw-2rem))]">
       <form
         onSubmit={(e) => void submit(e)}
         className="grid gap-4 text-sm"
-        onDragOver={(e) => !editing && e.preventDefault()}
+        onDragOver={(e) => e.preventDefault()}
         onDrop={(e: DragEvent) => {
-          if (editing) return;
           e.preventDefault();
           take(e.dataTransfer.files[0]);
         }}
         onPaste={(e: ClipboardEvent) => {
-          const pasted = editing ? undefined : [...e.clipboardData.files].find((f) => f.type.startsWith("image/"));
+          const pasted = [...e.clipboardData.files].find((f) => f.type.startsWith("image/"));
           if (pasted) {
             e.preventDefault();
             take(pasted);
@@ -126,38 +130,35 @@ export function PictureInTextDialog({
             )}
           </div>
           <div className="grid content-start gap-3">
-            {editing ? (
+            {editing && !file && (
               <p className="break-words">
                 <code className="rounded bg-panel px-1.5 py-0.5 text-[13px]">{editing.url.replace(/^\//, "")}</code>
               </p>
-            ) : (
-              <>
-                {file && (
-                  <p className="break-words">
-                    {file.name || "Pasted image"}
-                    {image && (
-                      <span className="text-muted">
-                        {" "}
-                        · {image.bitmap.width} × {image.bitmap.height} px · {megabytes(file.size)}
-                      </span>
-                    )}
-                  </p>
+            )}
+            {file && (
+              <p className="break-words">
+                {file.name || "Pasted image"}
+                {image && (
+                  <span className="text-muted">
+                    {" "}
+                    · {image.bitmap.width} × {image.bitmap.height} px · {megabytes(file.size)}
+                  </span>
                 )}
-                <p className="flex flex-wrap items-center gap-2">
-                  <Button size="sm" onClick={() => chooser.current?.click()} autoFocus={!file}>
-                    {file ? "Choose another…" : "Choose a picture…"}
-                  </Button>
-                  <span className="text-muted">or drop or paste one here</span>
-                </p>
-                <input ref={chooser} type="file" accept="image/*" hidden aria-label="Picture file" onChange={(e) => take(e.target.files?.[0])} />
-                {size && (
-                  <p className="text-muted">
-                    Saved as <code className="rounded bg-panel px-1.5 py-0.5 text-[13px] text-ink">{`images/${alt.trim() ? slugify(alt) : "picture"}.${rendered?.png ? "png" : "jpg"}`}</code>
-                    {", "}
-                    {size.width === image.bitmap.width ? "at" : "resized to"} {size.width} × {size.height} px{rendered ? `, about ${megabytes(rendered.blob.size)}` : ""}.
-                  </p>
-                )}
-              </>
+              </p>
+            )}
+            <p className="flex flex-wrap items-center gap-2">
+              <Button size="sm" onClick={() => chooser.current?.click()} data-autofocus={(editing ? change : !file) || undefined}>
+                {file || editing ? "Choose another…" : "Choose a picture…"}
+              </Button>
+              <span className="text-muted">or drop or paste one here</span>
+            </p>
+            <input ref={chooser} type="file" accept="image/*" hidden aria-label="Picture file" onChange={(e) => take(e.target.files?.[0])} />
+            {size && (
+              <p className="text-muted">
+                Saved as <code className="rounded bg-panel px-1.5 py-0.5 text-[13px] text-ink">{`images/${alt.trim() ? slugify(alt) : "picture"}.${rendered?.png ? "png" : "jpg"}`}</code>
+                {", "}
+                {size.width === image.bitmap.width ? "at" : "resized to"} {size.width} × {size.height} px{rendered ? `, about ${megabytes(rendered.blob.size)}` : ""}.
+              </p>
             )}
           </div>
         </div>
@@ -166,14 +167,14 @@ export function PictureInTextDialog({
           value={alt}
           onChange={(e) => setAlt(e.target.value)}
           required
-          autoFocus={!!editing || !!file}
+          data-autofocus={(editing ? !change : !!file) || undefined}
           hint="What the picture shows, read aloud by screen readers in place of it, and shown if it can't be."
         />
         <Field label="Caption (optional)" value={caption} onChange={(e) => setCaption(e.target.value)} hint="Shown under the picture, in the text and in the compiled book." />
         {problem && <ErrorAlert title={editing ? "Couldn't change the picture" : "Couldn't add the picture"}>{problem}</ErrorAlert>}
         <div className="flex justify-end gap-2">
           <Button onClick={onClose}>Cancel</Button>
-          <Button type="submit" variant="primary" disabled={!alt.trim() || saving || (!editing && !rendered)}>
+          <Button type="submit" variant="primary" disabled={!alt.trim() || saving || (!!file && !rendered) || (!editing && !file)}>
             {saving ? "Saving…" : editing ? "Save" : "Insert"}
           </Button>
         </div>
