@@ -131,29 +131,38 @@ class WriterPlugin(private val activity: Activity) : Plugin(activity) {
 
     private fun sharesDir() = File(activity.filesDir, "shared")
 
-    /** A share in a folder of its own, shared/<id>: its pictures, and share.json saying what it is. Whole, or not at all. */
+    /**
+     * A share in a folder of its own, shared/<id>: its pictures, and share.json saying what it is.
+     * Whole, or not at all: written as <id>.part, and named <id> once it's all there. A picture that
+     * can't be read (its app didn't let Writer) is left out, and the rest kept.
+     */
     private fun keep(share: Shared<Uri>) {
         val id = "${System.currentTimeMillis()}"
         val part = File(sharesDir(), "$id.part").apply { deleteRecursively(); mkdirs() }
-        val files = JSONArray()
-        share.streams.forEachIndexed { i, uri ->
-            val resolver = activity.contentResolver
-            val type = resolver.getType(uri) ?: "image/jpeg"
-            if (!type.startsWith("image/")) return@forEachIndexed
-            val name = safeName(displayName(uri), "picture-${i + 1}")
-            val file = File(part, "$i-$name")
-            val copied = resolver.openInputStream(uri)?.use { input -> file.outputStream().use { input.copyTo(it) } } != null
-            if (copied) files.put(JSONObject().put("name", name).put("type", type).put("file", file.name))
-        }
-        if (files.length() == 0 && share.text == null) {
+        try {
+            val files = JSONArray()
+            share.streams.forEachIndexed { i, uri ->
+                try {
+                    val resolver = activity.contentResolver
+                    val type = resolver.getType(uri) ?: "image/jpeg"
+                    if (!type.startsWith("image/")) return@forEachIndexed
+                    val name = safeName(displayName(uri), "picture-${i + 1}")
+                    val file = File(part, "$i-$name")
+                    val copied = resolver.openInputStream(uri)?.use { input -> file.outputStream().use { input.copyTo(it) } } != null
+                    if (copied) files.put(JSONObject().put("name", name).put("type", type).put("file", file.name))
+                } catch (e: Exception) {
+                    Log.w("Writer", "Couldn't read a shared picture: ${e.message}")
+                }
+            }
+            if (files.length() == 0 && share.text == null) throw IllegalStateException("Nothing shared could be read.")
+            val json = JSONObject().put("id", id).put("received", System.currentTimeMillis()).put("files", files)
+            share.text?.let { json.put("text", it) }
+            share.subject?.let { json.put("subject", it) }
+            File(part, "share.json").writeText(json.toString())
+            if (!part.renameTo(File(sharesDir(), id))) throw IllegalStateException("Couldn't keep the share.")
+        } finally {
             part.deleteRecursively()
-            return
         }
-        val json = JSONObject().put("id", id).put("received", System.currentTimeMillis()).put("files", files)
-        share.text?.let { json.put("text", it) }
-        share.subject?.let { json.put("subject", it) }
-        File(part, "share.json").writeText(json.toString())
-        part.renameTo(File(sharesDir(), id))
     }
 
     private fun displayName(uri: Uri): String? = try {
