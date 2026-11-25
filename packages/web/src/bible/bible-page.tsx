@@ -355,8 +355,15 @@ export function BiblePage({
   const [said, setSaid] = useState("");
   const selectedEntry = selected && "entry" in selected ? novel.entities.find((e) => e.id === selected.entry) : undefined;
   const sayIt = selectedEntry ? `${selectedEntry.name}, ${(novel.entityTypes.find((t) => t.key === selectedEntry.type)?.label ?? "").toLowerCase()}, ${listed.findIndex((e) => e.id === selectedEntry.id) + 1} of ${listed.length}` : "";
+  // Only when it changes: said on arriving too, its 300 ms ran over a new order or view chosen at once
+  // from the palette, and the line went blank before it could be heard (CI, #178).
+  const lastSayIt = useRef(sayIt);
   useEffect(() => {
-    const t = setTimeout(() => setSaid(sayIt), 300);
+    if (sayIt === lastSayIt.current) return;
+    const t = setTimeout(() => {
+      lastSayIt.current = sayIt;
+      setSaid(sayIt);
+    }, 300);
     return () => clearTimeout(t);
   }, [sayIt]);
 
@@ -567,32 +574,36 @@ export function BiblePage({
   }
 
   const width = layout.width[view];
+  // The dialogs where they are with one pane, so the line said stays the same element as the layout
+  // changes under it (List to Table): a live region put in along with its words isn't read out.
   return (
-    <div className="grid h-full min-h-0" style={{ gridTemplateColumns: layout.collapsed ? "2.75rem minmax(0,1fr)" : `${width}px 0.375rem minmax(0,1fr)` }}>
-      {layout.collapsed ? (
-        <div className="flex flex-col items-center gap-1 border-r border-rule bg-panel py-2">
-          <button type="button" onClick={() => setLayout({ collapsed: false })} aria-label="Show the list" title="Show the list" className="rounded-md p-2 text-muted hover:bg-paper hover:text-ink">
-            <PanelLeftOpen className="size-4" aria-hidden />
-          </button>
-        </div>
-      ) : (
-        <>
-          <div className="min-h-0 overflow-y-auto">{listContent}</div>
-          <ResizeHandle width={width} onResize={(n) => setLayout({ width: { ...layout.width, [view]: n } })} label="Resize the list" />
-        </>
-      )}
-      <div className="min-h-0 overflow-y-auto">
-        {pane ?? (
-          <div className="grid h-full place-items-center px-6 py-10 text-center text-muted">
-            <div className="grid max-w-sm gap-2">
-              <p>Choose {w.entity.a} from the list to read it here.</p>
-              <p className="text-sm">Or make one with New {w.entity.one}.</p>
-            </div>
-          </div>
-        )}
-      </div>
+    <>
       {dialogs}
-    </div>
+      <div className="grid h-full min-h-0" style={{ gridTemplateColumns: layout.collapsed ? "2.75rem minmax(0,1fr)" : `${width}px 0.375rem minmax(0,1fr)` }}>
+        {layout.collapsed ? (
+          <div className="flex flex-col items-center gap-1 border-r border-rule bg-panel py-2">
+            <button type="button" onClick={() => setLayout({ collapsed: false })} aria-label="Show the list" title="Show the list" className="rounded-md p-2 text-muted hover:bg-paper hover:text-ink">
+              <PanelLeftOpen className="size-4" aria-hidden />
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="min-h-0 overflow-y-auto">{listContent}</div>
+            <ResizeHandle width={width} onResize={(n) => setLayout({ width: { ...layout.width, [view]: n } })} label="Resize the list" />
+          </>
+        )}
+        <div className="min-h-0 overflow-y-auto">
+          {pane ?? (
+            <div className="grid h-full place-items-center px-6 py-10 text-center text-muted">
+              <div className="grid max-w-sm gap-2">
+                <p>Choose {w.entity.a} from the list to read it here.</p>
+                <p className="text-sm">Or make one with New {w.entity.one}.</p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </>
   );
 }
 

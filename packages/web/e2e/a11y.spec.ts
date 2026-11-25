@@ -225,6 +225,7 @@ test("the index's screens by keyboard and the palette: the table, its columns an
 
   // Merge, from an entry's profile: audited; closed, the focus on the entry.
   await palette(page, "story bible");
+  await expect(page.getByRole("heading", { level: 1, name: "Story bible" })).toBeVisible();
   await palette(page, "show the bible as list");
   await page.getByRole("link", { name: /^Ben Varn/ }).click();
   await expect(page.getByRole("heading", { level: 2, name: "Ben Varn" })).toBeVisible();

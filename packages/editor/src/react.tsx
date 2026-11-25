@@ -102,14 +102,39 @@ const movingAround = [TrailingParagraphExtension, Gapcursor, Dropcursor.configur
 /**
  * TipTap focuses a new editor a moment after mounting it (in a timeout). A dialog opened meanwhile
  * keeps the focus, such as the palette opened while a scene was still loading: what's typed in it
- * mustn't land in the text. This timeout, set as the editor mounts, runs just before TipTap's.
+ * mustn't land in the text. One on its way out (closed, while it fades) doesn't. This timeout, set as
+ * the editor mounts, runs just before TipTap's.
+ *
+ * TipTap makes the editor as React renders it, which may be a while before React shows it: a phone's
+ * Go to that made a new scene was still on the page, holding the focus, and the text never took it
+ * (CI). An editor not on the page yet is focused once it is, unless a dialog has the focus by then.
  */
 function keepDialogFocus({ editor }: { editor: Editor }) {
+  const wanted = editor.options.autofocus;
+  if (wanted === false || wanted === null) return;
+  const dialogHasFocus = () => {
+    const dialog = document.activeElement?.closest('[role="dialog"]:not([data-state="closed"]), [role="alertdialog"]:not([data-state="closed"])');
+    return !!dialog && !dialog.contains(editor.view.dom);
+  };
   setTimeout(() => {
-    const dialog = document.activeElement?.closest('[role="dialog"], [role="alertdialog"]');
-    if (dialog && !editor.isDestroyed && !dialog.contains(editor.view.dom)) editor.options.autofocus = false;
+    if (editor.isDestroyed) return;
+    if (editor.view.dom.isConnected) {
+      if (dialogHasFocus()) editor.options.autofocus = false;
+      return;
+    }
+    editor.options.autofocus = false;
+    let frames = 0;
+    const shown = () => {
+      if (editor.isDestroyed || ++frames > SHOWN_WITHIN) return;
+      if (!editor.view.dom.isConnected) return void requestAnimationFrame(shown);
+      if (!dialogHasFocus()) editor.commands.focus(wanted);
+    };
+    requestAnimationFrame(shown);
   });
 }
+
+/** How many frames a new editor may wait to be shown and still take the focus: about two seconds. */
+const SHOWN_WITHIN = 120;
 
 /** Pictures dropped, pasted, changed (Enter or a double-click on one) or replaced (Change… on its toolbar), handed to the latest `pictures` prop. */
 function usePicturesExtension(callbacks: PictureCallbacks | undefined) {
