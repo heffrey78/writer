@@ -153,14 +153,21 @@ test("the index of a 500-entry book opens in under a second; searching, stepping
   const tidied = report("Tidy up's counts", tidying);
 
   // Ada Varn's profile, in a fresh page: every passage of the 200,000 words naming her, worked out
-  // from nothing (as the profile times it).
-  await page.goto(new URL(`${new URL(page.url()).pathname.replace(/\/bible.*$/, "")}/bible/${ADA}`, page.url()).href);
-  await expect(page.getByRole("region", { name: /^Appears in · \d{3,}/ })).toBeVisible({ timeout: 15_000 });
-  const listing = await page.evaluate(
-    (id) => performance.getEntriesByName("passages").filter((m) => (m as PerformanceMeasure).detail === id).map((m) => m.duration),
-    ADA,
-  );
-  const passages = report("listing a main character's passages", listing.slice(0, 1));
+  // from nothing (as the profile times it). A fresh page has nothing cached, so this is timed once
+  // per page, in three of them: one cold listing on a busy runner took 70 ms where it takes 10.
+  const profile = new URL(`${new URL(page.url()).pathname.replace(/\/bible.*$/, "")}/bible/${ADA}`, page.url()).href;
+  const listing: number[] = [];
+  for (let i = 0; i < 3; i++) {
+    await page.goto(profile);
+    await expect(page.getByRole("region", { name: /^Appears in · \d{3,}/ })).toBeVisible({ timeout: 15_000 });
+    const first = await page.evaluate(
+      (id) => performance.getEntriesByName("passages").filter((m) => (m as PerformanceMeasure).detail === id).map((m) => m.duration)[0],
+      ADA,
+    );
+    if (first !== undefined) listing.push(first);
+  }
+  expect(listing).toHaveLength(3);
+  const passages = report("listing a main character's passages", listing);
 
   expect(opening).toBeLessThan(1000);
   expect(typed).toBeLessThan(BUDGET);
