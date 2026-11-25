@@ -885,3 +885,21 @@ test("Save to Writer: what's shared can be left for later, by Not now or Back, a
   await page.waitForTimeout(500);
   await expect(page.getByRole("heading", { level: 1, name: "Save to Writer" })).toHaveCount(0);
 });
+
+test("Save to Writer: what's just been shared comes first, before one left from before (#205)", async ({ page, app }) => {
+  await app.restart(app.novelRepo("varn"));
+  await sharing(page, [
+    { id: "1", received: 1, pictures: [{ name: "IMG_2041.png", type: "image/png", data: icon("32x32") }] },
+    { id: "2", received: 2, text: "Crust: 2½ cups flour, 1 cup cold butter.", pictures: [] },
+  ]);
+  await page.goto(app.launchUrl);
+  await expect(page.getByRole("heading", { level: 1, name: "Save to Writer" })).toBeVisible();
+  await expect(page.getByText("The latest of 2 things shared and not yet saved")).toBeVisible();
+  const shared = page.getByRole("region", { name: "What was shared" });
+  await expect(shared).toContainText("2½ cups flour");
+  await expect(shared.getByRole("img")).toHaveCount(0);
+  // Let go, the one from before is next.
+  await page.getByRole("button", { name: "Discard" }).tap();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Discard" }).tap();
+  await expect(shared.locator("img")).toHaveCount(1);
+});

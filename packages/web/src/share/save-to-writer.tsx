@@ -81,17 +81,18 @@ export function SaveToWriterPage() {
     load();
     return onShared(load);
   }, []);
-  const share = shares?.[0];
+  // The latest first: what the writer has just shared, not one left from before.
+  const share = shares?.at(-1);
   return (
     <main id="main" tabIndex={-1} className="mx-auto grid w-full max-w-2xl gap-5 px-4 py-6 outline-none">
       <div className="grid gap-1">
         <h1 className="text-2xl font-semibold">Save to Writer</h1>
-        {shares && shares.length > 1 && <p className="text-sm text-muted">1 of {shares.length} things shared</p>}
+        {shares && shares.length > 1 && <p className="text-sm text-muted">The latest of {shares.length} things shared and not yet saved</p>}
       </div>
       {!shares ? (
         <p className="text-muted">Opening what was shared…</p>
       ) : share ? (
-        <SaveShare key={share.id} share={share} onDone={() => setShares((s) => s?.slice(1))} />
+        <SaveShare key={share.id} share={share} onDone={() => setShares((s) => s?.filter((x) => x.id !== share.id))} />
       ) : (
         <p>
           Nothing to save. What you share with Writer from another app comes here.{" "}
