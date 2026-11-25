@@ -252,6 +252,34 @@ img.ProseMirror-separator {
   border-radius: 2px;
 }
 
+/*
+ * Pictures on neighbouring lines, side by side in rows of up to three (#201): each still a block of
+ * its own, inline here. On a phone's width, one a line again.
+ */
+.ghw-prose .ghw-picture.ghw-picture-row {
+  display: inline-block;
+  vertical-align: top;
+  /* A hair under a third (or a half), so a row's rounding never pushes its last onto a line of its own. */
+  width: calc((100% - (var(--ghw-row) - 1) * 1rem) / var(--ghw-row) - 0.1px);
+  margin-left: 1rem;
+}
+
+.ghw-prose .ghw-picture.ghw-picture-row-first {
+  margin-left: 0;
+}
+
+.ghw-prose .ghw-picture.ghw-picture-row img {
+  max-height: 20rem;
+}
+
+@media (max-width: 40rem) {
+  .ghw-prose .ghw-picture.ghw-picture-row {
+    display: block;
+    width: auto;
+    margin-left: 0;
+  }
+}
+
 /* A selected picture's Describe…, Change… and Remove (#200), over its top right corner. */
 .ghw-picture-toolbar {
   position: absolute;

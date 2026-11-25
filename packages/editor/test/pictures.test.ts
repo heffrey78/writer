@@ -3,6 +3,7 @@ import "./dom.ts";
 import { Editor } from "@tiptap/core";
 import { UndoRedo } from "@tiptap/extensions";
 import { NodeSelection, TextSelection } from "@tiptap/pm/state";
+import fc from "fast-check";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { chapterContent, getMarkdown, insertPicture, loadChapter, loadMarkdown, movePicture, pictureAt, PicturesExtension, proseContent, removePicture, serializeChapter, setPicture, type PictureCallbacks } from "../src/index.ts";
 
@@ -156,5 +157,43 @@ describe("moving a picture (#200)", () => {
     expect(getMarkdown(editor)).toBe("One.\n\n![A](/images/a.jpg)\n\nTwo.\n\n![B](/images/b.jpg)\n");
     expect(movePicture(editor, pos(3), 1)).toBe(false);
     expect(movePicture(editor, pos(0), 1)).toBe(false);
+  });
+});
+
+describe("pictures on neighbouring lines (#201)", () => {
+  /** Each picture's row size as shown, in order: 0 for one on its own. */
+  const rows = () => [...editor.view.dom.querySelectorAll("figure")].map((f) => Number(/--ghw-row: (\d)/.exec(f.getAttribute("style") ?? "")?.[1] ?? 0));
+  const pic = (n: number) => `![P${n}](/images/p${n}.jpg)`;
+
+  test("show as rows of up to three, a fourth starting another, a picture alone left alone", () => {
+    open([pic(1), "Words.", pic(2), pic(3), "More.", pic(4), pic(5), pic(6), pic(7), pic(8)].join("\n\n") + "\n");
+    expect(rows()).toEqual([0, 2, 2, 3, 3, 3, 2, 2]);
+    // In the DOM, each still a figure of its own, in order.
+    const figures = [...editor.view.dom.querySelectorAll("figure")];
+    expect(figures.map((f) => f.querySelector("img")!.alt)).toEqual(["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8"]);
+    expect(figures.map((f) => f.classList.contains("ghw-picture-row-first"))).toEqual([false, true, false, true, false, false, true, false]);
+  });
+
+  test("in a chapter, a scene's own pictures make its rows", () => {
+    editor = new Editor({ element: document.createElement("div"), extensions: [...chapterContent, UndoRedo, PicturesExtension] });
+    loadChapter(editor, [
+      { id: "a", title: "A", markdown: `${pic(1)}\n` },
+      { id: "b", title: "B", markdown: `${pic(2)}\n\n${pic(3)}\n` },
+    ]);
+    expect(rows()).toEqual([0, 2, 2]);
+  });
+
+  test("a run of pictures and paragraphs round-trips byte for byte", () => {
+    const block = fc.oneof(fc.integer({ min: 1, max: 9 }).map(pic), fc.constantFrom("Words.", "Some _more_ words.", '![Captioned](/images/c.jpg "A caption")'));
+    fc.assert(
+      fc.property(fc.array(block, { minLength: 1, maxLength: 10 }), (blocks) => {
+        const md = `${blocks.join("\n\n")}\n`;
+        open(md);
+        const same = getMarkdown(editor) === md;
+        editor.destroy();
+        return same;
+      }),
+      { numRuns: 200 },
+    );
   });
 });

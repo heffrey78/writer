@@ -153,3 +153,44 @@ test("Insert a picture… in the palette, and a picture described, moved and rem
   await expect.poll(note.read).not.toContain("the-ford");
   await expect.poll(() => note.exists("images/the-ford.jpg")).toBe(false);
 });
+
+test("pictures on neighbouring lines show as a row, one a line at a phone's width, each its own line in the file (#201)", async ({ page, app }) => {
+  const dir = app.novelRepo("varn");
+  const { mkdirSync, writeFileSync } = await import("node:fs");
+  const lines = ["![The north bank](/images/north.jpg)", "![The south bank](/images/south.jpg)"];
+  const body = `${readFileSync(join(dir, IDEA), "utf8").trimEnd()}\n\n${lines.join("\n\n")}\n`;
+  writeFileSync(join(dir, IDEA), body);
+  await app.restart(dir);
+  await page.goto(app.launchUrl);
+  await expect(page.getByRole("textbox", { name: "Chapter text" })).toBeFocused();
+  mkdirSync(join(dir, "images"), { recursive: true });
+  for (const [name, shade] of [["north", 1], ["south", 2]] as const) writeFileSync(join(dir, `images/${name}.jpg`), await makePicture(page, { width: 1200 + shade, height: 800, name: `${name}.jpg` }));
+  await palette(page, "note: what if ben");
+  const prose = page.getByRole("textbox", { name: "Note: What if Ben never sold the plans?" });
+  const north = prose.getByRole("img", { name: "The north bank" });
+  const south = prose.getByRole("img", { name: "The south bank" });
+  await expect(south).toBeVisible();
+  // Side by side: the same top, the second to the right.
+  await expect.poll(async () => [(await north.boundingBox())!.y === (await south.boundingBox())!.y, (await south.boundingBox())!.x > (await north.boundingBox())!.x]).toEqual([true, true]);
+  // By keyboard, in order: → from the first goes on to the second (past the gap between them), ← back.
+  const selected = prose.locator(".ProseMirror-selectednode img");
+  await north.click();
+  await expect(selected).toHaveAttribute("alt", "The north bank");
+  await expect(async () => {
+    await page.keyboard.press("ArrowRight");
+    await expect(selected).toHaveAttribute("alt", "The south bank", { timeout: 200 });
+  }).toPass({ timeout: 3000 });
+  await expect(async () => {
+    await page.keyboard.press("ArrowLeft");
+    await expect(selected).toHaveAttribute("alt", "The north bank", { timeout: 200 });
+  }).toPass({ timeout: 3000 });
+  for (const colorScheme of ["light", "dark"] as const) {
+    await page.emulateMedia({ colorScheme });
+    await axe(page);
+  }
+  // At a phone's width, one a line.
+  await page.setViewportSize({ width: 375, height: 800 });
+  await expect.poll(async () => (await south.boundingBox())!.y > (await north.boundingBox())!.y + (await north.boundingBox())!.height - 1).toBe(true);
+  // The file is as it was.
+  expect(readFileSync(join(dir, IDEA), "utf8")).toBe(body);
+});

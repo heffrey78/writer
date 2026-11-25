@@ -1,7 +1,7 @@
 import { Extension, type Editor } from "@tiptap/core";
 import { NodeSelection, Plugin, PluginKey, Selection, TextSelection, type EditorState, type Transaction } from "@tiptap/pm/state";
 import type { Node as ProseNode } from "@tiptap/pm/model";
-import type { EditorView } from "@tiptap/pm/view";
+import { Decoration, DecorationSet, type EditorView } from "@tiptap/pm/view";
 import { insertBlock } from "./structure.ts";
 
 /*
@@ -33,6 +33,14 @@ export const PicturesExtension = Extension.create<{ callbacks: () => PictureCall
   addProseMirrorPlugins() {
     const callbacks = this.options.callbacks;
     return [
+      new Plugin({
+        key: ROWS,
+        state: {
+          init: (_, state) => pictureRows(state.doc),
+          apply: (tr, rows) => (tr.docChanged ? pictureRows(tr.doc) : rows),
+        },
+        props: { decorations: (state) => ROWS.getState(state) },
+      }),
       new Plugin({
         key: new PluginKey("ghwPictures"),
         view: (view) => new PictureToolbar(view, callbacks),
@@ -159,6 +167,39 @@ class PictureToolbar {
     window.removeEventListener("resize", this.#follow);
     this.#bar.remove();
   }
+}
+
+const ROWS = new PluginKey<DecorationSet>("ghwPictureRows");
+/** The most pictures side by side; a run of more starts another row. */
+const ROW = 3;
+
+/**
+ * Pictures on neighbouring lines, shown as rows of up to three (#201): each picture of a run is
+ * marked with its row's size, for the styles to put them side by side. Only how they're shown: each
+ * is still a block of its own, on its own line in the file, in the order it's read and moved.
+ */
+function pictureRows(doc: ProseNode): DecorationSet {
+  const marks: Decoration[] = [];
+  // The blocks in `node`, whose content starts at `start`: a chapter's scenes hold theirs.
+  const visit = (node: ProseNode, start: number) => {
+    let run: { at: number; size: number }[] = [];
+    const end = () => {
+      for (let i = 0; i < run.length; i += ROW) {
+        const row = run.slice(i, i + ROW);
+        if (row.length < 2) continue;
+        row.forEach(({ at, size }, j) => marks.push(Decoration.node(at, at + size, { class: j === 0 ? "ghw-picture-row ghw-picture-row-first" : "ghw-picture-row", style: `--ghw-row: ${row.length}` })));
+      }
+      run = [];
+    };
+    node.forEach((child, offset) => {
+      if (child.type.name === "picture") return void run.push({ at: start + offset, size: child.nodeSize });
+      end();
+      if (!child.isTextblock && !child.isAtom) visit(child, start + offset + 1);
+    });
+    end();
+  };
+  visit(doc, 0);
+  return DecorationSet.create(doc, marks);
 }
 
 function imageFiles(data: DataTransfer | null): File[] {
