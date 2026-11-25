@@ -1,7 +1,7 @@
 import { listedOrder, pieceSections, sectionById, vocabulary, type Book, type Section } from "@writer/core";
 import { CalendarDays, ChevronDown, ChevronRight, ChevronUp, ListTree, Plus } from "lucide-react";
 import { Dialog } from "radix-ui";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
 import { webModulesByIds } from "../modules.tsx";
 import { cn } from "../ui/cn.ts";
@@ -42,14 +42,28 @@ function pageOf(novelId: string, novel: Book, pathname: string, onGitHub: boolea
 }
 
 export function GoToButton({ novelId, novel, workspace, onGitHub }: { novelId: string; novel: Book; workspace: Workspace; onGitHub: boolean }) {
-  const [open, setOpen] = useState(false);
   const { pathname } = useLocation();
-  useEffect(() => setOpen(false), [pathname]);
+  // Open on the page it was opened on: going anywhere closes it in the render that shows the new page.
+  // Closed a render later (an effect on the address), it still held the focus as a new scene's text
+  // was made, so the text didn't take it, or took it and lost it to this button as the dialog left.
+  const [openOn, setOpenOn] = useState<string>();
+  const open = openOn === pathname;
+  const setOpen = (o: boolean) => setOpenOn(o ? pathname : undefined);
+  useEffect(() => {
+    if (openOn !== undefined && openOn !== pathname) setOpenOn(undefined);
+  }, [openOn, pathname]);
+  const openedAt = useRef<string>(undefined);
   const page = pageOf(novelId, novel, pathname, onGitHub);
   const title = novel.config?.title ?? "Untitled";
   const w = vocabulary(novel.kind);
   return (
-    <Dialog.Root open={open} onOpenChange={setOpen}>
+    <Dialog.Root
+      open={open}
+      onOpenChange={(o) => {
+        if (o) openedAt.current = window.location.pathname;
+        setOpen(o);
+      }}
+    >
       <Dialog.Trigger asChild>
         <button type="button" aria-label={`${page.name}, in ${title}: go to ${w.piece.a}`} className={cn("flex min-h-12 max-w-full min-w-0 items-center gap-1 rounded-md px-2 text-left text-lg font-semibold", open && "bg-accent-soft")}>
           <span className="truncate">{page.name}</span>
@@ -58,7 +72,19 @@ export function GoToButton({ novelId, novel, workspace, onGitHub }: { novelId: s
       </Dialog.Trigger>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-40 bg-black/40" />
-        <Dialog.Content aria-describedby={undefined} className="fixed inset-x-0 top-0 z-50 grid max-h-[85dvh] gap-2 overflow-y-auto rounded-b-2xl border-b border-rule bg-raised px-4 pt-3 pb-1 text-ink shadow-xl">
+        <Dialog.Content
+          aria-describedby={undefined}
+          // Closed by going somewhere, the focus is the new page's (a new scene's text), not this button's;
+          // left on nothing (a page that takes none), the page's main area has it.
+          onCloseAutoFocus={(e) => {
+            if (window.location.pathname === openedAt.current) return;
+            e.preventDefault();
+            setTimeout(() => {
+              if (!document.activeElement || document.activeElement === document.body) document.getElementById("main")?.focus();
+            });
+          }}
+          className="fixed inset-x-0 top-0 z-50 grid max-h-[85dvh] gap-2 overflow-y-auto rounded-b-2xl border-b border-rule bg-raised px-4 pt-3 pb-1 text-ink shadow-xl"
+        >
           <GoTo novelId={novelId} novel={novel} workspace={workspace} onGitHub={onGitHub} current={page} />
           <SheetHandle edge="top" onClose={() => setOpen(false)} />
         </Dialog.Content>
