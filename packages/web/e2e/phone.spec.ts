@@ -22,6 +22,18 @@ async function fits(page: Page) {
   expect(await page.evaluate(() => Math.max(document.documentElement.scrollWidth, innerWidth))).toBeLessThanOrEqual(page.viewportSize()!.width);
 }
 
+/**
+ * The text's focus, settled: what the editor does just after the text takes it, done. TipTap focuses
+ * a new editor once more on the next frame, and ProseMirror puts its own selection back on the page
+ * 20 ms after the focus if it hasn't yet read the page's. Quicker than a person, as only a test is,
+ * the keyboard put away came back (CI: the status bar not shown), and a selection made by keys was
+ * undone before the editor saw it (CI: Shift+Home's words selected, then not). A frame asked for now
+ * comes after TipTap's, and a timer of the same length set then, after ProseMirror's.
+ */
+async function focusSettled(page: Page) {
+  await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => setTimeout(done, 20))));
+}
+
 async function audit(page: Page) {
   for (const colorScheme of ["light", "dark"] as const) {
     await page.emulateMedia({ colorScheme });
@@ -345,7 +357,12 @@ test("on a phone, writing: the bar on top of the keyboard, every tap leaving the
   const bar = page.getByRole("toolbar", { name: "Writing" });
   const book = page.getByRole("navigation", { name: "Book" });
   // Only while writing, above the book's bar; with the keyboard up (the window made shorter for it,
-  // as Android does), in place of it (#100).
+  // as Android does), in place of it (#100). The chapter opens with its text focused, as on a wide
+  // screen, so the keyboard is put away first: counted at once after the reload, the bar was missing
+  // only because the text hadn't loaded yet, and was there when it had (under load).
+  await expect(text).toBeFocused();
+  await focusSettled(page);
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await expect(bar).toHaveCount(0);
   await expect(book).toBeVisible();
   await text.tap();
@@ -386,6 +403,8 @@ test("on a phone, writing: the bar on top of the keyboard, every tap leaving the
   await expect(text).not.toBeFocused();
   await expect(bar).toHaveCount(0);
   await text.tap();
+  await expect(bar).toBeVisible();
+  await focusSettled(page);
   await page.keyboard.press("Control+End");
 
   // A selection's actions while there's one.
@@ -568,6 +587,10 @@ test("on a phone, a short scene's bar sits on the bottom bar, and on the keyboar
   await dialog.getByRole("textbox").fill("Hardly begun");
   await dialog.getByRole("button", { name: "Add scene" }).tap();
   await expect(page.getByRole("heading", { level: 1, name: "Hardly begun" })).toBeVisible();
+  // The new scene's text takes the focus once its editor is made, after its heading is shown: put
+  // away sooner, the keyboard came back up over the status bar (CI).
+  await expect(page.getByRole("textbox", { name: "Scene text" })).toBeFocused();
+  await focusSettled(page);
 
   // The keyboard away: the status bar, right on the bottom bar.
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());

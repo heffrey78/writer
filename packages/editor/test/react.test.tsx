@@ -99,7 +99,32 @@ describe("autofocus", () => {
     act(() => void vi.runAllTimers());
     expect(document.activeElement).toBe(input);
     expect(editor.isFocused).toBe(false);
+    cleanup();
+
+    // One closing, though the focus is still in it (a phone's Go to, as the new scene it made opens): the text takes it.
+    dialog.setAttribute("data-state", "closed");
+    input.focus();
+    mount("One.\n", { autofocus: true });
+    act(() => void vi.runAllTimers());
+    expect(editor.isFocused).toBe(true);
     dialog.remove();
+    cleanup();
+
+    // Made before it's shown (React rendering the next page ahead of showing it): focused once it's on
+    // the page, not while the page before it still has a dialog in focus.
+    const page = document.createElement("div");
+    const leaving = document.body.appendChild(document.createElement("div"));
+    leaving.setAttribute("role", "dialog");
+    const button = leaving.appendChild(document.createElement("button"));
+    button.focus();
+    render(<SceneEditor markdown={"One.\n"} label="Scene text" onReady={(e) => (editor = e)} autofocus />, { container: page });
+    act(() => void vi.advanceTimersByTime(50));
+    expect(editor.isFocused).toBe(false);
+    leaving.remove();
+    document.body.append(page);
+    act(() => void vi.advanceTimersByTime(100));
+    expect(editor.isFocused).toBe(true);
+    page.remove();
   });
 });
 
