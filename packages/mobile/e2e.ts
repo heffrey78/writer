@@ -436,7 +436,9 @@ try {
   // Its strip of parts (#176): a jump to Appears in, the focus on its heading; the way back still at the top.
   await page.getByRole("navigation", { name: "Parts of the entry" }).getByRole("button", { name: /^Appears in/ }).click();
   await expect(page.getByRole("region", { name: /^Appears in/ }).getByRole("heading", { name: /^Appears in/ })).toBeFocused();
-  expect(await page.locator("#index-entry > div").first().evaluate((e) => e.getBoundingClientRect().top)).toBe(0);
+  // Once the page has moved there: the jump scrolls smoothly unless the phone asks for less motion (Android's
+  // animations off), and the heading has the focus at once, before the page is there.
+  await expect.poll(() => page.locator("#index-entry > div").first().evaluate((e) => e.getBoundingClientRect().top), { message: "the way back at the top" }).toBe(0);
   adb("shell", "input", "keyevent", "KEYCODE_BACK");
   await expect(tomas).toBeFocused();
   expect(await page.evaluate(() => scrollY)).toBe(listTop);
