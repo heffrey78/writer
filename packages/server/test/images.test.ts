@@ -230,6 +230,28 @@ describe("a picture in the prose (heffrey78/gh-writer#203)", () => {
     expect(await warnings()).toEqual([]);
   });
 
+  it("in a note, stays while a scene shows it and goes when nothing does (#200)", async () => {
+    const NOTE = "notes/the-varn-bridge.md";
+    const { path } = await ws.addPicture("The old bridge", jpeg(3));
+    const line = `![The old bridge](/${path})`;
+    await add(NOTE, line);
+    await add(STATION, line);
+    await without(NOTE, line);
+    expect(existsSync(join(dir, path)), "still shown by the station").toBe(true);
+    await add(NOTE, line);
+    await without(STATION, line);
+    expect(existsSync(join(dir, path)), "still shown by the note").toBe(true);
+    await without(NOTE, line);
+    expect(existsSync(join(dir, path))).toBe(false);
+  });
+
+  it("shown in a scene, an entry's picture stays when the entry's is removed (#200)", async () => {
+    await bible.setPicture(ADA, hash(ADA_FILE), jpeg());
+    await add(STATION, "![Ada](/images/ada-varn.jpg)");
+    await bible.removePicture(ADA, hash(ADA_FILE));
+    expect(existsSync(join(dir, "images/ada-varn.jpg"))).toBe(true);
+  });
+
   it("stays while an entry or the cover shows it, and a picture outside images/ is never touched", async () => {
     await bible.setPicture(ADA, hash(ADA_FILE), jpeg());
     await add(STATION, "![Ada](/images/ada-varn.jpg)");

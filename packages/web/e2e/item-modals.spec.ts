@@ -43,12 +43,19 @@ test("a note: made in its modal over Notes by a title, written, closed by clicki
   await expect.poll(() => novel.read("notes/count-the-flags.md")).toMatch(/title: Count the flags\n[\s\S]*---\n\n?Nine flags, one missing\.\n$/);
   await axe(page);
 
-  // A tag, saved by clicking elsewhere in the modal (heffrey78/gh-writer#234).
+  // Tags: the book's offered to choose from, a new one made, each saved as it's chosen; a click
+  // elsewhere in the modal closes it (heffrey78/gh-writer#234).
   await page.getByRole("dialog").getByRole("button", { name: "Add tags" }).click();
-  await page.keyboard.type("flags");
+  await page.getByRole("dialog").getByRole("button", { name: /^Add a tag/ }).click();
+  const tagList = page.getByRole("dialog", { name: "Add a tag" });
+  await expect(tagList.getByRole("option", { name: "ending" })).toBeVisible();
+  await tagList.getByRole("option", { name: "ending" }).click();
+  await tagList.getByRole("combobox").fill("flags");
+  await tagList.getByRole("option", { name: "New tag “flags”" }).click();
+  await page.keyboard.press("Escape");
+  await expect.poll(() => novel.read("notes/count-the-flags.md")).toMatch(/tags: \[ending, flags\]\n|tags:\n {2}- ending\n {2}- flags\n/);
   await page.getByRole("heading", { level: 1, name: "Count the flags" }).click();
-  await expect.poll(() => novel.read("notes/count-the-flags.md")).toMatch(/tags: \[flags\]\n|tags:\n {2}- flags\n/);
-  await expect(page.getByRole("dialog").getByRole("textbox", { name: "Tags" })).toHaveCount(0);
+  await expect(page.getByRole("dialog").getByRole("button", { name: /^Add a tag/ })).toHaveCount(0);
 
   // A click outside closes it, back to the gallery, the note there.
   await page.mouse.click(4, 4);

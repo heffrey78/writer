@@ -121,7 +121,19 @@ fn selection_actions<R: Runtime>(app: AppHandle<R>, items: Vec<writer_android::S
     app.try_state::<writer_android::Android<R>>().map_or(Ok(()), |android| android.selection_actions(items))
 }
 
-/// The page's commands: the engine's ports, and dictation's where the phone can hear.
+/// What other apps have shared with Writer, kept until the page writes it into a book (#204).
+#[tauri::command]
+async fn shares<R: Runtime>(app: AppHandle<R>) -> Result<serde_json::Value, String> {
+    app.try_state::<writer_android::Android<R>>().map_or(Ok(json!({ "shares": [] })), |android| android.shares())
+}
+
+/// A share written into a book: what was kept of it goes.
+#[tauri::command]
+async fn share_done<R: Runtime>(app: AppHandle<R>, id: String) -> Result<(), String> {
+    app.try_state::<writer_android::Android<R>>().map_or(Ok(()), |android| android.share_done(id))
+}
+
+/// The page's commands: the engine's ports, what's shared with Writer, and dictation's where the phone can hear.
 fn handlers() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
     #[cfg(target_os = "android")]
     return tauri::generate_handler![
@@ -129,6 +141,8 @@ fn handlers() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
         listen,
         port,
         selection_actions,
+        shares,
+        share_done,
         dictation::dictation_available,
         dictation::dictate_start,
         dictation::dictate_stop,
@@ -141,7 +155,7 @@ fn handlers() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
         dictation::dictation_save_settings
     ];
     #[cfg(not(target_os = "android"))]
-    return tauri::generate_handler![git, listen, port, selection_actions];
+    return tauri::generate_handler![git, listen, port, selection_actions, shares, share_done];
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

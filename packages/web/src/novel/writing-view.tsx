@@ -8,24 +8,20 @@ import {
   editorWords,
   findCommands,
   getMarkdown,
-  insertPicture,
   linkCommands,
   liveCounts,
   MENTION_INFO_KEYS,
   mentionAtCaret,
-  pictureAt,
   selectPassage,
   selectQuote,
   serializeProse,
   sessionCommands,
-  setPicture,
   spellCommands,
   structureCommands,
   writingModeCommands,
   type EditorCommand,
   type Manuscript,
   type MentionTarget,
-  type PictureCallbacks,
 } from "@writer/editor";
 import { ChapterEditor, FindReplace, SceneEditor, useWritingModes, WordCount, type SpellService } from "@writer/editor/react";
 import type { Editor } from "@tiptap/core";
@@ -35,7 +31,6 @@ import { BookPlus, Plus } from "lucide-react";
 import { Button } from "../ui/button.tsx";
 import { create, useStore } from "zustand";
 import { joinSceneFile, splitSceneFile } from "@writer/editor";
-import { imageUrl } from "@writer/client";
 import { api } from "../api.ts";
 import { useCommands } from "../commands.ts";
 import type { QuickEntries } from "../bible/quick-entries.ts";
@@ -62,7 +57,7 @@ import { TodayCount } from "./today-count.tsx";
 import { useStructure } from "./structure.ts";
 import { TitleDialog } from "./structure-dialogs.tsx";
 import { chapterTitle } from "./navigation.tsx";
-import { PictureInTextDialog, type PictureRequest } from "./picture-in-text.tsx";
+import { usePictures } from "./use-pictures.tsx";
 import { RunPieces, type Run, type RunTools } from "./run.tsx";
 import type { Workspace } from "./workspace.ts";
 import { onAndroid } from "../platform.ts";
@@ -174,24 +169,8 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
     return () => offs.forEach((off) => off());
   }, [editor, workspace, paths.join("\n")]);
 
-  // Pictures in the text load from the server's images route.
-  const pictureUrl = useCallback((path: string) => imageUrl(novelId, path), [novelId]);
-  // A picture to add (dropped, pasted or from the palette) or change (Enter or a double-click on it): asked about in a dialog (heffrey78/gh-writer#203).
-  const [pictureRequest, setPictureRequest] = useState<PictureRequest>();
-  // The editor the picture goes in: in a run, the one it was dropped on or asked for in.
-  const pictureIn = useRef<Editor>(undefined);
-  const picturesFor = (get: () => Editor | undefined): PictureCallbacks => ({
-    add: (files, at) => {
-      pictureIn.current = get();
-      setPictureRequest({ kind: "add", at, ...(files[0] ? { file: files[0] } : {}) });
-    },
-    edit: (at) => {
-      const editor = get();
-      const picture = editor && !editor.isDestroyed ? pictureAt(editor, at) : undefined;
-      pictureIn.current = editor;
-      if (picture) setPictureRequest({ kind: "edit", at, picture });
-    },
-  });
+  // Pictures added, changed and replaced, asked about in a dialog (heffrey78/gh-writer#203, #200).
+  const { pictureUrl, picturesFor, ask: askPicture, dialog: pictureDialog } = usePictures(novelId);
   const pictures = picturesFor(() => editor);
   useCommands(
     () => [
@@ -200,11 +179,7 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
         title: "Insert a picture…",
         group: "Writing",
         keywords: ["image", "map", "illustration", "figure"],
-        run: () => {
-          if (!editor || editor.isDestroyed) return;
-          pictureIn.current = editor;
-          setPictureRequest({ kind: "add", at: editor.state.selection.from });
-        },
+        run: () => askPicture(editor),
       },
     ],
     [editor],
@@ -637,7 +612,7 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
           />
         )}
       </div>
-      <StatusBar novelId={novelId} workspace={workspace} editor={editor} selection={onSelection.map(({ label, icon, run }) => ({ label, ...(icon ? { icon } : {}), run }))} />
+      <StatusBar novelId={novelId} workspace={workspace} editor={editor} picture={(file) => askPicture(editor, file)} selection={onSelection.map(({ label, icon, run }) => ({ label, ...(icon ? { icon } : {}), run }))} />
       </div>
       {raising || issueOpen ? (
         // An issue being raised or read takes the sidebar's place until it's closed: beside the text,
@@ -695,25 +670,7 @@ export function WritingView({ novelId, novel, workspace, view, spell, entries }:
         />
       )}
       <AddToEntryDialog novelId={novelId} novel={novel} workspace={workspace} />
-      {pictureRequest && (
-        <PictureInTextDialog
-          novelId={novelId}
-          request={pictureRequest}
-          pictureUrl={pictureUrl}
-          onDone={(picture) => {
-            const request = pictureRequest;
-            setPictureRequest(undefined);
-            // Once the dialog has closed and given the text its focus back.
-            requestAnimationFrame(() => {
-              const editor = pictureIn.current;
-              if (!editor || editor.isDestroyed) return;
-              if (request.kind === "add") insertPicture(editor, picture, request.at);
-              else setPicture(editor, request.at, picture);
-            });
-          }}
-          onClose={() => setPictureRequest(undefined)}
-        />
-      )}
+      {pictureDialog}
       <NameEntryDialog novel={novel} />
       <MentionCard novelId={novelId} novel={novel} />
     </div>
@@ -799,7 +756,7 @@ function EmptyChapter({ autofocus, onAdd }: { autofocus: boolean; onAdd: (title:
  * against the daily goal. In focus mode, only while the count is pinned there. On a phone while
  * writing, the writing bar instead (#96), on top of the keyboard: the page ends there.
  */
-function StatusBar({ novelId, workspace, editor, selection }: { novelId: string; workspace: Workspace; editor: Editor | undefined; selection: BarAction[] }) {
+function StatusBar({ novelId, workspace, editor, selection, picture }: { novelId: string; workspace: Workspace; editor: Editor | undefined; selection: BarAction[]; picture: (file: File) => void }) {
   const hidden = useWritingModes((m) => m.focus && !m.pinCount);
   const words = editorWords(useBookKind());
   const narrow = useNarrow();
@@ -810,7 +767,7 @@ function StatusBar({ novelId, workspace, editor, selection }: { novelId: string;
   if (writing)
     return (
       <div className={cn("sticky z-10 border-t border-rule bg-paper px-2 py-1 text-[13px] text-muted", above)}>
-        <WritingBar editor={editor} dictate={<DictateButton editor={editor} />} selection={selection} />
+        <WritingBar editor={editor} dictate={<DictateButton editor={editor} bar />} selection={selection} picture={picture} />
       </div>
     );
   if (hidden) return null;

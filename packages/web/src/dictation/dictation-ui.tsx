@@ -68,8 +68,12 @@ export function DictationControls() {
 
 const keepFocus = (e: MouseEvent) => e.preventDefault();
 
-/** The microphone in the writing view's bar: Dictate into `editor` (or the one last written in), or stop. */
-export function DictateButton({ editor }: { editor: Editor | undefined }) {
+/**
+ * The microphone in the writing view's bar: Dictate into `editor` (or the one last written in), or
+ * stop. `bar`: on the bar above a phone's keyboard, a finger's size, 48 px (#203), and its microphone
+ * alone until it's listening, so the bar fits a phone.
+ */
+export function DictateButton({ editor, bar = false }: { editor: Editor | undefined; bar?: boolean }) {
   const { available, state, last } = useDictation();
   const into = editor && !editor.isDestroyed ? editor : last;
   if (!available || !into) return null;
@@ -78,6 +82,7 @@ export function DictateButton({ editor }: { editor: Editor | undefined }) {
     <button
       type="button"
       aria-pressed={listening}
+      aria-label={bar && !listening ? "Dictate" : undefined}
       title={listening ? "Stop dictating" : "Dictate"}
       onMouseDown={keepFocus}
       onClick={() => {
@@ -85,10 +90,10 @@ export function DictateButton({ editor }: { editor: Editor | undefined }) {
         if (!into.isFocused) into.commands.focus(null, { scrollIntoView: false });
         toggle(into);
       }}
-      className={cn("mr-auto inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 hover:text-ink", listening && "text-ink")}
+      className={cn("mr-auto inline-flex items-center gap-1.5 rounded hover:text-ink", bar ? cn("min-h-12 shrink-0 justify-center", listening ? "px-3 text-sm" : "w-12") : "px-1.5 py-0.5", listening && "text-ink")}
     >
-      <Mic className={cn("size-3.5", listening && "text-danger")} aria-hidden />
-      {listening ? "Stop dictating" : "Dictate"}
+      <Mic className={cn(bar ? "size-5" : "size-3.5", listening && "text-danger")} aria-hidden />
+      {bar && !listening ? null : listening ? "Stop dictating" : "Dictate"}
     </button>
   );
 }

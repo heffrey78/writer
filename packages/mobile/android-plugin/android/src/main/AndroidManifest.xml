@@ -2,4 +2,28 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Dictation (#86): heard on the phone, asked for the first time the writer dictates. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <application>
+        <!--
+          Writer in Android's share sheet (#204): one picture or several, text, and a link. Merged into
+          the app's own activity (Tauri's, singleTask: a share reaches the app already open as a new
+          intent), which WriterPlugin reads.
+        -->
+        <activity android:name="io.github.heffrey78.writer.MainActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity>
+    </application>
 </manifest>

@@ -1,9 +1,9 @@
-import { imageUrl } from "@writer/client";
 import { pieceSections, plural, readFrontMatter, vocabulary, word, type Book, type Note } from "@writer/core";
 import { joinSceneFile } from "@writer/editor";
 import { SceneEditor, type SpellService } from "@writer/editor/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowUpRight, Trash2 } from "lucide-react";
+import type { Editor } from "@tiptap/core";
+import { ArrowUpRight, ImagePlus, Trash2 } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 import { useStore } from "zustand";
@@ -21,6 +21,10 @@ import type { Workspace } from "../novel/workspace.ts";
 import { ErrorAlert } from "../ui/alert.tsx";
 import { Button } from "../ui/button.tsx";
 import { Confirm } from "../ui/confirm.tsx";
+import { usePictures } from "../novel/use-pictures.tsx";
+import { useTextFocused, WritingBar } from "../novel/writing-bar.tsx";
+import { DictateButton } from "../dictation/dictation-ui.tsx";
+import { useNarrow } from "../narrow.ts";
 import { PromoteNoteDialog } from "./promote.tsx";
 
 /**
@@ -62,7 +66,20 @@ export function NotePage({
   // What it can become: what the kind's modules make of a note ("an event"), or a piece.
   const into = moduleRecordTypes(novel.kind).flatMap((t) => (t.fromNote ? [word({ label: t.def.noun.short ?? t.def.noun.label, plural: plural(t.def.noun.short ?? t.def.noun.label) })] : []));
   const becomes = [...into.map((x) => x.a), w.piece.a].join(" or ");
-  useCommands(() => [{ id: "note.promote", title: `Make “${note.title}” ${becomes}`, group: "Notes", keywords: ["promote", ...into.map((x) => x.one), w.piece.one], run: () => setPromoting(true) }], [note.title, w, becomes]);
+  // Pictures, as a scene takes them (#200): dropped, pasted, from Add a picture or the palette.
+  const [editor, setEditor] = useState<Editor>();
+  const { pictureUrl, picturesFor, ask: askPicture, dialog: pictureDialog } = usePictures(novelId);
+  // On a phone, while writing, the bar above the keyboard (#96), with Picture (#203).
+  const narrow = useNarrow();
+  const inText = useTextFocused();
+  const writing = narrow && inText;
+  useCommands(
+    () => [
+      { id: "note.promote", title: `Make “${note.title}” ${becomes}`, group: "Notes", keywords: ["promote", ...into.map((x) => x.one), w.piece.one], run: () => setPromoting(true) },
+      { id: "note.insertPicture", title: "Insert a picture…", group: "Notes", keywords: ["image", "map", "handout", "photo"], run: () => askPicture(editor) },
+    ],
+    [note.title, w, becomes, editor],
+  );
 
   // A note just made: the caret goes into its prose, ready to write (heffrey78/gh-writer#222).
   const { state } = useLocation() as { state: { focusProse?: boolean } | null };
@@ -87,12 +104,13 @@ export function NotePage({
     await workspace.open([path]);
     await refresh();
   };
-  const setTags = async (text: string) => {
-    const list = [...new Set(text.split(",").map((t) => t.trim()).filter(Boolean))];
+  const setTags = async (chosen: string[]) => {
+    const list = [...new Set(chosen.map((t) => t.trim()).filter(Boolean))];
     await workspace.editFrontMatter(note.file, [list.length ? { path: ["tags"], value: list } : { path: ["tags"], remove: true }]).catch((e: unknown) => {
       show({ message: `Couldn't change the tags: ${e instanceof Error ? e.message : String(e)}` });
     });
   };
+  const bookTags = useMemo(() => [...new Set([...novel.notes, ...novel.entities].flatMap((x) => x.tags))].sort((a, b) => a.localeCompare(b)), [novel]);
   const sceneTitle = (id: string) => novel.allPieces.find((x) => x.id === id)?.title ?? id;
   const setScenes = async (scenes: string[]) => {
     try {
@@ -116,16 +134,21 @@ export function NotePage({
   const becameRecord = note.became ? novel.moduleRecords.find((r) => r.id === note.became) : undefined;
   const becameType = becameRecord && moduleRecordType(novel.kind, becameRecord.type);
   const Heading = embedded && !embedded.modal ? "h2" : "h1";
+  const iconOnly = narrow ? "size-12 justify-center p-0" : undefined;
   return (
     <div className={embedded ? "grid gap-4" : "mx-auto grid w-full max-w-[calc(var(--ghw-prose-measure)+3rem)] gap-5 px-6 py-6"}>
       <div className="grid gap-1.5">
         <div className="flex flex-wrap items-center gap-2 pr-8">
-          <p className="flex-1 text-sm text-muted">Note{note.created && ` · ${realDay(note.created)}`}</p>
-          <Button variant="ghost" size="sm" onClick={() => setPromoting(true)}>
-            <ArrowUpRight className="size-4" aria-hidden /> Make it {becomes}
+          <p className="flex-1 text-sm whitespace-nowrap text-muted">Note{note.created && ` · ${realDay(note.created)}`}</p>
+          {/* On a phone, icons alone, each a finger's size: their words squeezed the date onto four lines. */}
+          <Button variant="ghost" size="sm" className={iconOnly} aria-label={narrow ? "Add a picture" : undefined} onClick={() => askPicture(editor)} disabled={!editor}>
+            <ImagePlus className={narrow ? "size-5" : "size-4"} aria-hidden /> {!narrow && "Add a picture"}
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => setDeleting(true)} disabled={remove.isPending}>
-            <Trash2 className="size-4" aria-hidden /> Delete
+          <Button variant="ghost" size="sm" className={iconOnly} aria-label={narrow ? `Make it ${becomes}` : undefined} onClick={() => setPromoting(true)}>
+            <ArrowUpRight className={narrow ? "size-5" : "size-4"} aria-hidden /> {!narrow && `Make it ${becomes}`}
+          </Button>
+          <Button variant="ghost" size="sm" className={iconOnly} aria-label={narrow ? "Delete" : undefined} onClick={() => setDeleting(true)} disabled={remove.isPending}>
+            <Trash2 className={narrow ? "size-5" : "size-4"} aria-hidden /> {!narrow && "Delete"}
           </Button>
         </div>
         {place.editing === "title" ? (
@@ -144,7 +167,22 @@ export function NotePage({
           </div>
         )}
         {place.editing === "tags" ? (
-          <TextEditor place={place} label="Tags" hint="Separated by commas." value={tags.join(", ")} onSave={setTags} />
+          // The tags the book already has, to choose from as well as new ones: one tag isn't written two ways.
+          <EditorFrame place={place}>
+            <Group label="Tags">
+              <Chips items={tags.map((t) => ({ id: t, label: t, remove: () => void setTags(tags.filter((x) => x !== t)) }))} />
+              <Picker
+                label="Add a tag"
+                items={bookTags.map((t) => ({ value: t, label: t }))}
+                value={undefined}
+                chosen={tags}
+                onChange={(v) => v && void setTags(tags.includes(v) ? tags.filter((x) => x !== v) : [...tags, v])}
+                placeholder="Add a tag…"
+                create={{ noun: "tag", create: (name) => name.replace(/,/g, " ").trim() || undefined }}
+              />
+            </Group>
+            <EditorButtons onCancel={() => place.done()} hint="Each change is saved as it's made · Esc returns" />
+          </EditorFrame>
         ) : tags.length ? (
           <div className="group flex flex-wrap items-center gap-1.5">
             <ul aria-label="Tags" className="flex flex-wrap gap-1.5">
@@ -224,7 +262,9 @@ export function NotePage({
               markdown={file.body}
               onChange={(md) => workspace.change(note.file, md)}
               entities={mentions}
-              pictureUrl={(path) => imageUrl(novelId, path)}
+              pictureUrl={pictureUrl}
+              pictures={picturesFor(() => editor)}
+              onReady={setEditor}
               className="ghw-notes"
               {...(spell ? { spell } : {})}
             />
@@ -234,6 +274,12 @@ export function NotePage({
         )}
       </section>
 
+      {writing && (
+        <div className="sticky bottom-0 z-10 -mx-2 border-t border-rule bg-paper px-2 py-1">
+          <WritingBar editor={editor} dictate={<DictateButton editor={editor} bar />} selection={[]} picture={(file) => askPicture(editor, file)} />
+        </div>
+      )}
+      {pictureDialog}
       {promoting && <PromoteNoteDialog novelId={novelId} novel={novel} workspace={workspace} note={note} flush={() => workspace.autosave.flush()} open onOpenChange={setPromoting} />}
       <Confirm open={deleting} onOpenChange={setDeleting} title={`Delete “${note.title}”?`} description={`The note goes from the ${w.book.one}. It stays in the history.`} action="Delete" danger onConfirm={() => remove.mutate()} />
       {remove.isError && <ErrorAlert title="Couldn't delete it">{remove.error.message}</ErrorAlert>}

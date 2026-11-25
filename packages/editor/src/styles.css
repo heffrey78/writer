@@ -252,6 +252,161 @@ img.ProseMirror-separator {
   border-radius: 2px;
 }
 
+/*
+ * Pictures on neighbouring lines, side by side in rows of up to three (#201): each still a block of
+ * its own, inline here. On a phone's width, one a line again.
+ */
+.ghw-prose .ghw-picture.ghw-picture-row {
+  display: inline-block;
+  vertical-align: top;
+  /* A hair under a third (or a half), so a row's rounding never pushes its last onto a line of its own. */
+  width: calc((100% - (var(--ghw-row) - 1) * 1rem) / var(--ghw-row) - 0.1px);
+  margin-left: 1rem;
+}
+
+.ghw-prose .ghw-picture.ghw-picture-row-first {
+  margin-left: 0;
+}
+
+.ghw-prose .ghw-picture.ghw-picture-row img {
+  max-height: 20rem;
+}
+
+@media (max-width: 40rem) {
+  .ghw-prose .ghw-picture.ghw-picture-row {
+    display: block;
+    width: auto;
+    margin-left: 0;
+  }
+}
+
+/* A selected picture's Describe…, Change… and Remove (#200), over its top right corner. */
+.ghw-picture-toolbar {
+  position: absolute;
+  z-index: 30;
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--ghw-rule);
+  border-radius: 6px;
+  background: var(--ghw-paper);
+  color: var(--ghw-ink);
+  font: 0.8125rem/1.2 var(--ghw-ui-font, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.15);
+}
+
+.ghw-picture-toolbar[hidden],
+.ghw-picture-toolbar button[hidden] {
+  display: none;
+}
+
+.ghw-picture-toolbar button {
+  min-height: 2rem;
+  padding: 0 0.6rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.ghw-picture-toolbar button:hover {
+  background: var(--ghw-accent-soft);
+}
+
+/* A finger's size on a touch screen. */
+@media (pointer: coarse) {
+  .ghw-picture-toolbar button {
+    min-height: 3rem;
+    padding: 0 0.9rem;
+  }
+}
+
+/* The bar under a link the caret is in: where it goes, Open, Edit and Remove link, or its words and address to change. */
+.ghw-link-bar {
+  position: absolute;
+  z-index: 30;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  max-width: min(28rem, calc(100% - 8px));
+  padding: 2px;
+  border: 1px solid var(--ghw-rule);
+  border-radius: 6px;
+  background: var(--ghw-paper);
+  color: var(--ghw-ink);
+  font: 0.8125rem/1.2 var(--ghw-ui-font, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.15);
+}
+
+.ghw-link-bar[hidden],
+.ghw-link-bar [hidden] {
+  display: none;
+}
+
+.ghw-link-address {
+  flex: 1 1 10rem;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0 0.5rem;
+  color: var(--ghw-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: text;
+}
+
+.ghw-link-bar button {
+  min-height: 2rem;
+  padding: 0 0.6rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.ghw-link-bar button:hover {
+  background: var(--ghw-accent-soft);
+}
+
+.ghw-link-form {
+  display: grid;
+  flex: 1 1 100%;
+  gap: 0.5rem;
+  padding: 0.5rem;
+}
+
+.ghw-link-form label {
+  display: grid;
+  gap: 0.25rem;
+  font-weight: 500;
+}
+
+.ghw-link-form input {
+  min-height: 2.25rem;
+  padding: 0 0.5rem;
+  border: 1px solid var(--ghw-rule);
+  border-radius: 4px;
+  background: var(--ghw-paper);
+  color: var(--ghw-ink);
+  font-size: 1rem;
+}
+
+.ghw-link-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.25rem;
+}
+
+.ghw-link-actions button[type="submit"] {
+  background: var(--ghw-accent);
+  color: var(--ghw-paper);
+}
+
+/* A finger's size on a touch screen. */
+@media (pointer: coarse) {
+  .ghw-link-bar button,
+  .ghw-link-form input {
+    min-height: 3rem;
+    padding: 0 0.9rem;
+  }
+}
+
 /* Where something dragged will land, and the caret between two blocks that aren't text. */
 .ghw-dropcursor {
   background: var(--ghw-accent);
