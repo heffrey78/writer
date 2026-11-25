@@ -3,7 +3,7 @@ import { join } from "node:path";
 import fc from "fast-check";
 import { isMap, parseDocument, type Node, type Pair } from "yaml";
 import { describe, expect, it } from "vitest";
-import { backlinks, editFrontMatter, editYaml, loadBook, numberedName, readFrontMatter, relationshipHistory, relationshipsAt, slugify, uniqueFileName, uniqueId, type YamlEdit } from "../src/index.ts";
+import { backlinks, editFrontMatter, NOTE_COLORS, editYaml, loadBook, numberedName, readFrontMatter, relationshipHistory, relationshipsAt, slugify, uniqueFileName, uniqueId, type YamlEdit } from "../src/index.ts";
 import { nodeSource } from "../src/node.ts";
 
 const sample = new URL("../../../examples/sample-novel/", import.meta.url).pathname;
@@ -118,6 +118,22 @@ describe("editFrontMatter", () => {
     const file = "﻿---\r\nid: sc_a\r\ntitle: Old\r\n---\r\n\r\nBody text.\r\n";
     expect(editFrontMatter(file, [{ path: ["title"], value: "New" }])).toBe("﻿---\r\nid: sc_a\r\ntitle: New\r\n---\r\n\r\nBody text.\r\n");
     expect(readFrontMatter(file)).toEqual({ id: "sc_a", title: "Old" });
+  });
+
+  it("sets and clears a note's color (D24) on its own line, keeping every other byte", () => {
+    const tags = fc.array(fc.stringMatching(/^[a-z]{1,8}$/), { maxLength: 3 });
+    const comment = fc.constantFrom("", "  # mine", " # keep");
+    fc.assert(
+      fc.property(tags, comment, fc.constantFrom(...NOTE_COLORS), fc.constantFrom("\n", "\r\n"), fc.string({ maxLength: 40 }), (ts, c, color, eol, prose) => {
+        const lines = ["---", "id: note_aaaaaa", `title: An idea${c}`, ...(ts.length ? [`tags: [${ts.join(", ")}]`] : []), "# a note to self", "created: 2026-10-15", "---", "", prose.replace(/\r?\n|\r/g, " ")];
+        const file = lines.join(eol) + eol;
+        const set = editFrontMatter(file, [{ path: ["color"], value: color }]);
+        const end = lines.indexOf("---", 1);
+        expect(set).toBe([...lines.slice(0, end), `color: ${color}`, ...lines.slice(end)].join(eol) + eol);
+        expect(editFrontMatter(set, [{ path: ["color"], remove: true }])).toBe(file);
+      }),
+      { numRuns: 300 },
+    );
   });
 
   it("adds front matter to a file without any", () => {

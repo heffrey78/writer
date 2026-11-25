@@ -37,6 +37,7 @@ export const RULES: Readonly<Record<string, Severity>> = {
   W_MISSING_IMAGE: "warning",
   W_IMAGE_OUTSIDE: "warning",
   W_NOTE_PIN: "warning",
+  W_NOTE_COLOR: "warning",
   W_SIDEBAR_UNKNOWN: "warning",
   W_FIELD_VALUE: "warning",
   W_FIELD_CHANGE: "warning",

@@ -256,6 +256,18 @@ describe("validate", () => {
       ]);
     });
 
+    it("a note's color is one of the names (D24); another is W_NOTE_COLOR and reads as none", async () => {
+      const ok = await fixture({ "notes/an-idea.md": note("note_aaaaaa", "color: yellow\n") });
+      expect(ok.diagnostics).toEqual([]);
+      expect(ok.novel.notes[0]!.color).toBe("yellow");
+      for (const value of ["mauve", "'#ffcc00'", "3", "[red]"]) {
+        const bad = await fixture({ "notes/an-idea.md": note("note_aaaaaa", `color: ${value}\n`) });
+        expect(bad.diagnostics.map((d) => [d.code, d.severity, d.pointer])).toEqual([["W_NOTE_COLOR", "warning", "/color"]]);
+        expect(bad.novel.notes[0]).not.toHaveProperty("color");
+      }
+      expect((await fixture({ "notes/an-idea.md": note("note_aaaaaa") })).novel.notes[0]).not.toHaveProperty("color");
+    });
+
     it("a note is never mentioned; note is no custom type's prefix", async () => {
       const r = await fixture({
         "notes/an-idea.md": note("note_aaaaaa"),

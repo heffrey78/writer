@@ -42,7 +42,7 @@ export async function body(c: Context): Promise<Record<string, unknown>> {
  * POST  /:id/bible/relationships/:rel/end      { at }
  * POST  /:id/bible/relationships/:rel/delete
  * POST  /:id/notes                              { title, tags?, scenes?, note? } → 201 { id, file }: a writer's note (D12)
- * PATCH /:id/notes/:note                       { changes: { title?, tags?, scenes?, note? }, base? } → { file }
+ * PATCH /:id/notes/:note                       { changes: { title?, tags?, scenes?, color?, note? }, base? } → { file }
  * POST  /:id/notes/:note/pin                   { scene, pinned }: pinned to the top of the scene's notes (its other unpinned), or not
  * POST  /:id/notes/:note/delete                { base? }
  * POST  /:id/notes/:note/promote               { chapter, keep } → 201 { id, file }: the scene it became (what a module makes of one is the module's route)

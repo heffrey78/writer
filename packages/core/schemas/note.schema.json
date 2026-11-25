@@ -29,6 +29,9 @@
     "became": {
       "$ref": "common.schema.json#/$defs/id",
       "description": "The event or scene it was promoted to, when kept."
+    },
+    "color": {
+      "description": "The color the writer gave it (D24): red, orange, yellow, green, teal, blue, purple or gray. Another value is a warning (W_NOTE_COLOR), not an error, so a newer Writer's color doesn't stop an older one."
     }
   },
   "required": [

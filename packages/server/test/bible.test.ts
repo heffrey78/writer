@@ -623,6 +623,21 @@ describe("notes (D12)", () => {
     expect((await valid()).notes.map((n) => n.id)).toContain(id);
   });
 
+  it("gives a note a color and takes it off (D24), changing only that line", async () => {
+    const before = read(IDEA);
+    await bible.updateNote("note_w1fben", { color: "yellow" });
+    expect(read(IDEA)).toBe(before.replace("created: 2026-10-15\n", "created: 2026-10-15\ncolor: yellow\n"));
+    expect(lastCommit()).toBe("Notes: edit “What if Ben never sold the plans?”");
+    expect((await valid()).notes.find((n) => n.id === "note_w1fben")!.color).toBe("yellow");
+    await bible.updateNote("note_w1fben", { color: "teal" });
+    expect(read(IDEA)).toBe(before.replace("created: 2026-10-15\n", "created: 2026-10-15\ncolor: teal\n"));
+    await bible.updateNote("note_w1fben", { color: null });
+    expect(read(IDEA)).toBe(before);
+    await expect(bible.updateNote("note_w1fben", { color: "mauve" as never })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(read(IDEA)).toBe(before);
+    clean();
+  });
+
   it("edits tags and prose against the file as read, renames with a new title, and removes it", async () => {
     const before = read(IDEA);
     await bible.updateNote("note_w1fben", { tags: null, note: "Then the bridge stands." }, { base: hashText(before) });
