@@ -100,13 +100,13 @@ export const PAPER: Record<Mode, Tokens> = {
     "series-6": "#008300",
     "series-7": "#6250d6",
     "series-8": "#e34948",
-    "note-red": "#f7d8d2",
+    "note-red": "#f7d9d3",
     "note-orange": "#fadfc4",
     "note-yellow": "#f6eab2",
     "note-green": "#dbeac6",
     "note-teal": "#cbe7e1",
     "note-blue": "#d6e3f4",
-    "note-purple": "#e4daf2",
+    "note-purple": "#e5dcf2",
     "note-gray": "#e6e2db",
   },
   dark: {
@@ -136,10 +136,10 @@ export const PAPER: Record<Mode, Tokens> = {
     "series-7": "#9085e9",
     "series-8": "#e66767",
     "note-red": "#4a2a26",
-    "note-orange": "#4a3120",
+    "note-orange": "#493020",
     "note-yellow": "#3d3519",
-    "note-green": "#2d3b23",
-    "note-teal": "#1e3c38",
+    "note-green": "#2c3822",
+    "note-teal": "#1e3935",
     "note-blue": "#233349",
     "note-purple": "#352a48",
     "note-gray": "#34322e",
@@ -357,7 +357,8 @@ export function derive(colors: Colors, minimum = 4.5): Tokens {
     "series-6": base["series-6"],
     "series-7": base["series-7"],
     "series-8": base["series-8"],
-    ...noteShades(paper, [ink, muted, accent], minimum),
+    // A mention in a colored note is a link on its tint, over the note's color.
+    ...noteShades(paper, [ink, muted, accent], minimum, { accent, soft: soft.accent }),
   };
 }
 
@@ -379,15 +380,16 @@ const NOTE_HUES: Record<(typeof NOTE_COLORS)[number], string> = {
 
 /**
  * A theme's note colors: its paper tinted with each hue, the tint lessened until text, quiet text
- * and links all read on it at `minimum`. At no tint it's the paper, where they read already, so every
+ * and links all read on it at `minimum`, and `link`'s color on its own soft tint over it (a mention). At no tint it's the paper, where they read already, so every
  * shade reads, whatever the paper.
  */
-function noteShades(paper: string, text: readonly string[], minimum: number): Record<NoteToken, string> {
+export function noteShades(paper: string, text: readonly string[], minimum: number, link?: { accent: string; soft: number }): Record<NoteToken, string> {
   const strength = isDark(paper) ? 0.24 : 0.3;
+  const reads = (tinted: string) => text.every((t) => contrast(t, tinted) >= minimum) && (!link || contrast(link.accent, over(link.accent, link.soft, tinted)) >= minimum);
   const shade = (hue: string) => {
     for (let step = Math.round(strength * 100); step > 0; step--) {
       const tinted = mix(paper, hue, step / 100);
-      if (text.every((t) => contrast(t, tinted) >= minimum)) return tinted;
+      if (reads(tinted)) return tinted;
     }
     return paper;
   };
