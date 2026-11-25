@@ -306,6 +306,21 @@ export function picturePath(src: string): string | undefined {
   return path.slice(1);
 }
 
+/** A picture shown in prose, by its repository path under images/: what a gallery's card shows of a note (#202). */
+export interface ShownPicture {
+  path: string;
+  alt: string;
+  caption?: string;
+}
+
+/** The pictures under images/ in Markdown prose (a note's, say), in order: the reader compile and the server use. */
+export function shownPictures(body: string): ShownPicture[] {
+  return pictures(body).flatMap((p) => {
+    const path = picturePath(p.src);
+    return path ? [{ path, alt: p.alt, ...(p.caption ? { caption: p.caption } : {}) }] : [];
+  });
+}
+
 /**
  * The pictures `book` shows, as repository paths: its cover, its entries' pictures, and those in the
  * prose of its pieces, notes and modules' records (#200). A picture's file is deleted only when it

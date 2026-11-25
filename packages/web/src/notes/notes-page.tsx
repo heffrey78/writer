@@ -1,4 +1,5 @@
-import { proseText, type Book } from "@writer/core";
+import { imageUrl } from "@writer/client";
+import { proseText, shownPictures, type Book } from "@writer/core";
 import { Pin, Plus, Search } from "lucide-react";
 import { useId, useMemo, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router";
@@ -10,15 +11,16 @@ import { cn } from "../ui/cn.ts";
 type Sort = "newest" | "title";
 
 /**
- * Every note at a glance (heffrey78/gh-writer#223), as cards like the Story bible's: title, an excerpt, its tags and its
- * scenes (pinned ones marked). Filtered by a tag and by words, sorted newest first or by title; the
- * choices are in the address. A note opens in a modal over it (`over`, heffrey78/gh-writer#235).
+ * Every note at a glance (heffrey78/gh-writer#223), as cards like the Story bible's: its first picture and how many
+ * it has (#202), title, an excerpt, its tags and its scenes (pinned ones marked). Filtered by a tag, by
+ * words and to those with pictures, sorted newest first or by title; the choices are in the address. A note opens in a modal over it (`over`, heffrey78/gh-writer#235).
  */
 export function NotesPage({ novelId, novel, over }: { novelId: string; novel: Book; over?: ReactNode }) {
   const [params, setParams] = useSearchParams();
   const query = params.get("q") ?? "";
   const tag = params.get("tag") ?? "";
   const sort: Sort = params.get("sort") === "title" ? "title" : "newest";
+  const withPictures = params.get("pictures") === "1";
   const ids = { search: useId(), tag: useId(), sort: useId() };
   const add = useNewNote((s) => s.set);
   const setParam = (key: string, value: string | undefined) => {
@@ -29,8 +31,9 @@ export function NotesPage({ novelId, novel, over }: { novelId: string; novel: Bo
   };
   const tags = useMemo(() => [...new Set(novel.notes.flatMap((n) => n.tags))].sort((a, b) => a.localeCompare(b)), [novel.notes]);
   const q = query.trim().toLowerCase();
+  const picturesOf = useMemo(() => new Map(novel.notes.map((n) => [n.id, shownPictures(n.body)])), [novel.notes]);
   const shown = novel.notes
-    .filter((n) => (!tag || n.tags.includes(tag)) && (!q || [n.title, proseText(n.body), ...n.tags].some((t) => t.toLowerCase().includes(q))))
+    .filter((n) => (!tag || n.tags.includes(tag)) && (!withPictures || picturesOf.get(n.id)!.length > 0) && (!q || [n.title, proseText(n.body), ...n.tags].some((t) => t.toLowerCase().includes(q))))
     .sort((a, b) => (sort === "title" ? a.title.localeCompare(b.title) : (b.created ?? "").localeCompare(a.created ?? "") || a.title.localeCompare(b.title)));
   const sceneTitle = (id: string) => novel.allPieces.find((s) => s.id === id)?.title ?? id;
 
@@ -72,6 +75,10 @@ export function NotesPage({ novelId, novel, over }: { novelId: string; novel: Bo
             </select>
           </label>
         )}
+        <label className="flex items-center gap-2 text-sm text-muted">
+          <input type="checkbox" checked={withPictures} onChange={(e) => setParam("pictures", e.target.checked ? "1" : undefined)} className="size-4 accent-accent" />
+          With pictures
+        </label>
         <label htmlFor={ids.sort} className="flex items-center gap-2 text-sm text-muted">
           Sort
           <select id={ids.sort} value={sort} onChange={(e) => setParam("sort", e.target.value === "newest" ? undefined : e.target.value)} className="h-9 rounded-md border border-rule bg-raised px-2 text-ink">
@@ -80,7 +87,7 @@ export function NotesPage({ novelId, novel, over }: { novelId: string; novel: Bo
           </select>
         </label>
       </div>
-      {(q || tag) && (
+      {(q || tag || withPictures) && (
         <p role="status" className="text-sm text-muted">
           {shown.length === 1 ? "1 note matches" : `${shown.length} notes match`}
         </p>
@@ -89,12 +96,14 @@ export function NotesPage({ novelId, novel, over }: { novelId: string; novel: Bo
         <ul aria-label="Notes" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {shown.map((n) => {
             const text = proseText(n.body).replace(/\s+/g, " ").trim();
+            const pictures = picturesOf.get(n.id)!;
+            const first = pictures[0];
             return (
               <li key={n.id} className="grid">
                 <Link
                   to={`/novels/${novelId}/note/${n.id}`}
                   state={{ fromGallery: true }}
-                  className="grid content-start gap-1.5 rounded-lg border border-l-4 border-rule border-l-warn/60 bg-raised px-4 py-3 hover:border-accent focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+                  className="grid content-start gap-1.5 overflow-hidden rounded-lg border border-l-4 border-rule border-l-warn/60 bg-raised px-4 py-3 hover:border-accent focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
                 >
                   <span className="font-semibold">{n.title}</span>
                   {text && <span className="line-clamp-3 font-prose leading-snug">{text}</span>}
@@ -109,6 +118,13 @@ export function NotesPage({ novelId, novel, over }: { novelId: string; novel: Bo
                           {i < n.scenes.length - 1 && ","}
                         </span>
                       ))}
+                    </span>
+                  )}
+                  {/* Shown first, read last: a screen reader hears the title, then the words. */}
+                  {first && (
+                    <span className="relative order-first -mx-4 -mt-3 mb-1 block aspect-[16/9] bg-panel">
+                      <img src={imageUrl(novelId, first.path)} alt="" loading="lazy" className="size-full object-cover" />
+                      {pictures.length > 1 && <span className="absolute right-2 bottom-2 rounded-full bg-black/65 px-2 py-0.5 text-xs font-medium text-white">{pictures.length} pictures</span>}
                     </span>
                   )}
                 </Link>

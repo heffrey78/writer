@@ -194,3 +194,50 @@ test("pictures on neighbouring lines show as a row, one a line at a phone's widt
   // The file is as it was.
   expect(readFileSync(join(dir, IDEA), "utf8")).toBe(body);
 });
+
+test("the Notes gallery shows a note's first picture and how many it has, and With pictures keeps only those (#202)", async ({ page, app }) => {
+  const dir = app.novelRepo("varn");
+  const { mkdirSync, writeFileSync } = await import("node:fs");
+  const add = (file: string, lines: string[]) => writeFileSync(join(dir, file), `${readFileSync(join(dir, file), "utf8").trimEnd()}\n\n${lines.join("\n\n")}\n`);
+  add(IDEA, ["![Ben's plans](/images/plans.jpg)", "![The toll seal](/images/seal.jpg)"]);
+  add("notes/the-varn-bridge.md", ["![The bridge at dusk](/images/bridge.jpg)"]);
+  await app.restart(dir);
+  await page.goto(app.launchUrl);
+  await expect(page.getByRole("textbox", { name: "Chapter text" })).toBeFocused();
+  mkdirSync(join(dir, "images"), { recursive: true });
+  for (const name of ["plans", "seal", "bridge"]) writeFileSync(join(dir, `images/${name}.jpg`), await makePicture(page, { width: 1200, height: 800, name: `${name}.jpg` }));
+
+  await palette(page, "note: what if ben");
+  await expect(page.getByRole("textbox", { name: "Note: What if Ben never sold the plans?" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("heading", { level: 1, name: /^Notes/ })).toBeVisible();
+  const cards = page.getByRole("list", { name: "Notes" }).getByRole("listitem");
+  const idea = cards.filter({ hasText: "What if Ben never sold the plans?" });
+  const bridge = cards.filter({ hasText: "The Varn Bridge" });
+  // The first picture, shown first but read after the title and words; "2 pictures" when it has more than one.
+  await expect(idea.locator("img")).toHaveAttribute("src", /\/images\/plans\.jpg$/);
+  await expect.poll(() => idea.locator("img").evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth)).toBe(1200);
+  await expect(idea).toContainText("2 pictures");
+  await expect(bridge.locator("img")).toHaveAttribute("src", /\/images\/bridge\.jpg$/);
+  await expect(bridge).not.toContainText("pictures");
+  expect((await idea.getByRole("link").textContent())!.startsWith("What if Ben never sold the plans?Then Ada")).toBe(true);
+  // A note without pictures is words only.
+  await expect(cards.filter({ hasText: "Tomas Hale" }).locator("img")).toHaveCount(0);
+  for (const colorScheme of ["light", "dark"] as const) {
+    await page.emulateMedia({ colorScheme });
+    await axe(page);
+  }
+
+  // With pictures: only those, kept in the address.
+  await page.getByRole("checkbox", { name: "With pictures" }).click();
+  await expect(page.getByRole("checkbox", { name: "With pictures" })).toBeChecked();
+  await expect(cards.locator("span.font-semibold")).toHaveText(["The Varn Bridge", "What if Ben never sold the plans?"]);
+  await expect(page.getByRole("status").filter({ hasText: "notes match" })).toHaveText("2 notes match");
+  await expect(page).toHaveURL(/[?&]pictures=1/);
+  await page.reload();
+  await expect(page.getByRole("checkbox", { name: "With pictures" })).toBeChecked();
+  await expect(cards).toHaveCount(2);
+  await page.getByRole("checkbox", { name: "With pictures" }).click();
+  await expect(cards).toHaveCount(6);
+  await expect(page).not.toHaveURL(/pictures=/);
+});
