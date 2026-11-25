@@ -791,7 +791,7 @@ async function sharing(page: Page, shares: { id: string; received: number; text?
 
 const icon = (size: "32x32" | "128x128") => readFileSync(fileURLToPath(new URL(`../../mobile/src-tauri/icons/${size}.png`, import.meta.url))).toString("base64");
 
-test("Save to Writer: a picture and a link shared from another app become a new note in the book used last, each picture described (#205)", async ({ page, app }) => {
+test("Save to Writer: a picture and a link shared from another app become a new note in the book used last, only its title asked for, a description shown as its caption (#205)", async ({ page, app }) => {
   const dir = app.novelRepo("varn");
   await app.restart(dir);
   const left = await sharing(page, [
@@ -808,15 +808,16 @@ test("Save to Writer: a picture and a link shared from another app become a new 
   await expect(page.getByRole("radio", { name: "New note" })).toBeChecked();
   await expect(page.getByRole("textbox", { name: "Title" })).toHaveValue("The toll house");
   const save = page.getByRole("button", { name: "Save as a new note" });
-  // Each picture described first: Save says which isn't, and goes to it.
+  // Only the title is asked for: emptied, Save says so and goes to it. A description is optional.
+  const title = page.getByRole("textbox", { name: "Title" });
+  await title.fill("");
   await save.tap();
-  await expect(page.getByRole("alert")).toHaveText("Describe picture 1.");
-  await expect(page.getByRole("textbox", { name: "Description of picture 1" })).toBeFocused();
-  await page.getByRole("textbox", { name: "Description of picture 1" }).fill("The toll house from the bridge");
-  await save.tap();
-  await expect(page.getByRole("alert")).toHaveText("Describe picture 2.");
-  await expect(page.getByRole("textbox", { name: "Description of picture 2" })).toBeFocused();
-  await page.getByRole("textbox", { name: "Description of picture 2" }).fill("The toll board");
+  await expect(page.getByRole("alert")).toHaveText("Give the note a title.");
+  await expect(title).toBeFocused();
+  await title.fill("The toll house");
+  // The title before the descriptions.
+  expect((await title.boundingBox())!.y).toBeLessThan((await page.getByRole("textbox", { name: "Description of picture 1 (optional)" }).boundingBox())!.y);
+  await page.getByRole("textbox", { name: "Description of picture 1 (optional)" }).fill("The toll house from the bridge");
   await audit(page);
   for (const target of await page.locator("main").locator("input:not([type=radio]), select, button").all()) expect((await target.boundingBox())!.height).toBeGreaterThanOrEqual(48);
   await fits(page);
@@ -824,11 +825,13 @@ test("Save to Writer: a picture and a link shared from another app become a new 
 
   // The note, opened; written in the book with its pictures saved in images/, and the share let go.
   await expect(page.getByRole("textbox", { name: "Note: The toll house" })).toBeVisible();
-  await expect(page.getByRole("textbox", { name: "Note: The toll house" }).getByRole("img", { name: "The toll board" })).toBeVisible();
+  // The description under its picture, shown; the title what screen readers say for each.
+  await expect(page.getByRole("textbox", { name: "Note: The toll house" })).toContainText("The toll house from the bridge");
+  await expect(page.getByRole("textbox", { name: "Note: The toll house" }).getByRole("img", { name: "The toll house, picture 2" })).toBeVisible();
   const note = readFileSync(join(dir, "notes/the-toll-house.md"), "utf8");
   expect(note).toMatch(/^---\nid: note_\w+\ntitle: The toll house\ncreated: [\d-]+T[\d:]+\n---\n/);
   // A new note as New note makes one: a line between its front matter and its words.
-  expect(note.split("---\n")[2]).toBe("\nToll houses of the valley <https://example.com/tolls>\n\n![The toll house from the bridge](/images/the-toll-house-from-the-bridge.png)\n\n![The toll board](/images/the-toll-board.png)\n");
+  expect(note.split("---\n")[2]).toBe('\nToll houses of the valley <https://example.com/tolls>\n\n![The toll house, picture 1](/images/the-toll-house-from-the-bridge.png "The toll house from the bridge")\n\n![The toll house, picture 2](/images/the-toll-house-picture-2.png)\n');
   expect(existsSync(join(dir, "images/the-toll-house-from-the-bridge.png"))).toBe(true);
   expect(await left()).toEqual([]);
   // Let go: a reload doesn't bring it back.

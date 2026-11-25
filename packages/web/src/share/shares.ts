@@ -88,7 +88,7 @@ export function sharedLink(share: Pick<Share, "text">): { url: string; words: st
 
 /**
  * A title for a note made of what's shared: its subject (a page's title), the words that came with a
- * link or the text's first line, the link's site, or what it is ("A picture", "3 pictures").
+ * link or the text's first line, or the link's site. Pictures alone have none: empty, for the writer's.
  */
 export function sharedTitle(share: Omit<Share, "id" | "received">): string {
   const clip = (s: string) => (s.length > 80 ? `${s.slice(0, 79).trimEnd()}…` : s);
@@ -97,15 +97,16 @@ export function sharedTitle(share: Omit<Share, "id" | "received">): string {
   const firstLine = (link ? link.words : (share.text ?? "")).split("\n").map((l) => l.trim()).find(Boolean);
   if (firstLine) return clip(firstLine);
   if (link) return new URL(link.url).hostname.replace(/^www\./, "");
-  const n = share.pictures.length;
-  return n === 1 ? "A picture" : `${n} pictures`;
+  // Pictures alone say nothing a title could be made of: the writer gives it.
+  return "";
 }
 
 /**
  * What's shared as Markdown for a note: its words, each link kept as a link (Writer doesn't fetch the
- * page), the subject its words where a link came alone, then each picture saved on a line of its own.
+ * page), the subject its words where a link came alone, then each picture saved on a line of its own,
+ * its caption with it.
  */
-export function sharedMarkdown(share: Omit<Share, "id" | "received" | "pictures">, pictures: { url: string; alt: string }[]): string {
+export function sharedMarkdown(share: Omit<Share, "id" | "received" | "pictures">, pictures: { url: string; alt: string; caption?: string }[]): string {
   const parts: string[] = [];
   const text = share.text?.trim();
   if (text) {
@@ -113,7 +114,7 @@ export function sharedMarkdown(share: Omit<Share, "id" | "received" | "pictures"
     if (link && !link.words && share.subject) parts.push(`[${escapeText(share.subject)}](${link.url})`);
     else parts.push(...text.split(/\n\s*\n/).map((p) => p.trim().replace(LINK, (url) => `<${url}>`)));
   }
-  for (const p of pictures) parts.push(`![${escapeText(p.alt)}](${p.url})`);
+  for (const p of pictures) parts.push(`![${escapeText(p.alt)}](${p.url}${p.caption ? ` "${p.caption.replace(/\s+/g, " ").trim().replace(/["\\]/g, (c) => `\\${c}`)}"` : ""})`);
   return parts.length ? `${parts.join("\n\n")}\n` : "";
 }
 

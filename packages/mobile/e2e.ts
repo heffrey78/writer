@@ -549,7 +549,7 @@ try {
   adb("shell", "am", "start", "-a", "android.intent.action.SEND", "-t", "image/png", "--grant-read-uri-permission", "--eu", "android.intent.extra.STREAM", `content://${PACKAGE}.fileprovider/my_cache_images/toll-house.png`, "-n", `${PACKAGE}/.MainActivity`);
   await expect(page.getByRole("heading", { level: 1, name: "Save to Writer" })).toBeVisible();
   await expect(page.getByRole("combobox", { name: "Book" }).locator("option:checked")).toHaveText("The Bridge at Varn");
-  await page.getByRole("textbox", { name: "Description of the picture" }).fill("The toll house");
+  // Only the title asked for: a picture alone has none to start with. Its description is optional.
   await page.getByRole("textbox", { name: "Title" }).fill("The toll house");
   await page.getByRole("button", { name: "Save as a new note" }).click();
   await expect(page.getByRole("textbox", { name: "Note: The toll house" })).toBeVisible();

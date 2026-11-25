@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { parseProse, serializeProse } from "@writer/editor";
 import { pictureFile, sharedLink, sharedMarkdown, sharedTitle } from "../src/share/shares.ts";
 
 /** What's shared from another app, made into a note (#205). */
@@ -6,10 +7,13 @@ import { pictureFile, sharedLink, sharedMarkdown, sharedTitle } from "../src/sha
 const picture = { name: "IMG_2041.jpg", type: "image/jpeg", data: btoa("\xff\xd8\xff\xe0") };
 
 describe("a note made of what's shared", () => {
-  it("from a picture: titled for what it is, the picture on its own line", () => {
-    const share = { pictures: [picture] };
-    expect(sharedTitle(share)).toBe("A picture");
-    expect(sharedTitle({ pictures: [picture, picture, picture] })).toBe("3 pictures");
+  it("from a picture: no title made up, the picture on its own line, a description given as its caption", () => {
+    expect(sharedTitle({ pictures: [picture] })).toBe("");
+    expect(sharedTitle({ pictures: [picture, picture, picture] })).toBe("");
+    const captioned = sharedMarkdown({}, [{ url: "/images/a.jpg", alt: "Camping", caption: 'The "big" tent \\ by the lake' }]);
+    expect(captioned).toBe('![Camping](/images/a.jpg "The \\"big\\" tent \\\\ by the lake")\n');
+    // As the editor writes it: the note opens and saves byte for byte.
+    expect(serializeProse(parseProse(captioned))).toBe(captioned);
     expect(sharedMarkdown({}, [{ url: "/images/the-toll-house.jpg", alt: "The toll house" }])).toBe("![The toll house](/images/the-toll-house.jpg)\n");
     expect(sharedMarkdown({}, [{ url: "/images/a.jpg", alt: "A [rough] sketch" }, { url: "/images/b.jpg", alt: "Another" }])).toBe("![A \\[rough\\] sketch](/images/a.jpg)\n\n![Another](/images/b.jpg)\n");
   });

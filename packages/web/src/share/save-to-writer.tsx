@@ -65,8 +65,9 @@ const FIELD = "min-h-12 w-full rounded-md border border-rule bg-raised px-3 text
 /**
  * Save to Writer (#205): what another app shared (#204) goes into a book on the shelf, the one used
  * last first: as a new note, its title filled in from what's shared, or at the end of a note, picked
- * from the book's newest first. Each picture is described, resized and saved in images/; a link stays
- * a link with its words, and nothing is fetched. It's written on the phone at once and synced with the
+ * from the book's newest first. Only a new note's title is asked for. Each picture is resized and
+ * saved in images/, a description given shown under it as its caption; a link stays a link with its
+ * words, and nothing is fetched. It's written on the phone at once and synced with the
  * book; until it's written, the app keeps what was shared, to try again.
  */
 export function SaveToWriterPage() {
@@ -129,17 +130,13 @@ function SaveShare({ share, onDone }: { share: Share; onDone: () => void }) {
   const save = async (e: FormEvent) => {
     e.preventDefault();
     // What's still to fill in, said, and the field it's in focused: a Save that did nothing wouldn't say why.
-    const undescribed = descriptions.findIndex((d) => !d.trim());
-    const gap: [string, HTMLElement | null | undefined] | undefined =
-      undescribed >= 0
-        ? [files.length > 1 ? `Describe picture ${undescribed + 1}.` : "Describe the picture.", document.getElementById(`${ids.describe}-${undescribed}`)]
-        : !book
-          ? ["Choose a book.", document.getElementById(ids.book)]
-          : into === "new" && !title.trim()
-            ? ["Give the note a title.", document.getElementById(ids.title)]
-            : into === "add" && !noteId
-              ? ["Choose the note to add it to.", document.getElementById(ids.notes)?.querySelector<HTMLElement>("input") ?? document.getElementById(ids.search)]
-              : undefined;
+    const gap: [string, HTMLElement | null | undefined] | undefined = !book
+      ? ["Choose a book.", document.getElementById(ids.book)]
+      : into === "new" && !title.trim()
+        ? ["Give the note a title.", document.getElementById(ids.title)]
+        : into === "add" && !noteId
+          ? ["Choose the note to add it to.", document.getElementById(ids.notes)?.querySelector<HTMLElement>("input") ?? document.getElementById(ids.search)]
+          : undefined;
     setMissing(gap?.[0]);
     if (gap || !book) {
       gap?.[1]?.focus();
@@ -148,10 +145,14 @@ function SaveShare({ share, onDone }: { share: Share; onDone: () => void }) {
     setSaving(true);
     setProblem(undefined);
     try {
+      // A picture's description, if there's one, is its caption, shown under it. What screen readers
+      // say in its place is the note's title: a picture is never left with nothing to read.
+      const named = into === "new" ? title.trim() : (queryClient.getQueryData<{ novel: Book }>(keys.novel(book))?.novel.notes.find((n) => n.id === noteId)?.title ?? "A picture");
       const saved = [];
       for (const [i, file] of files.entries()) {
-        const alt = descriptions[i]!.trim();
-        saved.push({ url: `/${await savePicture(book, file, alt)}`, alt });
+        const alt = files.length > 1 ? `${named}, picture ${i + 1}` : named;
+        const caption = descriptions[i]!.trim() || undefined;
+        saved.push({ url: `/${await savePicture(book, file, caption ?? alt)}`, alt, caption });
       }
       const markdown = sharedMarkdown(share, saved);
       const note = into === "new" ? (await api.notes.create(book, { title: title.trim(), note: markdown })).id : await addToNote(book, noteId!, markdown);
@@ -169,39 +170,6 @@ function SaveShare({ share, onDone }: { share: Share; onDone: () => void }) {
   if (!books.length) return <p>There's no book on this phone to save it in. Start one, or clone one from GitHub, and share it again.</p>;
   return (
     <form noValidate onSubmit={(e) => void save(e)} className="grid gap-5">
-      <section aria-label="What was shared" className="grid gap-3 rounded-lg border border-rule bg-raised p-4">
-        {words && <p className="font-prose whitespace-pre-wrap">{words}</p>}
-        {link && (
-          <p className="flex items-center gap-2 break-all text-sm text-muted">
-            <Link2 className="size-4 shrink-0" aria-hidden /> <span className="sr-only">Link: </span>
-            {link.url}
-          </p>
-        )}
-        {share.pictures.map((p, i) => (
-          <div key={i} className="grid gap-2 sm:grid-cols-[8rem_minmax(0,1fr)] sm:items-start">
-            <img src={previews[i]} alt="" className="max-h-40 w-full rounded-md border border-rule bg-panel object-contain sm:w-32" />
-            <label className="grid gap-1.5 text-sm font-medium">
-              {share.pictures.length > 1 ? `Description of picture ${i + 1}` : "Description of the picture"}
-              <input
-                id={`${ids.describe}-${i}`}
-                required
-                aria-invalid={missing !== undefined && !descriptions[i]!.trim() ? true : undefined}
-                value={descriptions[i]}
-                onChange={(e) => setDescriptions((d) => d.map((x, j) => (j === i ? e.target.value : x)))}
-                aria-describedby={`${ids.title}-describe`}
-                className={FIELD}
-              />
-              <span className="font-normal text-muted">{p.name}</span>
-            </label>
-          </div>
-        ))}
-        {share.pictures.length > 0 && (
-          <p id={`${ids.title}-describe`} className="text-xs text-muted">
-            What the picture shows, read aloud by screen readers in place of it.
-          </p>
-        )}
-      </section>
-
       <label htmlFor={ids.book} className="grid gap-1.5 text-sm font-medium">
         Book
         <select id={ids.book} value={book} onChange={(e) => (setBookId(e.target.value), setNoteId(undefined))} className={FIELD}>
@@ -233,6 +201,37 @@ function SaveShare({ share, onDone }: { share: Share; onDone: () => void }) {
       ) : (
         book && <NotePicker bookId={book} value={noteId} onChange={setNoteId} searchId={ids.search} listId={ids.notes} />
       )}
+
+      <section aria-label="What was shared" className="grid gap-3 rounded-lg border border-rule bg-raised p-4">
+        {words && <p className="font-prose whitespace-pre-wrap">{words}</p>}
+        {link && (
+          <p className="flex items-center gap-2 break-all text-sm text-muted">
+            <Link2 className="size-4 shrink-0" aria-hidden /> <span className="sr-only">Link: </span>
+            {link.url}
+          </p>
+        )}
+        {share.pictures.map((p, i) => (
+          <div key={i} className="grid gap-2 sm:grid-cols-[8rem_minmax(0,1fr)] sm:items-start">
+            <img src={previews[i]} alt="" className="max-h-40 w-full rounded-md border border-rule bg-panel object-contain sm:w-32" />
+            <label className="grid gap-1.5 text-sm font-medium">
+              {share.pictures.length > 1 ? `Description of picture ${i + 1} (optional)` : "Description (optional)"}
+              <input
+                id={`${ids.describe}-${i}`}
+                value={descriptions[i]}
+                onChange={(e) => setDescriptions((d) => d.map((x, j) => (j === i ? e.target.value : x)))}
+                aria-describedby={`${ids.title}-describe`}
+                className={FIELD}
+              />
+              <span className="font-normal text-muted">{p.name}</span>
+            </label>
+          </div>
+        ))}
+        {share.pictures.length > 0 && (
+          <p id={`${ids.title}-describe`} className="text-xs text-muted">
+            Shown under the picture in the note.
+          </p>
+        )}
+      </section>
 
       {problem && (
         <ErrorAlert title="Couldn't save it">
