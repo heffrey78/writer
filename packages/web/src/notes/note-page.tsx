@@ -104,12 +104,13 @@ export function NotePage({
     await workspace.open([path]);
     await refresh();
   };
-  const setTags = async (text: string) => {
-    const list = [...new Set(text.split(",").map((t) => t.trim()).filter(Boolean))];
+  const setTags = async (chosen: string[]) => {
+    const list = [...new Set(chosen.map((t) => t.trim()).filter(Boolean))];
     await workspace.editFrontMatter(note.file, [list.length ? { path: ["tags"], value: list } : { path: ["tags"], remove: true }]).catch((e: unknown) => {
       show({ message: `Couldn't change the tags: ${e instanceof Error ? e.message : String(e)}` });
     });
   };
+  const bookTags = useMemo(() => [...new Set([...novel.notes, ...novel.entities].flatMap((x) => x.tags))].sort((a, b) => a.localeCompare(b)), [novel]);
   const sceneTitle = (id: string) => novel.allPieces.find((x) => x.id === id)?.title ?? id;
   const setScenes = async (scenes: string[]) => {
     try {
@@ -166,7 +167,22 @@ export function NotePage({
           </div>
         )}
         {place.editing === "tags" ? (
-          <TextEditor place={place} label="Tags" hint="Separated by commas." value={tags.join(", ")} onSave={setTags} />
+          // The tags the book already has, to choose from as well as new ones: one tag isn't written two ways.
+          <EditorFrame place={place}>
+            <Group label="Tags">
+              <Chips items={tags.map((t) => ({ id: t, label: t, remove: () => void setTags(tags.filter((x) => x !== t)) }))} />
+              <Picker
+                label="Add a tag"
+                items={bookTags.map((t) => ({ value: t, label: t }))}
+                value={undefined}
+                chosen={tags}
+                onChange={(v) => v && void setTags(tags.includes(v) ? tags.filter((x) => x !== v) : [...tags, v])}
+                placeholder="Add a tag…"
+                create={{ noun: "tag", create: (name) => name.replace(/,/g, " ").trim() || undefined }}
+              />
+            </Group>
+            <EditorButtons onCancel={() => place.done()} hint="Each change is saved as it's made · Esc returns" />
+          </EditorFrame>
         ) : tags.length ? (
           <div className="group flex flex-wrap items-center gap-1.5">
             <ul aria-label="Tags" className="flex flex-wrap gap-1.5">

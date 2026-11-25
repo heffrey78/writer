@@ -834,6 +834,23 @@ test("Save to Writer: a picture and a link shared from another app become a new 
   expect(note.split("---\n")[2]).toBe('\nToll houses of the valley <https://example.com/tolls>\n\n![The toll house, picture 1](/images/the-toll-house-from-the-bridge.png "The toll house from the bridge")\n\n![The toll house, picture 2](/images/the-toll-house-picture-2.png)\n');
   expect(existsSync(join(dir, "images/the-toll-house-from-the-bridge.png"))).toBe(true);
   expect(await left()).toEqual([]);
+
+  // The link in it, tapped: where it goes shown under it, to open, or to change its words and address.
+  const noteText = page.getByRole("textbox", { name: "Note: The toll house" });
+  await noteText.getByRole("link").tap();
+  const bar = page.getByRole("toolbar", { name: "Link" });
+  await expect(bar).toBeVisible();
+  await expect(bar).toContainText("https://example.com/tolls");
+  for (const name of ["Open", "Edit", "Remove link"]) expect((await bar.getByRole("button", { name }).boundingBox())!.height).toBeGreaterThanOrEqual(48);
+  await audit(page);
+  await bar.getByRole("button", { name: "Edit" }).tap();
+  await bar.getByRole("textbox", { name: "Text" }).fill("The valley's toll houses");
+  await bar.getByRole("textbox", { name: "Link" }).fill("https://example.com/tolls/valley");
+  await fits(page);
+  await bar.getByRole("button", { name: "Save" }).tap();
+  await expect(noteText.getByRole("link", { name: "The valley's toll houses" })).toBeVisible();
+  await expect.poll(() => readFileSync(join(dir, "notes/the-toll-house.md"), "utf8")).toContain("Toll houses of the valley [The valley's toll houses](https://example.com/tolls/valley)\n");
+
   // Let go: a reload doesn't bring it back.
   await page.reload();
   await expect(page.getByRole("heading", { level: 1, name: "Save to Writer" })).toHaveCount(0);

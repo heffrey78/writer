@@ -19,6 +19,7 @@ import { LinkSuggestExtension, linkSuggestKey } from "./link-suggest.ts";
 import type { NotName } from "@writer/core";
 import { MentionInfoExtension, type MentionTarget } from "./mention-info.ts";
 import { PicturesExtension, type PictureCallbacks } from "./pictures.ts";
+import { LinksExtension } from "./links.ts";
 import { TrailingParagraphExtension } from "./trailing.ts";
 import { MentionSuggestExtension, type MentionEntity, type MentionType } from "./mention-suggest.ts";
 import { SpellCheckExtension, type SpellService } from "./spell.ts";
@@ -256,6 +257,7 @@ export function SceneEditor({
       mentionInfo,
       FootnotesExtension,
       picturesExtension,
+      LinksExtension,
       ...movingAround,
       Placeholder.configure({ placeholder }),
     ],
@@ -426,7 +428,7 @@ export function ChapterEditor({
   }).current;
 
   const editor = useEditor({
-    extensions: [...withPictures(chapterContent, pictureUrl).map((e) => ((e as unknown) === Scene ? Scene.configure({ label: words.piece.One }) : e)), UndoRedo, SelectFocusExtension, issueMarksExtension, pinnedLines, WritingModesExtension, WordCountExtension, DictationExtension, FindExtension, SearchHighlightExtension, spellExtension, ...mentionExtension, mentionInfo, FootnotesExtension, picturesExtension, ...movingAround],
+    extensions: [...withPictures(chapterContent, pictureUrl).map((e) => ((e as unknown) === Scene ? Scene.configure({ label: words.piece.One }) : e)), UndoRedo, SelectFocusExtension, issueMarksExtension, pinnedLines, WritingModesExtension, WordCountExtension, DictationExtension, FindExtension, SearchHighlightExtension, spellExtension, ...mentionExtension, mentionInfo, FootnotesExtension, picturesExtension, LinksExtension, ...movingAround],
     editorProps: {
       attributes: { role: "textbox", "aria-multiline": "true", "aria-label": label, class: "ghw-prose ghw-chapter" },
     },
