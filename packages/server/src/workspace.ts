@@ -1,4 +1,4 @@
-import { EVENT_FILES_FORMAT, kindByKey, knownKind, loadBook, MANIFEST, parseYaml, picturePath, pictures, readManifest, SCHEMA_VERSION, slugify, uniqueFileName, V2_KIND, type BookKind, type FileSource, type Book } from "@writer/core";
+import { EVENT_FILES_FORMAT, kindByKey, knownKind, loadBook, MANIFEST, parseYaml, picturePath, pictures, picturesShown, readManifest, SCHEMA_VERSION, slugify, uniqueFileName, V2_KIND, type BookKind, type FileSource, type Book } from "@writer/core";
 import { BibleOperations } from "./bible.ts";
 import { moduleServices, type ModuleService } from "./modules.ts";
 import { Checkpoints } from "./checkpoints.ts";
@@ -299,12 +299,13 @@ export class NovelWorkspace {
   }
 
   /**
-   * After a piece is saved: a picture it no longer names, that no other piece, entry or the cover does,
-   * has its file deleted (no picture is left behind in images/); one it names again whose file this
+   * After a piece or a note is saved (#200): a picture it no longer names, that nothing else in the
+   * book shows (a piece, a note, an entry, the cover), has its file deleted (no picture is left behind in images/); one it names again whose file this
    * deleted is put back.
    */
   async #prosePictures(path: string, before: string, after: string): Promise<void> {
-    if (!path.startsWith(`${this.kind.folders.content}/`) || !path.endsWith(".md")) return;
+    const { content, notes } = this.kind.folders;
+    if (!(path.startsWith(`${content}/`) || path.startsWith(`${notes}/`)) || !path.endsWith(".md")) return;
     const named = (text: string) => new Set(pictures(text).flatMap((p) => picturePath(p.src) ?? []));
     const was = named(before);
     const now = named(after);
@@ -317,8 +318,7 @@ export class NovelWorkspace {
     const gone = [...was].filter((p) => !now.has(p) && p.startsWith(`${IMAGES_DIR}/`));
     if (!gone.length) return;
     const novel = await loadBook(bookSource(this.root));
-    const kept = new Set<string | undefined>([novel.config?.cover, ...novel.entities.map((e) => e.image)]);
-    for (const scene of novel.allPieces) for (const p of pictures(scene.body)) kept.add(picturePath(p.src));
+    const kept = picturesShown(novel);
     for (const picture of gone.filter((p) => !kept.has(p))) {
       const image = await servableImage(this.root, picture).catch(() => undefined);
       const bytes = image && (await filesPort().read(image.full));

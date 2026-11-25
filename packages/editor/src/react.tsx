@@ -110,7 +110,7 @@ function keepDialogFocus({ editor }: { editor: Editor }) {
   });
 }
 
-/** Pictures dropped, pasted or changed (Enter or a double-click on one), handed to the latest `pictures` prop. */
+/** Pictures dropped, pasted, changed (Enter or a double-click on one) or replaced (Change… on its toolbar), handed to the latest `pictures` prop. */
 function usePicturesExtension(callbacks: PictureCallbacks | undefined) {
   const latest = useRef(callbacks);
   latest.current = callbacks;
@@ -118,6 +118,7 @@ function usePicturesExtension(callbacks: PictureCallbacks | undefined) {
     callbacks: () => ({
       ...(latest.current?.add ? { add: (files: File[], at: number) => latest.current?.add?.(files, at) } : {}),
       ...(latest.current?.edit ? { edit: (at: number) => latest.current?.edit?.(at) } : {}),
+      ...(latest.current?.change ? { change: (at: number) => latest.current?.change?.(at) } : {}),
     }),
   });
 }

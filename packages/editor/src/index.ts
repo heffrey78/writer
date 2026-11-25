@@ -3,7 +3,7 @@ export { parseProse, serializeProse } from "./markdown.ts";
 export { joinSceneFile, splitSceneFile, type SceneFile } from "./scene-file.ts";
 export { insertSectionBreak, Picture, proseContent, type PictureOptions } from "./extensions.ts";
 export { insertTable, setHeading, structureCommands } from "./structure.ts";
-export { insertPicture, pictureAt, PicturesExtension, setPicture, type PictureAttrs, type PictureCallbacks } from "./pictures.ts";
+export { insertPicture, movePicture, pictureAt, PicturesExtension, removePicture, setPicture, type PictureAttrs, type PictureCallbacks } from "./pictures.ts";
 export { getMarkdown, loadMarkdown, setInitialMarkdown } from "./editor.ts";
 export { sound, spellNames, spokenPhrase, type Spoken, type SpokenName } from "./spoken.ts";
 export { DICTATE_KEYS, DictationExtension, heardText, holdHeard, joinPhrase, leaveDictation, offerDictation, settleHeard, showHeard, type DictationOffer, type HeldPhrase } from "./dictation.ts";

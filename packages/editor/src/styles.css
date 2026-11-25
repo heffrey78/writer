@@ -252,6 +252,45 @@ img.ProseMirror-separator {
   border-radius: 2px;
 }
 
+/* A selected picture's Describe…, Change… and Remove (#200), over its top right corner. */
+.ghw-picture-toolbar {
+  position: absolute;
+  z-index: 30;
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--ghw-rule);
+  border-radius: 6px;
+  background: var(--ghw-paper);
+  color: var(--ghw-ink);
+  font: 0.8125rem/1.2 var(--ghw-ui-font, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.15);
+}
+
+.ghw-picture-toolbar[hidden],
+.ghw-picture-toolbar button[hidden] {
+  display: none;
+}
+
+.ghw-picture-toolbar button {
+  min-height: 2rem;
+  padding: 0 0.6rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.ghw-picture-toolbar button:hover {
+  background: var(--ghw-accent-soft);
+}
+
+/* A finger's size on a touch screen. */
+@media (pointer: coarse) {
+  .ghw-picture-toolbar button {
+    min-height: 3rem;
+    padding: 0 0.9rem;
+  }
+}
+
 /* Where something dragged will land, and the caret between two blocks that aren't text. */
 .ghw-dropcursor {
   background: var(--ghw-accent);

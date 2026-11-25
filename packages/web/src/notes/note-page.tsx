@@ -1,9 +1,9 @@
-import { imageUrl } from "@writer/client";
 import { pieceSections, plural, readFrontMatter, vocabulary, word, type Book, type Note } from "@writer/core";
 import { joinSceneFile } from "@writer/editor";
 import { SceneEditor, type SpellService } from "@writer/editor/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowUpRight, Trash2 } from "lucide-react";
+import type { Editor } from "@tiptap/core";
+import { ArrowUpRight, ImagePlus, Trash2 } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 import { useStore } from "zustand";
@@ -21,6 +21,7 @@ import type { Workspace } from "../novel/workspace.ts";
 import { ErrorAlert } from "../ui/alert.tsx";
 import { Button } from "../ui/button.tsx";
 import { Confirm } from "../ui/confirm.tsx";
+import { usePictures } from "../novel/use-pictures.tsx";
 import { PromoteNoteDialog } from "./promote.tsx";
 
 /**
@@ -62,7 +63,16 @@ export function NotePage({
   // What it can become: what the kind's modules make of a note ("an event"), or a piece.
   const into = moduleRecordTypes(novel.kind).flatMap((t) => (t.fromNote ? [word({ label: t.def.noun.short ?? t.def.noun.label, plural: plural(t.def.noun.short ?? t.def.noun.label) })] : []));
   const becomes = [...into.map((x) => x.a), w.piece.a].join(" or ");
-  useCommands(() => [{ id: "note.promote", title: `Make “${note.title}” ${becomes}`, group: "Notes", keywords: ["promote", ...into.map((x) => x.one), w.piece.one], run: () => setPromoting(true) }], [note.title, w, becomes]);
+  // Pictures, as a scene takes them (#200): dropped, pasted, from Add a picture or the palette.
+  const [editor, setEditor] = useState<Editor>();
+  const { pictureUrl, picturesFor, ask: askPicture, dialog: pictureDialog } = usePictures(novelId);
+  useCommands(
+    () => [
+      { id: "note.promote", title: `Make “${note.title}” ${becomes}`, group: "Notes", keywords: ["promote", ...into.map((x) => x.one), w.piece.one], run: () => setPromoting(true) },
+      { id: "note.insertPicture", title: "Insert a picture…", group: "Notes", keywords: ["image", "map", "handout", "photo"], run: () => askPicture(editor) },
+    ],
+    [note.title, w, becomes, editor],
+  );
 
   // A note just made: the caret goes into its prose, ready to write (heffrey78/gh-writer#222).
   const { state } = useLocation() as { state: { focusProse?: boolean } | null };
@@ -121,6 +131,9 @@ export function NotePage({
       <div className="grid gap-1.5">
         <div className="flex flex-wrap items-center gap-2 pr-8">
           <p className="flex-1 text-sm text-muted">Note{note.created && ` · ${realDay(note.created)}`}</p>
+          <Button variant="ghost" size="sm" onClick={() => askPicture(editor)} disabled={!editor}>
+            <ImagePlus className="size-4" aria-hidden /> Add a picture
+          </Button>
           <Button variant="ghost" size="sm" onClick={() => setPromoting(true)}>
             <ArrowUpRight className="size-4" aria-hidden /> Make it {becomes}
           </Button>
@@ -224,7 +237,9 @@ export function NotePage({
               markdown={file.body}
               onChange={(md) => workspace.change(note.file, md)}
               entities={mentions}
-              pictureUrl={(path) => imageUrl(novelId, path)}
+              pictureUrl={pictureUrl}
+              pictures={picturesFor(() => editor)}
+              onReady={setEditor}
               className="ghw-notes"
               {...(spell ? { spell } : {})}
             />
@@ -234,6 +249,7 @@ export function NotePage({
         )}
       </section>
 
+      {pictureDialog}
       {promoting && <PromoteNoteDialog novelId={novelId} novel={novel} workspace={workspace} note={note} flush={() => workspace.autosave.flush()} open onOpenChange={setPromoting} />}
       <Confirm open={deleting} onOpenChange={setDeleting} title={`Delete “${note.title}”?`} description={`The note goes from the ${w.book.one}. It stays in the history.`} action="Delete" danger onConfirm={() => remove.mutate()} />
       {remove.isError && <ErrorAlert title="Couldn't delete it">{remove.error.message}</ErrorAlert>}

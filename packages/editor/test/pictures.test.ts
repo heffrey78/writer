@@ -4,7 +4,7 @@ import { Editor } from "@tiptap/core";
 import { UndoRedo } from "@tiptap/extensions";
 import { NodeSelection, TextSelection } from "@tiptap/pm/state";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { chapterContent, getMarkdown, insertPicture, loadChapter, loadMarkdown, pictureAt, PicturesExtension, proseContent, serializeChapter, setPicture, type PictureCallbacks } from "../src/index.ts";
+import { chapterContent, getMarkdown, insertPicture, loadChapter, loadMarkdown, movePicture, pictureAt, PicturesExtension, proseContent, removePicture, serializeChapter, setPicture, type PictureCallbacks } from "../src/index.ts";
 
 /** Pictures put in, changed and handed to the app (D10, heffrey78/gh-writer#203). */
 
@@ -95,5 +95,66 @@ describe("a picture in the text", () => {
     editor.view.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, inText("More"))));
     enter();
     expect(edit).toHaveBeenCalledTimes(1);
+  });
+
+  test("given a url, shows another picture, its line alone rewritten", () => {
+    open(md);
+    const at = editor.state.doc.firstChild!.nodeSize;
+    setPicture(editor, at, { url: "/images/map-2.jpg", alt: "Old", caption: "Old caption" });
+    expect(getMarkdown(editor)).toBe('Some _emphasis_ here.\n\n![Old](/images/map-2.jpg "Old caption")\n\nMore  text.\n');
+  });
+
+  test("is removed, the caret where it was", () => {
+    open(md);
+    expect(removePicture(editor, editor.state.doc.firstChild!.nodeSize)).toBe(true);
+    expect(getMarkdown(editor)).toBe("Some _emphasis_ here.\n\nMore  text.\n");
+    expect(removePicture(editor, 0)).toBe(false);
+  });
+});
+
+describe("moving a picture (#200)", () => {
+  const md = "One.\n\n![A](/images/a.jpg)\n\n![B](/images/b.jpg)\n\nTwo.\n";
+  const pos = (n: number) => {
+    let at = 0;
+    for (let i = 0; i < n; i++) at += editor.state.doc.child(i).nodeSize;
+    return at;
+  };
+  const alt = (e: string) => editor.view.someProp("handleKeyDown", (f) => f(editor.view, new KeyboardEvent("keydown", { key: e, altKey: true })));
+
+  test("Alt+↑ and Alt+↓ move it past the block before or after, still selected", () => {
+    open(md);
+    editor.view.dispatch(editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, pos(1))));
+    expect(alt("ArrowUp")).toBe(true);
+    expect(getMarkdown(editor)).toBe("![A](/images/a.jpg)\n\nOne.\n\n![B](/images/b.jpg)\n\nTwo.\n");
+    expect(pictureAt(editor, (editor.state.selection as NodeSelection).from)?.alt).toBe("A");
+    // At the start it stays.
+    expect(alt("ArrowUp")).toBe(true);
+    expect(editor.state.doc.child(0).attrs.alt).toBe("A");
+    alt("ArrowDown");
+    alt("ArrowDown");
+    expect(getMarkdown(editor)).toBe("One.\n\n![B](/images/b.jpg)\n\n![A](/images/a.jpg)\n\nTwo.\n");
+    expect((editor.state.selection as NodeSelection).node.attrs.alt).toBe("A");
+  });
+
+  test("goes past the empty line left after a picture put in, to the next block with something in it", () => {
+    open("One.\n\n![B](/images/b.jpg)\n\nTwo.\n");
+    insertPicture(editor, { url: "/images/a.jpg", alt: "A" }, inText("One"));
+    // One, A, an empty paragraph, B, Two.
+    expect(editor.state.doc.child(2).childCount).toBe(0);
+    expect(movePicture(editor, pos(1), 1)).toBe(true);
+    expect(getMarkdown(editor)).toBe("One.\n\n![B](/images/b.jpg)\n\n![A](/images/a.jpg)\n\nTwo.\n");
+    expect((editor.state.selection as NodeSelection).node.attrs.alt).toBe("A");
+    expect(movePicture(editor, (editor.state.selection as NodeSelection).from, -1)).toBe(true);
+    expect(getMarkdown(editor)).toBe("One.\n\n![A](/images/a.jpg)\n\n![B](/images/b.jpg)\n\nTwo.\n");
+  });
+
+  test("Alt+arrows on text are left alone, and movePicture says when it can't", () => {
+    open(md);
+    editor.view.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, inText("One"))));
+    expect(alt("ArrowDown")).toBeFalsy();
+    expect(movePicture(editor, pos(2), 1)).toBe(true);
+    expect(getMarkdown(editor)).toBe("One.\n\n![A](/images/a.jpg)\n\nTwo.\n\n![B](/images/b.jpg)\n");
+    expect(movePicture(editor, pos(3), 1)).toBe(false);
+    expect(movePicture(editor, pos(0), 1)).toBe(false);
   });
 });

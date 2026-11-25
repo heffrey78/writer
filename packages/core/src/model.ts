@@ -306,6 +306,24 @@ export function picturePath(src: string): string | undefined {
   return path.slice(1);
 }
 
+/**
+ * The pictures `book` shows, as repository paths: its cover, its entries' pictures, and those in the
+ * prose of its pieces, notes and modules' records (#200). A picture's file is deleted only when it
+ * isn't here. `except`: the entry whose own picture doesn't count ("novel" for the cover), as it goes.
+ */
+export function picturesShown(book: Book, { except }: { except?: string } = {}): Set<string> {
+  const shown = new Set<string>();
+  if (book.config?.cover && except !== "novel") shown.add(book.config.cover);
+  for (const e of book.entities) if (e.image && e.id !== except) shown.add(e.image);
+  for (const r of [...book.allPieces, ...book.notes, ...book.moduleRecords]) {
+    for (const p of pictures(r.body)) {
+      const path = picturePath(p.src);
+      if (path) shown.add(path);
+    }
+  }
+  return shown;
+}
+
 /** Entity mentions (`[Name](#id)`) in Markdown prose. */
 export function mentions(body: string): Mention[] {
   const out: Mention[] = [];
