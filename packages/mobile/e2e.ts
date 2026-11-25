@@ -526,6 +526,9 @@ try {
   let pictured = "";
   for (let i = 0; i < 40 && !pictured; i++, await sleep(250)) pictured = inApp("grep -l \"a-sketch-of-the-toll-house\" books/varn/notes/what-if-ben-never-sold.md || true").trim();
   if (!pictured) throw new Error("The picture wasn't saved in the note on the phone.");
+  // The note's modal closed, Android's back, for the book's Sync.
+  adb("shell", "input", "keyevent", "KEYCODE_BACK");
+  adb("shell", "input", "keyevent", "KEYCODE_BACK");
   await page.getByRole("button", { name: /^Sync: / }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Sync now" }).click();
   let onGitHub = false;
@@ -535,14 +538,13 @@ try {
 
   // Shared from another app (#204, #205), as Android's share sheet sends it: a picture from the
   // phone's photos, then a link with its words, each to Save to Writer, into the novel, offline.
-  adb("push", "-q", join(repo, "packages/mobile/src-tauri/icons/128x128.png"), "/sdcard/Pictures/toll-house.png");
-  adb("shell", "am", "broadcast", "-a", "android.intent.action.MEDIA_SCANNER_SCAN_FILE", "-d", "file:///sdcard/Pictures/toll-house.png");
-  let media = "";
-  for (let i = 0; i < 40 && !media; i++, await sleep(250)) media = /_id=(\d+)/.exec(adb("shell", "content", "query", "--uri", "content://media/external/images/media", "--projection", "_id", "--where", "\"_display_name='toll-house.png'\""))?.[1] ?? "";
-  if (!media) throw new Error("The picture isn't in the phone's photos.");
+  // The picture behind the app's own FileProvider (its cache), standing in for a photos app's: one
+  // that grants Writer reading it, which a share from adb's shell can't.
+  adb("push", "-q", join(repo, "packages/mobile/src-tauri/icons/128x128.png"), "/data/local/tmp/toll-house.png");
+  inApp("mkdir -p cache && cp /data/local/tmp/toll-house.png cache/toll-house.png");
   adb("shell", "svc", "wifi", "disable");
   adb("shell", "svc", "data", "disable");
-  adb("shell", "am", "start", "-a", "android.intent.action.SEND", "-t", "image/png", "--grant-read-uri-permission", "--eu", "android.intent.extra.STREAM", `content://media/external/images/media/${media}`, "-n", `${PACKAGE}/.MainActivity`);
+  adb("shell", "am", "start", "-a", "android.intent.action.SEND", "-t", "image/png", "--grant-read-uri-permission", "--eu", "android.intent.extra.STREAM", `content://${PACKAGE}.fileprovider/my_cache_images/toll-house.png`, "-n", `${PACKAGE}/.MainActivity`);
   await expect(page.getByRole("heading", { level: 1, name: "Save to Writer" })).toBeVisible();
   await expect(page.getByRole("combobox", { name: "Book" }).locator("option:checked")).toHaveText("The Bridge at Varn");
   await page.getByRole("textbox", { name: "Description of the picture" }).fill("The toll house");
@@ -561,6 +563,8 @@ try {
   if (inApp("ls files/shared 2>/dev/null || true").trim()) throw new Error("What was shared is still kept after it was written.");
   adb("shell", "svc", "wifi", "enable");
   adb("shell", "svc", "data", "enable");
+  // The book's page, for its Sync.
+  await page.goto(`${new URL(page.url()).origin}${new URL(page.url()).pathname.split("/").slice(0, 3).join("/")}`);
   await page.getByRole("button", { name: /^Sync: / }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Sync now" }).click();
   let sharedOnGitHub = false;

@@ -49,9 +49,10 @@ const keepFocus = (e: MouseEvent) => e.preventDefault();
 
 /**
  * On a phone, while writing (#96): what's wanted at hand, on top of the keyboard, without leaving the
- * text. Commands (the palette), then `dictate` where the device can hear, Undo, Redo, @ to mention,
- * a picture where pictures can go (#203), and the selected text's actions while there's a selection;
- * last, Hide the keyboard. Every target is at least 48 px, a finger's.
+ * text. Commands (the palette), then `dictate` where the device can hear, Undo, Redo, then @ to
+ * mention and a picture where pictures can go (#203), or, while there's a selection, its actions in
+ * their place; last, Hide the keyboard. Every target is at least 48 px, a finger's, and they fit a
+ * phone's width.
  */
 export function WritingBar({ editor, dictate, selection, picture }: { editor: Editor | undefined; dictate?: ReactNode; selection: BarAction[]; picture?: (file: File) => void }) {
   useEditorChanges(editor);
@@ -63,8 +64,9 @@ export function WritingBar({ editor, dictate, selection, picture }: { editor: Ed
       {dictate}
       <BarButton label="Undo" icon={Undo2} disabled={!live?.can().undo()} onPress={() => live?.commands.undo()} />
       <BarButton label="Redo" icon={Redo2} disabled={!live?.can().redo()} onPress={() => live?.commands.redo()} />
-      <BarButton label="Mention" icon={AtSign} disabled={!live} onPress={() => live && mention(live)} />
-      {picture && <PictureButton disabled={!live} onPicture={picture} />}
+      {/* What goes in at the caret, while there's no selection: with one, its actions in their place, so the bar fits a phone. */}
+      {!selected && <BarButton label="Mention" icon={AtSign} disabled={!live} onPress={() => live && mention(live)} />}
+      {!selected && picture && <PictureButton disabled={!live} onPicture={picture} />}
       {/* One in words; more as their icons, or they'd run off a phone's screen. */}
       {selected &&
         selection.map((a) => (

@@ -258,7 +258,7 @@ export function NotePage({
 
       {writing && (
         <div className="sticky bottom-0 z-10 -mx-2 border-t border-rule bg-paper px-2 py-1">
-          <WritingBar editor={editor} dictate={<DictateButton editor={editor} />} selection={[]} picture={(file) => askPicture(editor, file)} />
+          <WritingBar editor={editor} dictate={<DictateButton editor={editor} bar />} selection={[]} picture={(file) => askPicture(editor, file)} />
         </div>
       )}
       {pictureDialog}

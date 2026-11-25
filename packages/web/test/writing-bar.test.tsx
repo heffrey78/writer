@@ -49,4 +49,14 @@ describe("the writing bar", () => {
     fireEvent.click(screen.getByRole("button", { name: "Picture" }));
     for (const b of screen.getAllByRole("button")) expect(b.className).toMatch(/\bh-12\b/);
   });
+
+  it("with a selection, puts its actions in place of Mention and Picture, so the bar fits a phone", () => {
+    const e = editor();
+    e.commands.setContent("<p>The ford floods.</p>");
+    e.commands.setTextSelection({ from: 1, to: 4 });
+    render(<WritingBar editor={e} selection={[{ label: "Raise an issue…", run: () => {} }, { label: "Add to an entry…", run: () => {} }]} picture={() => {}} />);
+    expect(screen.queryByRole("button", { name: "Mention" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Picture" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Add to an entry…" })).toBeTruthy();
+  });
 });

@@ -767,7 +767,7 @@ function StatusBar({ novelId, workspace, editor, selection, picture }: { novelId
   if (writing)
     return (
       <div className={cn("sticky z-10 border-t border-rule bg-paper px-2 py-1 text-[13px] text-muted", above)}>
-        <WritingBar editor={editor} dictate={<DictateButton editor={editor} />} selection={selection} picture={picture} />
+        <WritingBar editor={editor} dictate={<DictateButton editor={editor} bar />} selection={selection} picture={picture} />
       </div>
     );
   if (hidden) return null;
