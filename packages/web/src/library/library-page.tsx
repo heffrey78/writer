@@ -19,6 +19,7 @@ import { SHAPES } from "../bible/pictures.ts";
 import { CloneDialog, NewNovelDialog, OpenFolderDialog } from "./add-dialogs.tsx";
 import { onAndroid } from "../platform.ts";
 import { Cover } from "./cover.tsx";
+import { SharesWaiting } from "../share/save-to-writer.tsx";
 import { DeleteBook } from "./delete-book.tsx";
 
 export type AddMode = "new" | "open" | "clone";
@@ -95,6 +96,8 @@ export function LibraryPage() {
       <p role="status" className="mt-2 text-sm empty:hidden">
         {said}
       </p>
+
+      <SharesWaiting />
 
       <FromGhWriter books={library.data?.ghWriter ?? []} />
 

@@ -13,26 +13,50 @@ import { ErrorAlert } from "../ui/alert.tsx";
 import { Button } from "../ui/button.tsx";
 import { Confirm } from "../ui/confirm.tsx";
 import { cn } from "../ui/cn.ts";
-import { onShared, pendingShares, pictureFile, shareDone, sharedLink, sharedMarkdown, sharedTitle, type Share } from "./shares.ts";
+import { markOpened, onShared, openedShares, pendingShares, pictureFile, shareDone, sharedLink, sharedMarkdown, sharedTitle, type Share } from "./shares.ts";
 
 /**
  * Something shared with Writer from another app (#204) opens Save to Writer: what was shared before
- * the app started, as it starts, and what's shared while it's open, as it comes.
+ * the app started, as it starts, and what's shared while it's open, as it comes. Only what it hasn't
+ * shown yet: one left for later (Not now, or Back) waits on the shelf, and the writer isn't sent back.
  */
 export function ShareWatcher() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const here = useRef(pathname);
   here.current = pathname;
+  // React Router's navigate changes with the page: looked at once, on start, and when something comes.
+  const go = useRef(navigate);
+  go.current = navigate;
   useEffect(() => {
     const look = () =>
       void pendingShares().then((shares) => {
-        if (shares.length && here.current !== "/share") void navigate("/share");
+        const opened = openedShares();
+        if (shares.some((s) => !opened.has(s.id)) && here.current !== "/share") void go.current("/share");
       });
     look();
     return onShared(look);
-  }, [navigate]);
+  }, []);
   return null;
+}
+
+/** On the shelf, what's been shared and left for later, to save. */
+export function SharesWaiting() {
+  const [shares, setShares] = useState<Share[]>([]);
+  useEffect(() => {
+    const load = () => void pendingShares().then(setShares);
+    load();
+    return onShared(load);
+  }, []);
+  if (!shares.length) return null;
+  return (
+    <p className="mt-4 rounded-md border border-rule bg-raised px-3 py-2 text-sm">
+      {shares.length === 1 ? "Something you shared with Writer isn't saved yet." : `${shares.length} things you shared with Writer aren't saved yet.`}{" "}
+      <Link to="/share" className="text-accent underline underline-offset-[3px]">
+        Save to Writer
+      </Link>
+    </p>
+  );
 }
 
 /** A finger's size for every control here: 48 px. */
@@ -48,7 +72,11 @@ const FIELD = "min-h-12 w-full rounded-md border border-rule bg-raised px-3 text
 export function SaveToWriterPage() {
   const [shares, setShares] = useState<Share[]>();
   useEffect(() => {
-    const load = () => void pendingShares().then(setShares);
+    const load = () =>
+      void pendingShares().then((shares) => {
+        markOpened(shares);
+        setShares(shares);
+      });
     load();
     return onShared(load);
   }, []);
@@ -78,7 +106,7 @@ export function SaveToWriterPage() {
 function SaveShare({ share, onDone }: { share: Share; onDone: () => void }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const ids = { book: useId(), title: useId(), into: useId(), search: useId() };
+  const ids = { book: useId(), title: useId(), into: useId(), search: useId(), notes: useId(), describe: useId(), missing: useId() };
   const library = useQuery({ queryKey: keys.library, queryFn: api.library });
   // The book used last first.
   const books = useMemo(() => [...(library.data?.novels ?? [])].sort((a, b) => b.lastOpened.localeCompare(a.lastOpened)), [library.data]);
@@ -94,12 +122,29 @@ function SaveShare({ share, onDone }: { share: Share; onDone: () => void }) {
   const [problem, setProblem] = useState<string>();
   const [saving, setSaving] = useState(false);
   const [discarding, setDiscarding] = useState(false);
+  const [missing, setMissing] = useState<string>();
   const link = sharedLink(share);
   const words = link ? link.words : share.text;
 
   const save = async (e: FormEvent) => {
     e.preventDefault();
-    if (!book || (into === "add" && !noteId) || (into === "new" && !title.trim()) || descriptions.some((d) => !d.trim())) return;
+    // What's still to fill in, said, and the field it's in focused: a Save that did nothing wouldn't say why.
+    const undescribed = descriptions.findIndex((d) => !d.trim());
+    const gap: [string, HTMLElement | null | undefined] | undefined =
+      undescribed >= 0
+        ? [files.length > 1 ? `Describe picture ${undescribed + 1}.` : "Describe the picture.", document.getElementById(`${ids.describe}-${undescribed}`)]
+        : !book
+          ? ["Choose a book.", document.getElementById(ids.book)]
+          : into === "new" && !title.trim()
+            ? ["Give the note a title.", document.getElementById(ids.title)]
+            : into === "add" && !noteId
+              ? ["Choose the note to add it to.", document.getElementById(ids.notes)?.querySelector<HTMLElement>("input") ?? document.getElementById(ids.search)]
+              : undefined;
+    setMissing(gap?.[0]);
+    if (gap) {
+      gap[1]?.focus();
+      return;
+    }
     setSaving(true);
     setProblem(undefined);
     try {
@@ -123,7 +168,7 @@ function SaveShare({ share, onDone }: { share: Share; onDone: () => void }) {
   if (library.isPending) return <p className="text-muted">Opening your books…</p>;
   if (!books.length) return <p>There's no book on this phone to save it in. Start one, or clone one from GitHub, and share it again.</p>;
   return (
-    <form onSubmit={(e) => void save(e)} className="grid gap-5">
+    <form noValidate onSubmit={(e) => void save(e)} className="grid gap-5">
       <section aria-label="What was shared" className="grid gap-3 rounded-lg border border-rule bg-raised p-4">
         {words && <p className="font-prose whitespace-pre-wrap">{words}</p>}
         {link && (
@@ -138,7 +183,9 @@ function SaveShare({ share, onDone }: { share: Share; onDone: () => void }) {
             <label className="grid gap-1.5 text-sm font-medium">
               {share.pictures.length > 1 ? `Description of picture ${i + 1}` : "Description of the picture"}
               <input
+                id={`${ids.describe}-${i}`}
                 required
+                aria-invalid={missing !== undefined && !descriptions[i]!.trim() ? true : undefined}
                 value={descriptions[i]}
                 onChange={(e) => setDescriptions((d) => d.map((x, j) => (j === i ? e.target.value : x)))}
                 aria-describedby={`${ids.title}-describe`}
@@ -181,10 +228,10 @@ function SaveShare({ share, onDone }: { share: Share; onDone: () => void }) {
       {into === "new" ? (
         <label htmlFor={ids.title} className="grid gap-1.5 text-sm font-medium">
           Title
-          <input id={ids.title} required value={title} onChange={(e) => setTitle(e.target.value)} className={FIELD} />
+          <input id={ids.title} required aria-invalid={missing !== undefined && !title.trim() ? true : undefined} value={title} onChange={(e) => setTitle(e.target.value)} className={FIELD} />
         </label>
       ) : (
-        book && <NotePicker bookId={book} value={noteId} onChange={setNoteId} searchId={ids.search} />
+        book && <NotePicker bookId={book} value={noteId} onChange={setNoteId} searchId={ids.search} listId={ids.notes} />
       )}
 
       {problem && (
@@ -192,11 +239,17 @@ function SaveShare({ share, onDone }: { share: Share; onDone: () => void }) {
           {problem} What was shared is kept: try again.
         </ErrorAlert>
       )}
+      <p id={ids.missing} role="alert" className="text-sm font-medium text-danger empty:hidden">
+        {missing}
+      </p>
       <div className="flex flex-wrap justify-end gap-2">
         <Button className="min-h-12" onClick={() => setDiscarding(true)} disabled={saving}>
           Discard
         </Button>
-        <Button type="submit" variant="primary" className="min-h-12 px-5" disabled={saving || (into === "add" && !noteId) || (into === "new" && !title.trim()) || descriptions.some((d) => !d.trim())}>
+        <Button className="min-h-12" onClick={() => void navigate("/")} disabled={saving}>
+          Not now
+        </Button>
+        <Button type="submit" variant="primary" className="min-h-12 px-5" aria-describedby={missing ? ids.missing : undefined} disabled={saving}>
           {saving ? "Saving…" : into === "new" ? "Save as a new note" : "Add to the note"}
         </Button>
       </div>
@@ -214,7 +267,7 @@ function SaveShare({ share, onDone }: { share: Share; onDone: () => void }) {
 }
 
 /** The book's notes, newest first, with a search, and each note's first picture: one to add to. */
-function NotePicker({ bookId, value, onChange, searchId }: { bookId: string; value: string | undefined; onChange: (id: string) => void; searchId: string }) {
+function NotePicker({ bookId, value, onChange, searchId, listId }: { bookId: string; value: string | undefined; onChange: (id: string) => void; searchId: string; listId: string }) {
   const novel = useQuery({ queryKey: keys.novel(bookId), queryFn: () => api.novel<Book>(bookId) });
   const [query, setQuery] = useState("");
   const name = useId();
@@ -236,7 +289,7 @@ function NotePicker({ bookId, value, onChange, searchId }: { bookId: string; val
         <Search className="pointer-events-none absolute top-3.5 left-3 size-5 text-muted" aria-hidden />
         <input id={searchId} type="search" placeholder="Search the notes" value={query} onChange={(e) => setQuery(e.target.value)} className={cn(FIELD, "pl-10")} />
       </div>
-      <ul className="grid max-h-[50vh] gap-1 overflow-y-auto" aria-label="Notes, newest first">
+      <ul id={listId} className="grid max-h-[50vh] gap-1 overflow-y-auto" aria-label="Notes, newest first">
         {shown.map((n) => (
           <li key={n.id}>
             <NoteChoice bookId={bookId} note={n} name={name} checked={value === n.id} onChange={() => onChange(n.id)} />

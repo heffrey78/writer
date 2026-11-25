@@ -808,9 +808,14 @@ test("Save to Writer: a picture and a link shared from another app become a new 
   await expect(page.getByRole("radio", { name: "New note" })).toBeChecked();
   await expect(page.getByRole("textbox", { name: "Title" })).toHaveValue("The toll house");
   const save = page.getByRole("button", { name: "Save as a new note" });
-  // Each picture described first.
-  await expect(save).toBeDisabled();
+  // Each picture described first: Save says which isn't, and goes to it.
+  await save.tap();
+  await expect(page.getByRole("alert")).toHaveText("Describe picture 1.");
+  await expect(page.getByRole("textbox", { name: "Description of picture 1" })).toBeFocused();
   await page.getByRole("textbox", { name: "Description of picture 1" }).fill("The toll house from the bridge");
+  await save.tap();
+  await expect(page.getByRole("alert")).toHaveText("Describe picture 2.");
+  await expect(page.getByRole("textbox", { name: "Description of picture 2" })).toBeFocused();
   await page.getByRole("textbox", { name: "Description of picture 2" }).fill("The toll board");
   await audit(page);
   for (const target of await page.locator("main").locator("input:not([type=radio]), select, button").all()) expect((await target.boundingBox())!.height).toBeGreaterThanOrEqual(48);
@@ -842,6 +847,9 @@ test("Save to Writer: shared text added at the end of a note picked from the boo
   await page.getByRole("radio", { name: "Add to a note…" }).tap();
   const notes = page.getByRole("list", { name: "Notes, newest first" });
   await expect(notes.getByRole("radio")).not.toHaveCount(0);
+  await page.getByRole("button", { name: "Add to the note" }).tap();
+  await expect(page.getByRole("alert")).toHaveText("Choose the note to add it to.");
+  await expect(notes.getByRole("radio").first()).toBeFocused();
   await page.getByRole("searchbox", { name: "Search the notes" }).fill("flood");
   await expect(notes.getByRole("radio")).toHaveCount(1);
   await notes.getByRole("radio", { name: /What if Ben never sold the plans\?/ }).tap();
@@ -850,4 +858,27 @@ test("Save to Writer: shared text added at the end of a note picked from the boo
   await expect(page.getByRole("textbox", { name: "Note: What if Ben never sold the plans?" })).toContainText("Ask the ferryman.");
   expect(readFileSync(join(dir, IDEA), "utf8")).toBe(`${before.trimEnd()}\n\nThe ford floods in spring. Ask the ferryman.\n`);
   expect(await left()).toEqual([]);
+});
+
+test("Save to Writer: what's shared can be left for later, by Not now or Back, and waits on the shelf without sending the writer back to it (#205)", async ({ page, app }) => {
+  await app.restart(app.novelRepo("varn"));
+  const left = await sharing(page, [{ id: "3", received: 3, text: "The ford floods in spring.", pictures: [] }]);
+  await page.goto(app.launchUrl);
+  await expect(page.getByRole("heading", { level: 1, name: "Save to Writer" })).toBeVisible();
+  await page.getByRole("button", { name: "Not now" }).tap();
+  await expect(page.getByRole("heading", { level: 1, name: "Your books" })).toBeVisible();
+  // Kept, and on the shelf; the app opened again doesn't go back to it.
+  await expect(page.getByText("Something you shared with Writer isn't saved yet.")).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole("heading", { level: 1, name: "Your books" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Save to Writer" })).toHaveCount(0);
+  // Never let go: the app still keeps it as shared.
+  expect(await left()).toBeUndefined();
+  // From the shelf, and Back from there, as Android's back gesture: the shelf again, not Save to Writer.
+  await page.getByRole("link", { name: "Save to Writer" }).tap();
+  await expect(page.getByRole("heading", { level: 1, name: "Save to Writer" })).toBeVisible();
+  await page.goBack();
+  await expect(page.getByRole("heading", { level: 1, name: "Your books" })).toBeVisible();
+  await page.waitForTimeout(500);
+  await expect(page.getByRole("heading", { level: 1, name: "Save to Writer" })).toHaveCount(0);
 });

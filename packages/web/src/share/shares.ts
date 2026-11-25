@@ -42,6 +42,26 @@ export async function shareDone(id: string): Promise<void> {
   if (inApp()) await invoke("share_done", { id });
 }
 
+const OPENED = "writer.shares-opened";
+
+/** The shares Save to Writer has shown, by ID: a writer who left one for later isn't sent back to it. */
+export function openedShares(): Set<string> {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(OPENED) ?? "[]") as string[]);
+  } catch {
+    return new Set();
+  }
+}
+
+/** `shares` shown in Save to Writer: kept with those still waiting, the rest forgotten. */
+export function markOpened(shares: Pick<Share, "id">[]): void {
+  try {
+    localStorage.setItem(OPENED, JSON.stringify(shares.map((s) => s.id)));
+  } catch {
+    // Not kept: the writer is sent to Save to Writer for these again, next time.
+  }
+}
+
 /** Call `heard` when the app says something's been shared. */
 export function onShared(heard: () => void): () => void {
   window.addEventListener("writer-shared", heard);
