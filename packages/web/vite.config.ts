@@ -22,6 +22,7 @@ function writerServer(): Plugin {
       registerServerModule((await import("@writer/module-off-page-events/server")).offPageEventsServer);
       registerServerModule((await import("@writer/module-drafting-board/server")).draftingBoardServer);
       registerServerModule((await import("@writer/module-daily/server")).dailyServer);
+      registerServerModule((await import("@writer/module-mood-board/server")).moodBoardServer);
       const token = randomBytes(32).toString("base64url");
       const server = await createServer({ library: await Library.open(), token });
       const cookie = `${sessionCookie(server.port)}=${token}`;

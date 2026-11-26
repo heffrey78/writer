@@ -1,4 +1,4 @@
-import { stringify } from "yaml";
+import { isSeq, parseDocument, stringify, type Node } from "yaml";
 import { defineModule, editYaml, type Book, type BookModule, type FileTypeDef, type Finding, type ModuleFile } from "@writer/core";
 import boardSchema from "../../schemas/board.schema.json" with { type: "json" };
 
@@ -75,6 +75,27 @@ export function readBoard(file: ModuleFile): Board {
   return { id: file.id, title: file.title, cards, file: file.file };
 }
 
+/**
+ * A board file's cards where the file has them, by their place in its list: a card that isn't one is
+ * undefined, so every edit names a card by where it is in the file.
+ */
+export function cardsInFile(data: Record<string, unknown>): (BoardCard | undefined)[] {
+  return cardsOf(data).map((raw) => {
+    const card = readCard(raw);
+    return "malformed" in card ? undefined : card;
+  });
+}
+
+/** A board file's text read as the app reads it: its title and its cards in place, or none if it doesn't parse. */
+export function readBoardText(fileText: string): { title: string; cards: (BoardCard | undefined)[] } | undefined {
+  const doc = parseDocument(fileText);
+  if (doc.errors.length) return undefined;
+  const data = doc.toJS() as unknown;
+  if (typeof data !== "object" || data === null || Array.isArray(data)) return undefined;
+  const d = data as Record<string, unknown>;
+  return { title: typeof d["title"] === "string" ? d["title"] : "", cards: cardsInFile(d) };
+}
+
 /** The book's boards, in file-name order. */
 export const boardsOf = (book: Book): Board[] => book.moduleFiles.filter((f) => f.type === BOARD.key).map(readBoard);
 
@@ -116,6 +137,71 @@ export function boardFile(board: Omit<Board, "file">): string {
 /** A board's file with card `index` moved and sized: only that card's line changes, and comments stay. */
 export function placeCard(fileText: string, index: number, { at, size }: { at?: Pair; size?: Pair }): string {
   return editYaml(fileText, [...(at ? [{ path: ["cards", index, "at"], value: at }] : []), ...(size ? [{ path: ["cards", index, "size"], value: size }] : [])]);
+}
+
+/** Where card `index`'s lines are in a board's file, from the start of its first line to the end of its last; none in a flow list. */
+function cardLines(fileText: string, index: number): [number, number] | undefined {
+  const cards = parseDocument(fileText).get("cards", true);
+  if (!isSeq(cards) || cards.flow) return undefined;
+  const item = cards.items[index] as Node | undefined;
+  if (!item?.range) return undefined;
+  const start = fileText.lastIndexOf("\n", item.range[0] - 1) + 1;
+  const newline = fileText.indexOf("\n", Math.max(item.range[1] - 1, item.range[0]));
+  return [start, newline < 0 ? fileText.length : newline + 1];
+}
+
+/** The cards as the file lists them, whatever they hold: for rewriting a list written as flow, which is rare. */
+const rawCards = (fileText: string): unknown[] => {
+  const data = parseDocument(fileText).toJS() as Record<string, unknown> | null;
+  return data && Array.isArray(data["cards"]) ? data["cards"] : [];
+};
+
+/** A board's file with card `index` taken off: its lines go, and everything else stays. */
+export function takeOffCard(fileText: string, index: number): string {
+  const lines = cardLines(fileText, index);
+  if (lines) {
+    const out = fileText.slice(0, lines[0]) + fileText.slice(lines[1]);
+    // The last card gone: an empty list, still a list.
+    return rawCards(fileText).length === 1 ? editYaml(out, [{ path: ["cards"], value: [] }]) : out;
+  }
+  return editYaml(fileText, [{ path: ["cards"], value: rawCards(fileText).filter((_, i) => i !== index) }]);
+}
+
+/**
+ * A board's file with card `index` brought to the front (drawn over the others, and read last) or sent
+ * to the back (drawn under them, read first): its lines move, unchanged.
+ */
+export function reorderCard(fileText: string, index: number, to: "front" | "back"): string {
+  const count = rawCards(fileText).length;
+  if (count < 2 || (to === "front" && index === count - 1) || (to === "back" && index === 0)) return fileText;
+  const lines = cardLines(fileText, index);
+  const edge = cardLines(fileText, to === "front" ? count - 1 : 0);
+  if (lines && edge) {
+    let card = fileText.slice(lines[0], lines[1]);
+    const rest = fileText.slice(0, lines[0]) + fileText.slice(lines[1]);
+    if (!card.endsWith("\n")) card += "\n";
+    // Where the edge card is once this one's lines are gone.
+    const at = to === "back" ? edge[0] : edge[1] - (lines[1] - lines[0]);
+    const before = rest.slice(0, at);
+    return (before.endsWith("\n") || before === "" ? before : `${before}\n`) + card + rest.slice(at);
+  }
+  const cards = rawCards(fileText);
+  const [card] = cards.splice(index, 1);
+  return editYaml(fileText, [{ path: ["cards"], value: to === "front" ? [...cards, card] : [card, ...cards] }]);
+}
+
+/** A board's file with a card added on top, on a line of its own. */
+export function addCard(fileText: string, card: BoardCard): string {
+  const count = rawCards(fileText).length;
+  const last = count ? cardLines(fileText, count - 1) : undefined;
+  if (last) {
+    const before = fileText.slice(0, last[1]);
+    return (before.endsWith("\n") ? before : `${before}\n`) + cardLine(card) + fileText.slice(last[1]);
+  }
+  const doc = parseDocument(fileText);
+  if (!count && !doc.has("cards")) return `${fileText.endsWith("\n") || fileText === "" ? fileText : `${fileText}\n`}cards:\n${cardLine(card)}`;
+  if (!count) return fileText.replace(/^cards:.*$/m, `cards:\n${cardLine(card).trimEnd()}`);
+  return editYaml(fileText, [{ path: ["cards", count], value: parseDocument(cardLine(card).replace(/^  - /, "")).toJS() }]);
 }
 
 /** Cards that aren't one of the four kinds: the file breaks the format in a way its schema can't say. */

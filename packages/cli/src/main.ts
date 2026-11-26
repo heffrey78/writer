@@ -5,6 +5,7 @@ import { registerKinds } from "@writer/kinds";
 import { useNodePorts } from "@writer/server/node";
 import { dailyServer } from "@writer/module-daily/server";
 import { draftingBoardServer } from "@writer/module-drafting-board/server";
+import { moodBoardServer } from "@writer/module-mood-board/server";
 import { offPageEventsServer } from "@writer/module-off-page-events/server";
 import { storyTimeServer } from "@writer/module-story-time/server";
 import { registerServerModule } from "@writer/server";
@@ -18,7 +19,7 @@ import { runValidate } from "./validate-command.ts";
 registerKinds(); // The kinds of book the app ships (D14).
 useNodePorts(); // The server's git, on Node (D16).
 // The server halves of the modules they use: their routes under a book.
-for (const module of [storyTimeServer, offPageEventsServer, draftingBoardServer, dailyServer]) registerServerModule(module);
+for (const module of [storyTimeServer, offPageEventsServer, draftingBoardServer, dailyServer, moodBoardServer]) registerServerModule(module);
 
 const USAGE = `Usage: writer <command> [options]
 

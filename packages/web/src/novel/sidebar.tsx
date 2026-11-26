@@ -208,6 +208,7 @@ function Expanded({ novelId, novel, workspace, current, onGitHub, toggle }: { no
                     ))}
                   </ul>
                 )}
+                <ModuleItems novelId={novelId} novel={novel} path={p.path} />
               </li>
             ))}
           </Group>
@@ -217,6 +218,24 @@ function Expanded({ novelId, novel, workspace, current, onGitHub, toggle }: { no
         </button>
       </nav>
     </aside>
+  );
+}
+
+/** The pages a module's page lists under it in the sidebar (a book's boards), each a link. */
+function ModuleItems({ novelId, novel, path }: { novelId: string; novel: Book; path: string }) {
+  const view = moduleViews(novel.kind).find((v) => v.path === path);
+  const items = view?.items?.(novel) ?? [];
+  if (!view || !items.length) return null;
+  return (
+    <ul aria-label={view.label} className="mt-0.5 grid gap-0.5 pl-8 text-xs text-muted">
+      {items.map((item) => (
+        <li key={item.path}>
+          <NavLink to={`/novels/${novelId}/${view.path}/${item.path}`} className={({ isActive }) => cn("block truncate rounded px-1 pr-2 hover:bg-paper hover:text-ink", isActive && "bg-accent-soft font-medium text-ink")}>
+            {item.label}
+          </NavLink>
+        </li>
+      ))}
+    </ul>
   );
 }
 
