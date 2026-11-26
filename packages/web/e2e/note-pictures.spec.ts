@@ -8,6 +8,9 @@ import { makePicture, pastePicture, pictureIn } from "./pictures.ts";
 
 const IDEA = "notes/what-if-ben-never-sold.md";
 const PROSE = "Then [Ada](#char_7f3k2q) has no reason to come home, and the bridge stands. Unless the debt goes back to [the flood](#evt_9ab3kd).";
+// Autosave writes 2 s after the last change: polled every quarter second, not Playwright's 1 s steps,
+// which would wait nearly a second longer for each save.
+const SAVED = { intervals: [250] };
 
 async function openNote(page: Page, app: App) {
   const dir = app.novelRepo("varn");
@@ -21,6 +24,8 @@ async function openNote(page: Page, app: App) {
 }
 
 test("Add a picture, a paste and a drop, each described; moved by keyboard; described, changed and removed from its toolbar", async ({ page, app }) => {
+  // Eight saves, each waited for in the file: longer than the 30 s a test gets in Chromium on a busy runner.
+  test.setTimeout(60_000);
   const note = await openNote(page, app);
   const insert = page.getByRole("dialog", { name: "Insert a picture" });
 
@@ -39,7 +44,7 @@ test("Add a picture, a paste and a drop, each described; moved by keyboard; desc
   const plans = '![Ben\'s plans of the bridge](/images/bens-plans-of-the-bridge.jpg "The copy he kept")';
   await expect(note.prose.getByRole("img", { name: "Ben's plans of the bridge" })).toBeVisible();
   await page.keyboard.type("Where are they now?");
-  await expect.poll(note.read).toContain(`${PROSE}\n\n${plans}\n\nWhere are they now?\n`);
+  await expect.poll(note.read, SAVED).toContain(`${PROSE}\n\n${plans}\n\nWhere are they now?\n`);
   expect(pictureIn(note.dir, "images/bens-plans-of-the-bridge.jpg")).toEqual({ type: "image/jpeg", width: 1600, height: 1067 });
 
   // Pasted at the caret.
@@ -51,7 +56,7 @@ test("Add a picture, a paste and a drop, each described; moved by keyboard; desc
   await expect(insert.getByRole("button", { name: "Insert" })).toBeEnabled();
   await page.keyboard.press("Enter");
   await expect(insert).toBeHidden();
-  await expect.poll(note.read).toContain("Where are they now?\n\n![The toll seal](/images/the-toll-seal.jpg)\n");
+  await expect.poll(note.read, SAVED).toContain("Where are they now?\n\n![The toll seal](/images/the-toll-seal.jpg)\n");
 
   // Dropped on the first paragraph: it goes in after it.
   await makePicture(page, { width: 800, height: 1000, name: "letter.jpg" });
@@ -68,7 +73,7 @@ test("Add a picture, a paste and a drop, each described; moved by keyboard; desc
   await insert.getByLabel("Description").fill("Mirela's letter");
   await insert.getByRole("button", { name: "Insert" }).click();
   await expect(insert).toBeHidden();
-  await expect.poll(note.read).toContain(`${PROSE}\n\n![Mirela's letter](/images/mirelas-letter.jpg)\n\n${plans}`);
+  await expect.poll(note.read, SAVED).toContain(`${PROSE}\n\n![Mirela's letter](/images/mirelas-letter.jpg)\n\n${plans}`);
   for (const colorScheme of ["light", "dark"] as const) {
     await page.emulateMedia({ colorScheme });
     await axe(page);
@@ -80,9 +85,9 @@ test("Add a picture, a paste and a drop, each described; moved by keyboard; desc
   await expect(note.prose.locator(".ghw-picture.ProseMirror-selectednode")).toHaveCount(1);
   await expect(note.prose).toBeFocused();
   await page.keyboard.press("Alt+ArrowDown");
-  await expect.poll(note.read).toContain(`${PROSE}\n\n${plans}\n\n![Mirela's letter](/images/mirelas-letter.jpg)\n\nWhere are they now?`);
+  await expect.poll(note.read, SAVED).toContain(`${PROSE}\n\n${plans}\n\n![Mirela's letter](/images/mirelas-letter.jpg)\n\nWhere are they now?`);
   await page.keyboard.press("Alt+ArrowUp");
-  await expect.poll(note.read).toContain(`${PROSE}\n\n![Mirela's letter](/images/mirelas-letter.jpg)\n\n${plans}`);
+  await expect.poll(note.read, SAVED).toContain(`${PROSE}\n\n![Mirela's letter](/images/mirelas-letter.jpg)\n\n${plans}`);
 
   // Its toolbar: Describe…
   const toolbar = page.getByRole("toolbar", { name: "Picture" });
@@ -93,7 +98,7 @@ test("Add a picture, a paste and a drop, each described; moved by keyboard; desc
   await change.getByLabel("Description").fill("Mirela's letter to Ada");
   await change.getByRole("button", { name: "Save" }).click();
   await expect(change).toBeHidden();
-  await expect.poll(note.read).toContain("![Mirela's letter to Ada](/images/mirelas-letter.jpg)");
+  await expect.poll(note.read, SAVED).toContain("![Mirela's letter to Ada](/images/mirelas-letter.jpg)");
 
   // …Change…, another picture in its place, the one it showed deleted.
   await note.prose.getByRole("img", { name: "Mirela's letter to Ada" }).click();
@@ -105,7 +110,7 @@ test("Add a picture, a paste and a drop, each described; moved by keyboard; desc
   await expect(change).toContainText("letter-2.jpg · 900 × 900 px");
   await change.getByRole("button", { name: "Save" }).click();
   await expect(change).toBeHidden();
-  await expect.poll(note.read).toContain("![Mirela's letter to Ada](/images/mirelas-letter-to-ada.jpg)");
+  await expect.poll(note.read, SAVED).toContain("![Mirela's letter to Ada](/images/mirelas-letter-to-ada.jpg)");
   await expect.poll(() => note.exists("images/mirelas-letter.jpg")).toBe(false);
   expect(pictureIn(note.dir, "images/mirelas-letter-to-ada.jpg")).toEqual({ type: "image/jpeg", width: 900, height: 900 });
 
@@ -114,7 +119,7 @@ test("Add a picture, a paste and a drop, each described; moved by keyboard; desc
   await toolbar.getByRole("button", { name: "Remove" }).click();
   await expect(note.prose.getByRole("img", { name: "Mirela's letter to Ada" })).toHaveCount(0);
   await expect(toolbar).toBeHidden();
-  await expect.poll(note.read).toContain(`${PROSE}\n\n${plans}`);
+  await expect.poll(note.read, SAVED).toContain(`${PROSE}\n\n${plans}`);
   await expect.poll(() => note.exists("images/mirelas-letter-to-ada.jpg")).toBe(false);
 });
 
@@ -135,7 +140,7 @@ test("Insert a picture… in the palette, and a picture described, moved and rem
   await page.keyboard.press("Enter");
   await expect(insert).toBeHidden();
   await expect(note.prose).toBeFocused();
-  await expect.poll(note.read).toContain(`${PROSE}\n\n![The ford](/images/the-ford.jpg)\n`);
+  await expect.poll(note.read, SAVED).toContain(`${PROSE}\n\n![The ford](/images/the-ford.jpg)\n`);
 
   // ↑ selects it; Enter describes it.
   await page.keyboard.press("ArrowUp");
@@ -145,12 +150,12 @@ test("Insert a picture… in the palette, and a picture described, moved and rem
   await page.keyboard.type(" at dawn");
   await page.keyboard.press("Enter");
   await expect(change).toBeHidden();
-  await expect.poll(note.read).toContain("![The ford at dawn](/images/the-ford.jpg)");
+  await expect.poll(note.read, SAVED).toContain("![The ford at dawn](/images/the-ford.jpg)");
   // Alt+↑ puts it before the words; Delete takes it, and its file.
   await page.keyboard.press("Alt+ArrowUp");
-  await expect.poll(note.read).toMatch(/---\n!\[The ford at dawn\]\(\/images\/the-ford\.jpg\)\n\nThen \[Ada\]/);
+  await expect.poll(note.read, SAVED).toMatch(/---\n!\[The ford at dawn\]\(\/images\/the-ford\.jpg\)\n\nThen \[Ada\]/);
   await page.keyboard.press("Delete");
-  await expect.poll(note.read).not.toContain("the-ford");
+  await expect.poll(note.read, SAVED).not.toContain("the-ford");
   await expect.poll(() => note.exists("images/the-ford.jpg")).toBe(false);
 });
 
