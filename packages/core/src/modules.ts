@@ -35,6 +35,8 @@ export interface BookModule {
   entityTypes?: readonly EntityTypeDef[];
   /** Records of its own it keeps in the codex, a file each: the off-page event. */
   records?: readonly RecordTypeDef[];
+  /** Files of its own it keeps in a folder of the book's, outside the codex: the mood board. */
+  files?: readonly FileTypeDef[];
   checks?: readonly ModuleCheck[];
   /** Its diagrams for the book's diagrams/ folder, and its section of their README. */
   snapshots?: (book: Book) => ModuleSnapshots;
@@ -83,6 +85,24 @@ export interface RecordTypeDef {
   schema: object;
   /** A list of them in one YAML file of the codex, as format v1 kept events: each item's `body` key is its note. */
   list?: { file: string; key: string; body: string; schema: object };
+}
+
+/**
+ * A kind of file a module keeps (D14): one YAML file each in a folder of the book's own, beside the
+ * notes, as a mood board is (boards/<slug>.yaml). Not story facts, so outside the codex. The base loads
+ * them, checks them against their schema, checks their IDs with every other record's, and keeps the
+ * pictures they show; the module reads them as it needs, and shows them.
+ */
+export interface FileTypeDef {
+  /** What the base calls one among the book's records, and its schema's name: "board". */
+  key: string;
+  prefix: string;
+  /** Its folder, from the book's root: "boards". */
+  folder: string;
+  /** The JSON Schema of its files. */
+  schema: object;
+  /** The pictures a file shows, as repository paths (images/…), from its data: kept while it shows them. */
+  pictures?(data: Record<string, unknown>): string[];
 }
 
 /**
@@ -158,6 +178,9 @@ export function modulesOf(kind: BookKind): BookModule[] {
 /** The record types the kind's modules keep, in the order it lists them. */
 export const recordTypesOf = (kind: BookKind): RecordTypeDef[] => modulesOf(kind).flatMap((m) => m.records ?? []);
 
+/** The file types the kind's modules keep, in the order it lists them. */
+export const fileTypesOf = (kind: BookKind): FileTypeDef[] => modulesOf(kind).flatMap((m) => m.files ?? []);
+
 /** A record type of the kind's modules, by its key. */
 export const recordType = (kind: BookKind, key: string): RecordTypeDef | undefined => recordTypesOf(kind).find((t) => t.key === key);
 
@@ -194,6 +217,16 @@ export function withModules(kind: BookKind): BookKind {
           throw new Error(`The module “${module.id}” keeps the record type “${r.key}”, whose key, prefix or folder the ${kind.label} kind or another of its modules already has`);
         }
         records.push(r);
+      }
+    }
+    const files: FileTypeDef[] = [];
+    const folders = Object.values(kind.folders);
+    for (const module of modulesOf(kind)) {
+      for (const f of module.files ?? []) {
+        if ([...files, ...records, ...entityTypes].some((u) => u.key === f.key || u.prefix === f.prefix) || [...files.map((g) => g.folder), ...folders].includes(f.folder)) {
+          throw new Error(`The module “${module.id}” keeps the file type “${f.key}”, whose key, prefix or folder the ${kind.label} kind or another of its modules already has`);
+        }
+        files.push(f);
       }
     }
     full = { ...kind, fields: ordered(fields, kind.fieldOrder), entityTypes: ordered(entityTypes, kind.entityTypeOrder) };

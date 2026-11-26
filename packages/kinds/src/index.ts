@@ -6,6 +6,7 @@ import { citations } from "@writer/module-citations/core";
 import { daily } from "@writer/module-daily/core";
 import { draftingBoard } from "@writer/module-drafting-board/core";
 import { manuscriptFormat } from "@writer/module-manuscript-format/core";
+import { moodBoard } from "@writer/module-mood-board/core";
 import { offPageEvents } from "@writer/module-off-page-events/core";
 import { storyTime } from "@writer/module-story-time/core";
 import { toJournalModule } from "@writer/module-to-journal/core";
@@ -20,7 +21,7 @@ export { campaign, journal, nonfiction, novel };
 export const KINDS: readonly BookKind[] = [novel, journal, campaign, nonfiction];
 
 /** The core halves of the modules the shipped kinds use (D14), from packages/modules. */
-export const MODULES: readonly BookModule[] = [pointOfView, plotlines, presenceModule, storyTime, offPageEvents, draftingBoard, manuscriptFormat, daily, toJournalModule, citations];
+export const MODULES: readonly BookModule[] = [pointOfView, plotlines, presenceModule, storyTime, offPageEvents, draftingBoard, manuscriptFormat, daily, toJournalModule, citations, moodBoard];
 
 /**
  * Make the shipped modules and kinds known to the base, the modules first: each of the app's entry

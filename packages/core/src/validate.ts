@@ -2,7 +2,7 @@ import { fieldLabel, holdsText, holdsValue } from "./entry-fields.ts";
 import { idPrefix, isId, RECORD_PREFIXES, type EntryFieldDef } from "./ids.ts";
 import type { FieldDef } from "./kinds.ts";
 import { loadBook } from "./load.ts";
-import { moduleDiagnostics, recordTypesOf } from "./modules.ts";
+import { fileTypesOf, moduleDiagnostics, recordTypesOf } from "./modules.ts";
 import { allRecords, levelLabel, mentions, pieceLevel, picturePath, pictures, sectionsAt, type Book, type Picture, type RecordRef } from "./model.ts";
 import { sidebarOf, sidebarPages, type SidebarFile } from "./sidebar.ts";
 import type { FileSource } from "./source.ts";
@@ -74,8 +74,9 @@ export function validateBook(novel: Book): Diagnostic[] {
   // The book's own prefix, its levels' and its pieces' are its kind's; the rest every book shares.
   const { kind } = novel;
   const recordTypes = recordTypesOf(kind);
+  const fileTypes = fileTypesOf(kind);
   const recordPrefix = (r: RecordRef) =>
-    r.kind === "book" ? kind.prefix : r.kind === "piece" ? kind.piece.prefix : r.kind === "section" ? kind.levels.find((l) => l.key === r.level)?.prefix : (RECORD_PREFIXES[r.kind as keyof typeof RECORD_PREFIXES] ?? recordTypes.find((t) => t.key === r.kind)?.prefix);
+    r.kind === "book" ? kind.prefix : r.kind === "piece" ? kind.piece.prefix : r.kind === "section" ? kind.levels.find((l) => l.key === r.level)?.prefix : (RECORD_PREFIXES[r.kind as keyof typeof RECORD_PREFIXES] ?? [...recordTypes, ...fileTypes].find((t) => t.key === r.kind)?.prefix);
   /** Prefixes a record's ID may still have from before its book was of this kind (a journal kept as a novel's sc_). */
   const formerPrefixes = (r: RecordRef): readonly string[] =>
     (r.kind === "book" ? kind.formerPrefixes : r.kind === "piece" ? kind.piece.formerPrefixes : r.kind === "section" ? kind.levels.find((l) => l.key === r.level)?.formerPrefixes : r.kind === "entity" ? typeByKey.get(r.type!)?.formerPrefixes : undefined) ?? [];
@@ -355,6 +356,8 @@ async function missingImages(novel: Book, source: FileSource): Promise<Diagnosti
     ...novel.entities.flatMap((e) => inProse(e.body, e.file, e.bodyLine)),
     ...novel.moduleRecords.flatMap((r) => (r.pointer === undefined ? inProse(r.body, r.file, r.bodyLine) : [])),
     ...novel.notes.flatMap((n) => inProse(n.body, n.file, n.bodyLine)),
+    // The pictures modules' files show (a mood board's, #206).
+    ...novel.moduleFiles.flatMap((f) => f.pictures.map((path) => ({ path, file: f.file, what: `A picture on “${f.title}”` }))),
   ];
   const out: Diagnostic[] = [];
   for (const w of wanted) {

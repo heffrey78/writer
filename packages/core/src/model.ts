@@ -33,6 +33,8 @@ export interface Book {
   relationships: Relationship[];
   /** The records its kind's modules keep in the codex (an off-page event), in the order their types and files are found. */
   moduleRecords: ModuleRecord[];
+  /** The files its kind's modules keep in folders of their own (a mood board), by type, then file name. */
+  moduleFiles: ModuleFile[];
   /** The writer's notes (notes/, D12), not story facts. */
   notes: Note[];
   layouts: Record<string, { nodes: Record<string, { x: number; y: number }> }>;
@@ -151,6 +153,19 @@ export interface ModuleRecord {
   pointer?: string;
 }
 
+/** A file a module keeps in a folder of its own (FileTypeDef, D14): boards/<slug>.yaml. */
+export interface ModuleFile {
+  /** Its type's key: "board". */
+  type: string;
+  id: string;
+  title: string;
+  /** The file's data, as parsed: the module reads it. */
+  data: Record<string, unknown>;
+  /** The pictures it shows, as repository paths: its type says which. */
+  pictures: string[];
+  file: string;
+}
+
 /**
  * The colors a writer may give a note (D24, #222), as the note's file names them. The file keeps the name,
  * never a shade: each theme draws each name, in light and dark, in a shade that reads.
@@ -207,6 +222,7 @@ export function allRecords(novel: Book): RecordRef[] {
   for (const r of novel.relationships) out.push({ kind: "relationship", id: r.id, file: r.file });
   for (const r of novel.moduleRecords) out.push({ kind: r.type, id: r.id, file: r.file });
   for (const n of novel.notes) out.push({ kind: "note", id: n.id, file: n.file });
+  for (const f of novel.moduleFiles) out.push({ kind: f.type, id: f.id, file: f.file });
   return out;
 }
 
@@ -335,8 +351,9 @@ export function shownPictures(body: string): ShownPicture[] {
 }
 
 /**
- * The pictures `book` shows, as repository paths: its cover, its entries' pictures, and those in the
- * prose of its pieces, notes and modules' records (#200). A picture's file is deleted only when it
+ * The pictures `book` shows, as repository paths: its cover, its entries' pictures, those in the
+ * prose of its pieces, notes and modules' records (#200), and those its modules' files show (a mood
+ * board's, #206). A picture's file is deleted only when it
  * isn't here. `except`: the entry whose own picture doesn't count ("novel" for the cover), as it goes.
  */
 export function picturesShown(book: Book, { except }: { except?: string } = {}): Set<string> {
@@ -349,6 +366,7 @@ export function picturesShown(book: Book, { except }: { except?: string } = {}):
       if (path) shown.add(path);
     }
   }
+  for (const f of book.moduleFiles) for (const path of f.pictures) shown.add(path);
   return shown;
 }
 

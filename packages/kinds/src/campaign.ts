@@ -117,7 +117,7 @@ export const campaign: BookKind = {
     { key: "entities", label: "Also in it", role: "in it", type: { kind: "own-entities" }, mentionAdds: true },
   ],
   // The world's calendar under the session's title, then who and what is in it.
-  modules: ["presence", "story-time"],
+  modules: ["presence", "story-time", "mood-board"],
   sidebar: [
     { key: "prep", label: "Prep", pages: ["index", "notes", "outline", "issues"] },
     { key: "world", label: "The world", pages: ["relationships", "story-map"] },

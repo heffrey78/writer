@@ -1,7 +1,7 @@
 import { reservedPrefixes, type EntityTypeDef, type EntryFieldDef } from "./ids.ts";
 import { HOLDS } from "./entry-fields.ts";
 import { kindByKey, knownKind, startLevels, V2_KIND, type BookKind, type LevelDef } from "./kinds.ts";
-import { recordTypesOf, withModules } from "./modules.ts";
+import { fileTypesOf, recordTypesOf, withModules } from "./modules.ts";
 import { EVENT_FILES_FORMAT, MANIFEST, NOVEL_MANIFEST, readManifest, SCHEMA_VERSION } from "./manifest.ts";
 import { isNoteColor, NOTE_COLORS, type Section, type Entity, type FieldChange, type Book, type ModuleRecord, type Relationship, type Piece, type ThemeRef } from "./model.ts";
 import { judgementFiles, readDifferent, readNotNames } from "./judgements.ts";
@@ -52,6 +52,7 @@ export async function loadBook(source: FileSource, kind?: BookKind): Promise<Boo
     entities: [],
     relationships: [],
     moduleRecords: [],
+    moduleFiles: [],
     notes: [],
     layouts: {},
     notNames: [],
@@ -113,6 +114,7 @@ export async function loadBook(source: FileSource, kind?: BookKind): Promise<Boo
   await loadManuscript();
   await loadBible();
   await loadNotes();
+  await loadModuleFiles();
 
   // The index's judgements (D19): read leniently, a line that isn't one skipped with a warning.
   const judgements = judgementFiles(bookKind);
@@ -327,6 +329,20 @@ export async function loadBook(source: FileSource, kind?: BookKind): Promise<Boo
     const fields = Object.fromEntries(Object.entries(md.data).filter(([k]) => k !== "id" && k !== "title"));
     const record: ModuleRecord = { type, id: str(md.data["id"])!, title: str(md.data["title"]) ?? "", fields, body: md.body, bodyLine: md.bodyLine, file };
     novel.moduleRecords.push(record);
+  }
+
+  /** The files the kind's modules keep in folders of their own (D14): boards/*.yaml, in file-name order. */
+  async function loadModuleFiles() {
+    for (const t of fileTypesOf(bookKind)) {
+      const names = (await source.list(t.folder)).filter((f) => !f.dir && f.name.endsWith(".yaml")).map((f) => f.name).sort();
+      for (const name of names) {
+        const file = joinPath(t.folder, name);
+        const data = await yamlFile(file, t.key);
+        const id = str(data?.["id"]);
+        if (!data || !id) continue;
+        novel.moduleFiles.push({ type: t.key, id, title: str(data["title"]) ?? "", data, pictures: t.pictures?.(data) ?? [], file });
+      }
+    }
   }
 
   /** The writer's notes (D12): notes/*.md. */
