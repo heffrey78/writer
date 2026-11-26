@@ -796,19 +796,28 @@ test("a picture from the phone's photos into a note, from Picture on the bar abo
 /**
  * Shares from another app (#204), as the Android app's plugin keeps them: its two commands answered
  * in the page in place of Tauri's, what's written let go, and kept across reloads as the app keeps them.
+ * `video`, what the app's host answers when asked for a video's picture (#229): a PNG's bytes, or
+ * "never" for a fetch that doesn't come back; the URLs asked for are kept in `test-fetched`.
  */
-async function sharing(page: Page, shares: { id: string; received: number; text?: string; subject?: string; pictures: { name: string; type: string; data: string }[] }[]) {
-  await page.addInitScript((seed) => {
+async function sharing(page: Page, shares: { id: string; received: number; text?: string; subject?: string; pictures: { name: string; type: string; data: string }[] }[], video?: string) {
+  await page.addInitScript(([seed, video]) => {
     const kept = () => JSON.parse(localStorage.getItem("test-shares") ?? "null") ?? seed;
     (window as unknown as { __TAURI_INTERNALS__: unknown }).__TAURI_INTERNALS__ = {
       invoke: async (command: string, args: { id?: string }) => {
         if (command === "shares") return { shares: kept() };
         if (command === "share_done") return void localStorage.setItem("test-shares", JSON.stringify(kept().filter((s: { id: string }) => s.id !== args.id)));
+        const port = args as { port?: string; op?: string; args?: [{ url: string }] };
+        if (command === "port" && port.port === "host" && port.op === "facts") return { env: {} };
+        if (command === "port" && port.port === "http" && port.op === "fetch" && video) {
+          localStorage.setItem("test-fetched", JSON.stringify([...JSON.parse(localStorage.getItem("test-fetched") ?? "[]"), port.args![0].url]));
+          if (video === "never") return new Promise(() => {});
+          return { status: 200, headers: [["content-type", "image/png"]], body: { $bytes: video } };
+        }
         throw new Error(`No command ${command}`);
       },
       transformCallback: () => 0,
     };
-  }, shares);
+  }, [shares, video] as const);
   return () => page.evaluate(() => (JSON.parse(localStorage.getItem("test-shares") ?? "null") as { id: string }[] | null)?.map((s) => s.id));
 }
 
@@ -877,6 +886,38 @@ test("Save to Writer: a picture and a link shared from another app become a new 
   // Let go: a reload doesn't bring it back.
   await page.reload();
   await expect(page.getByRole("heading", { level: 1, name: "Save to Writer" })).toHaveCount(0);
+});
+
+test("Save to Writer: a YouTube link brings its video's picture, first in the note and on its card; one that doesn't come in time isn't waited for (#229)", async ({ page, app }) => {
+  const dir = app.novelRepo("varn");
+  await app.restart(dir);
+  const left = await sharing(page, [{ id: "3", received: 3, text: "https://youtu.be/dQw4w9WgXcQ?si=x", subject: "Riveting a truss bridge", pictures: [] }], icon("128x128"));
+  await page.goto(app.launchUrl);
+  await expect(page.getByRole("heading", { level: 1, name: "Save to Writer" })).toBeVisible();
+  // Said before it's fetched: the one thing Save to Writer fetches.
+  await expect(page.getByRole("region", { name: "What was shared" })).toContainText("The video's picture is fetched from YouTube as it's saved, if the phone is online.");
+  await audit(page);
+  await page.getByRole("button", { name: "Save as a new note" }).tap();
+  await expect(page.getByRole("textbox", { name: "Note: Riveting a truss bridge" })).toBeVisible();
+  expect(readFileSync(join(dir, "notes/riveting-a-truss-bridge.md"), "utf8").split("---\n")[2]).toBe("\n![Riveting a truss bridge](/images/riveting-a-truss-bridge.png)\n\n[Riveting a truss bridge](https://youtu.be/dQw4w9WgXcQ?si=x)\n");
+  expect(existsSync(join(dir, "images/riveting-a-truss-bridge.png"))).toBe(true);
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("test-fetched") ?? "[]"))).toEqual(["https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg"]);
+  expect(await left()).toEqual([]);
+  // In the gallery: the picture on its card, with the link's site.
+  await page.goto(`${new URL(page.url()).origin}${new URL(page.url()).pathname.split("/").slice(0, 3).join("/")}/notes`);
+  const card = page.getByRole("link", { name: /^youtu\.be ?Riveting a truss bridge/ });
+  await expect(card.locator("img")).toBeVisible();
+  await fits(page);
+
+  // Offline, or YouTube slow: saved after a few seconds at most, without a picture.
+  await page.evaluate(() => localStorage.clear());
+  const later = await sharing(page, [{ id: "4", received: 4, text: "https://www.youtube.com/watch?v=aaaaaaaaaaa", subject: "Heating the rivets", pictures: [] }], "never");
+  await page.goto(app.launchUrl);
+  await expect(page.getByRole("heading", { level: 1, name: "Save to Writer" })).toBeVisible();
+  await page.getByRole("button", { name: "Save as a new note" }).tap();
+  await expect(page.getByRole("textbox", { name: "Note: Heating the rivets" })).toBeVisible({ timeout: 8000 });
+  expect(readFileSync(join(dir, "notes/heating-the-rivets.md"), "utf8").split("---\n")[2]).toBe("\n[Heating the rivets](https://www.youtube.com/watch?v=aaaaaaaaaaa)\n");
+  expect(await later()).toEqual([]);
 });
 
 test("Save to Writer: shared text added at the end of a note picked from the book's, newest first, with search (#205)", async ({ page, app }) => {

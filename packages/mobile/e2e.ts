@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { createServer } from "node:http";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -134,6 +135,15 @@ header.writeUInt32LE(pcm.length, data - 4);
 writeFileSync(sentence, Buffer.concat([header, pcm]));
 const MODELS = "/data/local/tmp/writer-dictation";
 
+// YouTube's pictures of videos (#229), as img.youtube.com serves them: one video's, and a 404 for any other.
+const VIDEO = "AAAAAAAAAAA";
+const videoPictures = createServer((req, res) => {
+  if (req.url !== `/vi/${VIDEO}/hqdefault.jpg`) return void res.writeHead(404, { "content-type": "image/jpeg" }).end();
+  res.writeHead(200, { "content-type": "image/png" }).end(readFileSync(join(repo, "packages/mobile/src-tauri/icons/icon.png")));
+});
+await new Promise<void>((done) => videoPictures.listen(0, "127.0.0.1", done));
+const videoPort = (videoPictures.address() as { port: number }).port;
+
 const port = new URL(fake.url).port;
 const steps: [string, number][] = [];
 let started = Date.now();
@@ -151,11 +161,12 @@ try {
   if (!device) throw new Error("No Android device: start the emulator, or connect a phone with USB debugging on.");
   // The same port on both sides: the fake's own URLs (a new repository's clone URL) work on the device.
   adb("reverse", `tcp:${port}`, `tcp:${port}`);
+  adb("reverse", `tcp:${videoPort}`, `tcp:${videoPort}`);
   const apk = process.argv[2];
   if (apk) adb("install", "-r", apk);
   adb("shell", "am", "force-stop", PACKAGE);
   adb("shell", "pm", "clear", PACKAGE);
-  inApp("cat > env.json", JSON.stringify({ WRITER_GITHUB_URL: fake.url, WRITER_GITHUB_API_URL: fake.url, WRITER_GITHUB_CLIENT_ID: fake.clientId, WRITER_DICTATION_CLIP: "dictated.wav" }));
+  inApp("cat > env.json", JSON.stringify({ WRITER_GITHUB_URL: fake.url, WRITER_GITHUB_API_URL: fake.url, WRITER_GITHUB_CLIENT_ID: fake.clientId, WRITER_DICTATION_CLIP: "dictated.wav", WRITER_VIDEO_PICTURES_URL: `http://127.0.0.1:${videoPort}` }));
   // The speech model, as its download leaves it (pushed once: 208 MB), and the recording.
   if (adb("shell", `test -f ${MODELS}/models/parakeet/encoder.int8.onnx && echo there || true`).trim() !== "there") {
     adb("shell", "mkdir", "-p", `${MODELS}/models`);
@@ -595,6 +606,27 @@ try {
   if (!sharedOnGitHub) throw new Error("The note made of what was shared didn't reach GitHub.");
   step("shared from another app offline: a picture made a new note, a link added to it, both synced to GitHub once back online");
 
+  // A YouTube link shared online (#229): its video's picture fetched as it's saved, first in the
+  // note, and on its card with the link's site; a video with no picture saved at once without one.
+  const shareVideo = (id: string, title: string) => adb("shell", "am", "start", "-a", "android.intent.action.SEND", "-t", "text/plain", "--es", "android.intent.extra.TEXT", `'https://youtu.be/${id}?si=x'`, "--es", "android.intent.extra.SUBJECT", `'${title}'`, "-n", `${PACKAGE}/.MainActivity`);
+  shareVideo(VIDEO, "Riveting a truss bridge");
+  await expect(page.getByRole("heading", { level: 1, name: "Save to Writer" })).toBeVisible();
+  await expect(page.getByText("The video's picture is fetched from YouTube as it's saved")).toBeVisible();
+  await page.getByRole("button", { name: "Save as a new note" }).click();
+  await expect(page.getByRole("textbox", { name: "Note: Riveting a truss bridge" })).toBeVisible();
+  const riveting = inApp("cat books/varn/notes/riveting-a-truss-bridge.md");
+  if (!/---\n\n!\[Riveting a truss bridge\]\(\/images\/riveting-a-truss-bridge\.(png|jpg)\)\n\n\[Riveting a truss bridge\]\(https:\/\/youtu\.be\/AAAAAAAAAAA\?si=x\)\n$/.test(riveting)) throw new Error(`The video's picture isn't first in its note: ${riveting}`);
+  shareVideo("BBBBBBBBBBB", "A video with no picture");
+  await expect(page.getByRole("heading", { level: 1, name: "Save to Writer" })).toBeVisible();
+  await page.getByRole("button", { name: "Save as a new note" }).click();
+  await expect(page.getByRole("textbox", { name: "Note: A video with no picture" })).toBeVisible();
+  const noPicture = inApp("cat books/varn/notes/a-video-with-no-picture.md");
+  if (noPicture.includes("![")) throw new Error(`A video with no picture was given one: ${noPicture}`);
+  await page.goto(`${new URL(page.url()).origin}${new URL(page.url()).pathname.split("/").slice(0, 3).join("/")}/notes`);
+  const videoCard = page.getByRole("link", { name: /^youtu\.be ?Riveting a truss bridge/ });
+  await expect(videoCard.locator("img")).toBeVisible();
+  step("a YouTube link shared online: its video's picture first in the note and on its card; a video with no picture saved without one");
+
   // Typing, then the app killed before the autosave lands; opened again, the text is there and saved.
   const todaysEntry = async (p: Page) => {
     await p.goto("http://tauri.localhost/");
@@ -660,10 +692,12 @@ try {
   await android?.close();
   try {
     adb("reverse", "--remove", `tcp:${port}`);
+    adb("reverse", "--remove", `tcp:${videoPort}`);
   } catch {
     // Only a picture of what went wrong.
   }
   await fake.close();
+  videoPictures.close();
   rmSync(tmp, { recursive: true, force: true });
 }
 // Done, cleaned up: leave. Something of Playwright's Android connection keeps the process alive

@@ -85,6 +85,9 @@ test("its tree lists the newest month and entry first, the older months folded, 
   await page.getByRole("table").getByRole("link", { name: /28 September/ }).first().click();
   await expect(item("September")).toHaveAttribute("aria-expanded", "true");
   await expect(item("Monday, 28 September")).toHaveAttribute("aria-selected", "true");
+  // The entry opened takes the focus (in a moment, after it's made), before it's moved to the tree:
+  // under load, it would take it from there.
+  await expect(page.getByRole("textbox", { name: "Entry text" })).toBeFocused();
 
   // Moving up moves it up the screen: Thursday above Saturday, so after it in reading order.
   await item("Thursday, 1 October").focus();

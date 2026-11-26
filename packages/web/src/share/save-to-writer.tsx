@@ -13,7 +13,7 @@ import { ErrorAlert } from "../ui/alert.tsx";
 import { Button } from "../ui/button.tsx";
 import { Confirm } from "../ui/confirm.tsx";
 import { cn } from "../ui/cn.ts";
-import { markOpened, onShared, openedShares, pendingShares, pictureFile, shareDone, sharedLink, sharedMarkdown, sharedTitle, type Share } from "./shares.ts";
+import { markOpened, onShared, openedShares, pendingShares, pictureFile, shareDone, sharedLink, sharedMarkdown, sharedTitle, videoId, videoPicture, type Share, type SharedPicture } from "./shares.ts";
 
 /**
  * Something shared with Writer from another app (#204) opens Save to Writer: what was shared before
@@ -67,7 +67,7 @@ const FIELD = "min-h-12 w-full rounded-md border border-rule bg-raised px-3 text
  * last first: as a new note, its title filled in from what's shared, or at the end of a note, picked
  * from the book's newest first. Only a new note's title is asked for. Each picture is resized and
  * saved in images/, a description given shown under it as its caption; a link stays a link with its
- * words, and nothing is fetched. It's written on the phone at once and synced with the
+ * words, and nothing is fetched but a YouTube video's picture (#229). It's written on the phone at once and synced with the
  * book; until it's written, the app keeps what was shared, to try again.
  */
 export function SaveToWriterPage() {
@@ -127,6 +127,9 @@ function SaveShare({ share, onDone }: { share: Share; onDone: () => void }) {
   const [missing, setMissing] = useState<string>();
   const link = sharedLink(share);
   const words = link ? link.words : share.text;
+  const video = link && videoId(link.url);
+  // Asked for once, on the first Save: a Save tried again after a failure doesn't ask YouTube again.
+  const videoAsked = useRef<Promise<SharedPicture | undefined>>(undefined);
 
   const save = async (e: FormEvent) => {
     e.preventDefault();
@@ -149,13 +152,16 @@ function SaveShare({ share, onDone }: { share: Share; onDone: () => void }) {
       // A picture's description, if there's one, is its caption, shown under it. What screen readers
       // say in its place is the note's title: a picture is never left with nothing to read.
       const named = into === "new" ? title.trim() : (queryClient.getQueryData<{ novel: Book }>(keys.novel(book))?.novel.notes.find((n) => n.id === noteId)?.title ?? "A picture");
+      // A YouTube link's picture (#229), first, named as a shared picture is: none if it didn't come.
+      const videoShared = video ? await (videoAsked.current ??= videoPicture(video)) : undefined;
+      const videoSaved = videoShared && (await saveVideoPicture(book, pictureFile(videoShared), named));
       const saved = [];
       for (const [i, file] of files.entries()) {
         const alt = files.length > 1 ? `${named}, picture ${i + 1}` : named;
         const caption = descriptions[i]!.trim() || undefined;
         saved.push({ url: `/${await savePicture(book, file, caption ?? alt)}`, alt, caption });
       }
-      const markdown = sharedMarkdown(share, saved);
+      const markdown = sharedMarkdown(share, saved, videoSaved ? { url: `/${videoSaved}`, alt: named } : undefined);
       const note = into === "new" ? (await api.notes.create(book, { title: title.trim(), note: markdown })).id : await addToNote(book, noteId!, markdown);
       await shareDone(share.id);
       await queryClient.invalidateQueries({ queryKey: keys.novel(book) });
@@ -211,6 +217,7 @@ function SaveShare({ share, onDone }: { share: Share; onDone: () => void }) {
             {link.url}
           </p>
         )}
+        {video && <p className="text-sm text-muted">The video's picture is fetched from YouTube as it's saved, if the phone is online.</p>}
         {share.pictures.map((p, i) => (
           <div key={i} className="grid gap-2 sm:grid-cols-[8rem_minmax(0,1fr)] sm:items-start">
             <img src={previews[i]} alt="" className="max-h-40 w-full rounded-md border border-rule bg-panel object-contain sm:w-32" />
@@ -326,6 +333,21 @@ async function savePicture(bookId: string, file: File, description: string): Pro
     return (await api.addPicture(bookId, rendered.blob, description)).path;
   } finally {
     bitmap.close();
+  }
+}
+
+/**
+ * A video's picture saved as a shared one is, or nothing: one that can't be read, or YouTube's grey
+ * stand-in for a video with no picture (120 by 90), isn't worth stopping the share for.
+ */
+async function saveVideoPicture(bookId: string, file: File, description: string): Promise<string | undefined> {
+  try {
+    const bitmap = await decodeImage(file);
+    const placeholder = bitmap.width <= 120 && bitmap.height <= 90;
+    bitmap.close();
+    return placeholder ? undefined : await savePicture(bookId, file, description);
+  } catch {
+    return undefined;
   }
 }
 

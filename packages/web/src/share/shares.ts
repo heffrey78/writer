@@ -102,12 +102,55 @@ export function sharedTitle(share: Omit<Share, "id" | "received">): string {
 }
 
 /**
- * What's shared as Markdown for a note: its words, a paragraph to a line, each link kept as a link (Writer doesn't fetch the
- * page), the subject its words where a link came alone, then each picture saved on a line of its own,
- * its caption with it.
+ * The YouTube video a link is to, its ID: from youtube.com/watch?v=, youtu.be/, /shorts/, /live/ and
+ * /embed/, on www., m. and music. too. Any other link has none.
  */
-export function sharedMarkdown(share: Omit<Share, "id" | "received" | "pictures">, pictures: { url: string; alt: string; caption?: string }[]): string {
+export function videoId(url: string): string | undefined {
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    return undefined;
+  }
+  if (u.protocol !== "https:" && u.protocol !== "http:") return undefined;
+  const host = u.hostname.toLowerCase().replace(/^(www|m|music)\./, "");
+  const id =
+    host === "youtu.be" ? u.pathname.split("/")[1]
+    : host === "youtube.com" ? (u.pathname === "/watch" ? u.searchParams.get("v") : u.pathname.match(/^\/(?:shorts|live|embed)\/([^/]+)/)?.[1])
+    : undefined;
+  return id && /^[A-Za-z0-9_-]{11}$/.test(id) ? id : undefined;
+}
+
+/** How long Save waits for a video's picture before saving without it, in ms. */
+export const VIDEO_PICTURE_WAIT = 4000;
+
+/**
+ * A YouTube video's picture (#229, a change to #205 that the owner agreed in #221), fetched once while
+ * the share is saved: YouTube's own address for it, through the app's host (the page can't read
+ * another site's bytes). Nothing if it's not there, or doesn't come within `wait` (offline, say): the
+ * share is saved without it. The e2e names a site of its own in env.json, WRITER_VIDEO_PICTURES_URL.
+ */
+export async function videoPicture(id: string, wait = VIDEO_PICTURE_WAIT): Promise<SharedPicture | undefined> {
+  if (!inApp()) return undefined;
+  const fetched = (async () => {
+    const facts = await invoke<{ env?: Record<string, string> }>("port", { port: "host", op: "facts", args: [] });
+    const site = facts.env?.WRITER_VIDEO_PICTURES_URL || "https://img.youtube.com";
+    const res = await invoke<{ status: number; headers: [string, string][]; body: { $bytes: string } }>("port", { port: "http", op: "fetch", args: [{ url: `${site}/vi/${id}/hqdefault.jpg`, method: "GET", headers: [] }] });
+    const type = res.headers.find(([k]) => k.toLowerCase() === "content-type")?.[1].split(";")[0]?.trim();
+    if (res.status !== 200 || !type?.startsWith("image/")) return undefined;
+    return { name: `${id}.jpg`, type, data: res.body.$bytes };
+  })().catch(() => undefined);
+  return Promise.race([fetched, new Promise<undefined>((done) => setTimeout(done, wait))]);
+}
+
+/**
+ * What's shared as Markdown for a note: a video's picture first (#229), its words, a paragraph to a
+ * line, each link kept as a link (Writer doesn't fetch the page), the subject its words where a link
+ * came alone, then each picture saved on a line of its own, its caption with it.
+ */
+export function sharedMarkdown(share: Omit<Share, "id" | "received" | "pictures">, pictures: { url: string; alt: string; caption?: string }[], video?: { url: string; alt: string }): string {
   const parts: string[] = [];
+  if (video) parts.push(`![${escapeText(video.alt)}](${video.url})`);
   const text = share.text?.trim();
   if (text) {
     const link = sharedLink(share);
