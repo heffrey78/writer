@@ -6,12 +6,15 @@ import { Link } from "react-router";
 import { cn } from "../ui/cn.ts";
 import { colorName, NOTE_BG } from "./note-colors.tsx";
 
+/** A note's body without the pictures it starts with: a shared video's comes before its link (#229). */
+const afterPictures = (body: string) => body.trimStart().replace(/^(?:!\[(?:[^\]\\]|\\.)*\]\([^)\s]+(?:\s+"(?:[^"\\]|\\.)*")?\)\s*)+/, "");
+
 /**
- * The site a note's words start with a link to (a link shared to Writer, #205): "youtube.com". A link
- * that comes after words is the words' business, not the card's.
+ * The site a note's words start with a link to (a link shared to Writer, #205), after any pictures:
+ * "youtube.com". A link that comes after words is the words' business, not the card's.
  */
 export function leadingSite(body: string): string | undefined {
-  const href = body.trimStart().match(/^(?:<(https?:\/\/[^>\s]+)>|\[(?:[^\]\\]|\\.)*\]\((https?:\/\/[^)\s]+)\))/i);
+  const href = afterPictures(body).match(/^(?:<(https?:\/\/[^>\s]+)>|\[(?:[^\]\\]|\\.)*\]\((https?:\/\/[^)\s]+)\))/i);
   const url = href?.[1] ?? href?.[2];
   if (!url) return undefined;
   try {
@@ -23,7 +26,7 @@ export function leadingSite(body: string): string | undefined {
 
 /** A card's words: the note's prose on one line, without the address of the link it starts with (the site's above them). */
 export function cardText(body: string): string {
-  const rest = body.trimStart().replace(/^<https?:\/\/[^>\s]+>/i, "");
+  const rest = afterPictures(body).replace(/^<https?:\/\/[^>\s]+>/i, "");
   return proseText(rest).replace(/\s+/g, " ").trim();
 }
 
