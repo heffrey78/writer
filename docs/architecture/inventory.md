@@ -135,6 +135,7 @@ All base: the TipTap schema and lossless Markdown, the chapter-as-one-document v
 | presence | entities × pieces matrices, for any entity type | Novel, Journal, Campaign |
 | story-time | `when`, `duration`, calendar and Day 1, the timeline, the outline in story time, `W_TIME_OVERLAP` | Novel, Campaign |
 | off-page-events | events as files, their pages, gallery and modals, writing one as a scene, promoting a note | Novel, Campaign |
+| mood-board | boards as files (`boards/`), their cards, the pictures they keep (#195) | Novel, Campaign |
 | drafting-board | the board in the app and on GitHub Projects | Novel, Non-fiction |
 | manuscript-format | DOCX and PDF in standard manuscript format, numbered chapter headings, the submission title page | Novel |
 

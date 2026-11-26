@@ -184,6 +184,19 @@ describe.each([
     expect(JSON.parse(r.stdout).diagnostics).toEqual(app.diagnostics);
   });
 
+  it("and its vendored validator reads mood boards as the app does, or leaves them alone where the kind has none (#206)", async () => {
+    const copy = join(tmp, `boards-${kind}`);
+    cpSync(join(repo, sample), copy, { recursive: true });
+    mkdirSync(join(copy, "boards"));
+    writeFileSync(join(copy, "boards/the-belfry.yaml"), "id: board_be1fry\ntitle: The Belfry\ncards:\n  - { note: note_zzzzzz, at: [ 0, 0 ], size: [ 200, 150 ] }\n  - { picture: images/gone.jpg, at: [ 240, 0 ], size: [ 200, 150 ] }\n  - { picture: none, at: [ 480, 0 ], size: [ 200, 150 ] }\n");
+    const r = node([join(dir, ".github/gh-writer/validate.mjs"), copy, "--json"]);
+    const app = await validate(nodeSource(copy));
+    expect(app.diagnostics.map((d) => [d.code, d.pointer])).toEqual(
+      kind === "campaign" ? [["E_SCHEMA", "/cards/2"], ["W_MISSING_IMAGE", undefined], ["W_BOARD_UNKNOWN", "/cards/0/note"]] : [],
+    );
+    expect(JSON.parse(r.stdout).diagnostics).toEqual(app.diagnostics);
+  });
+
   it("and its sample book's snapshots are current", () => {
     for (const book of [dir, join(repo, sample)]) {
       const check = node([join(dir, ".github/gh-writer/snapshots.mjs"), book, "--check"]);

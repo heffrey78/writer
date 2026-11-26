@@ -1,6 +1,6 @@
 {
   "novel": {
-    "fingerprint": "72a924496a9186ec",
+    "fingerprint": "c214f479195b8437",
     "exports": {
       "novel": "v0",
       "manuscript-order": "v1",
@@ -14,7 +14,8 @@
       "part": "v9",
       "chapter": "v10",
       "event": "v11",
-      "event-list": "v12"
+      "event-list": "v12",
+      "board": "v13"
     }
   },
   "journal": {
@@ -34,7 +35,7 @@
     }
   },
   "campaign": {
-    "fingerprint": "bd0260bc0e132dd3",
+    "fingerprint": "1470ab9311e2f47e",
     "exports": {
       "novel": "v0",
       "manuscript-order": "v1",
@@ -45,7 +46,8 @@
       "layouts": "v6",
       "compile": "v7",
       "book": "v8",
-      "arc": "v9"
+      "arc": "v9",
+      "board": "v10"
     }
   },
   "nonfiction": {

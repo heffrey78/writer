@@ -11,10 +11,10 @@ import { campaign } from "../src/index.ts";
 const SAMPLE = fileURLToPath(new URL("../../../examples/sample-campaign", import.meta.url));
 
 describe("the Campaign kind", () => {
-  it("is registered with presence and story time, and none of the Novel's story-only modules", () => {
+  it("is registered with presence, story time and mood boards, and none of the Novel's story-only modules", () => {
     const kind = kindByKey("campaign");
     expect(kind).toBe(withModules(campaign));
-    expect(kind.modules).toEqual(["presence", "story-time"]);
+    expect(kind.modules).toEqual(["presence", "story-time", "mood-board"]);
     expect(kind.fields.map((f) => f.key)).toEqual(["when", "party", "npcs", "locations", "factions", "items", "quests", "entities"]);
     expect(layoutOf(kind)).toBe(PLAIN_LAYOUT);
   });

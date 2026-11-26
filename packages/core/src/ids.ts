@@ -1,5 +1,5 @@
 import type { BookKind } from "./kinds.ts";
-import { recordTypesOf } from "./modules.ts";
+import { fileTypesOf, recordTypesOf } from "./modules.ts";
 
 /** Lowercase Crockford base32: digits and letters without i, l, o, u. */
 export const ID_ALPHABET = "0123456789abcdefghjkmnpqrstvwxyz";
@@ -59,6 +59,7 @@ export function reservedPrefixes(kind: BookKind): ReadonlySet<string> {
     ...(kind.piece.formerPrefixes ?? []),
     ...Object.values(RECORD_PREFIXES),
     ...recordTypesOf(kind).map((t) => t.prefix),
+    ...fileTypesOf(kind).map((t) => t.prefix),
     ...kind.entityTypes.flatMap((t) => [t.prefix, ...(t.formerPrefixes ?? [])]),
   ]);
 }

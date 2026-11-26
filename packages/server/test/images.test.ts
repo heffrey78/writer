@@ -245,6 +245,27 @@ describe("a picture in the prose (heffrey78/gh-writer#203)", () => {
     expect(existsSync(join(dir, path))).toBe(false);
   });
 
+  it("on a mood board, stays when it leaves its note, and a picture alone goes with its last board, back with an Undo (#206)", async () => {
+    const NOTE = "notes/the-varn-bridge.md";
+    const BOARD = "boards/the-bridge.yaml";
+    const { path } = await ws.addPicture("The old bridge", jpeg(3));
+    const { path: alone } = await ws.addPicture("The river", jpeg(4));
+    const line = `![The old bridge](/${path})`;
+    await add(NOTE, line);
+    const board = `id: board_aaaaaa\ntitle: The bridge\ncards:\n  - { note: note_fb6bkb, picture: ${path}, at: [0, 0], size: [200, 150] }\n  - { picture: ${alone}, description: The river, at: [240, 0], size: [200, 150] }\n`;
+    expect((await ws.write(BOARD, board, null)).ok).toBe(true);
+    await without(NOTE, line);
+    expect(existsSync(join(dir, path)), "still on the board").toBe(true);
+    await save(BOARD, (t) => t.replace(/  - \{ picture: .*\n/, ""));
+    expect(existsSync(join(dir, alone)), "on no board now").toBe(false);
+    expect(existsSync(join(dir, path))).toBe(true);
+    await save(BOARD, () => board);
+    expect(readFileSync(join(dir, alone))).toEqual(jpeg(4));
+    // A board that doesn't parse shows nothing anyone can tell, so nothing goes.
+    await save(BOARD, () => "id: board_aaaaaa\ncards: [\n");
+    expect(existsSync(join(dir, alone))).toBe(true);
+  });
+
   it("shown in a scene, an entry's picture stays when the entry's is removed (#200)", async () => {
     await bible.setPicture(ADA, hash(ADA_FILE), jpeg());
     await add(STATION, "![Ada](/images/ada-varn.jpg)");

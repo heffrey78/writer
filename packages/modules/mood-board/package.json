@@ -1,0 +1,14 @@
+{
+  "name": "@writer/module-mood-board",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Mood boards (D14, #195): pages of pictures, notes, a note's pictures and entries as cards placed and sized by hand, a file each in boards/.",
+  "exports": {
+    "./core": "./src/core/index.ts"
+  },
+  "dependencies": {
+    "@writer/core": "0.1.0",
+    "yaml": "^2.9.1"
+  }
+}

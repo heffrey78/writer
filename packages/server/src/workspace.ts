@@ -1,4 +1,4 @@
-import { EVENT_FILES_FORMAT, kindByKey, knownKind, loadBook, MANIFEST, parseYaml, picturePath, pictures, picturesShown, readManifest, SCHEMA_VERSION, slugify, uniqueFileName, V2_KIND, type BookKind, type FileSource, type Book } from "@writer/core";
+import { EVENT_FILES_FORMAT, fileTypesOf, kindByKey, knownKind, loadBook, MANIFEST, parseYaml, picturePath, pictures, picturesShown, readManifest, SCHEMA_VERSION, slugify, uniqueFileName, V2_KIND, type BookKind, type FileSource, type Book } from "@writer/core";
 import { BibleOperations } from "./bible.ts";
 import { moduleServices, type ModuleService } from "./modules.ts";
 import { Checkpoints } from "./checkpoints.ts";
@@ -299,14 +299,25 @@ export class NovelWorkspace {
   }
 
   /**
-   * After a piece or a note is saved (#200): a picture it no longer names, that nothing else in the
-   * book shows (a piece, a note, an entry, the cover), has its file deleted (no picture is left behind in images/); one it names again whose file this
-   * deleted is put back.
+   * After a piece, a note or a module's file (a mood board) is saved (#200, #206): a picture it no longer
+   * shows, that nothing else in the book shows (a piece, a note, an entry, the cover, a board), has its
+   * file deleted (no picture is left behind in images/); one it shows again whose file this deleted is
+   * put back.
    */
   async #prosePictures(path: string, before: string, after: string): Promise<void> {
     const { content, notes } = this.kind.folders;
-    if (!(path.startsWith(`${content}/`) || path.startsWith(`${notes}/`)) || !path.endsWith(".md")) return;
-    const named = (text: string) => new Set(pictures(text).flatMap((p) => picturePath(p.src) ?? []));
+    const prose = (path.startsWith(`${content}/`) || path.startsWith(`${notes}/`)) && path.endsWith(".md");
+    const fileType = fileTypesOf(this.kind).find((t) => t.pictures && path.startsWith(`${t.folder}/`) && path.endsWith(".yaml"));
+    if (!prose && !fileType) return;
+    const shownBy = (text: string): string[] => {
+      if (prose) return pictures(text).flatMap((p) => picturePath(p.src) ?? []);
+      const parsed = parseYaml(text, path);
+      const data = parsed.data;
+      // A file that doesn't parse shows nothing anyone can tell: nothing is deleted for it.
+      return parsed.diagnostics.length || typeof data !== "object" || data === null || Array.isArray(data) ? [] : fileType!.pictures!(data as Record<string, unknown>);
+    };
+    if (fileType && parseYaml(after, path).diagnostics.length) return;
+    const named = (text: string) => new Set(shownBy(text));
     const was = named(before);
     const now = named(after);
     for (const picture of now) {
