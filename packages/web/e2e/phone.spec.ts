@@ -574,8 +574,8 @@ test("on a phone, a long page scrolls clear of the bottom bar: notes and the out
   await expect(page.getByRole("heading", { level: 1, name: "Notes" })).toBeVisible();
   const lastNote = page.locator('a[href*="/note/"]').last();
   await expect(lastNote).toBeAttached();
-  await scrolledToEnd(page);
-  await expect.poll(async () => (await lastNote.boundingBox())!.y + (await lastNote.boundingBox())!.height).toBeLessThanOrEqual(await barTop(page));
+  // Scrolled again while waiting: the cards take their heights as the fonts come, and the page grows.
+  await expect.poll(async () => (await scrolledToEnd(page), (await lastNote.boundingBox())!.y + (await lastNote.boundingBox())!.height)).toBeLessThanOrEqual(await barTop(page));
 });
 
 test("on a phone, a short scene's bar sits on the bottom bar, and on the keyboard while it's up", async ({ page, app }) => {
@@ -904,12 +904,15 @@ test("Save to Writer: shared text added at the end of a note picked from the boo
 
   // The note's own buttons, on a phone: icons a finger's size, named for screen readers, and the date
   // on one line beside them.
-  for (const name of ["Add a picture", "Make it an event or a scene", "Delete"]) {
+  for (const name of ["Add a picture", "Make it an event or a scene", "Color: none", "Delete"]) {
     const button = page.getByRole("button", { name, exact: true });
     await expect(button).toHaveText("");
     expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(48);
   }
-  const date = page.getByText(/^Note · /);
+  // All four on the date's line.
+  const top = async (name: string) => (await page.getByRole("button", { name, exact: true }).boundingBox())!.y;
+  expect(Math.abs((await top("Delete")) - (await top("Add a picture")))).toBeLessThan(2);
+  const date = page.getByText("Oct 15, 2026", { exact: true });
   expect((await date.boundingBox())!.height).toBeLessThan(30);
   await fits(page);
 });
@@ -953,4 +956,65 @@ test("Save to Writer: what's just been shared comes first, before one left from 
   await page.getByRole("button", { name: "Discard" }).tap();
   await page.getByRole("alertdialog").getByRole("button", { name: "Discard" }).tap();
   await expect(shared.locator("img")).toHaveCount(1);
+});
+
+test("on a phone, the Notes screen: one search bar, its Sort and filter sheet, the chips for what's on, New note at the bottom right, and a note's color from its sheet (#226, #228)", async ({ page, app }) => {
+  const dir = app.novelRepo("varn");
+  const IDEA = "notes/what-if-ben-never-sold.md";
+  writeFileSync(join(dir, IDEA), readFileSync(join(dir, IDEA), "utf8").replace("\ntags:", "\ncolor: yellow\ntags:"));
+  await app.restart(dir);
+  await launch(page, app);
+  await page.getByRole("navigation", { name: "Book" }).getByRole("link", { name: "Notes" }).tap();
+  await expect(page.getByRole("heading", { level: 1, name: "Notes" })).toBeAttached();
+  const cards = page.getByRole("list", { name: "Notes" }).getByRole("listitem");
+  await expect(cards).toHaveCount(6);
+
+  // The bar: 56 px, the search in it and Sort and filter, a finger's size.
+  const search = page.getByRole("searchbox", { name: "Search the notes" });
+  await expect(search).toHaveAttribute("placeholder", "Search 6 notes");
+  expect((await search.locator("..").boundingBox())!.height).toBe(56);
+  const filter = page.getByRole("button", { name: "Sort and filter" });
+  expect((await filter.boundingBox())!.height).toBeGreaterThanOrEqual(48);
+  // New note at the bottom right, above the bottom bar.
+  const add = page.getByRole("button", { name: "New note" });
+  const box = (await add.boundingBox())!;
+  expect(box.x + box.width).toBeGreaterThan(viewport.width - 24);
+  expect(box.y + box.height).toBeLessThanOrEqual(await barTop(page));
+  await audit(page);
+  await fits(page);
+
+  // The sheet: a color and a tag, each at once; Show 1 note closes it, the focus back on Sort and filter.
+  await filter.tap();
+  const sheet = page.getByRole("dialog", { name: "Sort and filter" });
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByRole("radiogroup", { name: "Sort" }).getByRole("radio")).toHaveText(["Newest", "Oldest", "Title"]);
+  await sheet.getByRole("radiogroup", { name: "Color" }).getByRole("radio", { name: "Yellow" }).tap();
+  await sheet.getByRole("radiogroup", { name: "Tag" }).getByRole("radio", { name: "ben" }).tap();
+  for (const radio of await sheet.getByRole("radio").all()) expect((await radio.boundingBox())!.height).toBeGreaterThanOrEqual(48);
+  await audit(page);
+  await sheet.getByRole("button", { name: "Show 1 note" }).tap();
+  await expect(sheet).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Sort and filter, 2 on" })).toBeFocused();
+  await expect(cards).toHaveCount(1);
+  await expect(page).toHaveURL(/color=yellow/);
+  // A chip taken off, then Clear.
+  await page.getByRole("button", { name: "Remove the filter: ben" }).tap();
+  await expect(page.getByRole("status").filter({ hasText: "note matches" })).toHaveText("1 note matches");
+  await page.getByRole("button", { name: "Clear", exact: true }).tap();
+  await expect(cards).toHaveCount(6);
+  await expect(page.getByRole("button", { name: "Sort and filter" })).toBeVisible();
+
+  // A note's color, from its sheet: the page and its card take it at once.
+  await cards.getByRole("link", { name: /^What if Ben never sold the plans\? ?, yellow\./ }).tap();
+  // Hidden from a screen reader while the sheet over it is open: found all the same.
+  const note = page.getByRole("dialog", { name: "What if Ben never sold the plans?", includeHidden: true });
+  await note.getByRole("button", { name: "Color: yellow" }).tap();
+  const colors = page.getByRole("dialog", { name: "Color" });
+  await colors.getByRole("radio", { name: "Teal" }).tap();
+  await expect(note).toHaveClass(/bg-note-teal/);
+  for (const radio of await colors.getByRole("radio").all()) expect((await radio.boundingBox())!.height).toBeGreaterThanOrEqual(48);
+  await audit(page);
+  await page.getByRole("button", { name: "Close" }).first().tap();
+  await expect(colors).toHaveCount(0);
+  await expect.poll(() => readFileSync(join(dir, IDEA), "utf8")).toContain("\ncolor: teal\ntags:");
 });

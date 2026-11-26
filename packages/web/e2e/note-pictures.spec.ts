@@ -229,15 +229,18 @@ test("the Notes gallery shows a note's first picture and how many it has, and Wi
   }
 
   // With pictures: only those, kept in the address.
+  await page.getByRole("button", { name: "Filter", exact: true }).click();
   await page.getByRole("checkbox", { name: "With pictures" }).click();
   await expect(page.getByRole("checkbox", { name: "With pictures" })).toBeChecked();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("button", { name: "Filter · 1" })).toBeFocused();
   await expect(cards.locator("span.font-semibold")).toHaveText(["The Varn Bridge", "What if Ben never sold the plans?"]);
   await expect(page.getByRole("status").filter({ hasText: "notes match" })).toHaveText("2 notes match");
   await expect(page).toHaveURL(/[?&]pictures=1/);
   await page.reload();
-  await expect(page.getByRole("checkbox", { name: "With pictures" })).toBeChecked();
+  await expect(page.getByRole("button", { name: "Remove the filter: With pictures" })).toBeVisible();
   await expect(cards).toHaveCount(2);
-  await page.getByRole("checkbox", { name: "With pictures" }).click();
+  await page.getByRole("button", { name: "Remove the filter: With pictures" }).click();
   await expect(cards).toHaveCount(6);
   await expect(page).not.toHaveURL(/pictures=/);
 });

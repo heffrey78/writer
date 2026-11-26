@@ -528,15 +528,36 @@ try {
   let pictured = "";
   for (let i = 0; i < 40 && !pictured; i++, await sleep(250)) pictured = inApp("grep -l \"a-sketch-of-the-toll-house\" books/varn/notes/what-if-ben-never-sold.md || true").trim();
   if (!pictured) throw new Error("The picture wasn't saved in the note on the phone.");
-  // The note's modal closed, Android's back, for the book's Sync.
+  step("a picture chosen from the photos into a note from the bar above the keyboard, saved on the phone");
+
+  // The note colored from its sheet (#228): its page takes the color, its file the one line. Android's
+  // back closes the sheet, then the note, for the gallery, filtered by the color from its sheet (#226).
+  // Hidden from a screen reader while the sheet is over it, so found all the same.
+  const theNote = page.getByRole("dialog", { name: "What if Ben never sold the plans?", includeHidden: true });
+  await theNote.getByRole("button", { name: "Color: none" }).click();
+  await page.getByRole("dialog", { name: "Color" }).getByRole("radio", { name: "Teal" }).click();
+  await expect(theNote).toHaveClass(/bg-note-teal/);
+  let colored = "";
+  for (let i = 0; i < 40 && !colored; i++, await sleep(250)) colored = inApp("grep -l \"^color: teal$\" books/varn/notes/what-if-ben-never-sold.md || true").trim();
+  if (!colored) throw new Error("The note's color wasn't saved on the phone.");
   adb("shell", "input", "keyevent", "KEYCODE_BACK");
+  await expect(page.getByRole("dialog", { name: "Color" })).toHaveCount(0);
   adb("shell", "input", "keyevent", "KEYCODE_BACK");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.getByRole("button", { name: "Sort and filter" }).click();
+  const filterSheet = page.getByRole("dialog", { name: "Sort and filter" });
+  await filterSheet.getByRole("radiogroup", { name: "Color" }).getByRole("radio", { name: "Teal" }).click();
+  await filterSheet.getByRole("button", { name: "Show 1 note" }).click();
+  await expect(page.getByRole("list", { name: "Notes" }).getByRole("listitem")).toHaveCount(1);
+  await page.getByRole("button", { name: "Remove the filter: Teal" }).click();
+  step("a note colored from its sheet, its page in the color and the line in its file; the gallery filtered by it from Sort and filter");
+
   await page.getByRole("button", { name: /^Sync: / }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Sync now" }).click();
   let onGitHub = false;
   for (let i = 0; i < 80 && !onGitHub; i++, await sleep(250)) onGitHub = git(varn, "ls-tree", "-r", "--name-only", "main").split("\n").some((f) => /^images\/a-sketch-of-the-toll-house\.(png|jpg)$/.test(f));
   if (!onGitHub) throw new Error("The picture didn't reach GitHub.");
-  step("a picture chosen from the photos into a note from the bar above the keyboard, saved on the phone and synced to GitHub");
+  step("the picture and the note's color synced to GitHub");
 
   // Shared from another app (#204, #205), as Android's share sheet sends it: a picture from the
   // phone's photos, then a link with its words, each to Save to Writer, into the novel, offline.

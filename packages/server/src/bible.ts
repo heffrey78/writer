@@ -24,8 +24,11 @@ import {
   uniqueFileName,
   uniqueId,
   vocabulary,
+  isNoteColor,
+  NOTE_COLORS,
   type Book,
   type Entity,
+  type NoteColor,
   type NotName,
   type Passage,
   mentionEdits,
@@ -150,6 +153,8 @@ export interface NoteFields {
   scenes?: string[] | null;
   /** On a new note: the scenes, of its own, it's pinned in, taking the pin from the note pinned there before. */
   pinned?: string[];
+  /** The color the writer gave it (D24); null takes it off. */
+  color?: NoteColor | null;
   note?: string | null;
 }
 
@@ -514,16 +519,18 @@ export class BibleOperations {
     });
   }
 
-  /** Change a note's title (its file moves to match), tags or prose (`note`). `base`: the file's hash as read. */
+  /** Change a note's title (its file moves to match), tags, scenes, color or prose (`note`). `base`: the file's hash as read. */
   updateNote(id: string, changes: NoteFields, { base }: { base?: string } = {}): Promise<OperationResult & { file: string }> {
     return this.#run(async (novel) => {
       const note = this.findNote(novel, id);
       if (changes.title !== undefined) required(changes.title, "title");
+      if (changes.color != null && !isNoteColor(changes.color)) throw new OperationError("BAD_REQUEST", `A note's color is one of ${NOTE_COLORS.join(", ")}, not “${String(changes.color)}”.`);
       const text = await this.#read(note.file);
       if (base !== undefined && hashText(text) !== base) throw new OperationError("STALE", `“${note.title}” changed since it was read.`, { path: note.file });
       const edits: YamlEdit[] = [];
       if (changes.title !== undefined) edits.push({ path: ["title"], value: changes.title.trim() });
       if (changes.tags !== undefined) edits.push(changes.tags?.length ? { path: ["tags"], value: changes.tags } : { path: ["tags"], remove: true });
+      if (changes.color !== undefined) edits.push(changes.color ? { path: ["color"], value: changes.color } : { path: ["color"], remove: true });
       if (changes.scenes !== undefined) {
         const scenes = this.#checkScenes(novel, changes.scenes ?? []);
         const pinned = note.pinned.filter((id) => scenes.includes(id));

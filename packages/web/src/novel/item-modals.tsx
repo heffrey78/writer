@@ -5,6 +5,7 @@ import { useLocation, useNavigate, useParams, useSearchParams } from "react-rout
 import { api, keys } from "../api.ts";
 import type { moduleRecordTypes } from "../modules.tsx";
 import { NotePage } from "../notes/note-page.tsx";
+import { NOTE_BG } from "../notes/note-colors.tsx";
 import { ItemModal, NewItem, useCloseTo, type OverState } from "../ui/item-modal.tsx";
 import type { useSpell } from "./spell.ts";
 import type { Workspace } from "./workspace.ts";
@@ -53,7 +54,7 @@ export function NoteOver({ novelId, novel, workspace, spell }: Props) {
   const headingId = useId();
   const note = novel.notes.find((n) => n.id === noteId);
   return (
-    <ItemModal title={noteId === "new" ? "New note" : (note?.title ?? "Note")} onClose={close}>
+    <ItemModal title={noteId === "new" ? "New note" : (note?.title ?? "Note")} onClose={close} className={note?.color && NOTE_BG[note.color]}>
       {noteId === "new" ? (
         <NewItem heading="New note" label="Title" placeholder="What if…" make={async (title) => made((await api.notes.create(novelId, { title })).id)} />
       ) : note ? (

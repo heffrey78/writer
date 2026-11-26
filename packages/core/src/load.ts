@@ -3,7 +3,7 @@ import { HOLDS } from "./entry-fields.ts";
 import { kindByKey, knownKind, startLevels, V2_KIND, type BookKind, type LevelDef } from "./kinds.ts";
 import { recordTypesOf, withModules } from "./modules.ts";
 import { EVENT_FILES_FORMAT, MANIFEST, NOVEL_MANIFEST, readManifest, SCHEMA_VERSION } from "./manifest.ts";
-import type { Section, Entity, FieldChange, Book, ModuleRecord, Relationship, Piece, ThemeRef } from "./model.ts";
+import { isNoteColor, NOTE_COLORS, type Section, type Entity, type FieldChange, type Book, type ModuleRecord, type Relationship, type Piece, type ThemeRef } from "./model.ts";
 import { judgementFiles, readDifferent, readNotNames } from "./judgements.ts";
 import { parseMarkdown, parseYaml } from "./parse.ts";
 import { checkSchema, type SchemaKind } from "./schemas.ts";
@@ -338,6 +338,12 @@ export async function loadBook(source: FileSource, kind?: BookKind): Promise<Boo
       if (!md || !str(md.data["id"])) continue;
       const d = md.data;
       const created = str(d["created"]), became = str(d["became"]);
+      // A color is one of the names every theme draws (D24); another is shown as none, and said.
+      const color = d["color"] === undefined ? undefined : isNoteColor(d["color"]) ? d["color"] : null;
+      if (color === null) {
+        const named = typeof d["color"] === "string" ? `“${d["color"]}”` : "something that isn't a name";
+        diagnostics.push({ severity: "warning", code: "W_NOTE_COLOR", file, pointer: "/color", message: `The note's color is ${named}, which isn't one of ${NOTE_COLORS.join(", ")}; it's shown without one` });
+      }
       novel.notes.push({
         id: str(d["id"])!,
         title: str(d["title"]) ?? "",
@@ -346,6 +352,7 @@ export async function loadBook(source: FileSource, kind?: BookKind): Promise<Boo
         pinned: strList(d["pinned"]),
         ...(created ? { created } : {}),
         ...(became ? { became } : {}),
+        ...(color ? { color } : {}),
         body: md.body,
         bodyLine: md.bodyLine,
         file,

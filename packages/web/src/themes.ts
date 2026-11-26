@@ -34,6 +34,15 @@ export const TOKENS = [
   "series-6",
   "series-7",
   "series-8",
+  // A note's color (D24, #222): the card and the note's page, behind text, quiet text and links.
+  "note-red",
+  "note-orange",
+  "note-yellow",
+  "note-green",
+  "note-teal",
+  "note-blue",
+  "note-purple",
+  "note-gray",
 ] as const;
 export type Token = (typeof TOKENS)[number];
 export type Tokens = Record<Token, string>;
@@ -91,6 +100,14 @@ export const PAPER: Record<Mode, Tokens> = {
     "series-6": "#008300",
     "series-7": "#6250d6",
     "series-8": "#e34948",
+    "note-red": "#f7d9d3",
+    "note-orange": "#fadfc4",
+    "note-yellow": "#f6eab2",
+    "note-green": "#dbeac6",
+    "note-teal": "#cbe7e1",
+    "note-blue": "#d6e3f4",
+    "note-purple": "#e5dcf2",
+    "note-gray": "#e6e2db",
   },
   dark: {
     ink: "#e8e4dc",
@@ -118,6 +135,14 @@ export const PAPER: Record<Mode, Tokens> = {
     "series-6": "#008300",
     "series-7": "#9085e9",
     "series-8": "#e66767",
+    "note-red": "#4a2a26",
+    "note-orange": "#493020",
+    "note-yellow": "#3d3519",
+    "note-green": "#2c3822",
+    "note-teal": "#1e3935",
+    "note-blue": "#233349",
+    "note-purple": "#352a48",
+    "note-gray": "#34322e",
   },
 };
 
@@ -332,7 +357,43 @@ export function derive(colors: Colors, minimum = 4.5): Tokens {
     "series-6": base["series-6"],
     "series-7": base["series-7"],
     "series-8": base["series-8"],
+    // A mention in a colored note is a link on its tint, over the note's color.
+    ...noteShades(paper, [ink, muted, accent], minimum, { accent, soft: soft.accent }),
   };
+}
+
+/** The colors a note may have (D24), in the order the picker shows them. */
+export const NOTE_COLORS = ["red", "orange", "yellow", "green", "teal", "blue", "purple", "gray"] as const;
+type NoteToken = `note-${(typeof NOTE_COLORS)[number]}`;
+
+/** Each note color's hue, which a theme's paper is tinted with. Paper's own shades are the mock-ups' (#221). */
+const NOTE_HUES: Record<(typeof NOTE_COLORS)[number], string> = {
+  red: "#d9534a",
+  orange: "#e8873a",
+  yellow: "#e3c13b",
+  green: "#6aa84f",
+  teal: "#3fa596",
+  blue: "#4a86d4",
+  purple: "#8e6ccf",
+  gray: "#8a8580",
+};
+
+/**
+ * A theme's note colors: its paper tinted with each hue, the tint lessened until text, quiet text
+ * and links all read on it at `minimum`, and `link`'s color on its own soft tint over it (a mention). At no tint it's the paper, where they read already, so every
+ * shade reads, whatever the paper.
+ */
+export function noteShades(paper: string, text: readonly string[], minimum: number, link?: { accent: string; soft: number }): Record<NoteToken, string> {
+  const strength = isDark(paper) ? 0.24 : 0.3;
+  const reads = (tinted: string) => text.every((t) => contrast(t, tinted) >= minimum) && (!link || contrast(link.accent, over(link.accent, link.soft, tinted)) >= minimum);
+  const shade = (hue: string) => {
+    for (let step = Math.round(strength * 100); step > 0; step--) {
+      const tinted = mix(paper, hue, step / 100);
+      if (reads(tinted)) return tinted;
+    }
+    return paper;
+  };
+  return Object.fromEntries(NOTE_COLORS.map((c) => [`note-${c}`, shade(NOTE_HUES[c])])) as Record<NoteToken, string>;
 }
 
 /** A theme's tokens in a mode: Paper's as the stylesheets set them, the others made by derive(). */

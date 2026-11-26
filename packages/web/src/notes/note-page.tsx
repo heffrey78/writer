@@ -1,9 +1,10 @@
-import { pieceSections, plural, readFrontMatter, vocabulary, word, type Book, type Note } from "@writer/core";
+import { isNoteColor, NOTE_COLORS, pieceSections, plural, readFrontMatter, vocabulary, word, type Book, type Note, type NoteColor } from "@writer/core";
 import { joinSceneFile } from "@writer/editor";
 import { SceneEditor, type SpellService } from "@writer/editor/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Editor } from "@tiptap/core";
-import { ArrowUpRight, ImagePlus, Trash2 } from "lucide-react";
+import { ArrowUpRight, ImagePlus, Palette, Trash2 } from "lucide-react";
+import { Dialog, Popover } from "radix-ui";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 import { useStore } from "zustand";
@@ -25,7 +26,9 @@ import { usePictures } from "../novel/use-pictures.tsx";
 import { useTextFocused, WritingBar } from "../novel/writing-bar.tsx";
 import { DictateButton } from "../dictation/dictation-ui.tsx";
 import { useNarrow } from "../narrow.ts";
+import { ColorChoice, colorName } from "./note-colors.tsx";
 import { PromoteNoteDialog } from "./promote.tsx";
+import { SheetHandle } from "../ui/sheet-handle.tsx";
 
 /**
  * A writer's note (heffrey78/gh-writer#205): its title, tags and prose, each edited in place, and what it became if it
@@ -55,6 +58,8 @@ export function NotePage({
   const file = useStore(workspace.store, (s) => s.files[note.file]);
   const fm = useMemo(() => (file ? (readFrontMatter(joinSceneFile(file)) ?? {}) : {}), [file?.frontMatter]); // eslint-disable-line react-hooks/exhaustive-deps
   const tags = Array.isArray(fm.tags) ? (fm.tags as unknown[]).filter((t): t is string => typeof t === "string") : note.tags;
+  // Its color as its file has it now: once the file's open, what it says, or none.
+  const color = file ? (isNoteColor(fm.color) ? fm.color : undefined) : note.color;
   const mentions = useMemo(() => mentionEntities(novel), [novel]);
   const w = vocabulary(novel.kind);
   const proseId = useId();
@@ -77,8 +82,9 @@ export function NotePage({
     () => [
       { id: "note.promote", title: `Make “${note.title}” ${becomes}`, group: "Notes", keywords: ["promote", ...into.map((x) => x.one), w.piece.one], run: () => setPromoting(true) },
       { id: "note.insertPicture", title: "Insert a picture…", group: "Notes", keywords: ["image", "map", "handout", "photo"], run: () => askPicture(editor) },
+      ...[undefined, ...NOTE_COLORS].map((c) => ({ id: `note.color.${c ?? "none"}`, title: `Note color: ${c ? colorName(c) : "None"}`, group: "Notes", keywords: ["colour"], isActive: () => c === color, run: () => void setColor(c) })),
     ],
-    [note.title, w, becomes, editor],
+    [note.title, w, becomes, editor, color],
   );
 
   // A note just made: the caret goes into its prose, ready to write (heffrey78/gh-writer#222).
@@ -110,6 +116,15 @@ export function NotePage({
       show({ message: `Couldn't change the tags: ${e instanceof Error ? e.message : String(e)}` });
     });
   };
+  // Its color (#228): one line of its file, written as any edit is; the gallery's card takes it at once.
+  const setColor = async (c: NoteColor | undefined) => {
+    const colored = (n: Note): Note => (n.id !== note.id ? n : c ? { ...n, color: c } : (({ color: _, ...rest }) => rest)(n));
+    queryClient.setQueryData<{ novel: Book }>(keys.novel(novelId), (data) => data && { ...data, novel: { ...data.novel, notes: data.novel.notes.map(colored) } });
+    await workspace.editFrontMatter(note.file, [c ? { path: ["color"], value: c } : { path: ["color"], remove: true }]).catch((e: unknown) => {
+      show({ message: `Couldn't change its color: ${e instanceof Error ? e.message : String(e)}` });
+      void refresh();
+    });
+  };
   const bookTags = useMemo(() => [...new Set([...novel.notes, ...novel.entities].flatMap((x) => x.tags))].sort((a, b) => a.localeCompare(b)), [novel]);
   const sceneTitle = (id: string) => novel.allPieces.find((x) => x.id === id)?.title ?? id;
   const setScenes = async (scenes: string[]) => {
@@ -138,8 +153,9 @@ export function NotePage({
   return (
     <div className={embedded ? "grid gap-4" : "mx-auto grid w-full max-w-[calc(var(--ghw-prose-measure)+3rem)] gap-5 px-6 py-6"}>
       <div className="grid gap-1.5">
-        <div className="flex flex-wrap items-center gap-2 pr-8">
-          <p className="flex-1 text-sm whitespace-nowrap text-muted">Note{note.created && ` · ${realDay(note.created)}`}</p>
+        <div className={narrow ? "flex items-center gap-1 pr-8" : "flex flex-wrap items-center gap-2 pr-8"}>
+          {/* On a phone, the date alone beside the four icons: with "Note", the last went onto a line of its own. */}
+          <p className="min-w-0 flex-1 truncate text-sm text-muted">{narrow ? (note.created ? realDay(note.created) : "Note") : `Note${note.created ? ` · ${realDay(note.created)}` : ""}`}</p>
           {/* On a phone, icons alone, each a finger's size: their words squeezed the date onto four lines. */}
           <Button variant="ghost" size="sm" className={iconOnly} aria-label={narrow ? "Add a picture" : undefined} onClick={() => askPicture(editor)} disabled={!editor}>
             <ImagePlus className={narrow ? "size-5" : "size-4"} aria-hidden /> {!narrow && "Add a picture"}
@@ -147,6 +163,7 @@ export function NotePage({
           <Button variant="ghost" size="sm" className={iconOnly} aria-label={narrow ? `Make it ${becomes}` : undefined} onClick={() => setPromoting(true)}>
             <ArrowUpRight className={narrow ? "size-5" : "size-4"} aria-hidden /> {!narrow && `Make it ${becomes}`}
           </Button>
+          <NoteColorButton color={color} onChange={(c) => void setColor(c)} narrow={narrow} className={iconOnly} />
           <Button variant="ghost" size="sm" className={iconOnly} aria-label={narrow ? "Delete" : undefined} onClick={() => setDeleting(true)} disabled={remove.isPending}>
             <Trash2 className={narrow ? "size-5" : "size-4"} aria-hidden /> {!narrow && "Delete"}
           </Button>
@@ -284,5 +301,47 @@ export function NotePage({
       <Confirm open={deleting} onOpenChange={setDeleting} title={`Delete “${note.title}”?`} description={`The note goes from the ${w.book.one}. It stays in the history.`} action="Delete" danger onConfirm={() => remove.mutate()} />
       {remove.isError && <ErrorAlert title="Couldn't delete it">{remove.error.message}</ErrorAlert>}
     </div>
+  );
+}
+
+/**
+ * Color (#228), among the note's icons, named for the color it has ("Color: yellow"): on a phone its
+ * choices in a sheet, each a finger's size with its name under it; on the desktop in a popover. A color
+ * chosen is written at once; the sheet or popover stays, for another.
+ */
+function NoteColorButton({ color, onChange, narrow, className }: { color: NoteColor | undefined; onChange: (c: NoteColor | undefined) => void; narrow: boolean; className: string | undefined }) {
+  const [open, setOpen] = useState(false);
+  const name = `Color: ${color ?? "none"}`;
+  const trigger = (
+    <Button variant="ghost" size="sm" className={className} aria-label={name} title={name}>
+      <Palette className={narrow ? "size-5" : "size-4"} aria-hidden /> {!narrow && "Color"}
+    </Button>
+  );
+  const hint = <p className="text-xs text-muted">Kept with the note, so its card has it on every device. Each theme draws it in its own shade.</p>;
+  if (narrow)
+    return (
+      <Dialog.Root open={open} onOpenChange={setOpen}>
+        <Dialog.Trigger asChild>{trigger}</Dialog.Trigger>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-[60] bg-black/40" />
+          <Dialog.Content aria-describedby={undefined} className="fixed inset-x-0 bottom-0 z-[60] grid gap-3 rounded-t-2xl border-t border-rule bg-raised px-4 pt-0 pb-5 text-ink shadow-xl">
+            <SheetHandle edge="bottom" onClose={() => setOpen(false)} />
+            <Dialog.Title className="text-lg font-semibold">Color</Dialog.Title>
+            <ColorChoice label="Color" value={color} onChange={onChange} />
+            {hint}
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+    );
+  return (
+    <Popover.Root open={open} onOpenChange={setOpen}>
+      <Popover.Trigger asChild>{trigger}</Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content align="end" sideOffset={6} aria-label="Color" className="z-[60] grid w-80 gap-3 rounded-xl border border-rule bg-raised p-4 text-sm text-ink shadow-lg">
+          <ColorChoice label="Color" value={color} onChange={onChange} />
+          {hint}
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }

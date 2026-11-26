@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { contrast, derive, luminance, ownFrom, ownOf, ownTheme, SWATCHES, PAPER, readable, THEMES, themeCss, themesCss, tokensOf, TOKENS, type Mode, type Tokens } from "../src/themes.ts";
+import { NOTE_COLORS as CORE_NOTE_COLORS } from "@writer/core";
+import { contrast, derive, luminance, mix, NOTE_COLORS, ownFrom, ownOf, ownTheme, SWATCHES, PAPER, readable, THEMES, themeCss, themesCss, tokensOf, TOKENS, type Mode, type Tokens } from "../src/themes.ts";
 
 const css = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
 const STYLESHEETS = css("../../editor/src/styles.css") + css("../src/styles.css");
@@ -101,6 +102,49 @@ describe("themes (#189)", () => {
       }),
       { numRuns: 300 },
     );
+  });
+
+  /** A mention's ground in a note of color `c`: the link color's soft tint over the note's color. */
+  const mention = (t: Tokens, c: (typeof NOTE_COLORS)[number]) => mix(t[`note-${c}`], t.accent, Number(/\/ ([\d.]+)\)$/.exec(t["accent-soft"])![1]));
+
+  it("draws every note color (D24) in every theme, light and dark, with text, quiet text, links and mentions reading on it", () => {
+    const failures: string[] = [];
+    for (const theme of THEMES) {
+      for (const mode of ["light", "dark"] as const) {
+        const t = tokensOf(theme, mode);
+        const shades = NOTE_COLORS.map((c) => t[`note-${c}`]);
+        // Eight colors a writer can tell apart: no two alike, none the paper itself.
+        expect(new Set([...shades, t.paper]).size, `${theme.name} ${mode}`).toBe(NOTE_COLORS.length + 1);
+        for (const c of NOTE_COLORS) {
+          for (const role of ["ink", "muted", "accent"] as const) {
+            const ratio = contrast(t[role], t[`note-${c}`]);
+            if (ratio < theme.minimum) failures.push(`${theme.name} ${mode}: ${role} on ${c} ${t[`note-${c}`]} is ${ratio.toFixed(2)}`);
+          }
+          const ratio = contrast(t.accent, mention(t, c));
+          if (ratio < theme.minimum) failures.push(`${theme.name} ${mode}: a mention on ${c} ${t[`note-${c}`]} is ${ratio.toFixed(2)}`);
+        }
+      }
+    }
+    expect(failures).toEqual([]);
+  });
+
+  it("makes note colors that read from any of a writer's own colors", () => {
+    const color = fc.tuple(fc.integer({ min: 0, max: 255 }), fc.integer({ min: 0, max: 255 }), fc.integer({ min: 0, max: 255 })).map((c) => `#${c.map((v) => v.toString(16).padStart(2, "0")).join("")}`);
+    const paper = color.filter((p) => luminance(p) < 0.05 || luminance(p) > 0.3);
+    fc.assert(
+      fc.property(paper, color, color, (paper, ink, accent) => {
+        const t = derive({ paper, ink, accent });
+        for (const c of NOTE_COLORS) {
+          for (const role of ["ink", "muted", "accent"] as const) expect(contrast(t[role], t[`note-${c}`]), `${role} on ${c}`).toBeGreaterThanOrEqual(4.5);
+          expect(contrast(t.accent, mention(t, c)), `a mention on ${c}`).toBeGreaterThanOrEqual(4.5);
+        }
+      }),
+      { numRuns: 200 },
+    );
+  });
+
+  it("names the same note colors as the book format", () => {
+    expect([...NOTE_COLORS]).toEqual([...CORE_NOTE_COLORS]);
   });
 
   it("finds the nearest readable shade: toward black on light paper, toward white on dark", () => {

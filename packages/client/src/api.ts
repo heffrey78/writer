@@ -4,7 +4,7 @@
  */
 
 import type { Comparison, ParagraphDiff } from "@writer/core/compare";
-import type { EntryFieldDef, FieldChange, NotName, SeriesSlot, SidebarFile, WritingDay } from "@writer/core";
+import type { EntryFieldDef, FieldChange, NoteColor, NotName, SeriesSlot, SidebarFile, WritingDay } from "@writer/core";
 
 /** GET /stats: the open version's writing days, the manuscript's words now, and novel.yaml's target. */
 /** How a relationship type is drawn: a palette slot and a line. */
@@ -271,6 +271,8 @@ export interface NoteFields {
   scenes?: string[] | null;
   /** On a new note: the scenes, of its own, it's pinned in. */
   pinned?: string[];
+  /** The color the writer gave it (D24); null takes it off. */
+  color?: NoteColor | null;
   note?: string | null;
 }
 

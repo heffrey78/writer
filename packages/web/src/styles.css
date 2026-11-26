@@ -28,6 +28,15 @@
   --ghw-series-6: #008300;
   --ghw-series-7: #6250d6;
   --ghw-series-8: #e34948;
+  /* A note's color (D24): the mock-ups' shades, every text color at 4.5 : 1 or better on each. */
+  --ghw-note-red: #f7d9d3;
+  --ghw-note-orange: #fadfc4;
+  --ghw-note-yellow: #f6eab2;
+  --ghw-note-green: #dbeac6;
+  --ghw-note-teal: #cbe7e1;
+  --ghw-note-blue: #d6e3f4;
+  --ghw-note-purple: #e5dcf2;
+  --ghw-note-gray: #e6e2db;
   color-scheme: light;
 }
 
@@ -50,6 +59,14 @@
     --ghw-series-6: #008300;
     --ghw-series-7: #9085e9;
     --ghw-series-8: #e66767;
+    --ghw-note-red: #4a2a26;
+    --ghw-note-orange: #493020;
+    --ghw-note-yellow: #3d3519;
+    --ghw-note-green: #2c3822;
+    --ghw-note-teal: #1e3935;
+    --ghw-note-blue: #233349;
+    --ghw-note-purple: #352a48;
+    --ghw-note-gray: #34322e;
     color-scheme: dark;
   }
 }
@@ -72,6 +89,14 @@
   --ghw-series-6: #008300;
   --ghw-series-7: #9085e9;
   --ghw-series-8: #e66767;
+  --ghw-note-red: #4a2a26;
+  --ghw-note-orange: #493020;
+  --ghw-note-yellow: #3d3519;
+  --ghw-note-green: #2c3822;
+  --ghw-note-teal: #1e3935;
+  --ghw-note-blue: #233349;
+  --ghw-note-purple: #352a48;
+  --ghw-note-gray: #34322e;
   color-scheme: dark;
 }
 
@@ -89,6 +114,14 @@
   --color-ok: var(--ghw-ok);
   --color-warn: var(--ghw-warn);
   --color-warn-soft: var(--ghw-warn-soft);
+  --color-note-red: var(--ghw-note-red);
+  --color-note-orange: var(--ghw-note-orange);
+  --color-note-yellow: var(--ghw-note-yellow);
+  --color-note-green: var(--ghw-note-green);
+  --color-note-teal: var(--ghw-note-teal);
+  --color-note-blue: var(--ghw-note-blue);
+  --color-note-purple: var(--ghw-note-purple);
+  --color-note-gray: var(--ghw-note-gray);
   --font-prose: var(--ghw-prose-font);
   /* The interface font: the system's, unless the device chose one of the app's (#192). */
   --font-ui: var(--ghw-ui-font, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif);

@@ -162,20 +162,101 @@ test("the Notes gallery: every note as a card, by tag and words, newest or by ti
   const cards = page.getByRole("list", { name: "Notes" }).getByRole("listitem");
   // Newest first: the one just written, the entries' notes moved from their files (D20), then the idea.
   await expect(cards.locator("span.font-semibold")).toHaveText(["A toll on the bridge", "Ada Varn", "Ben Varn", "Mirela Kost", "The Varn Bridge", "Tomas Hale", "What if Ben never sold the plans?"]);
-  await expect(cards.nth(6)).toContainText("ending · ben");
+  // Its tags as chips, and no stripe: a plain card is the raised surface with a rule.
+  await expect(cards.nth(6).locator("span.rounded-full")).toHaveText(["ending", "ben"]);
+  await expect(cards.nth(6).getByRole("link")).toHaveCSS("border-left-width", "1px");
   for (const colorScheme of ["light", "dark"] as const) {
     await page.emulateMedia({ colorScheme });
     await axe(page);
   }
   await page.getByRole("combobox", { name: "Sort" }).selectOption("title");
   await expect(cards.locator("span.font-semibold")).toHaveText(["A toll on the bridge", "Ada Varn", "Ben Varn", "Mirela Kost", "The Varn Bridge", "Tomas Hale", "What if Ben never sold the plans?"]);
-  await page.getByRole("combobox", { name: "Tag", exact: true }).selectOption("ben");
+  await page.getByRole("button", { name: /^Filter/ }).click();
+  await page.getByRole("radiogroup", { name: "Tag" }).getByRole("radio", { name: "ben" }).click();
   await expect(cards).toHaveCount(1);
   await expect(page.getByRole("status").filter({ hasText: "note matches" })).toHaveText("1 note matches");
-  await page.getByRole("combobox", { name: "Tag", exact: true }).selectOption("");
+  await page.getByRole("radiogroup", { name: "Tag" }).getByRole("radio", { name: "Any tag" }).click();
+  await page.keyboard.press("Escape");
   await page.getByRole("searchbox", { name: "Search the notes" }).fill("flood");
   await expect(cards).toHaveCount(1);
   await cards.getByRole("link").click();
   await expect(page.getByRole("heading", { level: 1, name: "What if Ben never sold the plans?" })).toBeVisible();
 
+});
+
+test("a note's color, chosen on the note by keyboard or from the palette, fills its page and its card, one line of its file (#228); the gallery filtered by it from Filter (#227)", async ({ page, app }) => {
+  const dir = await openNovel(page, app);
+  const before = readFileSync(join(dir, IDEA), "utf8");
+  await palette(page, "note: what if ben");
+  const note = page.getByRole("dialog", { name: "What if Ben never sold the plans?" });
+  await expect(note.getByRole("textbox", { name: "Note: What if Ben never sold the plans?" })).toBeVisible();
+
+  // By keyboard: Color, then the arrows through None and the eight.
+  await note.getByRole("button", { name: "Color: none" }).focus();
+  await page.keyboard.press("Enter");
+  const colors = page.getByRole("radiogroup", { name: "Color" });
+  await expect(colors.getByRole("radio", { name: "None" })).toBeFocused();
+  await expect(colors.getByRole("radio")).toHaveCount(9);
+  // Held a moment, as a finger holds a key: Radix moves the focus after the key's down, and chooses only while it's down.
+  for (let i = 0; i < 3; i++) await page.keyboard.press("ArrowRight", { delay: 50 });
+  await expect(colors.getByRole("radio", { name: "Yellow" })).toBeChecked();
+  await expect(note).toHaveClass(/bg-note-yellow/);
+  for (const colorScheme of ["light", "dark"] as const) {
+    await page.emulateMedia({ colorScheme });
+    await axe(page);
+  }
+  await page.emulateMedia({ colorScheme: "light" });
+  await page.keyboard.press("Escape");
+  await expect(note.getByRole("button", { name: "Color: yellow" })).toBeFocused();
+  // In the file, the one line.
+  const lines = (text: string) => text.split("\n");
+  await expect.poll(() => readFileSync(join(dir, IDEA), "utf8")).not.toBe(before);
+  const after = lines(readFileSync(join(dir, IDEA), "utf8"));
+  expect(after.filter((l) => !lines(before).includes(l))).toEqual(["color: yellow"]);
+  expect(after.filter((l) => l !== "color: yellow")).toEqual(lines(before));
+
+  // The gallery: its card in the color, read with its color's name.
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  const cards = page.getByRole("list", { name: "Notes" }).getByRole("listitem");
+  const idea = cards.getByRole("link", { name: /^What if Ben never sold the plans\? ?, yellow\. Then Ada/ });
+  await expect(idea).toHaveClass(/bg-note-yellow/);
+
+  // / searches; Filter, by keyboard alone, keeps the yellow ones; Escape gives the focus back to Filter.
+  await page.keyboard.press("/");
+  await expect(page.getByRole("searchbox", { name: "Search the notes" })).toBeFocused();
+  await page.getByRole("button", { name: "Filter", exact: true }).focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("radio", { name: "Any color" })).toBeFocused();
+  for (let i = 0; i < 3; i++) await page.keyboard.press("ArrowRight", { delay: 50 });
+  await expect(cards).toHaveCount(1);
+  await expect(page).toHaveURL(/[?&]color=yellow/);
+  for (const colorScheme of ["light", "dark"] as const) {
+    await page.emulateMedia({ colorScheme });
+    await axe(page);
+  }
+  await page.emulateMedia({ colorScheme: "light" });
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("button", { name: "Filter · 1" })).toBeFocused();
+  await expect(page.getByRole("status").filter({ hasText: "note matches" })).toHaveText("1 note matches");
+  await page.getByRole("button", { name: "Remove the filter: Yellow" }).click();
+  await expect(cards).toHaveCount(6);
+  // Cards of their own heights, in columns: each spans its height's worth of the grid's rows, after a
+  // search that matched nothing is cleared too.
+  await page.getByRole("searchbox", { name: "Search the notes" }).fill("nothing is called this");
+  await expect(page.getByText("No note matches.")).toBeVisible();
+  await page.getByRole("searchbox", { name: "Search the notes" }).fill("");
+  await expect(cards).toHaveCount(6);
+  for (const card of await cards.all()) await expect.poll(() => card.evaluate((li) => (li as HTMLElement).style.gridRowEnd)).toMatch(/^span \d+$/);
+  // None over another.
+  const boxes = await Promise.all((await cards.getByRole("link").all()).map(async (card) => (await card.boundingBox())!));
+  for (const [i, a] of boxes.entries()) for (const b of boxes.slice(i + 1)) expect(a.x + a.width <= b.x || b.x + b.width <= a.x || a.y + a.height <= b.y || b.y + b.height <= a.y).toBe(true);
+
+  // From the palette, with the note open: Note color: None takes it off, and the file is as it was.
+  await idea.click();
+  await expect(note.getByRole("button", { name: "Color: yellow" })).toBeVisible();
+  await palette(page, "note color: none");
+  await expect(note.getByRole("button", { name: "Color: none" })).toBeVisible();
+  await expect(note).not.toHaveClass(/bg-note-/);
+  await expect.poll(() => readFileSync(join(dir, IDEA), "utf8")).toBe(before);
 });

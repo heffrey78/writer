@@ -151,6 +151,17 @@ export interface ModuleRecord {
   pointer?: string;
 }
 
+/**
+ * The colors a writer may give a note (D24, #222), as the note's file names them. The file keeps the name,
+ * never a shade: each theme draws each name, in light and dark, in a shade that reads.
+ */
+export const NOTE_COLORS = ["red", "orange", "yellow", "green", "teal", "blue", "purple", "gray"] as const;
+export type NoteColor = (typeof NOTE_COLORS)[number];
+
+export function isNoteColor(v: unknown): v is NoteColor {
+  return typeof v === "string" && (NOTE_COLORS as readonly string[]).includes(v);
+}
+
 /** A writer's note: notes/<slug>.md (D12). */
 export interface Note {
   id: string;
@@ -164,6 +175,8 @@ export interface Note {
   created?: string;
   /** The event or scene it was promoted to, when kept. */
   became?: string;
+  /** The color the writer gave it (D24); a name this Writer doesn't know reads as none. */
+  color?: NoteColor;
   body: string;
   bodyLine: number;
   file: string;
