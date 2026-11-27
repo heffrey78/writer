@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { devices, type Locator, type Page } from "@playwright/test";
@@ -1058,4 +1058,34 @@ test("on a phone, the Notes screen: one search bar, its Sort and filter sheet, t
   await page.getByRole("button", { name: "Close" }).first().tap();
   await expect(colors).toHaveCount(0);
   await expect.poll(() => readFileSync(join(dir, IDEA), "utf8")).toContain("\ncolor: teal\ntags:");
+});
+
+test("on a phone, a board's cards are drawn, and the board fills the page down to the bottom bar", async ({ page, app }) => {
+  const dir = app.bookRepo(fileURLToPath(new URL("../../../examples/sample-campaign", import.meta.url)), "campaign");
+  mkdirSync(join(dir, "boards"));
+  writeFileSync(
+    join(dir, "boards/the-belfry.yaml"),
+    "id: board_be1fry\ntitle: The Belfry\ncards:\n  - { note: note_tab1e0, at: [ 0, 0 ], size: [ 252, 300 ] }\n  - { entry: npc_ma7ra1, at: [ 300, 40 ], size: [ 196, 230 ] }\n",
+  );
+  app.git(dir, "add", "-A");
+  app.git(dir, "commit", "-qm", "A board");
+  await app.restart(dir);
+  await page.goto(app.launchUrl);
+  await expect(page.getByRole("navigation", { name: "Book" })).toBeVisible();
+  const at = new URL(page.url());
+  await page.goto(`${at.origin}${at.pathname.replace(/^(\/novels\/[^/]+).*/, "$1")}/boards/board_be1fry${at.search}`);
+  await expect(page.getByRole("heading", { level: 1, name: "The Belfry" })).toBeVisible();
+  // React Flow drawn at 100% of a height a phone's page gave by flex alone was 0 px tall, its cards hidden in it.
+  const board = page.getByRole("region", { name: "Board: The Belfry, 2 cards" });
+  const box = (await board.boundingBox())!;
+  const bar = (await page.getByRole("navigation", { name: "Book" }).boundingBox())!;
+  expect(box.y + box.height).toBeGreaterThan(bar.y - 2);
+  for (const card of await board.locator(".react-flow__node").all()) {
+    await expect(card).toBeVisible();
+    const c = (await card.boundingBox())!;
+    expect(c.y).toBeGreaterThanOrEqual(box.y);
+    expect(c.y + c.height).toBeLessThanOrEqual(box.y + box.height);
+    expect(await card.evaluate((el) => document.elementFromPoint(el.getBoundingClientRect().x + 4, el.getBoundingClientRect().y + 4)?.closest(".react-flow__node") === el)).toBe(true);
+  }
+  await fits(page);
 });
