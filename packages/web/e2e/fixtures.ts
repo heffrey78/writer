@@ -374,6 +374,9 @@ export async function palette(page: Page, query: string) {
   const input = dialog.getByRole("combobox");
   await expect(input).toBeFocused();
   await page.keyboard.type(query);
+  // WebKit can drop the first key while a page just opened (a journal's today) still settles its
+  // focus: the query is then set whole, so what runs is the command asked for, not what "ndex" matches.
+  if ((await input.inputValue()) !== query) await input.fill(query);
   await expect(input).toHaveValue(query);
   await page.keyboard.press("Enter");
   await expect(dialog).toHaveCount(0);
