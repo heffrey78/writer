@@ -204,6 +204,45 @@ export function addCard(fileText: string, card: BoardCard): string {
   return editYaml(fileText, [{ path: ["cards", count], value: parseDocument(cardLine(card).replace(/^  - /, "")).toJS() }]);
 }
 
+/** Several cards added after the last, in order. */
+export const addCards = (fileText: string, cards: readonly BoardCard[]): string => cards.reduce(addCard, fileText);
+
+/** A new note's and entry's card, as the mock-ups draw them (#208). */
+export const NOTE_SIZE: Pair = [252, 300];
+export const ENTRY_SIZE: Pair = [196, 230];
+/** A picture's card when its picture can't be read. */
+export const PICTURE_SIZE: Pair = [240, 180];
+const GAP = 40;
+
+/** A new picture's card: the picture's own shape, its longest side `longest`. */
+export function pictureSize(width: number, height: number, longest = 280): Pair {
+  if (!(width > 0 && height > 0)) return PICTURE_SIZE;
+  const scale = longest / Math.max(width, height);
+  return [Math.max(48, Math.round(width * scale)), Math.max(36, Math.round(height * scale))];
+}
+
+/** Where cards put on a board from elsewhere go: to the right of everything on it, level with its top; at the origin on an empty board. */
+export function besideAll(cards: readonly (BoardCard | undefined)[]): Pair {
+  const on = cards.filter((c): c is BoardCard => !!c);
+  if (!on.length) return [0, 0];
+  return [Math.max(...on.map((c) => c.at[0] + c.size[0])) + GAP, Math.min(...on.map((c) => c.at[1]))];
+}
+
+/**
+ * A note and some of its pictures laid out from `at`: the note's card (unless `withNote` is false),
+ * then its pictures' cards in a column to its right, each tethered to the note on the board.
+ */
+export function noteCards(note: string, at: Pair, withNote: boolean, pictures: readonly { path: string; size: Pair }[]): BoardCard[] {
+  const out: BoardCard[] = withNote ? [{ kind: "note", note, wordsOnly: false, at, size: NOTE_SIZE }] : [];
+  const x = withNote ? at[0] + NOTE_SIZE[0] + GAP * 1.5 : at[0];
+  let y = at[1];
+  for (const p of pictures) {
+    out.push({ kind: "note-picture", note, picture: p.path, at: [x, y], size: p.size });
+    y += p.size[1] + GAP / 2;
+  }
+  return out;
+}
+
 /** Cards that aren't one of the four kinds: the file breaks the format in a way its schema can't say. */
 function malformedCards(book: Book): Finding[] {
   return book.moduleFiles.filter((f) => f.type === BOARD.key).flatMap((f) =>

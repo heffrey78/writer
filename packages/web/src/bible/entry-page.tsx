@@ -11,6 +11,7 @@ import { AlertDialog } from "radix-ui";
 import { startTransition, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { api, keys } from "../api.ts";
+import { ModulePageActions } from "../modules.tsx";
 import type { Workspace } from "../novel/workspace.ts";
 import { ErrorAlert } from "../ui/alert.tsx";
 import { Button } from "../ui/button.tsx";
@@ -195,6 +196,7 @@ export function EntryPage({
             <Button variant="ghost" size="sm" onClick={() => useMergeDialog.getState().open(entity.id)} title="Merge into…" className="max-md:size-11 max-md:px-0">
               <Merge className="size-4" aria-hidden /> <span className="max-md:sr-only">Merge into…</span>
             </Button>
+            <ModulePageActions novelId={novelId} novel={novel} subject={{ entity }} className="max-md:size-11 max-md:px-0" labelClassName="max-md:sr-only" />
             <Button variant="ghost" size="sm" onClick={() => remove.mutate(false)} disabled={remove.isPending} title="Delete" className="max-md:size-11 max-md:px-0">
               <Trash2 className="size-4" aria-hidden /> <span className="max-md:sr-only">Delete</span>
             </Button>

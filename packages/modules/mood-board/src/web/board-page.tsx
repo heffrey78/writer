@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import type { Book } from "@writer/core";
+import { shownPictures, vocabulary, type Book } from "@writer/core";
 import {
   Background,
   BackgroundVariant,
@@ -27,12 +27,16 @@ import { useTheme } from "@writer/web/theme.ts";
 import { ErrorAlert } from "@writer/web/ui/alert.tsx";
 import { Button } from "@writer/web/ui/button.tsx";
 import { Confirm } from "@writer/web/ui/confirm.tsx";
+import { PictureInTextDialog } from "@writer/web/novel/picture-in-text.tsx";
+import { ImagePlus, Library, StickyNote } from "lucide-react";
+import { create } from "zustand";
 import { createContext, memo, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
-import { placeCard, readBoardText, reorderCard, takeOffCard, type Board, type BoardCard, type Pair } from "../core/index.ts";
+import { addCard as putLine, ENTRY_SIZE, NOTE_SIZE, pictureSize, placeCard, readBoardText, reorderCard, takeOffCard, type Board, type BoardCard, type Pair } from "../core/index.ts";
 import { CardFace, shown } from "./cards.tsx";
 import { boards, changeBoard } from "./client.ts";
 import { BoardNameDialog } from "./board-name.tsx";
+import { droppedPicture, measure, PutOnBoard, putCards } from "./put-on-board.tsx";
 
 /*
  * A mood board (#207): its cards where the writer put them, at the size they gave them, on a board with
@@ -134,6 +138,85 @@ function toNodes(cards: readonly (BoardCard | undefined)[], selected: ReadonlySe
         }]
       : [],
   );
+}
+
+/**
+ * What's being added to the board (#208): a picture (chosen, or a file dropped or pasted, at where it
+ * was dropped), a note, or an entry. Without `at`, it goes in the middle of what's in view.
+ */
+type Adding = { kind: "picture"; file?: File; at?: Pair } | { kind: "note" } | { kind: "entry" };
+const useAdding = create<{ adding: Adding | undefined; set: (a: Adding | undefined) => void }>((set) => ({ adding: undefined, set: (adding) => set({ adding }) }));
+
+/** The board's middle, as it's in view, for a card of `size` to be centred on. */
+function useMiddle() {
+  const { screenToFlowPosition } = useReactFlow();
+  return useCallback(
+    (size: Pair): Pair => {
+      const box = document.querySelector("[data-board]")?.getBoundingClientRect();
+      if (!box) return [0, 0];
+      const p = screenToFlowPosition({ x: box.left + box.width / 2, y: box.top + box.height / 2 });
+      return [round(p.x - size[0] / 2), round(p.y - size[1] / 2)];
+    },
+    [screenToFlowPosition],
+  );
+}
+
+function AddTools({ book }: { book: Book }) {
+  const set = useAdding((s) => s.set);
+  const codex = vocabulary(book.kind).codex;
+  useCommands(
+    () => [
+      { id: "board.addPicture", title: "Add a picture to the board…", group: "Board", keywords: ["image", "photo", "map"], run: () => set({ kind: "picture" }) },
+      { id: "board.addNote", title: "Add a note to the board…", group: "Board", keywords: ["card"], run: () => set({ kind: "note" }) },
+      { id: "board.addEntry", title: `Add from the ${codex.one} to the board…`, group: "Board", keywords: ["entry", "card", codex.one], run: () => set({ kind: "entry" }) },
+    ],
+    [codex.one],
+  );
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <Button size="sm" onClick={() => set({ kind: "picture" })}>
+        <ImagePlus className="size-4" aria-hidden /> Add a picture
+      </Button>
+      <Button size="sm" onClick={() => set({ kind: "note" })}>
+        <StickyNote className="size-4" aria-hidden /> Add a note
+      </Button>
+      <Button size="sm" onClick={() => set({ kind: "entry" })}>
+        <Library className="size-4" aria-hidden /> Add from the {codex.one}
+      </Button>
+    </div>
+  );
+}
+
+/** The dialog for what's being added, putting its cards on the board where they go. */
+function AddDialogs({ novelId, book, board }: { novelId: string; book: Book; board: Board }) {
+  const { adding, set } = useAdding();
+  const middle = useMiddle();
+  const queryClient = useQueryClient();
+  const [error, setError] = useState<string>();
+  useEffect(() => () => set(undefined), [set]);
+  const close = () => set(undefined);
+  if (!adding) return error ? <ErrorAlert className="mx-4 mb-2" title="Couldn't put it on the board" detail={error} /> : null;
+  if (adding.kind === "picture")
+    return (
+      <PictureInTextDialog
+        novelId={novelId}
+        request={{ kind: "add", at: 0, ...(adding.file ? { file: adding.file } : {}) }}
+        pictureUrl={() => undefined}
+        words={{ title: "Add a picture to the board", action: "Add" }}
+        onClose={close}
+        onDone={(picture, saved) => {
+          close();
+          const size = saved ? pictureSize(saved.width, saved.height) : pictureSize(0, 0);
+          const at: Pair = adding.at ? [round(adding.at[0] - size[0] / 2), round(adding.at[1] - size[1] / 2)] : middle(size);
+          const card: BoardCard = { kind: "picture", picture: picture.url.replace(/^\//, ""), description: picture.alt, at, size };
+          putCards(novelId, board, () => [card]).then(
+            () => queryClient.invalidateQueries({ queryKey: keys.novel(novelId) }),
+            (e: unknown) => setError(e instanceof Error ? e.message : String(e)),
+          );
+        }}
+      />
+    );
+  return <PutOnBoard novelId={novelId} book={book} board={board} choose={adding.kind} at={middle(adding.kind === "note" ? NOTE_SIZE : ENTRY_SIZE)} onClose={close} />;
 }
 
 function Zoom() {
@@ -250,10 +333,43 @@ function Canvas({ novelId, book, board, text, setText }: { novelId: string; book
     });
   }, [cards, selected]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // A picture dropped or pasted on the board: a file is described first and saved as any picture; one
+  // dragged out of a note is a card of that note's picture, where it was dropped.
+  const { screenToFlowPosition } = useReactFlow();
+  const add = useAdding((s) => s.set);
+  const onDrop = (e: React.DragEvent) => {
+    const file = [...e.dataTransfer.files].find((f) => f.type.startsWith("image/"));
+    const url = e.dataTransfer.getData("text/uri-list").split("\n").find((l) => l && !l.startsWith("#")) || /<img[^>]+src="([^"]+)"/.exec(e.dataTransfer.getData("text/html"))?.[1];
+    const picture = !file && url ? droppedPicture(novelId, url) : undefined;
+    if (!file && !picture) return;
+    e.preventDefault();
+    const p = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+    if (file) return add({ kind: "picture", file, at: [round(p.x), round(p.y)] });
+    void measure(novelId, picture!).then((size) => {
+      const notes = book.notes.filter((n) => shownPictures(n.body).some((s) => s.path === picture));
+      const note = notes.find((n) => notesShown.has(n.id)) ?? notes[0];
+      const at: Pair = [round(p.x - size[0] / 2), round(p.y - size[1] / 2)];
+      const card: BoardCard = note ? { kind: "note-picture", note: note.id, picture: picture!, at, size } : { kind: "picture", picture: picture!, at, size };
+      change((t) => (readBoardText(t) ? putLine(t, card) : t));
+    });
+  };
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.closest("input, textarea, [contenteditable=true], [role=dialog]")) return;
+      const file = [...(e.clipboardData?.files ?? [])].find((f) => f.type.startsWith("image/"));
+      if (!file) return;
+      e.preventDefault();
+      add({ kind: "picture", file });
+    };
+    document.addEventListener("paste", onPaste);
+    return () => document.removeEventListener("paste", onPaste);
+  }, [add]);
+
   return (
     <Actions.Provider value={actions}>
       {error && <ErrorAlert className="mx-4 mb-2" title="The board couldn't be saved" detail={error} />}
-      <div className="relative min-h-0 flex-1" role="region" aria-label={`Board: ${board.title}, ${cards.filter(Boolean).length} cards`}>
+      <div className="relative min-h-0 flex-1" role="region" data-board aria-label={`Board: ${board.title}, ${cards.filter(Boolean).length === 1 ? "1 card" : `${cards.filter(Boolean).length} cards`}`} onDragOver={(e) => e.preventDefault()} onDrop={onDrop}>
         <ReactFlow<CardNode, Edge<{ strong: boolean }>>
           nodes={nodes}
           edges={edges}
@@ -293,7 +409,7 @@ function Canvas({ novelId, book, board, text, setText }: { novelId: string; book
         >
           <Background variant={BackgroundVariant.Dots} gap={22} />
         </ReactFlow>
-        {!cards.length && <p className="pointer-events-none absolute inset-0 grid place-items-center text-sm text-muted">Nothing on this board yet.</p>}
+        {!cards.length && <p className="pointer-events-none absolute inset-0 grid place-items-center text-sm text-muted">Nothing on this board yet. Add a picture, a note or an entry, or drop a picture here.</p>}
       </div>
     </Actions.Provider>
   );
@@ -332,11 +448,14 @@ export function BoardPage({ novelId, book, board }: { novelId: string; book: Boo
     <ReactFlowProvider>
     <div className="flex h-full min-h-[28rem] flex-col">
       <div className="flex flex-wrap items-center gap-3 border-b border-rule px-4 py-2.5">
-        <h1 className="mr-auto text-xl font-semibold">{board.title}</h1>
+        <h1 className="text-xl font-semibold">{board.title}</h1>
+        <AddTools book={book} />
+        <span className="flex-1" />
         <Zoom />
       </div>
       {error && <ErrorAlert className="m-4" title="The board couldn't be opened" detail={error} />}
       {text !== undefined && <Canvas key={board.file} novelId={novelId} book={book} board={board} text={text} setText={setText} />}
+      <AddDialogs novelId={novelId} book={book} board={board} />
       {renaming && (
         <BoardNameDialog
           title="Rename the board"

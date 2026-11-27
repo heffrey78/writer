@@ -2,7 +2,7 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { loadBook, memorySource, type Book } from "@writer/core";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import { moduleViews, registerWebModule } from "@writer/web/modules.tsx";
+import { modulePageActions, moduleViews, registerWebModule } from "@writer/web/modules.tsx";
 import type { BoardCard } from "../../src/core/index.ts";
 import { CardFace, shown } from "../../src/web/cards.tsx";
 import { moodBoardWeb } from "../../src/web/index.tsx";
@@ -79,5 +79,10 @@ describe("cards", () => {
   it("the Boards page lists the book's boards under it in the sidebar", () => {
     const view = moduleViews(book.kind).find((v) => v.path === "boards");
     expect(view && { label: view.label, group: view.group, items: view.items?.(book) }).toEqual({ label: "Boards", group: "Plan", items: [{ path: "board_be1fry", label: "The Belfry" }] });
+  });
+
+  it("Put on a board… is offered on a note's page and an entry's (#208)", () => {
+    expect(modulePageActions(book.kind, "note").map((a) => a.label)).toEqual(["Put on a board…"]);
+    expect(modulePageActions(book.kind, "entry").map((a) => a.label)).toEqual(["Put on a board…"]);
   });
 });

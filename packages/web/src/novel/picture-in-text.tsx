@@ -29,13 +29,16 @@ export function PictureInTextDialog({
   pictureUrl,
   onDone,
   onClose,
+  words,
 }: {
   novelId: string;
   request: PictureRequest;
   pictureUrl: (path: string) => string | undefined;
-  /** The picture to put in, or the changed one. */
-  onDone: (picture: PictureAttrs) => void;
+  /** The picture to put in, or the changed one, with the size it was saved at when it's new. */
+  onDone: (picture: PictureAttrs, saved?: { width: number; height: number }) => void;
   onClose: () => void;
+  /** For a picture put somewhere other than the text (a mood board's, #208): the dialog's title, its button, and no caption. */
+  words?: { title: string; action: string };
 }) {
   const editing = request.kind === "edit" ? request.picture : undefined;
   const w = useWords();
@@ -93,7 +96,7 @@ export function PictureInTextDialog({
     setProblem(undefined);
     try {
       const { path } = await api.addPicture(novelId, rendered.blob, description);
-      onDone({ url: `/${path}`, alt: description, caption: caption.trim() || null });
+      onDone({ url: `/${path}`, alt: description, caption: caption.trim() || null }, image ? savedSize(image.bitmap) : undefined);
     } catch (err) {
       setProblem(err instanceof Error ? err.message : String(err));
       setSaving(false);
@@ -103,7 +106,7 @@ export function PictureInTextDialog({
   const size = image && savedSize(image.bitmap);
   const shown = editing && !file ? pictureUrl(editing.url.replace(/^\//, "")) : image?.url;
   return (
-    <Modal title={editing ? "Change the picture" : "Insert a picture"} onClose={onClose} className="w-[min(40rem,calc(100vw-2rem))]">
+    <Modal title={words?.title ?? (editing ? "Change the picture" : "Insert a picture")} onClose={onClose} className="w-[min(40rem,calc(100vw-2rem))]">
       <form
         onSubmit={(e) => void submit(e)}
         className="grid gap-4 text-sm"
@@ -170,12 +173,12 @@ export function PictureInTextDialog({
           data-autofocus={(editing ? !change : !!file) || undefined}
           hint="What the picture shows, read aloud by screen readers in place of it, and shown if it can't be."
         />
-        <Field label="Caption (optional)" value={caption} onChange={(e) => setCaption(e.target.value)} hint="Shown under the picture, in the text and in the compiled book." />
+        {!words && <Field label="Caption (optional)" value={caption} onChange={(e) => setCaption(e.target.value)} hint="Shown under the picture, in the text and in the compiled book." />}
         {problem && <ErrorAlert title={editing ? "Couldn't change the picture" : "Couldn't add the picture"}>{problem}</ErrorAlert>}
         <div className="flex justify-end gap-2">
           <Button onClick={onClose}>Cancel</Button>
           <Button type="submit" variant="primary" disabled={!alt.trim() || saving || (!!file && !rendered) || (!editing && !file)}>
-            {saving ? "Saving…" : editing ? "Save" : "Insert"}
+            {saving ? "Saving…" : editing ? "Save" : (words?.action ?? "Insert")}
           </Button>
         </div>
       </form>

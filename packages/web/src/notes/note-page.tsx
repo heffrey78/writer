@@ -16,7 +16,7 @@ import { Chips, Group } from "../novel/scene-details.tsx";
 import { Picker } from "../ui/picker.tsx";
 import { mentionEntities } from "../bible/types.ts";
 import { useCommands } from "../commands.ts";
-import { moduleRecordType, moduleRecordTypes } from "../modules.tsx";
+import { ModulePageActions, moduleRecordType, moduleRecordTypes } from "../modules.tsx";
 import { useNotice } from "../novel/notice.tsx";
 import type { Workspace } from "../novel/workspace.ts";
 import { ErrorAlert } from "../ui/alert.tsx";
@@ -163,6 +163,7 @@ export function NotePage({
           <Button variant="ghost" size="sm" className={iconOnly} aria-label={narrow ? `Make it ${becomes}` : undefined} onClick={() => setPromoting(true)}>
             <ArrowUpRight className={narrow ? "size-5" : "size-4"} aria-hidden /> {!narrow && `Make it ${becomes}`}
           </Button>
+          <ModulePageActions novelId={novelId} novel={novel} subject={{ note }} narrow={narrow} {...(iconOnly ? { className: iconOnly } : {})} />
           <NoteColorButton color={color} onChange={(c) => void setColor(c)} narrow={narrow} className={iconOnly} />
           <Button variant="ghost" size="sm" className={iconOnly} aria-label={narrow ? "Delete" : undefined} onClick={() => setDeleting(true)} disabled={remove.isPending}>
             <Trash2 className={narrow ? "size-5" : "size-4"} aria-hidden /> {!narrow && "Delete"}
