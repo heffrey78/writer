@@ -11,3 +11,4 @@ export declare const v7: ValidateFunction;
 export declare const v8: ValidateFunction;
 export declare const v9: ValidateFunction;
 export declare const v10: ValidateFunction;
+export declare const v11: ValidateFunction;

@@ -19,7 +19,7 @@
     }
   },
   "journal": {
-    "fingerprint": "d8e0f41c56d1853b",
+    "fingerprint": "6b08f673e54712d6",
     "exports": {
       "novel": "v0",
       "manuscript-order": "v1",
@@ -31,7 +31,8 @@
       "compile": "v7",
       "book": "v8",
       "year": "v9",
-      "month": "v10"
+      "month": "v10",
+      "board": "v11"
     }
   },
   "campaign": {

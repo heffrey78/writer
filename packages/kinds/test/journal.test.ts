@@ -14,7 +14,7 @@ describe("the Journal kind", () => {
   it("is registered with presence, story time and daily writing, and none of the Novel's story-only modules", () => {
     const kind = kindByKey("journal");
     expect(kind).toBe(withModules(journal));
-    expect(kind.modules).toEqual(["presence", "story-time", "daily"]);
+    expect(kind.modules).toEqual(["presence", "story-time", "daily", "mood-board"]);
     expect(kind.fields.map((f) => f.key)).toEqual(["when", "people", "places", "events", "entities", "values"]);
     expect(layoutOf(kind)).toBe(PLAIN_LAYOUT);
   });

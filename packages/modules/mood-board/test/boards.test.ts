@@ -63,9 +63,9 @@ const codes = (ds: Diagnostic[]) => ds.map((d) => d.code);
 const sample = (name: string) => fileURLToPath(new URL(`../../../../examples/${name}/`, import.meta.url));
 
 describe("mood boards", () => {
-  it("are the Novel's and the Campaign's, and no other kind's", () => {
+  it("are the Novel's, the Campaign's and the Journal's, and no other kind's", () => {
     const using = (key: string) => modulesOf(kindByKey(key)).some((m) => m.id === "mood-board");
-    expect(["novel", "campaign", "journal", "nonfiction"].map(using)).toEqual([true, true, false, false]);
+    expect(["novel", "campaign", "journal", "nonfiction"].map(using)).toEqual([true, true, true, false]);
   });
 
   it("read from boards/: each kind of card, in the file's order, comments and all", async () => {

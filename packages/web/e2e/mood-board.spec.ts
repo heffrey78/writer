@@ -195,3 +195,23 @@ test("a board's cards where its file puts them: moved and resized by mouse a lin
   await page.getByRole("button", { name: "Fit all" }).click();
   for (const c of [picture, bell, marta]) await expect(c).toBeInViewport();
 });
+
+test("a journal has boards too, in Look back, its cards in the journal's words", async ({ page, app }) => {
+  const dir = app.bookRepo(fileURLToPath(new URL("../../../examples/sample-journal", import.meta.url)), "journal");
+  mkdirSync(join(dir, "boards"));
+  writeFileSync(join(dir, "boards/the-sluice.yaml"), `id: board_s1uice\ntitle: The sluice\ncards:\n  - { note: note_h1de99, at: [ 0, 0 ], size: [ 252, 300 ] }\n  - { entry: per_m1ra00, at: [ 300, 0 ], size: [ 196, 230 ] }\n`);
+  app.git(dir, "add", "-A");
+  app.git(dir, "commit", "-qm", "A board");
+  await app.restart(dir);
+  await page.goto(app.launchUrl);
+  const lookBack = page.getByRole("navigation", { name: "Views" }).getByRole("group", { name: "Look back" });
+  await lookBack.getByRole("list", { name: "Boards" }).getByRole("link", { name: "The sluice" }).click();
+  await expect(page.getByRole("region", { name: "Board: The sluice, 2 cards" })).toBeVisible();
+  await expect(card(page, "Note: Ask about a hide at the sluice")).toBeVisible();
+  await expect(card(page, "Person: Mira Hale")).toContainText("Mira Hale");
+  await expect(page.locator("main")).not.toContainText(/\b(scenes?|chapters?|manuscript|story bible|novel|codex)\b/i);
+  for (const colorScheme of ["light", "dark"] as const) {
+    await page.emulateMedia({ colorScheme });
+    await axe(page);
+  }
+});

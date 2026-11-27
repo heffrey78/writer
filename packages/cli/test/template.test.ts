@@ -192,7 +192,7 @@ describe.each([
     const r = node([join(dir, ".github/gh-writer/validate.mjs"), copy, "--json"]);
     const app = await validate(nodeSource(copy));
     expect(app.diagnostics.map((d) => [d.code, d.pointer])).toEqual(
-      kind === "campaign" ? [["E_SCHEMA", "/cards/2"], ["W_MISSING_IMAGE", undefined], ["W_BOARD_UNKNOWN", "/cards/0/note"]] : [],
+      kind === "campaign" || kind === "journal" ? [["E_SCHEMA", "/cards/2"], ["W_MISSING_IMAGE", undefined], ["W_BOARD_UNKNOWN", "/cards/0/note"]] : [],
     );
     expect(JSON.parse(r.stdout).diagnostics).toEqual(app.diagnostics);
   });
