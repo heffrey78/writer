@@ -406,6 +406,9 @@ function Canvas({ novelId, book, board, text, setText }: { novelId: string; book
           proOptions={{ hideAttribution: true }}
           colorMode={theme}
           deleteKeyCode={null}
+          // Laid over the region rather than 100% of its height: on a phone that height is the page's
+          // flex layout's, which a percentage doesn't take, and the board was drawn 0 px tall.
+          className="!absolute inset-0"
         >
           <Background variant={BackgroundVariant.Dots} gap={22} />
         </ReactFlow>
@@ -446,7 +449,7 @@ export function BoardPage({ novelId, book, board }: { novelId: string; book: Boo
 
   return (
     <ReactFlowProvider>
-    <div className="flex h-full min-h-[28rem] flex-col">
+    <div className="flex h-full min-h-[28rem] flex-1 flex-col">
       <div className="flex flex-wrap items-center gap-3 border-b border-rule px-4 py-2.5">
         <h1 className="text-xl font-semibold">{board.title}</h1>
         <AddTools book={book} />
