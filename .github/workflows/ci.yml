@@ -93,7 +93,7 @@ jobs:
         working-directory: packages/dictation
       # The microphone's part, which the tests don't open: it builds, and lists microphones right;
       # and the model's download, against a server of the test's own.
-      - run: sudo apt-get install -y -qq libasound2-dev > /dev/null && cargo test --release --features mic,download --lib
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq libasound2-dev > /dev/null && cargo test --release --features mic,download --lib
         working-directory: packages/dictation
 
   e2e:
