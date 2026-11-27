@@ -3,6 +3,7 @@ import { Dialog } from "radix-ui";
 import { useContext, useEffect, useMemo, useRef, useState, type FocusEvent, type FormEvent, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { OpenParts, partEscapes, saveOpenParts } from "../bible/profile.tsx";
+import { fromNotice } from "../novel/notice.tsx";
 import { ErrorAlert } from "./alert.tsx";
 import { cn } from "./cn.ts";
 
@@ -67,6 +68,10 @@ export function ItemModal({ title, onClose, children, className }: { title: stri
           onCloseAutoFocus={(e) => {
             e.preventDefault();
             if (opener?.isConnected) opener.focus();
+          }}
+          // The notice's buttons act on their own (Undo, Open the board, #208): a click on one doesn't close the item.
+          onInteractOutside={(e) => {
+            if (fromNotice(e.detail.originalEvent as Event)) e.preventDefault();
           }}
           onEscapeKeyDown={(e) => {
             if (!escapeTaken(e.target)) return;

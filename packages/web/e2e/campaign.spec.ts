@@ -38,10 +38,25 @@ async function newEntry(page: Page, name: string, row: number) {
 
 /** The caret on a new line under one of the prep's headings. */
 async function under(page: Page, heading: string) {
-  await session(page).getByRole("heading", { name: heading }).click();
-  await selectionSettled(page);
-  await page.keyboard.press("End");
-  await page.keyboard.press("Enter");
+  // A session just made can still be drawn again as its text arrives, putting the caret back at the
+  // start: then End and Enter went to the old selection, and the typing into the heading. Until the
+  // caret is on an empty line right under the heading, click and try again.
+  const onTheNewLine = () =>
+    page.evaluate((name) => {
+      const at = getSelection()?.anchorNode;
+      const block = (at instanceof Element ? at : at?.parentElement)?.closest("p");
+      const before = block?.previousElementSibling;
+      return !!block && block.textContent === "" && !!before && /^H\d$/.test(before.tagName) && before.textContent === name;
+    }, heading);
+  await expect(async () => {
+    if (await onTheNewLine()) return;
+    await session(page).getByRole("heading", { name: heading }).click();
+    await selectionSettled(page);
+    await page.keyboard.press("End");
+    await page.keyboard.press("Enter");
+    await selectionSettled(page);
+    expect(await onTheNewLine()).toBe(true);
+  }).toPass({ timeout: 10_000 });
 }
 
 /** Open a picker, type, and take the best match. */

@@ -10,6 +10,10 @@ export interface Notice {
   secondary?: { label: string; run: () => void };
 }
 
+/** Pointer presses on the notice: its buttons act on their own, so a press on one doesn't also close a modal (an item's, #208) as a press outside it would. */
+const noticeEvents = new WeakSet<Event>();
+export const fromNotice = (event: Event) => noticeEvents.has(event);
+
 /** One notice at a time, at the bottom of the workspace, until dismissed or replaced. */
 export const useNotice = create<{ notice: Notice | undefined; show: (n: Notice | undefined) => void }>((set) => ({
   notice: undefined,
@@ -53,7 +57,7 @@ export function NoticeBar() {
   );
   return (
     // On a phone, above the bottom bar and the writing bar: it stays until dismissed, and mustn't cover them.
-    <div role="status" aria-live="polite" className="pointer-events-none fixed inset-x-0 bottom-4 z-[70] flex justify-center px-4 max-md:bottom-36">
+    <div role="status" aria-live="polite" onPointerDownCapture={(e) => void noticeEvents.add(e.nativeEvent)} className="pointer-events-none fixed inset-x-0 bottom-4 z-[70] flex justify-center px-4 max-md:bottom-36">
       {notice && (
         // A long message takes the width, its buttons under it, rather than squeezed into a column beside them (a phone's).
         <div className="pointer-events-auto flex max-w-2xl flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-rule bg-raised py-2 pr-2 pl-4 text-sm shadow-lg">

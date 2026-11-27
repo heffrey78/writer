@@ -1,9 +1,11 @@
 import { recordTypesOf, vocabulary, type Book, type BookKind, type Entity, type ModuleRecord, type Note, type RecordTypeDef } from "@writer/core";
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
+import { useState } from "react";
 import { Route, useNavigate } from "react-router";
 import { create } from "zustand";
 import { useCommands, type Command } from "./commands.ts";
+import { Button } from "./ui/button.tsx";
 import type { SpellService } from "@writer/editor/react";
 import type { QuickEntries } from "./bible/quick-entries.ts";
 import type { Workspace } from "./novel/workspace.ts";
@@ -111,6 +113,25 @@ export interface ShelfAction {
   command: string;
 }
 
+/** The note or entry a page shows, as a module's action on it sees it. */
+export type PageSubject = { note: Note } | { entity: Entity };
+
+/**
+ * Something a module offers on a note's page and an entry's (Put on a board…, #208): a button among
+ * the page's own, and a command in the palette while the page is open. Either shows what `render`
+ * returns (its dialog) until it calls `close`.
+ */
+export interface PageAction {
+  key: string;
+  label: string;
+  icon: LucideIcon;
+  /** Words the palette also finds it by. */
+  keywords?: readonly string[];
+  /** The pages it's on. */
+  on: readonly ("note" | "entry")[];
+  render(view: { novelId: string; novel: Book; subject: PageSubject; close: () => void }): ReactNode;
+}
+
 export interface WebModule {
   /** The module's id, as its kind lists it. */
   id: string;
@@ -122,6 +143,7 @@ export interface WebModule {
   outlineOrders?: readonly OutlineOrder[];
   outlineViews?: readonly OutlineView[];
   dayToDate?: DayToDate;
+  pageActions?: readonly PageAction[];
   /** Commands in the palette while a book that uses it is open. Its views are offered under "Go to" without asking. */
   commands?(view: BookView & { navigate: (to: string) => void }): Command[];
 }
@@ -149,6 +171,33 @@ export const moduleStoryMapTabs = (kind: BookKind): StoryMapTab[] => webModulesO
 
 /** The profile sections the book's modules add for an entry of `type`. */
 export const moduleProfileSections = (kind: BookKind, type: string): ProfileSection[] => webModulesOf(kind).flatMap((m) => (m.profileSections ?? []).filter((s) => s.entityType === type));
+
+/** What the book's modules offer on a note's page or an entry's. */
+export const modulePageActions = (kind: BookKind, on: "note" | "entry"): PageAction[] => webModulesOf(kind).flatMap((m) => (m.pageActions ?? []).filter((a) => a.on.includes(on)));
+
+/**
+ * The book's modules' actions on a note's or an entry's page: their buttons (icons alone with
+ * `narrow`, named for a screen reader), their commands in the palette, and the dialog one opened.
+ */
+export function ModulePageActions({ novelId, novel, subject, narrow, className, labelClassName }: { novelId: string; novel: Book; subject: PageSubject; narrow?: boolean; className?: string; labelClassName?: string }) {
+  const actions = modulePageActions(novel.kind, "note" in subject ? "note" : "entry");
+  const [open, setOpen] = useState<string>();
+  useCommands(
+    () => actions.map((a) => ({ id: `page.${a.key}`, title: a.label, group: "note" in subject ? "Notes" : vocabulary(novel.kind).codex.One, keywords: [...(a.keywords ?? [])], run: () => setOpen(a.key) })),
+    [actions.map((a) => a.key).join()],
+  );
+  const opened = actions.find((a) => a.key === open);
+  return (
+    <>
+      {actions.map(({ key, label, icon: Icon }) => (
+        <Button key={key} variant="ghost" size="sm" className={className} aria-label={narrow ? label : undefined} title={label} onClick={() => setOpen(key)}>
+          <Icon className={narrow ? "size-5" : "size-4"} aria-hidden /> {!narrow && <span className={labelClassName}>{label}</span>}
+        </Button>
+      ))}
+      {opened?.render({ novelId, novel, subject, close: () => setOpen(undefined) })}
+    </>
+  );
+}
 
 /** The orders the book's modules add to the outline. */
 export const moduleOutlineOrders = (kind: BookKind): OutlineOrder[] => webModulesOf(kind).flatMap((m) => m.outlineOrders ?? []);

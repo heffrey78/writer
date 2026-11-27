@@ -215,3 +215,141 @@ test("a journal has boards too, in Look back, its cards in the journal's words",
     await axe(page);
   }
 });
+
+/** The sample campaign with a note of three pictures and an empty board, for putting things on it (#208). */
+async function forAdding(page: Page, app: App) {
+  const dir = app.bookRepo(sample, "campaign");
+  mkdirSync(join(dir, "images"), { recursive: true });
+  mkdirSync(join(dir, "boards"));
+  writeFileSync(join(dir, "images/causeway.png"), png(48, 27, [201, 214, 220]));
+  writeFileSync(join(dir, "images/saltmere.png"), png(33, 20, [235, 225, 203]));
+  writeFileSync(join(dir, "images/the-bell.png"), png(21, 23, [95, 125, 98]));
+  writeFileSync(
+    join(dir, "notes/the-belfry-at-low-tide.md"),
+    "---\nid: note_be1f7y\ntitle: The Belfry at low tide\ncreated: 2026-11-20T10:00:00\n---\nWhen the party reaches the causeway, the tide is out.\n\n![The Belfry from the causeway](/images/causeway.png)\n\n![Saltmere to the Belfry](/images/saltmere.png)\n\n![The bell, if they climb](/images/the-bell.png)\n",
+  );
+  writeFileSync(join(dir, BOARD), boardText([]).replace("cards:\n", "cards: []\n"));
+  app.git(dir, "add", "-A");
+  app.git(dir, "commit", "-qm", "A note and a board");
+  await app.restart(dir);
+  await page.goto(app.launchUrl);
+  const book = `${app.url}${new URL(app.launchUrl).pathname.replace(/^(\/novels\/[^/]+).*$/, "$1")}`;
+  return { dir, book, read: () => readFileSync(join(dir, BOARD), "utf8") };
+}
+
+const openTheBelfry = async (page: Page) => {
+  await page.getByRole("navigation", { name: "Views" }).getByRole("list", { name: "Boards" }).getByRole("link", { name: "The Belfry" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "The Belfry" })).toBeVisible();
+};
+
+const pick = async (page: Page, dialog: ReturnType<Page["getByRole"]>, label: string, name: string) => {
+  await dialog.getByRole("button", { name: new RegExp(`^${label}`) }).click();
+  await page.getByRole("dialog", { name: label }).getByRole("combobox").fill(name);
+  await page.getByRole("option", { name }).click();
+};
+
+test("from the board: a picture added and described, a note and two of its three pictures tethered to it, and an entry (#208)", async ({ page, app }) => {
+  const { read } = await forAdding(page, app);
+  await openTheBelfry(page);
+  await expect(page.getByText(/Nothing on this board yet/)).toBeVisible();
+
+  await page.getByRole("button", { name: "Add a picture" }).click();
+  const adding = page.getByRole("dialog", { name: "Add a picture to the board" });
+  await adding.getByLabel("Picture file").setInputFiles({ name: "harbour.png", mimeType: "image/png", buffer: png(40, 30, [61, 74, 92]) });
+  await adding.getByLabel("Description").fill("The harbour at night");
+  await expect(adding.getByLabel(/Caption/)).toHaveCount(0);
+  await adding.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(card(page, "Picture: The harbour at night")).toBeVisible();
+  await expect.poll(read, SAVED).toMatch(/\n {2}- \{ picture: images\/the-harbour-at-night\.jpg, description: "?The harbour at night"?, at: \[ -?\d+, -?\d+ \], size: \[ 280, 210 \] \}\n$/);
+
+  await page.getByRole("button", { name: "Add a note" }).click();
+  const note = page.getByRole("dialog", { name: "Add a note" });
+  await pick(page, note, "Note", "The Belfry at low tide");
+  // The first picture is on the note's card: the other two are cards of their own unless unticked.
+  await expect(note.getByRole("checkbox", { name: "The note, as a card" })).toBeChecked();
+  await expect(note.getByRole("checkbox", { name: /The Belfry from the causeway/ })).not.toBeChecked();
+  await expect(note.getByRole("checkbox", { name: "Saltmere to the Belfry" })).toBeChecked();
+  await expect(note.getByRole("checkbox", { name: "The bell, if they climb" })).toBeChecked();
+  for (const colorScheme of ["light", "dark"] as const) {
+    await page.emulateMedia({ colorScheme });
+    await axe(page);
+  }
+  await note.getByRole("button", { name: "Put 3 cards on the board" }).click();
+  await expect(note).toHaveCount(0);
+  await expect(card(page, "Note: The Belfry at low tide")).toBeVisible();
+  await expect(card(page, "Picture from the note The Belfry at low tide: Saltmere to the Belfry")).toBeVisible();
+  await expect(card(page, "Picture from the note The Belfry at low tide: The bell, if they climb")).toBeVisible();
+  await expect(page.locator(".react-flow__edge")).toHaveCount(2);
+  await expect.poll(read, SAVED).toContain("  - { note: note_be1f7y, at:");
+  expect(read()).toContain("  - { note: note_be1f7y, picture: images/saltmere.png, at:");
+  expect(read()).toContain("  - { note: note_be1f7y, picture: images/the-bell.png, at:");
+
+  await page.getByRole("button", { name: "Add from the codex" }).click();
+  const entry = page.getByRole("dialog", { name: "Add from the codex" });
+  await pick(page, entry, "Entry", "Marta Hollin");
+  await entry.getByRole("button", { name: "Put 1 card on the board" }).click();
+  await expect(card(page, "NPC: Marta Hollin")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Board: The Belfry, 5 cards" })).toBeVisible();
+  await expect.poll(read, SAVED).toMatch(/\n {2}- \{ entry: npc_ma7ra1, at: \[ -?\d+, -?\d+ \], size: \[ 196, 230 \] \}\n$/);
+});
+
+test("Put on a board… from a note's page, and from an entry's by the palette onto a new board (#208)", async ({ page, app }) => {
+  const { dir, book, read } = await forAdding(page, app);
+  await page.goto(`${book}/note/note_be1f7y`);
+  await page.getByRole("button", { name: "Put on a board…" }).click();
+  const dialog = page.getByRole("dialog", { name: "Put “The Belfry at low tide” on a board" });
+  await expect(dialog.getByRole("combobox", { name: "Board" })).toHaveValue("board_be1fry");
+  await dialog.getByRole("checkbox", { name: "The bell, if they climb" }).uncheck();
+  await dialog.getByRole("button", { name: "Put 2 cards on the board" }).click();
+  const notice = page.getByRole("status").filter({ hasText: "2 cards put on “The Belfry”." });
+  await expect(notice).toBeVisible();
+  expect(read().match(/note_be1f7y/g)).toHaveLength(2);
+  await notice.getByRole("button", { name: "Open the board" }).click();
+  await expect(page.getByRole("region", { name: "Board: The Belfry, 2 cards" })).toBeVisible();
+  await expect(page.locator(".react-flow__edge")).toHaveCount(1);
+
+  await page.goto(`${book}/bible/npc_ma7ra1/page`);
+  await expect(page.getByRole("button", { name: "Put on a board…" })).toBeVisible();
+  await palette(page, "put on a board");
+  const entry = page.getByRole("dialog", { name: "Put “Marta Hollin” on a board" });
+  await entry.getByRole("combobox", { name: "Board" }).selectOption({ label: "New board…" });
+  await entry.getByLabel("The new board's title").fill("Saltmere");
+  await entry.getByRole("button", { name: "Put 1 card on the board" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "1 card put on “Saltmere”." })).toBeVisible();
+  await expect.poll(() => existsSync(join(dir, "boards/saltmere.yaml"))).toBe(true);
+  await expect.poll(() => readFileSync(join(dir, "boards/saltmere.yaml"), "utf8"), SAVED).toMatch(/\ntitle: Saltmere\ncards:\n {2}- \{ entry: npc_ma7ra1, at: \[ 0, 0 \], size: \[ 196, 230 \] \}\n$/);
+});
+
+test("a picture dragged out of a note is a card of that note's picture; a file dropped is described and saved (#208)", async ({ page, app }) => {
+  const { book, read } = await forAdding(page, app);
+  await openTheBelfry(page);
+  const bellUrl = `/api/novels/${new URL(book).pathname.split("/")[2]}/images/the-bell.png`;
+  const drop = (data: { uri?: string; file?: boolean }) =>
+    page.evaluate(async ({ uri, file }) => {
+      const board = document.querySelector("[data-board]")!;
+      const box = board.getBoundingClientRect();
+      const dt = new DataTransfer();
+      if (uri) dt.setData("text/uri-list", uri);
+      if (file) {
+        const canvas = Object.assign(document.createElement("canvas"), { width: 30, height: 20 });
+        canvas.getContext("2d")!.fillRect(0, 0, 30, 20);
+        const blob = await new Promise<Blob>((done) => canvas.toBlob((b) => done(b!), "image/png"));
+        dt.items.add(new File([blob], "dropped.png", { type: "image/png" }));
+      }
+      const at = { clientX: box.left + box.width / 2, clientY: box.top + box.height / 2, dataTransfer: dt, bubbles: true, cancelable: true };
+      board.dispatchEvent(new DragEvent("dragover", at));
+      board.dispatchEvent(new DragEvent("drop", at));
+    }, data);
+
+  await drop({ uri: bellUrl });
+  await expect(card(page, "Picture from the note The Belfry at low tide: The bell, if they climb")).toBeVisible();
+  await expect.poll(read, SAVED).toMatch(/\n {2}- \{ note: note_be1f7y, picture: images\/the-bell\.png, at: \[ -?\d+, -?\d+ \], size: \[ 256, 280 \] \}\n$/);
+
+  await drop({ file: true });
+  const adding = page.getByRole("dialog", { name: "Add a picture to the board" });
+  await expect(adding.getByText("dropped.png")).toBeVisible();
+  await adding.getByLabel("Description").fill("A dark square");
+  await adding.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(card(page, "Picture: A dark square")).toBeVisible();
+  await expect.poll(read, SAVED).toContain("picture: images/a-dark-square.jpg");
+});

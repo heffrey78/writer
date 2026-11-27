@@ -10,6 +10,7 @@ import { create } from "zustand";
 import { boardsOf } from "../core/index.ts";
 import { BoardNameDialog } from "./board-name.tsx";
 import { BoardPage } from "./board-page.tsx";
+import { PutOnBoard } from "./put-on-board.tsx";
 import { boards } from "./client.ts";
 
 /*
@@ -89,6 +90,16 @@ export const moodBoardWeb: WebModule = {
       group: "Plan",
       items: (novel) => boardsOf(novel).map((b) => ({ path: b.id, label: b.title })),
       render: (view) => <BoardsRoute {...view} />,
+    },
+  ],
+  pageActions: [
+    {
+      key: "board.put",
+      label: "Put on a board…",
+      icon: LayoutDashboard,
+      keywords: ["mood board", "pictures", "card"],
+      on: ["note", "entry"],
+      render: ({ novelId, novel, subject, close }) => <PutOnBoard novelId={novelId} book={novel} subject={subject} onClose={close} />,
     },
   ],
   commands: ({ novelId, novel, navigate }) => [

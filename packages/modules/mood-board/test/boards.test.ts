@@ -3,7 +3,7 @@ import { kindByKey, loadBook, memorySource, modulesOf, parseYaml, picturesShown,
 import { nodeSource } from "@writer/core/node";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { addCard, BOARD, boardFile, boardsOf, cardLine, placeCard, readBoard, readBoardText, reorderCard, takeOffCard, type BoardCard } from "../src/core/index.ts";
+import { addCard, addCards, besideAll, BOARD, boardFile, boardsOf, cardLine, noteCards, NOTE_SIZE, pictureSize, placeCard, readBoard, readBoardText, reorderCard, takeOffCard, type BoardCard } from "../src/core/index.ts";
 
 /** Mood boards in the format (#206): boards/<slug>.yaml, read, checked, and counted as showing pictures. */
 
@@ -235,5 +235,33 @@ cards:
   it("read a board's text with each card in its place, a broken one a gap (#207)", () => {
     expect(readBoardText("id: board_be1fry\ntitle: B\ncards:\n  - { picture: none, at: [1, 2], size: [3, 4] }\n  - { entry: char_aaaaaa, at: [1, 2], size: [3, 4] }\n")).toEqual({ title: "B", cards: [undefined, { kind: "entry", entry: "char_aaaaaa", at: [1, 2], size: [3, 4] }] });
     expect(readBoardText("cards: [\n")).toBeUndefined();
+  });
+
+  it("size a new picture's card by its shape, its longest side 280, and one that can't be read as a plain card (#208)", () => {
+    expect(pictureSize(1600, 900)).toEqual([280, 158]);
+    expect(pictureSize(600, 1200)).toEqual([140, 280]);
+    expect(pictureSize(4000, 20)).toEqual([280, 36]);
+    expect(pictureSize(0, 0)).toEqual([240, 180]);
+  });
+
+  it("put cards from elsewhere to the right of everything on the board, level with its top; an empty board's at the origin (#208)", () => {
+    expect(besideAll([])).toEqual([0, 0]);
+    expect(besideAll([undefined, { kind: "entry", entry: "char_aaaaaa", at: [10, 50], size: [200, 100] }, { kind: "picture", picture: "images/a.jpg", at: [300, -20], size: [100, 100] }])).toEqual([440, -20]);
+  });
+
+  it("lay out a note and two of its pictures: the note, its pictures in a column to its right, added in that order (#208)", () => {
+    const cards = noteCards("note_4k8h2c", [100, 40], true, [
+      { path: "images/harbour.jpg", size: [280, 158] },
+      { path: "images/the-bell.jpg", size: [140, 280] },
+    ]);
+    expect(cards).toEqual<BoardCard[]>([
+      { kind: "note", note: "note_4k8h2c", wordsOnly: false, at: [100, 40], size: NOTE_SIZE },
+      { kind: "note-picture", note: "note_4k8h2c", picture: "images/harbour.jpg", at: [412, 40], size: [280, 158] },
+      { kind: "note-picture", note: "note_4k8h2c", picture: "images/the-bell.jpg", at: [412, 218], size: [140, 280] },
+    ]);
+    expect(noteCards("note_4k8h2c", [0, 0], false, [{ path: "images/a.jpg", size: [10, 10] }])).toEqual([{ kind: "note-picture", note: "note_4k8h2c", picture: "images/a.jpg", at: [0, 0], size: [10, 10] }]);
+    const text = addCards("id: board_be1fry\ntitle: B\ncards: []\n", cards);
+    expect(readBoardText(text)?.cards).toEqual(cards);
+    expect(text.split("\n").filter((l) => l.startsWith("  - "))).toHaveLength(3);
   });
 });
