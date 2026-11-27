@@ -13,7 +13,7 @@ test("the sidebar groups the views, collapses to a strip of icons with Ctrl+\\, 
   await expect(sidebar.getByRole("region", { name: /Off the page|Notes/ })).toHaveCount(0);
   await expect(views.getByRole("group")).toHaveCount(2);
   for (const [group, places] of [
-    ["Plan", ["Outline", "Story map", "Relationships", "Notes", "Progress", "Story bible"]],
+    ["Plan", ["Outline", "Story map", "Relationships", "Notes", "Progress", "Story bible", "Boards"]],
     ["Revise", ["Compare"]],
   ] as const) {
     // Its views, not the Story bible's types and recent entries listed under it.
@@ -25,7 +25,7 @@ test("the sidebar groups the views, collapses to a strip of icons with Ctrl+\\, 
   await page.keyboard.press("ControlOrMeta+\\");
   await expect(sidebar.getByRole("tree")).toHaveCount(0);
   await expect(page.getByRole("textbox", { name: "Chapter text" })).toBeFocused();
-  await expect(views.getByRole("link")).toHaveText(["", "", "", "", "", "", "", ""]);
+  await expect(views.getByRole("link")).toHaveText(["", "", "", "", "", "", "", "", ""]);
   await expect(views.getByRole("link", { name: "Relationships" })).toHaveAttribute("title", "Relationships");
   await axe(page);
   await page.emulateMedia({ colorScheme: "dark" });

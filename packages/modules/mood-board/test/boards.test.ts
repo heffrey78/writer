@@ -3,7 +3,7 @@ import { kindByKey, loadBook, memorySource, modulesOf, parseYaml, picturesShown,
 import { nodeSource } from "@writer/core/node";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { BOARD, boardFile, boardsOf, cardLine, placeCard, readBoard, type BoardCard } from "../src/core/index.ts";
+import { addCard, BOARD, boardFile, boardsOf, cardLine, placeCard, readBoard, readBoardText, reorderCard, takeOffCard, type BoardCard } from "../src/core/index.ts";
 
 /** Mood boards in the format (#206): boards/<slug>.yaml, read, checked, and counted as showing pictures. */
 
@@ -63,9 +63,9 @@ const codes = (ds: Diagnostic[]) => ds.map((d) => d.code);
 const sample = (name: string) => fileURLToPath(new URL(`../../../../examples/${name}/`, import.meta.url));
 
 describe("mood boards", () => {
-  it("are the Novel's and the Campaign's, and no other kind's", () => {
+  it("are the Novel's, the Campaign's and the Journal's, and no other kind's", () => {
     const using = (key: string) => modulesOf(kindByKey(key)).some((m) => m.id === "mood-board");
-    expect(["novel", "campaign", "journal", "nonfiction"].map(using)).toEqual([true, true, false, false]);
+    expect(["novel", "campaign", "journal", "nonfiction"].map(using)).toEqual([true, true, true, false]);
   });
 
   it("read from boards/: each kind of card, in the file's order, comments and all", async () => {
@@ -204,5 +204,36 @@ cards:
 
   it("write a card's line the way the board's file has it", () => {
     expect(cardLine({ kind: "entry", entry: "char_aaaaaa", at: [1, 2], size: [3, 4] })).toBe("  - { entry: char_aaaaaa, at: [ 1, 2 ], size: [ 3, 4 ] }\n");
+  });
+  it("take a card off by its lines alone, comments and the rest kept; the last leaves an empty list (#207)", () => {
+    expect(takeOffCard(BELFRY, 3)).toBe(BELFRY.replace("  - entry: char_aaaaaa\n    at: [48, 392]\n    size: [196, 230]\n", ""));
+    const one = "id: board_be1fry\ntitle: B\ncards:\n  - { entry: char_aaaaaa, at: [ 1, 2 ], size: [ 3, 4 ] }\n";
+    expect(takeOffCard(one, 0)).toBe("id: board_be1fry\ntitle: B\ncards: []\n");
+    // A list written as flow, as nobody but a hand would: written again, still a list.
+    expect(readBoardText(takeOffCard("id: board_be1fry\ntitle: B\ncards: [{ entry: char_aaaaaa, at: [1, 2], size: [3, 4] }, { note: note_4k8h2c, at: [5, 6], size: [7, 8] }]\n", 0))!.cards).toEqual([{ kind: "note", note: "note_4k8h2c", wordsOnly: false, at: [5, 6], size: [7, 8] }]);
+  });
+
+  it("bring a card to the front or send it to the back by moving its lines, unchanged (#207)", () => {
+    const lines = ["  - { entry: char_aaaaaa, at: [ 1, 2 ], size: [ 3, 4 ] }", "  - { note: note_4k8h2c, at: [ 5, 6 ], size: [ 7, 8 ] }", "  - { picture: images/a.jpg, at: [ 9, 10 ], size: [ 11, 12 ] }"];
+    const text = (order: number[]) => `# Mine.\nid: board_be1fry\ntitle: B\ncards:\n${order.map((i) => `${lines[i]}\n`).join("")}# The end.\n`;
+    expect(reorderCard(text([0, 1, 2]), 0, "front")).toBe(text([1, 2, 0]));
+    expect(reorderCard(text([0, 1, 2]), 2, "back")).toBe(text([2, 0, 1]));
+    expect(reorderCard(text([0, 1, 2]), 1, "front")).toBe(text([0, 2, 1]));
+    expect(reorderCard(text([0, 1, 2]), 2, "front")).toBe(text([0, 1, 2]));
+    // The mock-ups' cards, over several lines, move whole.
+    expect(readBoardText(reorderCard(BELFRY, 0, "front"))!.cards.map((c) => c?.kind)).toEqual(["note", "note-picture", "entry", "note", "picture"]);
+    expect(reorderCard(BELFRY, 0, "front")).toContain("  # Words only: no picture shown.\n    picture: none\n  - picture: images/the-belfry-at-dusk.jpg\n");
+  });
+
+  it("add a card on top, on a line of its own, to a board with cards or none (#207)", () => {
+    const card: BoardCard = { kind: "entry", entry: "char_aaaaaa", at: [1, 2], size: [3, 4] };
+    expect(addCard("id: board_be1fry\ntitle: B\ncards: []\n", card)).toBe("id: board_be1fry\ntitle: B\ncards:\n  - { entry: char_aaaaaa, at: [ 1, 2 ], size: [ 3, 4 ] }\n");
+    expect(addCard("id: board_be1fry\ntitle: B\n", card)).toBe("id: board_be1fry\ntitle: B\ncards:\n  - { entry: char_aaaaaa, at: [ 1, 2 ], size: [ 3, 4 ] }\n");
+    expect(addCard(BELFRY, card)).toBe(`${BELFRY}  - { entry: char_aaaaaa, at: [ 1, 2 ], size: [ 3, 4 ] }\n`);
+  });
+
+  it("read a board's text with each card in its place, a broken one a gap (#207)", () => {
+    expect(readBoardText("id: board_be1fry\ntitle: B\ncards:\n  - { picture: none, at: [1, 2], size: [3, 4] }\n  - { entry: char_aaaaaa, at: [1, 2], size: [3, 4] }\n")).toEqual({ title: "B", cards: [undefined, { kind: "entry", entry: "char_aaaaaa", at: [1, 2], size: [3, 4] }] });
+    expect(readBoardText("cards: [\n")).toBeUndefined();
   });
 });

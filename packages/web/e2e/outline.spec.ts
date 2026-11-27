@@ -52,6 +52,9 @@ test("reorders scenes with the keyboard, and opens one", async ({ page, app }) =
   await page.keyboard.press("Alt+ArrowDown");
   await expect.poll(() => novel.read(ARRIVAL)).toContain("scenes: [sc_br1dg3, sc_5tat1n]");
   await expect(page.getByRole("button", { name: "Move “The Station”" })).toBeFocused();
+  // The rows in their new order before a click on one: one clicked while they swap can be the other.
+  const titles = page.getByRole("table").getByRole("link", { name: /^(Walking the Span|The Station)$/ });
+  await expect(titles).toHaveText(["Walking the Span", "The Station"]);
   await row(page, "Walking the Span").getByRole("link", { name: "Walking the Span" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Walking the Span" })).toBeVisible();
 });

@@ -2,6 +2,7 @@ import { registerKinds } from "@writer/kinds";
 import { useCompiledKindSchemas } from "@writer/kinds/compiled-schemas";
 import { dailyServer } from "@writer/module-daily/server";
 import { draftingBoardServer } from "@writer/module-drafting-board/server";
+import { moodBoardServer } from "@writer/module-mood-board/server";
 import { offPageEventsServer } from "@writer/module-off-page-events/server";
 import { storyTimeServer } from "@writer/module-story-time/server";
 import { Channel, invoke } from "@tauri-apps/api/core";
@@ -37,7 +38,7 @@ export async function startEngine(channel: PortChannel, git: GitPort = remoteGit
   registerKinds();
   // The page's CSP forbids compiling the schemas here: the shipped kinds' are compiled ahead of time.
   useCompiledKindSchemas();
-  for (const module of [storyTimeServer, offPageEventsServer, draftingBoardServer, dailyServer]) registerServerModule(module);
+  for (const module of [storyTimeServer, offPageEventsServer, draftingBoardServer, dailyServer, moodBoardServer]) registerServerModule(module);
   const host = await remoteHost(channel);
   const files = remoteFilesPort(channel);
   setPorts({ git, files, host });

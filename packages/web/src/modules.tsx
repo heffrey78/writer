@@ -34,6 +34,8 @@ export interface ModuleView {
    * group's pages; none for a page reached another way (today's entry). Its path is its key in a kind's sidebar.
    */
   group?: "Plan" | "Revise";
+  /** Pages below it it lists under it in the sidebar (a book's boards): each at `<path>/<item's path>`. */
+  items?(novel: Book): { path: string; label: string }[];
   render(view: BookView): ReactNode;
 }
 

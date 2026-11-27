@@ -3,12 +3,17 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Mood boards (D14, #195): pages of pictures, notes, a note's pictures and entries as cards placed and sized by hand, a file each in boards/.",
+  "description": "Mood boards (D14, #195): pages of pictures, notes, a note's pictures and entries as cards placed and sized by hand, a file each in boards/; the board page, and its routes.",
   "exports": {
-    "./core": "./src/core/index.ts"
+    "./core": "./src/core/index.ts",
+    "./server": "./src/server/index.ts",
+    "./web": "./src/web/index.tsx"
   },
   "dependencies": {
+    "@writer/client": "0.1.0",
     "@writer/core": "0.1.0",
+    "@writer/server": "0.1.0",
+    "@writer/web": "0.1.0",
     "yaml": "^2.9.1"
   }
 }

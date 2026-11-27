@@ -979,8 +979,8 @@ test("merging two entries that are one: from Tidy up's pair or the profile, told
 
   // Undo: every file back, byte for byte.
   await page.getByRole("status").getByRole("button", { name: "Undo" }).click();
-  await expect.poll(() => existsSync(join(dir, "bible/characters/benjamin.md"))).toBe(true);
-  expect({ station: read(STATION), ben: read("bible/characters/ben.md"), benjamin: read("bible/characters/benjamin.md") }).toEqual(before);
+  // The files come back one after another: wait for them all, not just the first.
+  await expect.poll(() => existsSync(join(dir, "bible/characters/benjamin.md")) && { station: read(STATION), ben: read("bible/characters/ben.md"), benjamin: read("bible/characters/benjamin.md") }).toEqual(before);
   expect(existsSync(join(dir, "notes/benjamin.md"))).toBe(false);
 
   // From the profile, by keyboard: Merge into…, the one to keep chosen; its page follows to the one kept.

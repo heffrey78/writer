@@ -72,7 +72,7 @@ export const journal: BookKind = {
     },
   ],
   // An entry's date first on its card, then who, where and what.
-  modules: ["presence", "story-time", "daily"],
+  modules: ["presence", "story-time", "daily", "mood-board"],
   // Looking back comes first, from the journal page, where today's is written too; a journal has
   // little use for an outline, or for comparing drafts.
   sidebar: [
