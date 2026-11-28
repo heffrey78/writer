@@ -28,7 +28,7 @@ import { ErrorAlert } from "@writer/web/ui/alert.tsx";
 import { Button } from "@writer/web/ui/button.tsx";
 import { Confirm } from "@writer/web/ui/confirm.tsx";
 import { PictureInTextDialog } from "@writer/web/novel/picture-in-text.tsx";
-import { ImagePlus, Library, StickyNote } from "lucide-react";
+import { BringToFront, ImagePlus, Library, SendToBack, SquareArrowOutUpRight, StickyNote, Trash2, type LucideIcon } from "lucide-react";
 import { create } from "zustand";
 import { createContext, memo, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
@@ -69,6 +69,18 @@ interface BoardActions {
 
 const Actions = createContext<BoardActions | null>(null);
 
+/**
+ * One of a picked-up card's actions, as its icon: the bar stays narrower than the card under it, and
+ * fits a phone's screen. Its name is for screen readers and, as a tooltip, for the mouse.
+ */
+function CardAction({ label, icon: Icon, disabled, onClick }: { label: string; icon: LucideIcon; disabled?: boolean; onClick: () => void }) {
+  return (
+    <Button size="sm" variant="ghost" aria-label={label} title={label} disabled={disabled} onClick={onClick} className="w-8 px-0 max-md:size-11">
+      <Icon className="size-4 max-md:size-5" aria-hidden />
+    </Button>
+  );
+}
+
 const CardView = memo(function CardView({ id: nodeId, data, selected }: NodeProps<CardNode>) {
   const actions = useContext(Actions)!;
   const { card, index } = data;
@@ -83,21 +95,11 @@ const CardView = memo(function CardView({ id: nodeId, data, selected }: NodeProp
         onResizeEnd={(_, p) => actions.resized(index, [round(p.x), round(p.y)], [round(p.width), round(p.height)])}
       />
       <NodeToolbar isVisible={selected} position={Position.Bottom} align="start">
-        <div role="toolbar" aria-label="Card" className="flex gap-0.5 rounded-lg border border-rule bg-raised p-1 text-sm whitespace-nowrap text-ink shadow-md">
-          {what.opens && (
-            <Button size="sm" variant="ghost" onClick={() => actions.open(what.opens!.path)}>
-              {what.opens.label}
-            </Button>
-          )}
-          <Button size="sm" variant="ghost" disabled={index === actions.count - 1} onClick={() => actions.reorder(index, "front")}>
-            Bring to front
-          </Button>
-          <Button size="sm" variant="ghost" disabled={index === 0} onClick={() => actions.reorder(index, "back")}>
-            Send to back
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => actions.takeOff(index)}>
-            Take off the board
-          </Button>
+        <div role="toolbar" aria-label="Card" className="flex gap-0.5 rounded-lg border border-rule bg-raised p-1 text-ink shadow-md">
+          {what.opens && <CardAction label={what.opens.label} icon={SquareArrowOutUpRight} onClick={() => actions.open(what.opens!.path)} />}
+          <CardAction label="Bring to front" icon={BringToFront} disabled={index === actions.count - 1} onClick={() => actions.reorder(index, "front")} />
+          <CardAction label="Send to back" icon={SendToBack} disabled={index === 0} onClick={() => actions.reorder(index, "back")} />
+          <CardAction label="Take off the board" icon={Trash2} onClick={() => actions.takeOff(index)} />
         </div>
       </NodeToolbar>
       {/* Where a tether starts and ends: never shown, and never dragged from. */}
