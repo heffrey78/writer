@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { devices, type Locator, type Page } from "@playwright/test";
-import { axe, expect, launch, test } from "./fixtures.ts";
+import { axe, expect, launch, test, type App } from "./fixtures.ts";
 import { makePicture } from "./pictures.ts";
 
 /**
@@ -1060,13 +1060,15 @@ test("on a phone, the Notes screen: one search bar, its Sort and filter sheet, t
   await expect.poll(() => readFileSync(join(dir, IDEA), "utf8")).toContain("\ncolor: teal\ntags:");
 });
 
-test("on a phone, a board's cards are drawn, the board fills the page down to the bottom bar, and a card's actions are icons a finger's size", async ({ page, app }) => {
+const BELFRY = "boards/the-belfry.yaml";
+const NOTE_CARD = "  - { note: note_tab1e0, at: [ 0, 0 ], size: [ 252, 300 ] }";
+const ENTRY_CARD = "  - { entry: npc_ma7ra1, at: [ 300, 40 ], size: [ 196, 230 ] }";
+
+/** The sample campaign with a board of a note's card and an entry's, opened on the phone. */
+async function phoneBoard(page: Page, app: App) {
   const dir = app.bookRepo(fileURLToPath(new URL("../../../examples/sample-campaign", import.meta.url)), "campaign");
   mkdirSync(join(dir, "boards"));
-  writeFileSync(
-    join(dir, "boards/the-belfry.yaml"),
-    "id: board_be1fry\ntitle: The Belfry\ncards:\n  - { note: note_tab1e0, at: [ 0, 0 ], size: [ 252, 300 ] }\n  - { entry: npc_ma7ra1, at: [ 300, 40 ], size: [ 196, 230 ] }\n",
-  );
+  writeFileSync(join(dir, BELFRY), `id: board_be1fry\ntitle: The Belfry\ncards:\n${NOTE_CARD}\n${ENTRY_CARD}\n`);
   app.git(dir, "add", "-A");
   app.git(dir, "commit", "-qm", "A board");
   await app.restart(dir);
@@ -1075,6 +1077,11 @@ test("on a phone, a board's cards are drawn, the board fills the page down to th
   const at = new URL(page.url());
   await page.goto(`${at.origin}${at.pathname.replace(/^(\/novels\/[^/]+).*/, "$1")}/boards/board_be1fry${at.search}`);
   await expect(page.getByRole("heading", { level: 1, name: "The Belfry" })).toBeVisible();
+  return { dir, read: () => readFileSync(join(dir, BELFRY), "utf8") };
+}
+
+test("on a phone, a board's cards are drawn, the board fills the page down to the bottom bar, and a card's actions are icons a finger's size", async ({ page, app }) => {
+  await phoneBoard(page, app);
   // React Flow drawn at 100% of a height a phone's page gave by flex alone was 0 px tall, its cards hidden in it.
   const board = page.getByRole("region", { name: "Board: The Belfry, 2 cards" });
   const box = (await board.boundingBox())!;
@@ -1095,10 +1102,116 @@ test("on a phone, a board's cards are drawn, the board fills the page down to th
   for (const [i, name] of names.entries()) await expect(actions.nth(i)).toHaveAccessibleName(name);
   for (const action of await actions.all()) {
     const b = (await action.boundingBox())!;
-    expect(b.width).toBeGreaterThanOrEqual(44);
-    expect(b.height).toBeGreaterThanOrEqual(44);
+    expect(b.width).toBeGreaterThanOrEqual(48);
+    expect(b.height).toBeGreaterThanOrEqual(48);
     expect(b.x + b.width).toBeLessThanOrEqual(page.viewportSize()!.width);
   }
   await fits(page);
   await audit(page);
+});
+
+/** Where a card's line puts it and how big: `[x, y, width, height]`. */
+function placed(text: string, what: string): number[] {
+  const line = text.split("\n").find((l) => l.includes(what));
+  const m = line && /at: \[\s*(-?\d+),\s*(-?\d+)\s*\], size: \[\s*(\d+),\s*(\d+)\s*\]/.exec(line);
+  if (!m) throw new Error(`No card of ${what} in:\n${text}`);
+  return m.slice(1).map(Number);
+}
+
+/** Two fingers on the middle of `on`, drawn `by` px further apart each, then lifted: a pinch out. */
+async function pinch(page: Page, on: { x: number; y: number; width: number; height: number }, by: number) {
+  const cdp = await page.context().newCDPSession(page);
+  const x = on.x + on.width / 2;
+  const y = on.y + on.height / 2;
+  const points = (d: number) => [
+    { x: x - 30 - d, y, id: 0 },
+    { x: x + 30 + d, y, id: 1 },
+  ];
+  let at = Date.now() / 1000;
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", timestamp: at, touchPoints: points(0) });
+  for (let i = 1; i <= 10; i++) await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", timestamp: (at += 0.03), touchPoints: points((by * i) / 10) });
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", timestamp: (at += 0.15), touchPoints: [] });
+}
+
+test("on a phone, by finger: a card dragged moves, its corner dragged resizes it, its actions come up as a sheet, and the board pans and pinches, each a line of the board's file (#210)", async ({ page, app }) => {
+  const { read } = await phoneBoard(page, app);
+  const board = page.getByRole("region", { name: "Board: The Belfry, 2 cards" });
+  const note = board.locator(`.react-flow__node[aria-label="Note: Jo wants Aya's debt to come back"]`);
+  const sheet = page.getByRole("dialog").filter({ has: page.getByRole("toolbar", { name: "Card" }) });
+  const zoom = () => page.locator(".react-flow__viewport").evaluate((el) => new DOMMatrix(getComputedStyle(el).transform).a);
+  const moved = () => page.locator(".react-flow__viewport").evaluate((el) => new DOMMatrix(getComputedStyle(el).transform).f);
+  const swipe = await finger(page);
+  const z = await zoom();
+
+  // A card dragged by a finger: it goes where it's let go, its line alone changed, and it isn't picked up.
+  await swipe((await note.boundingBox())!, 60, 45);
+  await expect.poll(() => placed(read(), "note_tab1e0")).not.toEqual([0, 0, 252, 300]);
+  const [x, y] = placed(read(), "note_tab1e0");
+  expect(x).toBeCloseTo(60 / z, -0.5);
+  expect(y).toBeCloseTo(45 / z, -0.5);
+  expect(read()).toContain(ENTRY_CARD);
+  await expect(sheet).toHaveCount(0);
+
+  // Tapped, it's picked up: its sheet, named for it, of its actions as icons a finger's size, all on the screen.
+  await note.tap();
+  await expect(sheet).toBeVisible();
+  await expect(sheet).toHaveAccessibleName("Note: Jo wants Aya's debt to come back");
+  const actions = sheet.getByRole("toolbar", { name: "Card" }).getByRole("button");
+  const names = ["Open the note", "Bring to front", "Send to back", "Take off the board"];
+  for (const [i, name] of names.entries()) await expect(actions.nth(i)).toHaveAccessibleName(name);
+  for (const action of await actions.all()) {
+    const b = (await action.boundingBox())!;
+    expect(Math.min(b.width, b.height)).toBeGreaterThanOrEqual(48);
+    expect(b.x + b.width).toBeLessThanOrEqual(viewport.width);
+  }
+  await fits(page);
+  await audit(page);
+
+  // Its corner, a finger's size, dragged: the card bigger by as much, where it was.
+  // The card was low on the board: it's moved up for its corner to be clear of the sheet.
+  const corner = note.locator(".react-flow__resize-control");
+  await expect(corner).toHaveCount(1);
+  const sheetTop = (await sheet.boundingBox())!.y;
+  await expect.poll(async () => (await corner.boundingBox())!.y + 48).toBeLessThanOrEqual(sheetTop);
+  const c = (await corner.boundingBox())!;
+  expect(Math.round(Math.min(c.width, c.height))).toBeGreaterThanOrEqual(48);
+  await swipe(c, 40, 30);
+  await expect.poll(() => placed(read(), "note_tab1e0").slice(2)).not.toEqual([252, 300]);
+  const [x2, y2, w, h] = placed(read(), "note_tab1e0");
+  expect([x2, y2]).toEqual([x, y]);
+  expect(w! - 252).toBeCloseTo(40 / (await zoom()), -0.5);
+  expect(h! - 300).toBeCloseTo(30 / (await zoom()), -0.5);
+  expect(read()).toContain(ENTRY_CARD);
+
+  // Brought to the front, it's last in the file and still picked up; sent to the back, first again.
+  await sheet.getByRole("button", { name: "Bring to front" }).tap();
+  await expect.poll(() => read().indexOf("note_tab1e0") > read().indexOf("npc_ma7ra1")).toBe(true);
+  await expect(sheet.getByRole("button", { name: "Bring to front" })).toBeDisabled();
+  await sheet.getByRole("button", { name: "Send to back" }).tap();
+  await expect.poll(() => read().indexOf("note_tab1e0") < read().indexOf("npc_ma7ra1")).toBe(true);
+
+  // Its grip tapped puts it down.
+  await sheet.getByRole("button", { name: "Close" }).tap();
+  await expect(sheet).toHaveCount(0);
+  await expect(corner).toHaveCount(0);
+
+  // One finger on the board pans it, two pinch it bigger; neither changes the file.
+  const before = read();
+  const box = (await board.boundingBox())!;
+  const pane = { x: box.x, y: box.y + box.height - 80, width: box.width, height: 40 };
+  const top = await moved();
+  await swipe(pane, 0, -70);
+  await expect.poll(moved).toBeLessThan(top - 40);
+  await pinch(page, pane, 60);
+  await expect.poll(zoom).toBeGreaterThan(z * 1.2);
+  await fits(page);
+  expect(read()).toBe(before);
+
+  // Taken off from its sheet: its line goes.
+  await page.getByRole("button", { name: "Fit all" }).tap();
+  await note.tap();
+  await sheet.getByRole("button", { name: "Take off the board" }).tap();
+  await expect.poll(read).not.toContain("note_tab1e0");
+  await expect(sheet).toHaveCount(0);
+  expect(read()).toContain(ENTRY_CARD);
 });

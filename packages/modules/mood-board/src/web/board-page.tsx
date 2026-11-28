@@ -5,6 +5,7 @@ import {
   BackgroundVariant,
   BaseEdge,
   Handle,
+  NodeResizeControl,
   NodeResizer,
   NodeToolbar,
   Position,
@@ -22,12 +23,14 @@ import {
 import "@xyflow/react/dist/style.css";
 import { api, keys } from "@writer/web/api.ts";
 import { useCommands } from "@writer/web/commands.ts";
+import { useNarrow } from "@writer/web/narrow.ts";
 import { useNotice } from "@writer/web/novel/notice.tsx";
 import { useTheme } from "@writer/web/theme.ts";
 import { ErrorAlert } from "@writer/web/ui/alert.tsx";
 import { Button } from "@writer/web/ui/button.tsx";
 import { Confirm } from "@writer/web/ui/confirm.tsx";
 import { PictureInTextDialog } from "@writer/web/novel/picture-in-text.tsx";
+import { SheetHandle } from "@writer/web/ui/sheet-handle.tsx";
 import { BringToFront, ImagePlus, Library, SendToBack, SquareArrowOutUpRight, StickyNote, Trash2, type LucideIcon } from "lucide-react";
 import { create } from "zustand";
 import { createContext, memo, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
@@ -44,6 +47,11 @@ import { droppedPicture, measure, PutOnBoard, putCards } from "./put-on-board.ts
  * brings it to the front or sends it to the back, and takes it off the board (which Undo puts back).
  * Each change is a save of the board's file that changes the card's own line. A note's pictures are
  * tethered to its card by a dashed line, faint until one of them is selected.
+ *
+ * On a phone (#210) it's all by finger: a card dragged moves, its corner's grip (a finger's size) resizes
+ * it, one finger on the board pans and two pinch to zoom. A tapped card's actions come up as a sheet at
+ * the foot of the board, not a toolbar under the card: the sheet doesn't hide the card's corner, and the
+ * board can still be panned and the card moved while it's up.
  */
 
 /** A card by its place in the board's file. */
@@ -61,6 +69,8 @@ interface BoardActions {
   cards: readonly (BoardCard | undefined)[];
   notesShown: ReadonlySet<string>;
   count: number;
+  /** On a phone: the corner's grip to resize, and the actions in a sheet. */
+  narrow: boolean;
   open(path: string): void;
   reorder(index: number, to: "front" | "back"): void;
   takeOff(index: number): void;
@@ -71,37 +81,100 @@ const Actions = createContext<BoardActions | null>(null);
 
 /**
  * One of a picked-up card's actions, as its icon: the bar stays narrower than the card under it, and
- * fits a phone's screen. Its name is for screen readers and, as a tooltip, for the mouse.
+ * on a phone's sheet each is a finger's size (48 px). Its name is for screen readers and, as a tooltip,
+ * for the mouse.
  */
 function CardAction({ label, icon: Icon, disabled, onClick }: { label: string; icon: LucideIcon; disabled?: boolean; onClick: () => void }) {
   return (
-    <Button size="sm" variant="ghost" aria-label={label} title={label} disabled={disabled} onClick={onClick} className="w-8 px-0 max-md:size-11">
-      <Icon className="size-4 max-md:size-5" aria-hidden />
+    <Button size="sm" variant="ghost" aria-label={label} title={label} disabled={disabled} onClick={onClick} className="w-8 px-0 max-md:size-12">
+      <Icon className="size-4 max-md:size-6" aria-hidden />
     </Button>
   );
 }
+
+/** A card's actions, as its toolbar under it (desktop) or the phone's sheet has them. */
+function CardActions({ index, card }: { index: number; card: BoardCard }) {
+  const actions = useContext(Actions)!;
+  const what = shown(actions.book, card);
+  return (
+    <>
+      {what.opens && <CardAction label={what.opens.label} icon={SquareArrowOutUpRight} onClick={() => actions.open(what.opens!.path)} />}
+      <CardAction label="Bring to front" icon={BringToFront} disabled={index === actions.count - 1} onClick={() => actions.reorder(index, "front")} />
+      <CardAction label="Send to back" icon={SendToBack} disabled={index === 0} onClick={() => actions.reorder(index, "back")} />
+      <CardAction label="Take off the board" icon={Trash2} onClick={() => actions.takeOff(index)} />
+    </>
+  );
+}
+
+/**
+ * The selected card's actions on a phone: a sheet along the foot of the board, named for the card, with
+ * the actions as icons a finger's size. Not modal: the board stays in reach under it. Its grip, tapped
+ * or drawn down, puts the card down.
+ */
+function CardSheet({ index, card, onClose }: { index: number; card: BoardCard; onClose: () => void }) {
+  const actions = useContext(Actions)!;
+  const label = shown(actions.book, card).label;
+  const ref = useRef<HTMLDivElement>(null);
+  const { getViewport, setViewport } = useReactFlow();
+  // A card picked up low on the board would have its corner under the sheet: the board moves up to show it.
+  useEffect(() => {
+    const top = ref.current?.getBoundingClientRect().top;
+    const box = document.querySelector(`.react-flow__node[data-id="${id(index)}"]`)?.getBoundingClientRect();
+    if (top === undefined || !box) return;
+    const under = box.bottom + GRIP / 2 + 8 - top;
+    if (under <= 0) return;
+    const v = getViewport();
+    void setViewport({ ...v, y: v.y - under }, { duration: matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 150 });
+  }, [index, getViewport, setViewport]);
+  return (
+    <div ref={ref} role="dialog" aria-modal="false" aria-label={label} className="absolute inset-x-0 bottom-0 z-10 rounded-t-2xl border-t border-rule bg-raised px-4 pb-2 text-ink shadow-xl">
+      <SheetHandle edge="bottom" onClose={onClose} />
+      <p className="truncate text-sm font-semibold">{label}</p>
+      <div role="toolbar" aria-label="Card" className="flex justify-around gap-1 pt-1">
+        <CardActions index={index} card={card} />
+      </div>
+    </div>
+  );
+}
+
+/** A card's corner on a phone: a grip a finger can take, drawn small in the middle of where it's taken. */
+const GRIP = 48;
 
 const CardView = memo(function CardView({ id: nodeId, data, selected }: NodeProps<CardNode>) {
   const actions = useContext(Actions)!;
   const { card, index } = data;
   const what = shown(actions.book, card);
+  // The same function from one render to the next: the resizer starts over when it's given another,
+  // and a finger's resize under way stopped at its first move (its card re-drawn bigger).
+  const latest = useRef({ actions, index });
+  latest.current = { actions, index };
+  const onResizeEnd = useCallback((_: unknown, p: { x: number; y: number; width: number; height: number }) => latest.current.actions.resized(latest.current.index, [round(p.x), round(p.y)], [round(p.width), round(p.height)]), []);
   return (
     <>
-      <NodeResizer
-        isVisible={selected}
-        minWidth={48}
-        minHeight={36}
-        color="var(--ghw-accent)"
-        onResizeEnd={(_, p) => actions.resized(index, [round(p.x), round(p.y)], [round(p.width), round(p.height)])}
-      />
-      <NodeToolbar isVisible={selected} position={Position.Bottom} align="start">
-        <div role="toolbar" aria-label="Card" className="flex gap-0.5 rounded-lg border border-rule bg-raised p-1 text-ink shadow-md">
-          {what.opens && <CardAction label={what.opens.label} icon={SquareArrowOutUpRight} onClick={() => actions.open(what.opens!.path)} />}
-          <CardAction label="Bring to front" icon={BringToFront} disabled={index === actions.count - 1} onClick={() => actions.reorder(index, "front")} />
-          <CardAction label="Send to back" icon={SendToBack} disabled={index === 0} onClick={() => actions.reorder(index, "back")} />
-          <CardAction label="Take off the board" icon={Trash2} onClick={() => actions.takeOff(index)} />
-        </div>
-      </NodeToolbar>
+      {actions.narrow ? (
+        selected && (
+          <NodeResizeControl
+            position="bottom-right"
+            minWidth={48}
+            minHeight={36}
+            onResizeEnd={onResizeEnd}
+            // The control's own look (a 5 px square) is cleared: a clear finger-size target, its grip drawn in it.
+            className="!grid place-items-center !border-0 !bg-transparent"
+            style={{ width: GRIP, height: GRIP }}
+          >
+            <span aria-hidden className="size-5 rounded-full border-2 border-paper bg-accent shadow-md" />
+          </NodeResizeControl>
+        )
+      ) : (
+        <>
+          <NodeResizer isVisible={selected} minWidth={48} minHeight={36} color="var(--ghw-accent)" onResizeEnd={onResizeEnd} />
+          <NodeToolbar isVisible={selected} position={Position.Bottom} align="start">
+            <div role="toolbar" aria-label="Card" className="flex gap-0.5 rounded-lg border border-rule bg-raised p-1 text-ink shadow-md">
+              <CardActions index={index} card={card} />
+            </div>
+          </NodeToolbar>
+        </>
+      )}
       {/* Where a tether starts and ends: never shown, and never dragged from. */}
       <Handle type="source" position={Position.Right} isConnectable={false} className="!pointer-events-none !opacity-0" />
       <Handle type="target" position={Position.Left} isConnectable={false} className="!pointer-events-none !opacity-0" />
@@ -247,6 +320,7 @@ function Zoom() {
 
 function Canvas({ novelId, book, board, text, setText }: { novelId: string; book: Book; board: Board; text: string; setText: (t: string) => void }) {
   const navigate = useNavigate();
+  const narrow = useNarrow();
   const theme = useTheme((s) => s.theme);
   const queryClient = useQueryClient();
   const show = useNotice((s) => s.show);
@@ -286,6 +360,7 @@ function Canvas({ novelId, book, board, text, setText }: { novelId: string; book
       cards,
       notesShown,
       count: cards.length,
+      narrow,
       open: (path) => navigate(`/novels/${novelId}/${path}`),
       reorder: (index, to) => {
         setSelected(new Set([id(to === "front" ? cards.length - 1 : 0)]));
@@ -314,16 +389,26 @@ function Canvas({ novelId, book, board, text, setText }: { novelId: string; book
       },
       resized: (index, at, size) => change((t) => placeCard(t, index, { at, size })),
     }),
-    [novelId, book, cards, notesShown, navigate, change, show],
+    [novelId, book, cards, notesShown, narrow, navigate, change, show],
   );
 
   const onDragStop: OnNodeDrag<CardNode> = useCallback(
     (_, __, dragged) => {
       const moved = dragged.map((n) => ({ index: indexOf(n.id), at: [round(n.position.x), round(n.position.y)] as Pair }));
-      change((t) => moved.reduce((acc, m) => placeCard(acc, m.index, { at: m.at }), t));
+      // A tap on a phone is a drag that went nowhere (see nodeDragThreshold): nothing to save.
+      const changed = moved.filter((m) => cards[m.index]?.at.join() !== m.at.join());
+      if (changed.length) change((t) => changed.reduce((acc, m) => placeCard(acc, m.index, { at: m.at }), t));
     },
-    [change],
+    [change, cards],
   );
+
+  // On a phone, one card picked up has its sheet; closed, the card's put down.
+  const putDown = () => {
+    setSelected(new Set());
+    setNodes((ns) => ns.map((n) => (n.selected ? { ...n, selected: false } : n)));
+  };
+  const only = selected.size === 1 ? indexOf([...selected][0]!) : -1;
+  const sheet = narrow && cards[only] ? { index: only, card: cards[only]! } : undefined;
 
   const strong = (a: string, b: string) => selected.has(a) || selected.has(b);
   const edges: Edge<{ strong: boolean }>[] = useMemo(() => {
@@ -398,6 +483,13 @@ function Canvas({ novelId, book, board, text, setText }: { novelId: string; book
           }
           onNodeDragStop={onDragStop}
           onPaneClick={() => setSelected(new Set())}
+          // A card dragged on a phone isn't picked up too: its sheet would come up under the finger.
+          selectNodesOnDrag={!narrow}
+          // A phone's browser keeps a finger's first few pixels to itself (to see if it's a scroll), so a
+          // drag started once the finger had gone a pixel left the card that far behind it. Started at
+          // the touch, it's under the finger all the way. A tap is then a drag that went nowhere, which
+          // changes nothing in the file.
+          nodeDragThreshold={narrow ? 0 : 1}
           elevateNodesOnSelect={false}
           nodesConnectable={false}
           fitView
@@ -414,6 +506,7 @@ function Canvas({ novelId, book, board, text, setText }: { novelId: string; book
         >
           <Background variant={BackgroundVariant.Dots} gap={22} />
         </ReactFlow>
+        {sheet && <CardSheet index={sheet.index} card={sheet.card} onClose={putDown} />}
         {!cards.length && <p className="pointer-events-none absolute inset-0 grid place-items-center text-sm text-muted">Nothing on this board yet. Add a picture, a note or an entry, or drop a picture here.</p>}
       </div>
     </Actions.Provider>
