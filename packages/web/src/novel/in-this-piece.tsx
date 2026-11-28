@@ -77,9 +77,7 @@ export function InThisPiece({ novelId, novel, workspace, piece, editing, onEdit,
         </ul>
       )}
       {here.length === 0 ? (
-        <p className="text-muted">
-          No one and nothing is named in this {w.piece.one} yet. Type @ in the text to mention {w.entity.a}, or choose Add….
-        </p>
+        <p className="text-muted">No mentions yet</p>
       ) : (
         rest.length > 0 && (
           <ul aria-label={`In “${piece.title}”`} className="grid gap-1.5">
