@@ -117,6 +117,10 @@ const varn = fake.repoPath("ada", "varn");
 execFileSync("git", ["init", "--quiet", "--bare", "--initial-branch=main", varn]);
 const seed = join(tmp, "varn");
 execFileSync("cp", ["-r", join(repo, "examples/sample-novel"), seed]);
+// A mood board with a note's card on it, to move by touch (#210).
+const TOLL_HOUSE = "boards/the-toll-house.yaml";
+mkdirSync(join(seed, "boards"));
+writeFileSync(join(seed, TOLL_HOUSE), "id: board_t0llhs\ntitle: The Toll House\ncards:\n  - { note: note_w1fben, at: [ 0, 0 ], size: [ 252, 300 ] }\n");
 git(seed, "init", "-q", "-b", "main");
 git(seed, "add", "-A");
 git(seed, "commit", "-q", "-m", "The Bridge at Varn");
@@ -569,6 +573,40 @@ try {
   for (let i = 0; i < 80 && !onGitHub; i++, await sleep(250)) onGitHub = git(varn, "ls-tree", "-r", "--name-only", "main").split("\n").some((f) => /^images\/a-sketch-of-the-toll-house\.(png|jpg)$/.test(f));
   if (!onGitHub) throw new Error("The picture didn't reach GitHub.");
   step("the picture and the note's color synced to GitHub");
+
+  // A board by touch (#210): its card dragged by a finger, as Android's own touch sends it, goes where
+  // it's let go; its line in the board's file, and only that, changed on the phone and, synced, on GitHub.
+  const bookPath = new URL(page.url()).pathname.replace(/^(\/novels\/[^/]+).*/, "$1");
+  await page.goto(`http://tauri.localhost${bookPath}/boards/board_t0llhs`);
+  await expect(page.getByRole("heading", { level: 1, name: "The Toll House" })).toBeVisible();
+  const boardCard = page.locator(".react-flow__node").first();
+  await expect(boardCard).toBeVisible();
+  await sleep(500);
+  let view: ReturnType<typeof androidUi>[number] | undefined;
+  for (let i = 0; i < 6 && !view; i++) {
+    view = androidUi().find((n) => n.cls === "android.webkit.WebView");
+    if (!view) await sleep(500);
+  }
+  view ??= webviewAt;
+  if (!view) throw new Error("Android's screen shows no webview to drag on.");
+  const cardBox = (await boardCard.boundingBox())!;
+  const dpr = await page.evaluate(() => devicePixelRatio);
+  const [fromX, fromY] = [Math.round(view.x1 + (cardBox.x + cardBox.width / 2) * dpr), Math.round(view.y1 + (cardBox.y + cardBox.height / 2) * dpr)];
+  adb("shell", "input", "swipe", String(fromX), String(fromY), String(fromX + 150), String(fromY + 120), "800");
+  const boardOnPhone = () => inApp(`cat books/varn/${TOLL_HOUSE}`);
+  let placedOnPhone = "";
+  for (let i = 0; i < 40 && !placedOnPhone; i++, await sleep(250)) placedOnPhone = /at: \[ 0, 0 \]/.test(boardOnPhone()) ? "" : boardOnPhone();
+  if (!placedOnPhone) throw new Error("The card dragged on the board wasn't moved in its file on the phone.");
+  const [, cardX, cardY] = (/at: \[\s*(-?\d+),\s*(-?\d+)\s*\], size: \[ 252, 300 \]/.exec(placedOnPhone) ?? []).map(Number);
+  if (!(cardX! > 0 && cardY! > 0)) throw new Error(`The card wasn't moved right and down:\n${placedOnPhone}`);
+  await page.getByRole("button", { name: /^Sync: / }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Sync now" }).click();
+  let boardSynced = false;
+  for (let i = 0; i < 80 && !boardSynced; i++, await sleep(250)) boardSynced = git(varn, "show", `main:${TOLL_HOUSE}`) === placedOnPhone;
+  if (!boardSynced) throw new Error("The board's moved card didn't reach GitHub.");
+  const changed = git(varn, "log", "--format=", "--numstat", "main", "--", TOLL_HOUSE).trim().split("\n")[0];
+  if (changed !== `1\t1\t${TOLL_HOUSE}`) throw new Error(`The board's file changed more than its card's line: ${changed}`);
+  step("a board's card dragged by touch: its one line changed on the phone, and synced to GitHub");
 
   // Shared from another app (#204, #205), as Android's share sheet sends it: a picture from the
   // phone's photos, then a link with its words, each to Save to Writer, into the novel, offline.
