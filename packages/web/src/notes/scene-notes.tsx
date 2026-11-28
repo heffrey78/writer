@@ -32,7 +32,7 @@ type Spell = { service: SpellService; onAddWord: (w: string) => void } | undefin
  * The right sidebar's Notes tab (heffrey78/gh-writer#222): the notes on the scene the caret is in, as sticky-note cards,
  * the one pinned there first, then newest. A card is truncated until opened, when it expands in place
  * to edit its title, tags and prose, pin it here, take it off this scene, or open its page. + Note makes
- * one on the scene, opened, with the caret in its prose; Add a note puts one already written on it too (heffrey78/gh-writer#238).
+ * one on the scene, opened, with the caret in its prose; Add an existing note puts one already written on it too (heffrey78/gh-writer#238).
  */
 export function SceneNotes({ novelId, novel, workspace, scene, spell }: { novelId: string; novel: Book; workspace: Workspace; scene: Piece; spell: Spell }) {
   const queryClient = useQueryClient();
@@ -162,10 +162,10 @@ export function SceneNotes({ novelId, novel, workspace, scene, spell }: { novelI
           ))}
         </ul>
       ) : (
-        !adding && <p className="text-muted">No notes on this {w.piece.one} yet. + Note makes one, kept beside the text while you write{others.length > 0 && ", or add one already written below"}.</p>
+        !adding && <p className="text-muted">No notes yet</p>
       )}
       {/* After the scene's own notes: bringing in another is the less usual thing to do. */}
-      {others.length > 0 && <Picker label="Add a note already written" items={others} value={undefined} onChange={(v) => v && void addExisting(v)} placeholder="Choose a note…" className="border-t border-rule pt-3" />}
+      {others.length > 0 && <Picker label="Add an existing note" items={others} value={undefined} onChange={(v) => v && void addExisting(v)} placeholder="Choose a note…" className="border-t border-rule pt-3" />}
     </section>
   );
 }

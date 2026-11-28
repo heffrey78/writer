@@ -651,7 +651,7 @@ export function SceneDetails({
               ))}
             </ul>
           ) : (
-            <p className="text-muted">None about this {w.piece.one}'s passages.</p>
+            <p className="text-muted">No related issues</p>
           )}
         </section>
       )}
