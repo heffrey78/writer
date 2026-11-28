@@ -54,7 +54,7 @@ export async function runServe(dir: string | undefined, { port = 0, open = true,
 
     const web = webApp();
     if (!web) say("The web app isn't built yet: run `npm run build` first. Serving the API only.");
-    server = await createServer({ library, port, engineInPage, ...(web ? { web } : {}), ...(syncEvery !== undefined ? { sync: { intervalMs: syncEvery * 60_000 } } : {}) });
+    server = await createServer({ library, port, anyPortIfTaken: sidecar, engineInPage, ...(web ? { web } : {}), ...(syncEvery !== undefined ? { sync: { intervalMs: syncEvery * 60_000 } } : {}) });
     launchUrl = novel ? server.launchUrlFor(`/novels/${novel.id}`) : server.launchUrl;
     if (novel) server.prepare(novel.id);
     say(novel ? `Writer is serving ${novel.title} (${novel.path})` : `Writer is serving your library (${library.file})`);

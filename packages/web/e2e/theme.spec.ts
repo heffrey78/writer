@@ -63,12 +63,33 @@ test("the palette has a command for each theme beside light, dark and the system
   await page.keyboard.press("Escape");
 });
 
+// The desktop app starts Writer again at each launch. The theme is kept in the page's storage, which
+// belongs to the server's address: the app asks for last launch's port (`settings.json`), or it's lost.
+test("the theme stays when Writer is started again on the same address, and only there", async ({ page, app }) => {
+  await launch(page, app);
+  await palette(page, "theme: moss");
+  await expect(page.locator("html")).toHaveAttribute("data-palette", "moss");
+  const port = new URL(app.url).port;
+
+  await app.restart("--port", port);
+  await launch(page, app);
+  await expect(page.locator("html")).toHaveAttribute("data-palette", "moss");
+
+  // On another port, the page's storage is another's: Paper again. This was the desktop app, every launch.
+  await app.restart();
+  expect(new URL(app.url).port).not.toBe(port);
+  await launch(page, app);
+  await expect(page.locator("html")).not.toHaveAttribute("data-palette");
+});
+
 test("your own colors: started from the theme on screen, a too-faint link moved to the nearest shade that reads, named and said, a hex code typed, and kept (#191)", async ({ page, app }) => {
   test.setTimeout(60_000);
   await page.emulateMedia({ colorScheme: "light" });
   await launch(page, app);
   const token = (name: string) => page.evaluate((n) => getComputedStyle(document.documentElement).getPropertyValue(`--ghw-${n}`).trim(), name);
   await palette(page, "theme: slate");
+  // Slate on screen before the picker opens, or your own colors start from Paper.
+  await expect(page.locator("html")).toHaveAttribute("data-palette", "slate");
   await palette(page, "theme…");
   const picker = page.getByRole("dialog", { name: "Theme" });
   await picker.getByText("Your own", { exact: true }).click();

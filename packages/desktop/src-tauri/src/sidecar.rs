@@ -61,6 +61,16 @@ enum Line {
     },
 }
 
+/// What the server is started with: `port` is last launch's, which it takes again unless something
+/// else has it (then any free one), so the pages keep their storage, which belongs to their address.
+pub fn serve_args(server: &Path, port: Option<u16>) -> Vec<String> {
+    let mut args = vec![server.display().to_string(), "serve".into(), "--sidecar".into()];
+    if let Some(port) = port {
+        args.extend(["--port".into(), port.to_string()]);
+    }
+    args
+}
+
 /// The server's first line: its address and launch token, or why it couldn't start.
 pub fn parse_line(line: &str) -> Result<(String, String), String> {
     if line.trim().is_empty() {
@@ -77,15 +87,14 @@ impl Sidecar {
     /// Start the server and wait until it's listening. Its messages go to `log` (the last run's are
     /// kept beside it, as .previous.log). `askpass` answers git's prompts for GitHub tokens; `version`
     /// is the app's, for About and the update check.
-    pub fn start(resources: &Resources, askpass: &Path, log: &Path, version: &str) -> Result<Sidecar, String> {
+    pub fn start(resources: &Resources, port: Option<u16>, askpass: &Path, log: &Path, version: &str) -> Result<Sidecar, String> {
         if log.exists() {
             let _ = fs::rename(log, log.with_extension("previous.log"));
         }
         let log_file = File::create(log).map_err(|e| format!("Couldn't write the server's log ({}): {e}", log.display()))?;
         let mut command = Command::new(&resources.node);
         command
-            .arg(&resources.server)
-            .args(["serve", "--sidecar"])
+            .args(serve_args(&resources.server, port))
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(log_file)
@@ -159,7 +168,16 @@ impl Sidecar {
 
 #[cfg(test)]
 mod tests {
-    use super::parse_line;
+    use std::path::Path;
+
+    use super::{parse_line, serve_args};
+
+    #[test]
+    fn asks_for_last_launchs_port() {
+        let server = Path::new("server/writer.mjs");
+        assert_eq!(serve_args(server, None), ["server/writer.mjs", "serve", "--sidecar"]);
+        assert_eq!(serve_args(server, Some(41234)), ["server/writer.mjs", "serve", "--sidecar", "--port", "41234"]);
+    }
 
     #[test]
     fn reads_the_address_and_token() {

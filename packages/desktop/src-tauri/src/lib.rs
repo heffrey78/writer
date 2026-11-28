@@ -398,7 +398,11 @@ fn open_outside(app: &AppHandle, url: &Url) {
 /// start, say why and quit.
 fn start_server(app: &AppHandle) {
     let starting = Instant::now();
-    let system_git = app.state::<Shell>().settings.lock().unwrap().system_git;
+    let (system_git, port) = {
+        let shell = app.state::<Shell>();
+        let settings = shell.settings.lock().unwrap();
+        (settings.system_git, settings.port)
+    };
     let started = (|| {
         // Which folder couldn't be found is said: "unknown path" alone told a Windows run nothing (#106).
         let resources = Resources::in_dir(&app.path().resource_dir().map_err(|e| format!("Couldn't find the app's own files: {e}"))?, system_git);
@@ -407,7 +411,7 @@ fn start_server(app: &AppHandle) {
         // The app's own executable answers git's prompts for the GitHub token (askpass mode, in main).
         let askpass = std::env::current_exe().map_err(|e| e.to_string())?;
         let version = app.package_info().version.to_string();
-        let sidecar = Sidecar::start(&resources, &askpass, &logs.join("server.log"), &version)?;
+        let sidecar = Sidecar::start(&resources, port, &askpass, &logs.join("server.log"), &version)?;
         let url: Url = sidecar.url.parse().map_err(|e| format!("The server gave a bad address: {e}"))?;
         let server = Server { url, token: sidecar.token.clone() };
         Ok::<_, String>((sidecar, server))
@@ -416,6 +420,7 @@ fn start_server(app: &AppHandle) {
         Ok((sidecar, server)) => {
             eprintln!("Writer: server listening at {} after {} ms", server.url, starting.elapsed().as_millis());
             let shell = app.state::<Shell>();
+            remember_port(app, server.url.port());
             let previous = shell.server.lock().unwrap().replace(server.clone());
             *shell.sidecar.lock().unwrap() = Some(sidecar);
             let mut wanted = shell.wanted.lock().unwrap();
@@ -438,6 +443,25 @@ fn start_server(app: &AppHandle) {
                 .blocking_show();
             app.state::<Shell>().quitting.store(true, Ordering::SeqCst);
             app.exit(1);
+        }
+    }
+}
+
+/// Keep the server's port for next launch, when it isn't kept already: the pages' storage (the
+/// theme, D21; the sidebars) belongs to their address, and a new port would start it empty.
+fn remember_port(app: &AppHandle, port: Option<u16>) {
+    let shell = app.state::<Shell>();
+    let settings = {
+        let mut settings = shell.settings.lock().unwrap();
+        if port.is_none() || settings.port == port {
+            return;
+        }
+        settings.port = port;
+        settings.clone()
+    };
+    if let Ok(dir) = app.path().app_config_dir() {
+        if let Err(e) = settings.save(&dir) {
+            eprintln!("Writer: {e}");
         }
     }
 }

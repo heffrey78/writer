@@ -30,7 +30,8 @@ Commands:
       --no-open             Print the URL without opening a browser
       --sync-every <min>    Sync with GitHub every <min> minutes (default 5; 0: only on demand)
       --sidecar             For the desktop app: print {url, token, launchUrl} as one JSON line,
-                            with messages on stderr, and stop when stdin closes
+                            with messages on stderr, and stop when stdin closes; a --port
+                            that's taken gives way to a free one
       --engine-in-page      Run the app's engine in the page, as on Android, with git and the
                             disk reached through this server (for testing)
   validate [dir] [--json]   Check a novel repository (default: current directory)
