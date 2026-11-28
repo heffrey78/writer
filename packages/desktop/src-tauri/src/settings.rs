@@ -12,6 +12,9 @@ pub struct Settings {
     /// Use the computer's own git instead of the one inside the app.
     pub system_git: bool,
     pub dictation: Dictation,
+    /// The server's port last launch, asked for again: the pages' own storage (the theme, the
+    /// sidebars, D21) belongs to their address, so a new port each launch would start it empty.
+    pub port: Option<u16>,
 }
 
 /// How dictation hears the writer (#80): kept on this computer, never in a book. The page shows and
@@ -79,13 +82,22 @@ mod tests {
     fn keeps_dictation_settings_beside_the_others() {
         let dir = std::env::temp_dir().join(format!("writer-dictation-settings-{}", std::process::id()));
         let dictation = Dictation { microphone: Some(Microphone { id: "pulseaudio:alsa_input.usb".into(), name: "USB Microphone".into() }), silence_seconds: 120, announce: true, ..Dictation::default() };
-        Settings { system_git: true, dictation: dictation.clone() }.save(&dir).unwrap();
+        Settings { system_git: true, dictation: dictation.clone(), ..Settings::default() }.save(&dir).unwrap();
         assert_eq!(Settings::load(&dir).dictation, dictation);
         // Settings saved before dictation had any keep theirs, and dictation's defaults.
         std::fs::write(dir.join("settings.json"), r#"{ "systemGit": true }"#).unwrap();
         let loaded = Settings::load(&dir);
         assert!(loaded.system_git);
         assert_eq!(loaded.dictation.silence_seconds, 60);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn keeps_the_servers_port() {
+        let dir = std::env::temp_dir().join(format!("writer-port-settings-{}", std::process::id()));
+        assert_eq!(Settings::load(&dir).port, None);
+        Settings { port: Some(41234), ..Settings::default() }.save(&dir).unwrap();
+        assert_eq!(Settings::load(&dir).port, Some(41234));
         std::fs::remove_dir_all(&dir).unwrap();
     }
 }

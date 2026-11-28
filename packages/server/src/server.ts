@@ -19,6 +19,11 @@ export interface ServerOptions {
   token?: string;
   /** 0 (the default) picks a free port. */
   port?: number;
+  /**
+   * When `port` is taken, pick a free one rather than fail. The desktop app asks for the port it had
+   * last time, since the page's storage (its theme, its sidebars) belongs to the address it's at.
+   */
+  anyPortIfTaken?: boolean;
   /** How long `close()` waits for in-flight requests before cutting their connections (ms). */
   shutdownTimeout?: number;
   /** Background commit timing; false turns background commits off. */
@@ -58,7 +63,7 @@ export interface RunningServer {
 const HOST = "127.0.0.1";
 
 /** Starts the server on 127.0.0.1 only. */
-export async function createServer({ library, token = newToken(), port = 0, shutdownTimeout = 10_000, commit, sync, web, engineInPage = false, github = githubFromEnv() }: ServerOptions = {}): Promise<RunningServer> {
+export async function createServer({ library, token = newToken(), port = 0, anyPortIfTaken = false, shutdownTimeout = 10_000, commit, sync, web, engineInPage = false, github = githubFromEnv() }: ServerOptions = {}): Promise<RunningServer> {
   library ??= await Library.open();
   let boundPort = port;
   const workspaces = new Workspaces(library, { ...(commit !== undefined ? { commit } : {}), ...(sync !== undefined ? { sync } : {}), github });
@@ -68,13 +73,20 @@ export async function createServer({ library, token = newToken(), port = 0, shut
   const app = createApp({ token, port: () => boundPort, library, workspaces, github, ...(web ? { web } : {}), ...(engineInPage ? { engineInPage: { stopped: stopping.signal, ...(syncMs !== undefined ? { syncMs } : {}) } } : {}) });
   const server = createHttpServer(getRequestListener(app.fetch));
 
-  await new Promise<void>((resolve, reject) => {
-    server.once("error", reject);
-    server.listen(port, HOST, () => {
-      server.off("error", reject);
-      resolve();
+  const listen = (on: number) =>
+    new Promise<void>((resolve, reject) => {
+      server.once("error", reject);
+      server.listen(on, HOST, () => {
+        server.off("error", reject);
+        resolve();
+      });
     });
-  });
+  try {
+    await listen(port);
+  } catch (e) {
+    if (!(anyPortIfTaken && port !== 0 && (e as NodeJS.ErrnoException).code === "EADDRINUSE")) throw e;
+    await listen(0);
+  }
   boundPort = (server.address() as AddressInfo).port;
 
   let closing: Promise<void> | undefined;

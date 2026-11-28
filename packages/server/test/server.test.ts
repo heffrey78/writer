@@ -47,6 +47,23 @@ describe("createServer", () => {
       await Promise.all([a.close(), b.close()]);
     }
   });
+
+  // The desktop app asks for last launch's port: the page's storage (its theme) belongs to that address.
+  it("listens on the port asked for again after a restart, or on a free one when it's taken and may be", async () => {
+    const port = server.port;
+    await server.close();
+    server = await createServer({ library, token: TOKEN, port, anyPortIfTaken: true });
+    expect(server.port).toBe(port);
+
+    await expect(createServer({ library, port })).rejects.toMatchObject({ code: "EADDRINUSE" });
+    const other = await createServer({ library, port, anyPortIfTaken: true });
+    try {
+      expect(other.port).toBeGreaterThan(0);
+      expect(other.port).not.toBe(port);
+    } finally {
+      await other.close();
+    }
+  });
 });
 
 describe("session", () => {
