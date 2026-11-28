@@ -1060,7 +1060,7 @@ test("on a phone, the Notes screen: one search bar, its Sort and filter sheet, t
   await expect.poll(() => readFileSync(join(dir, IDEA), "utf8")).toContain("\ncolor: teal\ntags:");
 });
 
-test("on a phone, a board's cards are drawn, and the board fills the page down to the bottom bar", async ({ page, app }) => {
+test("on a phone, a board's cards are drawn, the board fills the page down to the bottom bar, and a card's actions are icons a finger's size", async ({ page, app }) => {
   const dir = app.bookRepo(fileURLToPath(new URL("../../../examples/sample-campaign", import.meta.url)), "campaign");
   mkdirSync(join(dir, "boards"));
   writeFileSync(
@@ -1087,5 +1087,18 @@ test("on a phone, a board's cards are drawn, and the board fills the page down t
     expect(c.y + c.height).toBeLessThanOrEqual(box.y + box.height);
     expect(await card.evaluate((el) => document.elementFromPoint(el.getBoundingClientRect().x + 4, el.getBoundingClientRect().y + 4)?.closest(".react-flow__node") === el)).toBe(true);
   }
+  // A card picked up: its actions as icons, each named, a finger's size, and all on the screen.
+  await board.locator(".react-flow__node").first().tap();
+  const actions = page.getByRole("toolbar", { name: "Card" }).getByRole("button");
+  const names = ["Open the note", "Bring to front", "Send to back", "Take off the board"];
+  await expect(actions).toHaveCount(names.length);
+  for (const [i, name] of names.entries()) await expect(actions.nth(i)).toHaveAccessibleName(name);
+  for (const action of await actions.all()) {
+    const b = (await action.boundingBox())!;
+    expect(b.width).toBeGreaterThanOrEqual(44);
+    expect(b.height).toBeGreaterThanOrEqual(44);
+    expect(b.x + b.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+  }
   await fits(page);
+  await audit(page);
 });
